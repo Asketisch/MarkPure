@@ -1,0 +1,9 @@
+[package]
+name = "mt-export"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mt-core = { path = "../mt-core" }
+mt-markdown = { path = "../mt-markdown" }
+printpdf = "0.7"

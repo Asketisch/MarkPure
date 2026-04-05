@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "src-rust",
+    "crates/mt-core",
+    "crates/mt-fs",
+    "crates/mt-markdown",
+    "crates/mt-export",
+]
+resolver = "2"

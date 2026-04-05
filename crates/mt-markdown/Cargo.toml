@@ -1,0 +1,8 @@
+[package]
+name = "mt-markdown"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mt-core = { path = "../mt-core" }
+pulldown-cmark = { version = "0.12", default-features = false, features = ["simd", "html"] }
