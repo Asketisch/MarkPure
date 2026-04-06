@@ -14,9 +14,9 @@ mark-web/
 │       ├── editor.ts       # Tiptap WYSIWYG 编辑器封装
 │       ├── commands.ts     # IPC 命令封装
 │       └── components/
-│           ├── SideBar.svelte     # 侧边栏容器
-│           ├── WorkSpace.svelte   # 文件树
-│           └── Outline.svelte     # 文档大纲
+│           ├── SideBar.svelte     # 侧边栏容器（文件树/大纲切换）
+│           ├── WorkSpace.svelte   # 文件树浏览器（搜索、右键菜单、CRUD）
+│           └── Outline.svelte     # 文档大纲（标题层级导航）
 ├── src-rust/               # Rust 后端（使用 wry + tao 直接构建 WebView 壳）
 │   ├── src/main.rs         # 入口：WebView 创建、窗口管理、IPC 处理
 │   └── Cargo.toml          # 依赖 wry/tao/rfd/rust-embed 和 mt-*/crates
@@ -121,6 +121,17 @@ npm run check
 | `save_tabs` | 前端→Rust | `WindowTabs[]` | `void` |
 | `tearoff_tab` | 前端→Rust | `TabState` | `{ window_id: string }` |
 
+### 导出
+| 命令 | 方向 | 参数 | 返回值 |
+|------|------|------|--------|
+| `export_html` | 前端→Rust | `{ content, title }` | `{ path }` |
+| `export_pdf` | 前端→Rust | `{ content, title }` | `{ path }` |
+
+### 文件监视事件
+| 命令 | 方向 | 参数 | 返回值 |
+|------|------|------|--------|
+| `poll_file_changes` | 前端→Rust | `void` | `FileChangeEvent[]` |
+
 ### 配置
 | 命令 | 方向 | 参数 | 返回值 |
 |------|------|------|--------|
@@ -167,6 +178,15 @@ npm run check
 
 切换方式：在 `.app-root` 元素上添加/移除 theme class。
 
+主要 CSS 变量：`--bg`、`--bg-secondary`、`--bg-tab-active`、`--bg-tab-inactive`、`--text`、`--text-secondary`、`--border`、`--accent`、`--accent-hover`、`--accent-bg`（选中态背景）、`--status-bg`、`--menu-hover-bg`、`--menu-hover-text`、`--scrollbar-thumb`、`--highlight-bg`（高亮背景色）、`--cell-selected-bg`（表格单元格选中色）。
+
+## 已知限制与待实现
+
+- **PDF 导出跨平台问题**：硬编码 macOS 字体路径 `/System/Library/Fonts/Helvetica.ttc`
+- **svelte-i18n 未集成**：`package.json` 中声明了 `svelte-i18n` 依赖，但前端未使用（无 locale 文件、无 `$tt()` 调用）
+- **大纲导航未实现**：`Outline.svelte` 的点击回调 `onOutlineNavigate` 在 `App.svelte` 中仅做 `console.log`
+- **主题不完整**：`ThemeId` 枚举定义了 6 个主题（Light、Dark、OneDark、Graphite、Ulysses、MaterialDark），但 `app.css` 仅实现了 3 个 CSS 主题
+
 ## 注意事项
 
 - Svelte 5 使用 runes (`$state`, `$effect`)，不支持旧版 `$:` 语法
@@ -174,3 +194,5 @@ npm run check
 - `mt-core::Document` 内部存储 LF 行尾，读写时根据检测到的行尾格式自动转换
 - 词数统计支持 CJK：每个 CJK 字符计为一个词
 - PDF 导出目前硬编码 macOS 字体路径（`/System/Library/Fonts/Helvetica.ttc`），跨平台需修复
+- Tiptap Editor 创建时必须设置 `contentType: 'markdown'`，否则 Markdown 内容会被当作 HTML 解析，导致表格等语法不渲染
+- 表格使用 `resizable: true`，需要 `.tableWrapper`、`.selectedCell`、`.column-resize-handle` CSS 样式配合

@@ -19,7 +19,8 @@ marktext-rs (src-rust)
 | `document` | `Document` | Rope 文本缓冲区，跟踪 path/dirty/line_ending/encoding。内部存储 LF，读写时自动转换 |
 | `config` | `AppConfig`, `EditorConfig`, `WindowConfig` | TOML 配置，存储在 `~/Library/Application Support/marktext-rs/config.toml` |
 | `error` | `Error` enum | Io / Encoding / Parse / Config / DocumentNotFound / NoFilePath |
-| `theme` | `ThemeId` enum | Light / Dark / OneDark / Graphite / Ulysses / MaterialDark，含 cycle() |
+| `theme` | `ThemeId` enum | Light / Dark / OneDark / Graphite / Ulysses / MaterialDark，含 `cycle()`、`label()`、`is_dark()`、`all()` |
+| `tab` | `TabState`, `WindowTabs` | 标签页状态持久化，JSON 格式存储 |
 | `keymap` | `KeyBinding` | 快捷键定义（声明式，尚未接入运行时） |
 
 ### Document API 要点
@@ -30,9 +31,26 @@ Document::from_content(text, path, encoding)             // 从字符串创建
 doc.text()           → String    // 带原始行尾的完整文本
 doc.text_normalized() → String   // LF 行尾（用于 markdown 处理）
 doc.word_count()     → usize     // CJK 感知词数统计
+doc.file_name()      → String    // 文件名（path 的最后一段）
+doc.path()           → Option<&Path>
+doc.encoding()       → &Encoding
+doc.line_ending()    → &LineEnding
 doc.insert(char_idx, text)
 doc.remove(start..end)
 doc.mark_saved()
+```
+
+### AppConfig API 要点
+
+```rust
+AppConfig::load(path)        → AppConfig
+AppConfig::save(&self, path) → Result<()>
+AppConfig::config_path()     → PathBuf  // 平台相关的配置文件路径
+config.add_recent_file(&mut self, path)
+config.get_recent_files(&self) → &[String]  // 最多 10 个
+config.clear_recent_files(&mut self)
+config.set_last_workspace(&mut self, path)
+config.set_language(&mut self, lang)
 ```
 
 ## mt-fs
@@ -43,6 +61,33 @@ doc.mark_saved()
 |------|------|
 | `read_file(path) → Result<Document>` | 读文件 → chardetng 检测编码 → 解码 → 返回 Document |
 | `write_file(doc, path) → Result<()>` | 用 Document 记录的编码回写 |
+| `create_file(path) → Result<()>` | 创建空文件（含父目录） |
+| `create_directory(path) → Result<()>` | 创建目录 |
+| `delete_file(path) → Result<()>` | 删除文件或目录 |
+| `rename_file(path, new_name) → Result<PathBuf>` | 重命名，返回新路径 |
+
+### walk_directory
+
+```rust
+walk_directory(path, depth) → Result<Vec<FileEntry>>
+```
+
+- 递归扫描目录，返回 `FileEntry` 树（`name`、`path`、`is_dir`、`children`、`mtime`）
+- **过滤规则**：仅保留 `.md`、`.markdown`、`.txt` 扩展名的文件
+- **跳过目录**：以 `.` 开头的隐藏目录、`node_modules`、`target`
+- 目录始终包含在结果中（不过滤）
+
+### FileWatcher
+
+```rust
+FileWatcher::new() → FileWatcher
+watcher.watch(path, id) → Result<Receiver<FileChangeEvent>>
+```
+
+- 基于 `notify` crate 实现
+- 支持递归目录监视
+- 事件类型：`modified`、`created`、`deleted`
+- 返回 `Receiver<FileChangeEvent>` 用于异步消费
 
 支持的编码：UTF-8、UTF-8 BOM、GBK、Shift_JIS、Big5 及其他 chardetng 可检测的编码。
 

@@ -3,11 +3,15 @@
   import { createEditor, getMarkdown, setContent } from './lib/editor'
   import {
     openFile,
+    openFileByPath,
     saveFile,
     saveFileAs,
     getDocStats,
     pickDirectory,
     getRecentFiles,
+    exportHtml,
+    exportPdf,
+    pollFileChanges,
   } from './lib/commands'
   import type { DocStats } from './lib/commands'
   import type { Editor } from '@tiptap/core'
@@ -102,7 +106,7 @@
 
   async function handleOpenFile(path: string) {
     try {
-      const info = await openFile()
+      const info = await openFileByPath(path)
       if (!info) return
       const existing = tabs.find(t => t.path === info.path)
       if (existing) {
@@ -207,6 +211,57 @@
     console.log('Navigate to:', text)
   }
 
+  async function handleExportHtml() {
+    const tab = getActiveTab()
+    if (!tab) return
+    const content = editor ? getMarkdown(editor) : tab.content
+    const title = tab.name.replace(/\.md$/, '')
+    try {
+      await exportHtml(content, title)
+    } catch (e) {
+      console.error('Failed to export HTML:', e)
+    }
+  }
+
+  async function handleExportPdf() {
+    const tab = getActiveTab()
+    if (!tab) return
+    const content = editor ? getMarkdown(editor) : tab.content
+    const title = tab.name.replace(/\.md$/, '')
+    try {
+      await exportPdf(content, title)
+    } catch (e) {
+      console.error('Failed to export PDF:', e)
+    }
+  }
+
+  let fileChangeInterval: ReturnType<typeof setInterval> | null = null
+
+  function startFileChangePolling() {
+    if (fileChangeInterval) return
+    fileChangeInterval = setInterval(async () => {
+      if (!workspacePath) return
+      try {
+        const events = await pollFileChanges()
+        if (events.length > 0) {
+          // Refresh file tree by toggling workspacePath reactivity
+          const path = workspacePath
+          workspacePath = null
+          setTimeout(() => { workspacePath = path }, 0)
+        }
+      } catch {
+        // ignore
+      }
+    }, 3000)
+  }
+
+  function stopFileChangePolling() {
+    if (fileChangeInterval) {
+      clearInterval(fileChangeInterval)
+      fileChangeInterval = null
+    }
+  }
+
   function handleKeydown(e: KeyboardEvent) {
     if (e.metaKey || e.ctrlKey) {
       switch (e.key) {
@@ -255,6 +310,8 @@
       <button class="menu-btn" onclick={handleSave}>Edit</button>
       <button class="menu-btn" onclick={toggleSidebar}>View</button>
       <button class="menu-btn" onclick={openWorkspace}>Workspace</button>
+      <button class="menu-btn" onclick={handleExportHtml}>Export HTML</button>
+      <button class="menu-btn" onclick={handleExportPdf}>Export PDF</button>
     </div>
     <div class="menu-title">MarkText</div>
     <div class="menu-actions">

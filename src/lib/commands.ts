@@ -193,3 +193,30 @@ export async function getConfig(): Promise<AppConfig> {
 export async function setConfig(config: Partial<AppConfig>): Promise<void> {
   await ipc('set_config', config)
 }
+
+// Open file by path (no dialog)
+
+export async function openFileByPath(path: string): Promise<FileInfo> {
+  return await ipc('open_file', { path })
+}
+
+// Export
+
+export async function exportHtml(content: string, title: string): Promise<{ path: string }> {
+  return await ipc('export_html', { content, title })
+}
+
+export async function exportPdf(content: string, title: string): Promise<{ path: string }> {
+  return await ipc('export_pdf', { content, title })
+}
+
+// File watcher events
+
+export interface FileChangeEvent {
+  path: string
+  kind: 'modified' | 'created' | 'deleted'
+}
+
+export async function pollFileChanges(): Promise<FileChangeEvent[]> {
+  return await ipc('poll_file_changes')
+}

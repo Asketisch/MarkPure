@@ -24,6 +24,7 @@ export function createEditor(opts: EditorOptions): Editor {
 
   const editor = new Editor({
     element: parent,
+    contentType: 'markdown',
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4, 5, 6] },

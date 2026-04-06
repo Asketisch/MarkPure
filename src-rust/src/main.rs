@@ -5,6 +5,7 @@ use rfd::FileDialog;
 use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::time::UNIX_EPOCH;
 use tao::event::{Event, WindowEvent};
@@ -37,8 +38,10 @@ struct IpcResponse {
 // ============ State ============
 
 struct AppState {
+    runtime: tokio::runtime::Runtime,
     config: Mutex<AppConfig>,
     watcher: Mutex<Option<mt_fs::FileWatcher>>,
+    watcher_rx: Mutex<Option<Receiver<mt_fs::FileChangeEvent>>>,
     tabs: Mutex<Vec<WindowTabs>>,
 }
 
@@ -51,9 +54,13 @@ impl AppState {
         let config_dir = config_path.parent().map(|p| p.to_path_buf()).unwrap_or_default();
         let tabs = load_tabs(&config_dir).unwrap_or_default();
 
+        let runtime = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+
         Self {
+            runtime,
             config: Mutex::new(config),
             watcher: Mutex::new(None),
+            watcher_rx: Mutex::new(None),
             tabs: Mutex::new(tabs),
         }
     }
@@ -65,6 +72,11 @@ impl AppState {
             let _ = std::fs::create_dir_all(parent);
         }
         let _ = config.save(&path);
+    }
+
+    /// Get a reference to the persistent tokio runtime
+    fn rt(&self) -> &tokio::runtime::Runtime {
+        &self.runtime
     }
 }
 
@@ -78,20 +90,20 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         "pick_directory" => cmd_pick_directory(),
 
         // File operations
-        "open_file" => cmd_open_file(&msg.params),
+        "open_file" => cmd_open_file(&msg.params, state),
         "save_file" => cmd_save_file(&msg.params, state),
         "get_doc_stats" => cmd_get_doc_stats(&msg.params),
 
         // Directory tree
-        "get_directory_tree" => cmd_get_directory_tree(&msg.params),
+        "get_directory_tree" => cmd_get_directory_tree(&msg.params, state),
         "watch_directory" => cmd_watch_directory(&msg.params, state),
         "unwatch_directory" => cmd_unwatch_directory(state),
 
         // File CRUD
-        "create_file" => cmd_create_file(&msg.params),
-        "create_directory" => cmd_create_directory(&msg.params),
-        "delete_file" => cmd_delete_file(&msg.params),
-        "rename_file" => cmd_rename_file(&msg.params),
+        "create_file" => cmd_create_file(&msg.params, state),
+        "create_directory" => cmd_create_directory(&msg.params, state),
+        "delete_file" => cmd_delete_file(&msg.params, state),
+        "rename_file" => cmd_rename_file(&msg.params, state),
 
         // Outline
         "get_outline" => cmd_get_outline(&msg.params),
@@ -109,6 +121,13 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         // Config
         "get_config" => cmd_get_config(state),
         "set_config" => cmd_set_config(&msg.params, state),
+
+        // Export
+        "export_html" => cmd_export_html(&msg.params),
+        "export_pdf" => cmd_export_pdf(&msg.params),
+
+        // File watcher events
+        "poll_file_changes" => cmd_poll_file_changes(state),
 
         _ => Err(format!("Unknown command: {}", msg.cmd)),
     };
@@ -150,12 +169,18 @@ fn cmd_pick_directory() -> std::result::Result<serde_json::Value, String> {
 
 // File operations
 
-fn cmd_open_file(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+fn cmd_open_file(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
     let path = PathBuf::from(path_str);
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-    let doc = rt.block_on(mt_fs::read_file(&path)).map_err(|e| e.to_string())?;
+    let doc = state.rt().block_on(mt_fs::read_file(&path)).map_err(|e| e.to_string())?;
+
+    // Add to recent files
+    {
+        let mut config = state.config.lock().unwrap();
+        config.add_recent_file(path_str);
+    }
+    state.save_config();
 
     let info = serde_json::json!({
         "content": doc.text_normalized(),
@@ -174,8 +199,7 @@ fn cmd_save_file(params: &serde_json::Value, state: &AppState) -> std::result::R
     let path = PathBuf::from(path_str);
     let doc = Document::from_content(content, Some(path.clone()), Encoding::Utf8);
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-    rt.block_on(mt_fs::write_file(&doc, &path)).map_err(|e| e.to_string())?;
+    state.rt().block_on(mt_fs::write_file(&doc, &path)).map_err(|e| e.to_string())?;
 
     // Add to recent files
     {
@@ -189,35 +213,23 @@ fn cmd_save_file(params: &serde_json::Value, state: &AppState) -> std::result::R
 
 fn cmd_get_doc_stats(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
     let content = params["content"].as_str().unwrap_or("");
-    let lines = content.lines().count();
-    let characters = content.chars().filter(|c| !c.is_whitespace()).count();
+    let doc = Document::from_content(content, None, Encoding::Utf8);
 
-    let mut words = 0usize;
-    let mut in_word = false;
-    for ch in content.chars() {
-        if ch.is_ascii_whitespace() {
-            in_word = false;
-        } else if ch > '\u{2E80}' {
-            words += 1;
-            in_word = false;
-        } else if !in_word {
-            words += 1;
-            in_word = true;
-        }
-    }
-
-    Ok(serde_json::json!({ "words": words, "characters": characters, "lines": lines }))
+    Ok(serde_json::json!({
+        "words": doc.word_count(),
+        "characters": doc.character_count(),
+        "lines": doc.len_lines(),
+    }))
 }
 
 // Directory tree
 
-fn cmd_get_directory_tree(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+fn cmd_get_directory_tree(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
     let path = PathBuf::from(path_str);
     let depth = params["depth"].as_u64().unwrap_or(10) as u32;
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-    let entries = rt.block_on(mt_fs::walk_directory(&path, depth)).map_err(|e| e.to_string())?;
+    let entries = state.rt().block_on(mt_fs::walk_directory(&path, depth)).map_err(|e| e.to_string())?;
 
     Ok(serde_json::to_value(entries).map_err(|e| e.to_string())?)
 }
@@ -233,57 +245,55 @@ fn cmd_watch_directory(params: &serde_json::Value, state: &AppState) -> std::res
 
     if let Some(ref mut watcher) = *watcher_guard {
         let id = path_str.to_string();
-        let _rx = watcher.watch(&path, id).map_err(|e| e.to_string())?;
+        let rx = watcher.watch(&path, id).map_err(|e| e.to_string())?;
+        // Store the receiver for poll_file_changes
+        *state.watcher_rx.lock().unwrap() = Some(rx);
     }
 
     Ok(serde_json::Value::Null)
 }
 
 fn cmd_unwatch_directory(state: &AppState) -> std::result::Result<serde_json::Value, String> {
-    let mut watcher_guard = state.watcher.lock().unwrap();
-    *watcher_guard = None;
+    *state.watcher.lock().unwrap() = None;
+    *state.watcher_rx.lock().unwrap() = None;
     Ok(serde_json::Value::Null)
 }
 
 // File CRUD
 
-fn cmd_create_file(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+fn cmd_create_file(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
     let path = PathBuf::from(path_str);
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-    rt.block_on(mt_fs::create_file(&path)).map_err(|e| e.to_string())?;
+    state.rt().block_on(mt_fs::create_file(&path)).map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({ "path": path_str }))
 }
 
-fn cmd_create_directory(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+fn cmd_create_directory(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
     let path = PathBuf::from(path_str);
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-    rt.block_on(mt_fs::create_directory(&path)).map_err(|e| e.to_string())?;
+    state.rt().block_on(mt_fs::create_directory(&path)).map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({ "path": path_str }))
 }
 
-fn cmd_delete_file(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+fn cmd_delete_file(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
     let path = PathBuf::from(path_str);
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-    rt.block_on(mt_fs::delete_file(&path)).map_err(|e| e.to_string())?;
+    state.rt().block_on(mt_fs::delete_file(&path)).map_err(|e| e.to_string())?;
 
     Ok(serde_json::Value::Null)
 }
 
-fn cmd_rename_file(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+fn cmd_rename_file(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
     let new_name = params["new_name"].as_str().ok_or("Missing 'new_name' parameter")?;
     let path = PathBuf::from(path_str);
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-    let new_path = rt.block_on(mt_fs::rename_file(&path, new_name)).map_err(|e| e.to_string())?;
+    let new_path = state.rt().block_on(mt_fs::rename_file(&path, new_name)).map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({ "path": new_path.to_string_lossy() }))
 }
@@ -394,12 +404,113 @@ fn cmd_get_config(state: &AppState) -> std::result::Result<serde_json::Value, St
 }
 
 fn cmd_set_config(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let mut config = state.config.lock().unwrap();
+
+    // Theme
+    if let Some(theme_str) = params.get("theme").and_then(|v| v.as_str()) {
+        match theme_str {
+            "Cadmium Light" | "Light" => config.theme = mt_core::ThemeId::Light,
+            "Dark" => config.theme = mt_core::ThemeId::Dark,
+            "One Dark" => config.theme = mt_core::ThemeId::OneDark,
+            "Graphite" => config.theme = mt_core::ThemeId::Graphite,
+            "Ulysses" => config.theme = mt_core::ThemeId::Ulysses,
+            "Material Dark" => config.theme = mt_core::ThemeId::MaterialDark,
+            _ => {}
+        }
+    }
+
+    // Language
     if let Some(language) = params.get("language").and_then(|v| v.as_str()) {
-        let mut config = state.config.lock().unwrap();
         config.set_language(Some(language.to_string()));
     }
+
+    // Last workspace
+    if let Some(workspace) = params.get("last_workspace") {
+        config.set_last_workspace(workspace.as_str().map(|s| s.to_string()));
+    }
+
+    // Editor settings
+    if let Some(editor) = params.get("editor") {
+        if let Some(v) = editor.get("font_family").and_then(|v| v.as_str()) {
+            config.editor.font_family = v.to_string();
+        }
+        if let Some(v) = editor.get("font_size").and_then(|v| v.as_u64()) {
+            config.editor.font_size = v as u16;
+        }
+        if let Some(v) = editor.get("tab_size").and_then(|v| v.as_u64()) {
+            config.editor.tab_size = v as u8;
+        }
+        if let Some(v) = editor.get("soft_tabs").and_then(|v| v.as_bool()) {
+            config.editor.soft_tabs = v;
+        }
+        if let Some(v) = editor.get("line_numbers").and_then(|v| v.as_bool()) {
+            config.editor.line_numbers = v;
+        }
+        if let Some(v) = editor.get("word_wrap").and_then(|v| v.as_bool()) {
+            config.editor.word_wrap = v;
+        }
+    }
+
+    drop(config);
     state.save_config();
     Ok(serde_json::Value::Null)
+}
+
+// Export commands
+
+fn cmd_export_html(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let content = params["content"].as_str().ok_or("Missing 'content' parameter")?;
+    let title = params.get("title").and_then(|v| v.as_str()).unwrap_or("Untitled");
+
+    let html = mt_export::export_html(content, title, None);
+
+    // Prompt save location
+    let path = FileDialog::new()
+        .add_filter("HTML", &["html"])
+        .set_file_name(&format!("{}.html", title))
+        .set_title("Export HTML")
+        .save_file()
+        .ok_or_else(|| "Cancelled".to_string())?;
+
+    std::fs::write(&path, html).map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({ "path": path.to_string_lossy() }))
+}
+
+fn cmd_export_pdf(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let content = params["content"].as_str().ok_or("Missing 'content' parameter")?;
+    let title = params.get("title").and_then(|v| v.as_str()).unwrap_or("Untitled");
+
+    // Prompt save location
+    let path = FileDialog::new()
+        .add_filter("PDF", &["pdf"])
+        .set_file_name(&format!("{}.pdf", title))
+        .set_title("Export PDF")
+        .save_file()
+        .ok_or_else(|| "Cancelled".to_string())?;
+
+    mt_export::export_pdf(content, title, &path.to_string_lossy())?;
+
+    Ok(serde_json::json!({ "path": path.to_string_lossy() }))
+}
+
+// File watcher events
+
+fn cmd_poll_file_changes(state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let rx_guard = state.watcher_rx.lock().unwrap();
+    let Some(rx) = rx_guard.as_ref() else {
+        return Ok(serde_json::json!([]));
+    };
+
+    let mut events = Vec::new();
+    while let Ok(event) = rx.try_recv() {
+        events.push(serde_json::json!({
+            "path": event.path,
+            "kind": event.kind,
+        }));
+    }
+
+    Ok(serde_json::Value::Array(events))
 }
 
 fn generate_uuid() -> String {
