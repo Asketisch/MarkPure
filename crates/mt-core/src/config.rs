@@ -101,8 +101,9 @@ impl AppConfig {
 
     /// Get the default config file path
     pub fn config_path() -> PathBuf {
-        let base = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-        base.join("marktext-rs").join("config.toml")
+        crate::dirs::app_config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("config.toml")
     }
 
     /// Add a file to recent files list (most recent first)
@@ -143,34 +144,5 @@ impl AppConfig {
     /// Set UI language
     pub fn set_language(&mut self, lang: Option<String>) {
         self.language = lang;
-    }
-}
-
-// dirs crate - add to mt-core dependencies if needed, for now use a simple approach
-mod dirs {
-    use std::path::PathBuf;
-
-    pub fn config_dir() -> Option<PathBuf> {
-        if cfg!(target_os = "macos") {
-            dirs_macos()
-        } else if cfg!(target_os = "windows") {
-            std::env::var("APPDATA").ok().map(PathBuf::from)
-        } else {
-            // Linux / XDG
-            std::env::var("XDG_CONFIG_HOME")
-                .ok()
-                .map(PathBuf::from)
-                .or_else(|| {
-                    std::env::var("HOME")
-                        .ok()
-                        .map(|h| PathBuf::from(h).join(".config"))
-                })
-        }
-    }
-
-    fn dirs_macos() -> Option<PathBuf> {
-        std::env::var("HOME")
-            .ok()
-            .map(|h| PathBuf::from(h).join("Library").join("Application Support"))
     }
 }

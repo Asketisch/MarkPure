@@ -1,4 +1,5 @@
 pub mod config;
+pub mod dirs;
 pub mod document;
 pub mod error;
 pub mod keymap;

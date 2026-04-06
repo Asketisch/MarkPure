@@ -1,16 +1,19 @@
 use printpdf::*;
 use std::fs::File;
 use std::io::BufWriter;
+use std::path::PathBuf;
 
 /// Export markdown text to a PDF file with basic text layout
 pub fn export_pdf(markdown: &str, title: &str, output_path: &str) -> Result<(), String> {
     let (mut doc, page_idx, layer_idx) = create_document(title);
 
+    let (regular_path, bold_path) = get_font_paths()?;
+
     let font = doc
-        .add_external_font(File::open("/System/Library/Fonts/Helvetica.ttc").map_err(|e| e.to_string())?)
+        .add_external_font(File::open(&regular_path).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     let bold_font = doc
-        .add_external_font(File::open("/System/Library/Fonts/Helvetica.ttc").map_err(|e| e.to_string())?)
+        .add_external_font(File::open(&bold_path).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
 
     let page_width = Mm(210.0).0;
@@ -85,7 +88,7 @@ fn add_page(doc: &mut PdfDocumentReference) -> (PdfPageIndex, PdfLayerIndex) {
 }
 
 fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
-    if text.len() <= max_chars {
+    if text.chars().count() <= max_chars {
         return vec![text.to_string()];
     }
 
@@ -117,6 +120,38 @@ fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
     }
 
     lines
+}
+
+/// Get platform-specific font paths for PDF rendering.
+///
+/// - macOS: Helvetica.ttc
+/// - Windows: Arial (arial.ttf / arialbd.ttf)
+/// - Linux: DejaVu Sans or Liberation Sans
+fn get_font_paths() -> Result<(PathBuf, PathBuf), String> {
+    if cfg!(target_os = "macos") {
+        let path = PathBuf::from("/System/Library/Fonts/Helvetica.ttc");
+        Ok((path.clone(), path))
+    } else if cfg!(target_os = "windows") {
+        let windir = std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".to_string());
+        let base = PathBuf::from(windir).join("Fonts");
+        Ok((base.join("arial.ttf"), base.join("arialbd.ttf")))
+    } else {
+        // Linux: try common font paths
+        let candidates = [
+            ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+            ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+             "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
+            ("/usr/share/fonts/TTF/DejaVuSans.ttf",
+             "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
+        ];
+        for (regular, bold) in &candidates {
+            if std::path::Path::new(regular).exists() {
+                return Ok((PathBuf::from(*regular), PathBuf::from(*bold)));
+            }
+        }
+        Err("No suitable font found for PDF export on Linux. Install dejavu-fonts or liberation-fonts.".to_string())
+    }
 }
 
 fn strip_markdown(text: &str) -> String {

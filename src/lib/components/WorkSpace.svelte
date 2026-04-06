@@ -82,13 +82,26 @@
     contextMenu = null
   }
 
+  function pathSeparator(p: string): string {
+    return p.includes('\\') ? '\\' : '/'
+  }
+
+  function joinPath(base: string, name: string): string {
+    const sep = pathSeparator(base)
+    return base.endsWith(sep) ? base + name : base + sep + name
+  }
+
+  function basename(p: string): string {
+    return p.split(/[/\\]/).pop() ?? ''
+  }
+
   async function handleNewFile() {
     if (!contextMenu) return
     const parentPath = contextMenu.isDir ? contextMenu.path : workspacePath
     if (!parentPath) return
     const name = prompt('New file name:', 'untitled.md')
     if (name) {
-      const fullPath = parentPath.endsWith('/') ? parentPath + name : parentPath + '/' + name
+      const fullPath = joinPath(parentPath, name)
       await createFile(fullPath)
       await loadTree()
     }
@@ -101,7 +114,7 @@
     if (!parentPath) return
     const name = prompt('New folder name:', 'new-folder')
     if (name) {
-      const fullPath = parentPath.endsWith('/') ? parentPath + name : parentPath + '/' + name
+      const fullPath = joinPath(parentPath, name)
       await createDirectory(fullPath)
       await loadTree()
     }
@@ -110,7 +123,7 @@
 
   async function handleRename() {
     if (!contextMenu) return
-    const oldName = contextMenu.path.split('/').pop() ?? ''
+    const oldName = basename(contextMenu.path)
     const newName = prompt('Rename to:', oldName)
     if (newName && newName !== oldName) {
       await renameFile(contextMenu.path, newName)

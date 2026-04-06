@@ -36,7 +36,8 @@
   let workspacePath = $state<string | null>(null)
   let showSidebar = $state(true)
   let recentFiles = $state<string[]>([])
-
+  let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
+  let initPending = false
   const themes = ['', 'theme-dark', 'theme-one-dark']
 
   function getActiveTab(): Tab | undefined {
@@ -57,10 +58,13 @@
   }
 
   function initEditor() {
-    if (editor) editor.destroy()
     const tab = getActiveTab()
     if (!tab || !editorContainer) return
 
+    if (editor) {
+      editor.destroy()
+      editor = null
+    }
     editorContainer.innerHTML = ''
     editor = createEditor({
       parent: editorContainer,
@@ -80,12 +84,18 @@
   }
 
   function switchTab(id: number) {
+    if (activeTabId === id) return
     const current = getActiveTab()
     if (current && editor) {
       current.content = getMarkdown(editor)
     }
     activeTabId = id
-    setTimeout(() => initEditor(), 0)
+    if (initPending) return
+    initPending = true
+    requestAnimationFrame(() => {
+      initPending = false
+      initEditor()
+    })
   }
 
   function newTab() {
@@ -97,11 +107,64 @@
   function closeTab(id: number) {
     if (tabs.length <= 1) return
     const idx = tabs.findIndex(t => t.id === id)
-    tabs = tabs.filter(t => t.id !== id)
-    if (activeTabId === id) {
-      const newIdx = Math.min(idx, tabs.length - 1)
-      switchTab(tabs[newIdx].id)
+    const wasActive = activeTabId === id
+
+    // Save current editor content if closing the active tab
+    if (wasActive && editor) {
+      const current = getActiveTab()
+      if (current) current.content = getMarkdown(editor)
     }
+
+    tabs = tabs.filter(t => t.id !== id)
+    if (wasActive && tabs.length > 0) {
+      const newIdx = Math.min(idx, tabs.length - 1)
+      activeTabId = tabs[newIdx].id
+      requestAnimationFrame(() => initEditor())
+    }
+  }
+
+  function closeOtherTabs(keepId: number) {
+    if (editor) {
+      const current = getActiveTab()
+      if (current) current.content = getMarkdown(editor)
+    }
+    const keepTab = tabs.find(t => t.id === keepId)
+    if (!keepTab) return
+    tabs = [keepTab]
+    activeTabId = keepId
+    requestAnimationFrame(() => initEditor())
+  }
+
+  function closeAllTabs() {
+    if (tabs.length === 0) return
+    const newTab: Tab = { id: nextId++, path: null, name: 'Untitled', dirty: false, content: '' }
+    tabs = [newTab]
+    activeTabId = newTab.id
+    requestAnimationFrame(() => initEditor())
+  }
+
+  function closeTabsToRight(id: number) {
+    const idx = tabs.findIndex(t => t.id === id)
+    if (idx === -1) return
+    if (editor) {
+      const current = getActiveTab()
+      if (current) current.content = getMarkdown(editor)
+    }
+    tabs = tabs.slice(0, idx + 1)
+    if (!tabs.find(t => t.id === activeTabId)) {
+      activeTabId = tabs[tabs.length - 1].id
+      requestAnimationFrame(() => initEditor())
+    }
+  }
+
+  function showTabContextMenu(e: MouseEvent, tabId: number) {
+    e.preventDefault()
+    e.stopPropagation()
+    tabContextMenu = { x: e.clientX, y: e.clientY, tabId }
+  }
+
+  function hideTabContextMenu() {
+    tabContextMenu = null
   }
 
   async function handleOpenFile(path: string) {
@@ -164,7 +227,7 @@
         const newPath = await saveFileAs(content)
         if (newPath) {
           tab.path = newPath
-          tab.name = newPath.split('/').pop() ?? 'Untitled'
+          tab.name = newPath.split(/[/\\]/).pop() ?? 'Untitled'
           tab.dirty = false
         }
       } else {
@@ -302,6 +365,8 @@
   })
 </script>
 
+<svelte:window onclick={hideTabContextMenu} oncontextmenu={hideTabContextMenu} />
+
 <div class="app-root {theme}">
   <!-- Menu Bar -->
   <nav class="menu-bar">
@@ -339,6 +404,7 @@
             class="tab"
             class:active={tab.id === activeTabId}
             onclick={() => switchTab(tab.id)}
+            oncontextmenu={(e) => showTabContextMenu(e, tab.id)}
           >
             <span class="tab-name">
               {tab.dirty ? '● ' : ''}{tab.name}
@@ -354,6 +420,16 @@
           </button>
         {/each}
       </div>
+
+      <!-- Tab Context Menu -->
+      {#if tabContextMenu}
+        <div class="context-menu" style="left: {tabContextMenu.x}px; top: {tabContextMenu.y}px">
+          <button onclick={() => { closeTab(tabContextMenu.tabId); hideTabContextMenu() }}>Close</button>
+          <button onclick={() => { closeOtherTabs(tabContextMenu.tabId); hideTabContextMenu() }}>Close Others</button>
+          <button onclick={() => { closeTabsToRight(tabContextMenu.tabId); hideTabContextMenu() }}>Close to the Right</button>
+          <button onclick={() => { closeAllTabs(); hideTabContextMenu() }}>Close All</button>
+        </div>
+      {/if}
 
       <!-- Toolbar -->
       <div class="toolbar">
@@ -535,4 +611,31 @@
     color: var(--text-secondary);
   }
   .saving { color: var(--accent); }
+
+  /* Tab Context Menu */
+  .context-menu {
+    position: fixed;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 160px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+  }
+  .context-menu button {
+    display: block;
+    width: 100%;
+    padding: 6px 16px;
+    border: none;
+    background: none;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .context-menu button:hover {
+    background: var(--menu-hover-bg);
+    color: var(--menu-hover-text);
+  }
 </style>

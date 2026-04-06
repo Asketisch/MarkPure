@@ -87,33 +87,7 @@ pub fn save_tabs(config_dir: &PathBuf, windows: &[WindowTabs]) -> std::io::Resul
 
 /// Get the default tabs file path
 pub fn tabs_path() -> PathBuf {
-    config_dir().join("tabs.json")
-}
-
-/// Get the default config directory
-fn config_dir() -> PathBuf {
-    if cfg!(target_os = "macos") {
-        dirs::home()
-            .map(|h| h.join("Library").join("Application Support").join("marktext-rs"))
-            .unwrap_or_else(|| PathBuf::from("."))
-    } else if cfg!(target_os = "windows") {
-        std::env::var("APPDATA")
-            .ok()
-            .map(|p| PathBuf::from(p).join("marktext-rs"))
-            .unwrap_or_else(|| PathBuf::from("."))
-    } else {
-        std::env::var("XDG_CONFIG_HOME")
-            .ok()
-            .map(|p| PathBuf::from(p).join("marktext-rs"))
-            .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config").join("marktext-rs")))
-            .unwrap_or_else(|| PathBuf::from("."))
-    }
-}
-
-mod dirs {
-    use std::path::PathBuf;
-
-    pub fn home() -> Option<PathBuf> {
-        std::env::var("HOME").ok().map(PathBuf::from)
-    }
+    crate::dirs::app_config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("tabs.json")
 }
