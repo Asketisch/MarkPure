@@ -14,6 +14,10 @@
     exportHtml,
     exportPdf,
     pollFileChanges,
+    docOpen,
+    docClose,
+    docSetContent,
+    docGetStats,
   } from './lib/commands'
   import type { DocStats } from './lib/commands'
   import type { Editor } from '@tiptap/core'
@@ -70,8 +74,17 @@
     return tab.content
   }
 
-  function updateStats(content: string) {
-    getDocStats(content).then(s => stats = s).catch(() => {})
+  function updateStats(docId: number) {
+    docGetStats(docId).then(s => stats = s).catch(() => {
+      // Fallback to legacy method if doc not registered
+      const content = getActiveContent()
+      if (content) getDocStats(content).then(s => stats = s).catch(() => {})
+    })
+  }
+
+  /** Sync editor content to Rust document registry */
+  function syncToRust(docId: number, content: string) {
+    docSetContent(docId, content).catch(() => {})
   }
 
   function initEditor() {
@@ -83,6 +96,10 @@
       editor = null
     }
     editorContainer.innerHTML = ''
+
+    // Register document in Rust
+    docOpen(tab.id, tab.content).catch(() => {})
+
     editor = createEditor({
       parent: editorContainer,
       content: tab.content,
@@ -91,8 +108,10 @@
         if (t) {
           t.content = md
           t.dirty = true
+          // Sync content to Rust document
+          syncToRust(t.id, md)
         }
-        updateStats(md)
+        updateStats(tab.id)
         // Auto-save with 3 second debounce
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
         autoSaveTimer = setTimeout(() => {
@@ -104,8 +123,12 @@
       },
       onSave: handleSave,
     })
+    // Initial sync
     const content = tab.content || getMarkdown(editor) || ''
-    updateStats(content)
+    if (content) {
+      syncToRust(tab.id, content)
+    }
+    updateStats(tab.id)
   }
 
   function switchTab(id: number) {
@@ -140,6 +163,9 @@
       if (current) current.content = getMarkdown(editor)
     }
 
+    // Unregister from Rust document registry
+    docClose(id).catch(() => {})
+
     tabs = tabs.filter(t => t.id !== id)
     if (wasActive && tabs.length > 0) {
       const newIdx = Math.min(idx, tabs.length - 1)
@@ -153,6 +179,10 @@
       const current = getActiveTab()
       if (current) current.content = getMarkdown(editor)
     }
+    // Unregister closed tabs from Rust
+    for (const t of tabs) {
+      if (t.id !== keepId) docClose(t.id).catch(() => {})
+    }
     const keepTab = tabs.find(t => t.id === keepId)
     if (!keepTab) return
     tabs = [keepTab]
@@ -162,6 +192,8 @@
 
   function closeAllTabs() {
     if (tabs.length === 0) return
+    // Unregister all tabs from Rust
+    for (const t of tabs) docClose(t.id).catch(() => {})
     const newTab: Tab = { id: nextId++, path: null, name: 'Untitled', dirty: false, content: '' }
     tabs = [newTab]
     activeTabId = newTab.id
@@ -174,6 +206,10 @@
     if (editor) {
       const current = getActiveTab()
       if (current) current.content = getMarkdown(editor)
+    }
+    // Unregister closed tabs from Rust
+    for (let i = idx + 1; i < tabs.length; i++) {
+      docClose(tabs[i].id).catch(() => {})
     }
     tabs = tabs.slice(0, idx + 1)
     if (!tabs.find(t => t.id === activeTabId)) {
@@ -200,6 +236,8 @@
       if (existing) {
         existing.content = info.content
         existing.dirty = false
+        // Sync updated content to Rust
+        syncToRust(existing.id, info.content)
         switchTab(existing.id)
         return
       }
@@ -225,6 +263,7 @@
       if (existing) {
         existing.content = info.content
         existing.dirty = false
+        syncToRust(existing.id, info.content)
         switchTab(existing.id)
         return
       }
@@ -541,7 +580,7 @@
     {#if showSidebar}
       <SideBar
         {workspacePath}
-        editorContent={getActiveContent()}
+        {editor}
         {recentFiles}
         onOpenFile={handleOpenFile}
         onOutlineNavigate={handleOutlineNavigate}

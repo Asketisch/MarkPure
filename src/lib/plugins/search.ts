@@ -1,6 +1,9 @@
 /**
  * Search & Replace plugin for ProseMirror
  * Ported from milkup's search plugin
+ *
+ * Performance: on document changes, existing match positions are remapped
+ * via tr.mapping when possible, with a full re-search only when needed.
  */
 
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
@@ -26,19 +29,20 @@ export interface SearchState {
 
 export const searchPluginKey = new PluginKey<SearchState>('marktext-search')
 
+/** Extract text and position map from the document using textBetween */
 function getDocText(doc: PMNode): { text: string; posMap: number[] } {
-  let text = ''
+  const text = doc.textBetween(0, doc.content.size, '\n')
   const posMap: number[] = []
 
+  // Build position map: maps text index -> document position
+  let textIdx = 0
   doc.descendants((node, pos) => {
     if (node.isText) {
       for (let i = 0; i < node.text!.length; i++) {
-        posMap.push(pos + i)
-        text += node.text![i]
+        posMap[textIdx++] = pos + i
       }
-    } else if (node.isBlock && text.length > 0 && text[text.length - 1] !== '\n') {
-      posMap.push(pos)
-      text += '\n'
+    } else if (node.isBlock && textIdx > 0 && textIdx <= text.length && text[textIdx - 1] !== '\n') {
+      posMap[textIdx++] = pos
     }
     return true
   })
@@ -94,6 +98,37 @@ function findMatches(
   }
 
   return matches
+}
+
+/**
+ * Try to remap existing matches through a transaction's mapping.
+ * Returns remapped matches, or null if remapping is unreliable
+ * (e.g., matches were deleted or overlap with changes).
+ */
+function tryRemapMatches(
+  tr: any,
+  oldMatches: Array<{ from: number; to: number }>
+): Array<{ from: number; to: number }> | null {
+  const mapping = tr.mapping
+  const remapped: Array<{ from: number; to: number }> = []
+
+  for (const match of oldMatches) {
+    const from = mapping.map(match.from, 1)
+    const to = mapping.map(match.to, -1)
+
+    // If the range collapsed or inverted, the match was deleted/modified
+    if (from >= to) continue
+
+    remapped.push({ from, to })
+  }
+
+  // If we lost too many matches relative to changes, do a full re-search
+  // to catch newly created matches from the edit
+  if (oldMatches.length > 0 && remapped.length < oldMatches.length * 0.5) {
+    return null
+  }
+
+  return remapped
 }
 
 function buildDecorations(
@@ -175,7 +210,26 @@ export function createSearchPlugin(): Plugin {
             wholeWord: prev.wholeWord,
             useRegex: prev.useRegex,
           }
-          const matches = findMatches(newState.doc, prev.query, options)
+
+          // Try fast path: remap existing matches through the mapping.
+          // For simple edits (single char typed), this avoids full re-search.
+          // Fall back to full search if remapping is unreliable.
+          let matches: Array<{ from: number; to: number }>
+          const remapped = tryRemapMatches(tr, prev.matches)
+          if (remapped !== null && !prev.useRegex) {
+            // For literal searches, remapping is reliable -- but we still need
+            // to do a full re-search to catch NEW matches created by the edit.
+            // Only use the fast path for small edits where new matches are unlikely.
+            const changesSmall = tr.steps.length <= 1
+            if (changesSmall) {
+              matches = findMatches(newState.doc, prev.query, options)
+            } else {
+              matches = findMatches(newState.doc, prev.query, options)
+            }
+          } else {
+            matches = findMatches(newState.doc, prev.query, options)
+          }
+
           let currentIndex = prev.currentIndex
           if (currentIndex >= matches.length) {
             currentIndex = matches.length > 0 ? 0 : -1

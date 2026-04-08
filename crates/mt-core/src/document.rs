@@ -1,3 +1,4 @@
+use regex::RegexBuilder;
 use ropey::Rope;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -174,6 +175,71 @@ impl Document {
     /// Get the detected encoding
     pub fn encoding(&self) -> Encoding {
         self.encoding.clone()
+    }
+
+    /// Replace a character range with new text (combines remove + insert)
+    pub fn replace(&mut self, from: usize, to: usize, text: &str) {
+        if from < to {
+            let end = to.min(self.rope.len_chars());
+            self.rope.remove(from..end);
+        }
+        if !text.is_empty() {
+            self.rope.insert(from, text);
+        }
+        self.dirty = true;
+    }
+
+    /// Replace the entire document content
+    pub fn set_content(&mut self, content: &str) {
+        let normalized = if content.contains("\r\n") {
+            content.replace("\r\n", "\n")
+        } else {
+            content.to_string()
+        };
+        self.rope = Rope::from(normalized);
+        self.dirty = true;
+    }
+
+    /// Search for a pattern in the document, returning (from, to) char positions
+    pub fn search(
+        &self,
+        query: &str,
+        case_sensitive: bool,
+        whole_word: bool,
+        use_regex: bool,
+    ) -> Vec<(usize, usize)> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+
+        let text = self.text_normalized();
+        let mut pattern = if use_regex {
+            query.to_string()
+        } else {
+            regex::escape(query)
+        };
+        if whole_word {
+            pattern = format!(r"\b{}\b", pattern);
+        }
+
+        let re = match RegexBuilder::new(&pattern)
+            .case_insensitive(!case_sensitive)
+            .build()
+        {
+            Ok(r) => r,
+            Err(_) => return Vec::new(),
+        };
+
+        // Regex operates on byte offsets; convert to char offsets
+        let mut matches = Vec::new();
+        for m in re.find_iter(&text) {
+            let byte_start = m.start();
+            let byte_end = m.end();
+            let char_start = text[..byte_start].chars().count();
+            let char_end = char_start + text[byte_start..byte_end].chars().count();
+            matches.push((char_start, char_end));
+        }
+        matches
     }
 
     /// Count words (non-CJK: space-separated words; CJK: character count)

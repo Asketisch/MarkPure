@@ -4,6 +4,7 @@ use mt_core::AppConfig;
 use rfd::FileDialog;
 use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
@@ -43,6 +44,8 @@ struct AppState {
     watcher: Mutex<Option<mt_fs::FileWatcher>>,
     watcher_rx: Mutex<Option<Receiver<mt_fs::FileChangeEvent>>>,
     tabs: Mutex<Vec<WindowTabs>>,
+    /// Document registry: tab_id → Document (Rust-owned text buffer)
+    documents: Mutex<HashMap<u64, Document>>,
 }
 
 impl AppState {
@@ -62,6 +65,7 @@ impl AppState {
             watcher: Mutex::new(None),
             watcher_rx: Mutex::new(None),
             tabs: Mutex::new(tabs),
+            documents: Mutex::new(HashMap::new()),
         }
     }
 
@@ -129,6 +133,13 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         // File watcher events
         "poll_file_changes" => cmd_poll_file_changes(state),
 
+        // Document registry (Rust-owned text buffer)
+        "doc_open" => cmd_doc_open(&msg.params, state),
+        "doc_close" => cmd_doc_close(&msg.params, state),
+        "doc_set_content" => cmd_doc_set_content(&msg.params, state),
+        "doc_get_stats" => cmd_doc_get_stats(&msg.params, state),
+        "doc_search" => cmd_doc_search(&msg.params, state),
+
         _ => Err(format!("Unknown command: {}", msg.cmd)),
     };
 
@@ -194,12 +205,23 @@ fn cmd_open_file(params: &serde_json::Value, state: &AppState) -> std::result::R
 
 fn cmd_save_file(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
-    let content = params["content"].as_str().ok_or("Missing 'content' parameter")?;
-
     let path = PathBuf::from(path_str);
-    let doc = Document::from_content(content, Some(path.clone()), Encoding::Utf8);
 
-    state.rt().block_on(mt_fs::write_file(&doc, &path)).map_err(|e| e.to_string())?;
+    // Try doc_id first (read from Rust document registry), fall back to content param
+    if let Some(doc_id) = params["doc_id"].as_u64() {
+        let mut docs = state.documents.lock().unwrap();
+        if let Some(doc) = docs.get_mut(&doc_id) {
+            doc.set_path(path.clone());
+            state.rt().block_on(mt_fs::write_file(doc, &path)).map_err(|e| e.to_string())?;
+            doc.mark_saved();
+        } else {
+            return Err("Document not found".to_string());
+        }
+    } else {
+        let content = params["content"].as_str().ok_or("Missing 'content' parameter")?;
+        let doc = Document::from_content(content, Some(path.clone()), Encoding::Utf8);
+        state.rt().block_on(mt_fs::write_file(&doc, &path)).map_err(|e| e.to_string())?;
+    }
 
     // Add to recent files
     {
@@ -511,6 +533,72 @@ fn cmd_poll_file_changes(state: &AppState) -> std::result::Result<serde_json::Va
     }
 
     Ok(serde_json::Value::Array(events))
+}
+
+// Document registry commands
+
+fn cmd_doc_open(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let doc_id = params["doc_id"].as_u64().ok_or("Missing 'doc_id' parameter")?;
+    let content = params["content"].as_str().unwrap_or("");
+
+    let doc = Document::from_content(content, None, Encoding::Utf8);
+    state.documents.lock().unwrap().insert(doc_id, doc);
+
+    Ok(serde_json::Value::Null)
+}
+
+fn cmd_doc_close(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let doc_id = params["doc_id"].as_u64().ok_or("Missing 'doc_id' parameter")?;
+    state.documents.lock().unwrap().remove(&doc_id);
+    Ok(serde_json::Value::Null)
+}
+
+fn cmd_doc_set_content(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let doc_id = params["doc_id"].as_u64().ok_or("Missing 'doc_id' parameter")?;
+    let content = params["content"].as_str().ok_or("Missing 'content' parameter")?;
+
+    let mut docs = state.documents.lock().unwrap();
+    if let Some(doc) = docs.get_mut(&doc_id) {
+        doc.set_content(content);
+    } else {
+        // Auto-register if not found
+        let doc = Document::from_content(content, None, Encoding::Utf8);
+        docs.insert(doc_id, doc);
+    }
+
+    Ok(serde_json::Value::Null)
+}
+
+fn cmd_doc_get_stats(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let doc_id = params["doc_id"].as_u64().ok_or("Missing 'doc_id' parameter")?;
+
+    let docs = state.documents.lock().unwrap();
+    let doc = docs.get(&doc_id).ok_or("Document not found")?;
+
+    Ok(serde_json::json!({
+        "words": doc.word_count(),
+        "characters": doc.character_count(),
+        "lines": doc.len_lines(),
+    }))
+}
+
+fn cmd_doc_search(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let doc_id = params["doc_id"].as_u64().ok_or("Missing 'doc_id' parameter")?;
+    let query = params["query"].as_str().unwrap_or("");
+    let case_sensitive = params["case_sensitive"].as_bool().unwrap_or(false);
+    let whole_word = params["whole_word"].as_bool().unwrap_or(false);
+    let use_regex = params["use_regex"].as_bool().unwrap_or(false);
+
+    let docs = state.documents.lock().unwrap();
+    let doc = docs.get(&doc_id).ok_or("Document not found")?;
+
+    let matches = doc.search(query, case_sensitive, whole_word, use_regex);
+    let result: Vec<serde_json::Value> = matches
+        .into_iter()
+        .map(|(from, to)| serde_json::json!({ "from": from, "to": to }))
+        .collect();
+
+    Ok(serde_json::Value::Array(result))
 }
 
 fn generate_uuid() -> String {

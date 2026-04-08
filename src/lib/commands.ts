@@ -210,6 +210,45 @@ export async function exportPdf(content: string, title: string): Promise<{ path:
   return await ipc('export_pdf', { content, title })
 }
 
+// Document registry (Rust-owned text buffer)
+
+export async function docOpen(docId: number, content: string): Promise<void> {
+  await ipc('doc_open', { doc_id: docId, content })
+}
+
+export async function docClose(docId: number): Promise<void> {
+  await ipc('doc_close', { doc_id: docId })
+}
+
+export async function docSetContent(docId: number, content: string): Promise<void> {
+  await ipc('doc_set_content', { doc_id: docId, content })
+}
+
+export async function docGetStats(docId: number): Promise<DocStats> {
+  return await ipc('doc_get_stats', { doc_id: docId })
+}
+
+export interface SearchMatch {
+  from: number
+  to: number
+}
+
+export async function docSearch(
+  docId: number,
+  query: string,
+  caseSensitive: boolean,
+  wholeWord: boolean,
+  useRegex: boolean,
+): Promise<SearchMatch[]> {
+  return await ipc('doc_search', {
+    doc_id: docId,
+    query,
+    case_sensitive: caseSensitive,
+    whole_word: wholeWord,
+    use_regex: useRegex,
+  })
+}
+
 // File watcher events
 
 export interface FileChangeEvent {

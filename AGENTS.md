@@ -1,28 +1,27 @@
 # AGENTS.md — MarkText-RS
 
-WYSIWYG Markdown 桌面编辑器，灵感来自 MarkText，使用 Rust (wry + tao) + Svelte 5 + Tiptap 构建。
+WYSIWYG Markdown 桌面编辑器，使用 Rust (wry + tao) + Svelte 5 + Tiptap 构建。
 
 ## 架构概览
 
 ```
-mark-web/
+MarkMe/
 ├── src/                    # Svelte 5 + TypeScript 前端
 │   ├── App.svelte          # 主应用：布局、标签栏、工具栏、编辑器、状态栏
-│   ├── app.css             # 全局样式 + Tiptap ProseMirror 编辑器样式
+│   ├── app.css             # 全局样式 + 主题 CSS 变量 + ProseMirror 编辑器样式
 │   ├── main.ts             # 入口
 │   └── lib/
 │       ├── editor.ts       # Tiptap WYSIWYG 编辑器封装
-│       ├── commands.ts     # IPC 命令封装
-│       └── components/
-│           ├── SideBar.svelte     # 侧边栏容器（文件树/大纲切换）
-│           ├── WorkSpace.svelte   # 文件树浏览器（搜索、右键菜单、CRUD）
-│           └── Outline.svelte     # 文档大纲（标题层级导航）
-├── src-rust/               # Rust 后端（使用 wry + tao 直接构建 WebView 壳）
-│   ├── src/main.rs         # 入口：WebView 创建、窗口管理、IPC 处理
-│   └── Cargo.toml          # 依赖 wry/tao/rfd/rust-embed 和 mt-*/crates
-└── crates/                 # Rust 库 crate（被 src-rust 引用）
-    ├── mt-core/            # Document (ropey)、AppConfig、TabState、Error、ThemeId
-    ├── mt-fs/              # 异步文件 I/O + 自动编码检测 + 目录扫描 + 文件监视
+│       ├── commands.ts     # IPC 命令封装 + TypeScript 接口定义
+│       ├── components/     # Svelte 组件（6 个）
+│       ├── extensions/     # Tiptap 扩展（7 个）
+│       ├── plugins/        # ProseMirror 插件（2 个）
+│       └── nodeviews/      # ProseMirror NodeView（1 个）
+├── src-rust/               # Rust 后端（wry + tao，无 Tauri）
+│   └── src/main.rs         # WebView 创建、IPC 处理、文档注册表
+└── crates/                 # Rust 库 crate
+    ├── mt-core/            # Document (ropey+regex)、AppConfig、TabState、ThemeId
+    ├── mt-fs/              # 异步文件 I/O + 编码检测 + 目录扫描 + 文件监视
     ├── mt-markdown/        # Markdown 解析 + HTML 转换 + 标题提取
     └── mt-export/          # HTML/PDF 导出
 ```
@@ -31,112 +30,109 @@ mark-web/
 
 | 层 | 技术 | 版本 |
 |---|---|---|
-| 桌面壳 | wry + tao | 0.46 + 0.34（纯 WebView，无 Tauri 框架） |
-| 前端框架 | Svelte | 5.x (runes: $state/$effect) |
+| 桌面壳 | wry + tao | 0.46 + 0.34 |
+| 前端框架 | Svelte | 5.x (runes) |
 | 构建工具 | Vite | 8.x |
 | 编辑器 | Tiptap (ProseMirror) | 3.22.x |
+| 代码块 | CodeMirror | 6.x |
+| 数学公式 | KaTeX | 0.16 |
 | Markdown 双向转换 | @tiptap/markdown | — |
 | 后端语言 | Rust | 2021 edition |
 | 文本缓冲区 | ropey | 1.6 |
-| Markdown 解析 | pulldown-cmark | 0.12 |
+| 正则搜索 | regex | 1.x |
+| Markdown 解析 | pulldown-cmark | 0.12 (SIMD) |
 | 文件监视 | notify | 8.x |
 | 编码检测 | chardetng + encoding_rs | — |
 
 ## 常用命令
 
 ```bash
-# 开发模式（前端热重载 + Rust 后端）
-# 终端1：启动前端开发服务器
-npm run dev
-# 终端2：启动 Rust 后端（连接前端服务器）
-cargo run -- --dev
+# 开发模式
+npm run dev               # 终端1：前端热重载
+cargo run -- --dev        # 终端2：Rust 后端
 
-# 仅构建前端
-npm run build
+# 一键构建
+./build.sh                # npm build + cargo build
 
-# 仅检查 Rust
-cargo check --workspace
-
-# 生产构建 Rust
-cargo build --release
-
-# 前端类型检查
-npm run check
+# 检查
+npm run check             # 前端类型检查
+cargo check --workspace   # Rust 编译检查
 ```
 
 ## 数据流
 
-1. 前端 Tiptap 编辑器 → `editor.getMarkdown()` → 获取原始 markdown 字符串
-2. 前端通过 `ipc(cmd, params)` → 自定义 IPC → Rust IPC handler
-3. Rust `handle_command` → 调用对应 module（如 `mt-fs::write_file`）
-4. 打开文件反向：`ipc('open_file')` → Rust `mt-fs::read_file`（自动检测编码）→ 返回 FileInfo
+### 编辑流程
+1. 用户在 Tiptap 编辑器中输入
+2. `onUpdate` → `editor.getMarkdown()` 获取 markdown
+3. 前端 `docSetContent(tabId, md)` → IPC → Rust 文档注册表同步
+4. Rust `Document.set_content()` 更新 rope 副本
+5. 前端 `docGetStats(tabId)` → Rust 直接在 rope 上计算统计（无需传 content）
+
+### 文件打开
+1. `ipc('open_file', {path})` → Rust `mt_fs::read_file`（自动编码检测）→ 返回 FileInfo
+2. 前端 `docOpen(tabId, content)` → 注册到 Rust 文档注册表
+3. Tiptap `setContent(md, {contentType: 'markdown'})` 加载到编辑器
+
+### 大纲提取
+- 直接从 ProseMirror `doc.descendants()` 提取标题节点，零 IPC 开销
 
 ## IPC 命令
 
 ### 文件对话框
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `pick_open_file` | 前端→Rust | `void` | `string` (文件路径) |
-| `pick_save_file` | 前端→Rust | `void` | `string` (文件路径) |
-| `pick_directory` | 前端→Rust | `void` | `string` (目录路径) |
+| 命令 | 参数 | 返回值 |
+|------|------|--------|
+| `pick_open_file` | `void` | `string` |
+| `pick_save_file` | `void` | `string` |
+| `pick_directory` | `void` | `string` |
 
 ### 文件操作
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `open_file` | 前端→Rust | `{ path: string }` | `FileInfo { content, path, file_name, encoding, line_ending }` |
-| `save_file` | 前端→Rust | `{ path: string, content: string }` | `void` |
-| `get_doc_stats` | 前端→Rust | `{ content: string }` | `DocStats { words, characters, lines }` |
+| 命令 | 参数 | 返回值 |
+|------|------|--------|
+| `open_file` | `{ path }` | `FileInfo` |
+| `save_file` | `{ path, content }` 或 `{ path, doc_id }` | `void` |
+| `get_doc_stats` | `{ content }` | `DocStats`（旧接口，保留兼容） |
+
+### 文档注册表（Rust 持有文档 rope 副本）
+| 命令 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `doc_open` | `{ doc_id, content }` | `void` | 注册文档到 Rust |
+| `doc_close` | `{ doc_id }` | `void` | 关闭标签页时注销 |
+| `doc_set_content` | `{ doc_id, content }` | `void` | 全量同步内容到 Rust |
+| `doc_get_stats` | `{ doc_id }` | `DocStats` | 零拷贝统计 |
+| `doc_search` | `{ doc_id, query, case_sensitive, whole_word, use_regex }` | `[{from, to}]` | Rust 端搜索 |
 
 ### 目录树
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `get_directory_tree` | 前端→Rust | `{ path: string, depth?: number }` | `FileEntry[]` |
-| `watch_directory` | 前端→Rust | `{ path: string }` | `void` |
-| `unwatch_directory` | 前端→Rust | `void` | `void` |
+| 命令 | 参数 | 返回值 |
+|------|------|--------|
+| `get_directory_tree` | `{ path, depth? }` | `FileEntry[]` |
+| `watch_directory` | `{ path }` | `void` |
+| `unwatch_directory` | `void` | `void` |
 
 ### 文件 CRUD
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `create_file` | 前端→Rust | `{ path: string }` | `void` |
-| `create_directory` | 前端→Rust | `{ path: string }` | `void` |
-| `delete_file` | 前端→Rust | `{ path: string }` | `void` |
-| `rename_file` | 前端→Rust | `{ path: string, new_name: string }` | `string` (新路径) |
+| 命令 | 参数 | 返回值 |
+|------|------|--------|
+| `create_file` | `{ path }` | `void` |
+| `create_directory` | `{ path }` | `void` |
+| `delete_file` | `{ path }` | `void` |
+| `rename_file` | `{ path, new_name }` | `string` |
 
-### 大纲
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `get_outline` | 前端→Rust | `{ content: string }` | `OutlineItem[]` |
+### 大纲（旧接口，保留兼容）
+| 命令 | 参数 | 返回值 |
+|------|------|--------|
+| `get_outline` | `{ content }` | `OutlineItem[]` |
 
-### 最近文件
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `get_recent_files` | 前端→Rust | `void` | `string[]` |
-| `add_recent_file` | 前端→Rust | `{ path: string }` | `void` |
-| `clear_recent_files` | 前端→Rust | `void` | `void` |
+### 最近文件 / Tab 状态 / 配置
+| 命令 | 参数 | 返回值 |
+|------|------|--------|
+| `get_recent_files` / `add_recent_file` / `clear_recent_files` | — | — |
+| `get_tabs` / `save_tabs` / `tearoff_tab` | — | — |
+| `get_config` / `set_config` | — | — |
 
-### Tab 状态
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `get_tabs` | 前端→Rust | `void` | `WindowTabs[]` |
-| `save_tabs` | 前端→Rust | `WindowTabs[]` | `void` |
-| `tearoff_tab` | 前端→Rust | `TabState` | `{ window_id: string }` |
-
-### 导出
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `export_html` | 前端→Rust | `{ content, title }` | `{ path }` |
-| `export_pdf` | 前端→Rust | `{ content, title }` | `{ path }` |
-
-### 文件监视事件
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `poll_file_changes` | 前端→Rust | `void` | `FileChangeEvent[]` |
-
-### 配置
-| 命令 | 方向 | 参数 | 返回值 |
-|------|------|------|--------|
-| `get_config` | 前端→Rust | `void` | `AppConfig` |
-| `set_config` | 前端→Rust | `Partial<AppConfig>` | `void` |
+### 导出 / 文件监视
+| 命令 | 参数 | 返回值 |
+|------|------|--------|
+| `export_html` / `export_pdf` | `{ content, title }` | `{ path }` |
+| `poll_file_changes` | `void` | `FileChangeEvent[]` |
 
 ### IPC 实现机制
 
@@ -145,29 +141,6 @@ npm run check
 - Rust `ipc_handler` 接收消息，调用 `handle_command`
 - Rust 通过 `webview.evaluate_script("window.__mt_dispatch('{json}')")` 返回结果
 - 前端 `window.__mt_dispatch` 解析响应，找到对应的 Promise resolve/reject
-
-## 文件树 (WorkSpace)
-
-**功能：**
-- 打开文件夹作为工作区
-- 树形显示 markdown 文件
-- 搜索/过滤文件
-- 右键菜单（新建文件/文件夹、重命名、删除、刷新）
-
-**状态管理：** 组件内部状态，通过 `workspacePath` prop 控制
-
-## 侧边栏 (SideBar)
-
-**功能：**
-- 标签切换：文件树 / 大纲
-- 可折叠（Ctrl/Cmd+B 切换）
-- 显示/隐藏切换
-
-## 大纲 (Outline)
-
-**功能：**
-- 从 markdown 内容提取标题
-- 点击标题可导航到对应位置
 
 ## 主题系统
 
@@ -178,21 +151,21 @@ npm run check
 
 切换方式：在 `.app-root` 元素上添加/移除 theme class。
 
-主要 CSS 变量：`--bg`、`--bg-secondary`、`--bg-tab-active`、`--bg-tab-inactive`、`--text`、`--text-secondary`、`--border`、`--accent`、`--accent-hover`、`--accent-bg`（选中态背景）、`--status-bg`、`--menu-hover-bg`、`--menu-hover-text`、`--scrollbar-thumb`、`--highlight-bg`（高亮背景色）、`--cell-selected-bg`（表格单元格选中色）。
+主要 CSS 变量：`--bg`、`--bg-secondary`、`--bg-tab-active`、`--bg-tab-inactive`、`--text`、`--text-secondary`、`--border`、`--accent`、`--accent-hover`、`--accent-bg`、`--status-bg`、`--menu-hover-bg`、`--menu-hover-text`、`--scrollbar-thumb`、`--highlight-bg`、`--cell-selected-bg`。
 
-## 已知限制与待实现
+## 性能优化要点
 
-- **PDF 导出跨平台问题**：硬编码 macOS 字体路径 `/System/Library/Fonts/Helvetica.ttc`
-- **svelte-i18n 未集成**：`package.json` 中声明了 `svelte-i18n` 依赖，但前端未使用（无 locale 文件、无 `$tt()` 调用）
-- **大纲导航未实现**：`Outline.svelte` 的点击回调 `onOutlineNavigate` 在 `App.svelte` 中仅做 `console.log`
-- **主题不完整**：`ThemeId` 枚举定义了 6 个主题（Light、Dark、OneDark、Graphite、Ulysses、MaterialDark），但 `app.css` 仅实现了 3 个 CSS 主题
+- **即时渲染插件** (`plugins/instant-render.ts`)：装饰集缓存在插件状态中，光标移动时仅对受影响的顶层块做增量更新（`findAffectedRange` + `nodesBetween`），不做全文档遍历
+- **搜索插件** (`plugins/search.ts`)：使用 `doc.textBetween()` 提取文本，通过 `tr.mapping` 尝试快速重映射已有匹配
+- **大纲组件** (`components/Outline.svelte`)：直接接收 Tiptap Editor 实例，从 ProseMirror 文档模型提取标题，不经过 IPC
+- **文档注册表**：Rust `AppState.documents` 持有每个标签页的 Document（rope），`doc_get_stats` 和 `doc_search` 直接在 rope 上计算
 
 ## 注意事项
 
-- Svelte 5 使用 runes (`$state`, `$effect`)，不支持旧版 `$:` 语法
+- Svelte 5 使用 runes (`$state`, `$effect`, `$props`)，不支持旧版 `$:` 语法
 - Tiptap 使用命名导出（`import { Table } from ...`），不要用默认导入
-- `mt-core::Document` 内部存储 LF 行尾，读写时根据检测到的行尾格式自动转换
+- `createEditor()` 必须设置 `contentType: 'markdown'`，否则表格等语法不渲染
+- `mt-core::Document` 内部存储 LF 行尾，读写时自动转换
 - 词数统计支持 CJK：每个 CJK 字符计为一个词
-- PDF 导出目前硬编码 macOS 字体路径（`/System/Library/Fonts/Helvetica.ttc`），跨平台需修复
-- Tiptap Editor 创建时必须设置 `contentType: 'markdown'`，否则 Markdown 内容会被当作 HTML 解析，导致表格等语法不渲染
+- PDF 导出硬编码 macOS 字体路径，跨平台需修复
 - 表格使用 `resizable: true`，需要 `.tableWrapper`、`.selectedCell`、`.column-resize-handle` CSS 样式配合

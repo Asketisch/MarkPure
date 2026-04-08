@@ -2,16 +2,17 @@
   import WorkSpace from './WorkSpace.svelte'
   import Outline from './Outline.svelte'
   import type { OutlineItem } from '$lib/commands'
+  import type { Editor } from '@tiptap/core'
 
   interface Props {
     workspacePath?: string | null
-    editorContent?: string
+    editor?: Editor | null
     recentFiles?: string[]
     onOpenFile?: (path: string) => void
     onOutlineNavigate?: (item: OutlineItem) => void
   }
 
-  let { workspacePath = null, editorContent = '', recentFiles = [], onOpenFile, onOutlineNavigate }: Props = $props()
+  let { workspacePath = null, editor = null, recentFiles = [], onOpenFile, onOutlineNavigate }: Props = $props()
 
   let activeTab = $state<'files' | 'outline' | 'recent'>('files')
   let collapsed = $state(false)
@@ -65,7 +66,7 @@
       {#if activeTab === 'files'}
         <WorkSpace {workspacePath} {onOpenFile} />
       {:else if activeTab === 'outline'}
-        <Outline content={editorContent} onNavigate={onOutlineNavigate} />
+        <Outline {editor} onNavigate={onOutlineNavigate} />
       {:else}
         <div class="recent-files">
           <div class="recent-header">Recent Files</div>

@@ -1,13 +1,13 @@
 # AGENTS.md — Rust 桌面壳 (src-rust/)
 
-整个 Rust 后端入口集中在 `src/main.rs`（~530 行），负责 WebView 创建、IPC 命令分发和静态资源服务。
+Rust 后端入口集中在 `src/main.rs`（~700 行），负责 WebView 创建、IPC 命令分发、文档注册表管理和静态资源服务。
 
 ## 架构
 
 ```
 main()
   ├── EventLoop::new()
-  ├── AppState::new()        ← 加载 AppConfig + TabState + 创建持久 tokio Runtime
+  ├── AppState::new()        ← 加载 AppConfig + TabState + 创建持久 tokio Runtime + 初始化文档注册表
   ├── WindowBuilder          ← tao 窗口 (1200×800)
   ├── WebViewBuilder         ← wry WebView
   │   ├── with_custom_protocol("mt", serve_asset)  ← rust-embed 资源服务
@@ -41,14 +41,16 @@ struct AppState {
     runtime: tokio::runtime::Runtime,  // 持久化 tokio Runtime（所有命令共享）
     config: Mutex<AppConfig>,
     watcher: Mutex<Option<FileWatcher>>,
-    watcher_rx: Mutex<Option<Receiver<FileChangeEvent>>>,  // 文件监视事件接收器
+    watcher_rx: Mutex<Option<Receiver<FileChangeEvent>>>,
     tabs: Mutex<Vec<WindowTabs>>,
+    documents: Mutex<HashMap<u64, Document>>,  // 文档注册表：tab_id → Document
 }
 ```
 
-- `AppState::new()` — 加载配置 + 栌久久标签页数据 + 创建 Runtime
+- `documents` — Rust 持有的文档 rope 副本，前端每次编辑同步到这里。`doc_get_stats`、`doc_search` 直接在 rope 上计算，无需通过 IPC 传输全文内容。
+- `AppState::new()` — 加载配置 + 标签页数据 + 创建 Runtime + 初始化空 documents HashMap
 - `save_config()` — 保存 AppConfig 到磁盘
-- `rt()` — 获取持久 Runtime 引用（避免每次命令创建新 Runtime）
+- `rt()` — 获取持久 Runtime 引用
 
 ## IPC 分发模式
 
@@ -65,27 +67,35 @@ struct AppState {
 | | `cmd_pick_save_file` | rfd 保存对话框（默认名 untitled.md） |
 | | `cmd_pick_directory` | rfd 目录选择 |
 | 文件操作 | `cmd_open_file` | 读文件（自动编码检测），返回 FileInfo |
-| | `cmd_save_file` | 写文件 + 添加到最近文件列表 |
-| | `cmd_get_doc_stats` | 使用 Document API 计算 CJK 感知词数/字符/行统计 |
+| | `cmd_save_file` | 支持 `doc_id`（从文档注册表读取）或 `content`（直接写入） |
+| | `cmd_get_doc_stats` | 旧接口，从传入 content 临时创建 Document 计算统计 |
 | 目录树 | `cmd_get_directory_tree` | 调用 `mt_fs::walk_directory` |
 | | `cmd_watch_directory` | 启动 FileWatcher，保存 Receiver |
 | | `cmd_unwatch_directory` | 停止监视 |
-| 文件 CRUD | `cmd_create_file` | 创建文件 |
-| | `cmd_create_directory` | 创建目录 |
-| | `cmd_delete_file` | 删除文件/目录 |
-| | `cmd_rename_file` | 重命名，返回新路径 |
-| 大纲 | `cmd_get_outline` | 调用 `mt_markdown::extract_headings` |
-| 最近文件 | `cmd_get_recent_files` | 从 AppConfig 读取 |
-| | `cmd_add_recent_file` | 添加并保存配置 |
-| | `cmd_clear_recent_files` | 清空并保存配置 |
-| 标签页 | `cmd_get_tabs` | 返回 WindowTabs 列表 |
-| | `cmd_save_tabs` | 持久化标签页状态到 JSON |
-| | `cmd_tearoff_tab` | 从当前窗口移除标签页，创建新窗口（部分实现） |
-| 配置 | `cmd_get_config` | 返回主题、语言、工作区、编辑器配置 |
-| | `cmd_set_config` | 处理所有配置字段（theme/language/editor.*/workspace） |
-| 导出 | `cmd_export_html` | 弹出保存对话框 → mt_export::export_html → 写入文件 |
-| | `cmd_export_pdf` | 弹出保存对话框 → mt_export::export_pdf → 写入文件 |
-| 文件监视事件 | `cmd_poll_file_changes` | 非阻塞地从 Receiver 取出所有积压事件 |
+| 文件 CRUD | `cmd_create_file` / `cmd_create_directory` / `cmd_delete_file` / `cmd_rename_file` | 文件系统 CRUD |
+| 大纲 | `cmd_get_outline` | 调用 `mt_markdown::extract_headings`（旧接口） |
+| 最近文件 | `cmd_get_recent_files` / `cmd_add_recent_file` / `cmd_clear_recent_files` | AppConfig 操作 |
+| 标签页 | `cmd_get_tabs` / `cmd_save_tabs` / `cmd_tearoff_tab` | 标签页状态持久化 |
+| 配置 | `cmd_get_config` / `cmd_set_config` | 主题/语言/编辑器/工作区配置 |
+| 导出 | `cmd_export_html` / `cmd_export_pdf` | 弹出保存对话框 → 导出 → 写入文件 |
+| 文件监视 | `cmd_poll_file_changes` | 非阻塞取出所有积压事件 |
+| **文档注册表** | `cmd_doc_open` | 注册文档到 `documents` HashMap |
+| | `cmd_doc_close` | 关闭标签页时移除文档 |
+| | `cmd_doc_set_content` | 全量同步内容到 Rust rope（自动注册） |
+| | `cmd_doc_get_stats` | 从注册表中的 Document 零拷贝计算统计 |
+| | `cmd_doc_search` | 在 Document 上执行 regex 搜索，返回字符位置数组 |
+
+## 文档注册表工作流
+
+```
+前端打开文件 → cmd_open_file → 返回 FileInfo
+前端 → cmd_doc_open(tab_id, content) → Rust HashMap 注册 Document
+前端编辑 → cmd_doc_set_content(tab_id, content) → Rust Document.set_content()
+前端请求统计 → cmd_doc_get_stats(tab_id) → 直接在 rope 计算（不传 content）
+前端搜索 → cmd_doc_search(tab_id, query, ...) → 在 rope 上 regex 搜索
+前端保存 → cmd_save_file({path, doc_id}) → 从注册表读取文本写入磁盘
+前端关闭标签 → cmd_doc_close(tab_id) → 从 HashMap 移除
+```
 
 ## 资源服务
 
@@ -95,30 +105,24 @@ struct AppState {
 #[derive(Embed)]
 #[folder = "../dist/"]
 struct Assets;
-
-fn serve_asset(path: &str) -> Response<Vec<u8>>
 ```
 
 - 自定义协议 `mt://localhost`
-- MIME 类型自动检测
-（通过 `mime-guess` feature）
+- MIME 类型自动检测（`mime-guess` feature）
 - SPA 回退：未匹配的路径返回 `index.html`
 
 ## 运行模式
 
-| 模式 | 启动参数 | WebView URL | 说明 |
-|------|---------|------------|------|
-| 生产 | （无） | `mt://localhost` | 从嵌入的 dist/ 加载前端 |
-| 开发 | `--dev` | `http://localhost:5173` | 连接 Vite 开发服务器，支持热重载 |
-| 子窗口 | `--child-window=<base64>` | `mt://localhost` | 标签页撕离模式（部分实现） |
+| 模式 | 启动参数 | WebView URL |
+|------|---------|------------|
+| 生产 | （无） | `mt://localhost` |
+| 开发 | `--dev` | `http://localhost:5173` |
+| 子窗口 | `--child-window=<data>` | `mt://localhost`（部分实现） |
 
 ## 注意事项
 
 - `AppState` 使用持久化 tokio Runtime（`state.rt().block_on(...)`），避免每次命令创建新实例
-- `generate_uuid()` 使用纳秒时间戳生成窗口 ID（非标准 UUID）
-- `cmd_set_config` 处理所有配置字段（theme/language/editor.*/workspace），theme 使用字符串匹配（label 名如 "One Dark"）
-- 标签页撕离（tearoff）：Rust 端更新了 tabs 状态，但实际的子窗口创建和事件循环未完成
-- `cmd_get_doc_stats` 使用 `Document::from_content()` + `word_count()` / `character_count()` / `len_lines()`，与 `mt-core` 保持一致
-- `cmd_open_file` 打开文件时自动添加到最近文件列表
-- `cmd_export_html` / `cmd_export_pdf` 先弹出原生保存对话框，再执行导出和写入
-- `cmd_poll_file_changes` 非阻塞地从 Receiver 取出所有积压事件返回数组，前端轮询调用（~3 秒间隔）
+- `cmd_save_file` 优先使用 `doc_id` 从文档注册表读取内容，fallback 到 `content` 参数
+- `cmd_doc_set_content` 如果文档未注册会自动注册（容错）
+- `generate_uuid()` 使用纳秒时间戳（非标准 UUID）
+- 标签页撕离（tearoff）：Rust 端更新了 tabs 状态，但实际子窗口创建未完成

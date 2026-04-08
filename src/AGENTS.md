@@ -8,12 +8,28 @@ src/
 ├── App.svelte       # 主组件：菜单栏、标签栏、工具栏、编辑器容器、状态栏
 ├── app.css          # 全局样式 + Tiptap ProseMirror 编辑器渲染样式 + 3 个主题的 CSS 变量
 └── lib/
-    ├── editor.ts    # Tiptap 编辑器工厂函数
+    ├── editor.ts    # Tiptap 编辑器工厂函数（createEditor, getMarkdown, setContent）
     ├── commands.ts  # 自定义 IPC 封装（所有命令 + TypeScript 接口定义）
-    └── components/
-        ├── SideBar.svelte     # 侧边栏容器（文件树/大纲标签切换，可折叠）
-        ├── WorkSpace.svelte   # 文件树浏览器（搜索、递归树、右键菜单 CRUD）
-        └── Outline.svelte     # 文档大纲（标题层级展示，点击导航待实现）
+    ├── components/
+    │   ├── SideBar.svelte          # 侧边栏容器（文件树/大纲/最近文件标签切换，可折叠）
+    │   ├── WorkSpace.svelte        # 文件树浏览器（搜索、递归树、右键菜单 CRUD）
+    │   ├── Outline.svelte          # 文档大纲（直接从 ProseMirror doc 提取标题，零 IPC）
+    │   ├── SearchBar.svelte        # 搜索替换栏（正则/大小写/全词匹配）
+    │   ├── SourceEditor.svelte     # 源码模式编辑器（CodeMirror 6 原始 Markdown）
+    │   └── QuickInsertPopup.svelte # @ 快速插入弹窗（标题、代码块、表格等）
+    ├── extensions/
+    │   ├── code-block-cm-extension.ts  # Tiptap 扩展：CodeMirror 代码块节点
+    │   ├── math-extension.ts           # Tiptap 扩展：KaTeX 数学公式
+    │   ├── instant-render-extension.ts # Tiptap 扩展：即时渲染注册
+    │   ├── search-extension.ts         # Tiptap 扩展：搜索注册
+    │   ├── quick-insert-extension.ts   # Tiptap 扩展：@ 快速插入
+    │   ├── quick-insert-config.ts      # 快速插入的命令配置列表
+    │   └── cm-theme.ts                 # CodeMirror 主题（跟随 app 主题 CSS 变量）
+    ├── plugins/
+    │   ├── instant-render.ts   # ProseMirror 插件：Typora 风格即时渲染（增量装饰更新）
+    │   └── search.ts           # ProseMirror 插件：搜索高亮 + 位置映射
+    └── nodeviews/
+        └── code-block-view.ts  # ProseMirror NodeView：CodeMirror 6 代码块编辑器
 ```
 
 ## App.svelte 状态模型
@@ -24,72 +40,105 @@ src/
 tabs: Tab[]          # 打开的文档列表，每个含 { id, path, name, dirty, content }
 activeTabId: number  # 当前激活的标签 ID
 editor: Editor|null  # Tiptap Editor 实例（标签切换时 destroy 重建）
-stats: DocStats      # 实时统计（通过 IPC 调用 Rust 计算）
+stats: DocStats      # 实时统计（通过 Rust 文档注册表计算）
 theme: string        # '' | 'theme-dark' | 'theme-one-dark'
 saving: boolean      # 保存中状态
 workspacePath: string | null  # 工作区目录路径
 showSidebar: boolean # 侧边栏可见性
 recentFiles: string[] # 最近打开的文件列表
+sourceMode: boolean  # 源码模式开关
+instantRenderEnabled: boolean  # 即时渲染开关
 ```
 
 ## 编辑器生命周期
 
-1. `initEditor()` — 销毁旧实例 → 清空容器 → `createEditor()` 创建新 Tiptap 实例（`contentType: 'markdown'`）
+1. `initEditor()` — 销毁旧实例 → 清空容器 → `docOpen(tabId, content)` 注册到 Rust → `createEditor()` 创建 Tiptap 实例
 2. 标签切换时先保存当前内容到 tab.content，再 initEditor 加载新标签内容
-3. `onUpdate` 回调中调用 `editor.getMarkdown()` 获取原始 markdown 并更新 tab
-4. **关键**：`createEditor()` 必须设置 `contentType: 'markdown'`，否则 Tiptap Markdown 扩展不会解析初始内容，表格等语法将不渲染
+3. `onChange` 回调：`editor.getMarkdown()` → 更新 tab.content → `syncToRust(tabId, md)` 同步到 Rust 文档注册表 → `updateStats(tabId)` 从 Rust 获取统计
+4. 关闭标签页时 `docClose(tabId)` 从 Rust 注销
+5. **关键**：`createEditor()` 必须设置 `contentType: 'markdown'`，否则表格等语法不渲染
+
+## Tiptap 扩展配置
 
 所有扩展在 `lib/editor.ts` 的 `createEditor()` 中统一配置：
 
-- **StarterKit** — 段落、标题(H1-H6)、加粗、斜体、删除线、代码块、引用、列表、水平线
-- **@tiptap/markdown** — Markdown 双向转换（`getMarkdown()` / `setContent(md, {contentType:'markdown'})`）
-- **Table + TableRow + TableCell + TableHeader** — 表格编辑（`resizable: true`，需要 `.tableWrapper` / `.selectedCell` / `.column-resize-handle` CSS 配合）
-- **TaskList + TaskItem** — 任务列表（checkbox，嵌套）
-- **Image / Link** — 图片和链接（链接不自动打开）
-- **Placeholder** — 空文档占位文本 "Start writing markdown..."
-- **Highlight** — 文本高亮标记
+| 扩展 | 来源 | 说明 |
+|------|------|------|
+| StarterKit | @tiptap/starter-kit | 段落、标题(H1-H6)、加粗、斜体、删除线、引用、列表、水平线（codeBlock 禁用） |
+| Markdown | @tiptap/markdown | Markdown 双向转换 |
+| Table + Row/Cell/Header | @tiptap/extension-table | 表格编辑（resizable: true） |
+| TaskList + TaskItem | @tiptap | 任务列表（checkbox，嵌套） |
+| Image / Link | @tiptap | 图片和链接 |
+| Placeholder | @tiptap | 空文档占位文本 |
+| Highlight | @tiptap | 文本高亮 |
+| CodeBlockCMExtension | 自定义 | CodeMirror 6 代码块（替代 StarterKit 默认代码块） |
+| MathExtension | 自定义 | KaTeX 行内/块级数学公式 |
+| InstantRenderExtension | 自定义 | Typora 风格即时渲染 |
+| SearchExtension | 自定义 | 搜索高亮 |
+| QuickInsertExtension | 自定义 | @ 触发的命令面板 |
+
+## 关键插件
+
+### 即时渲染 (`plugins/instant-render.ts`)
+
+Typora 风格：光标附近显示 `**`、`*`、`` ` `` 等 Markdown 语法标记，远离时隐藏。
+
+性能优化：
+- 装饰集 (`DecorationSet`) 缓存在插件 state 中
+- 光标移动时仅更新旧/新光标所在的顶层块（`findAffectedRange` + `doc.nodesBetween`）
+- 文档变更时全量重建装饰
+- 支持：标题 `#`、引用块 `>`、粗体、斜体、删除线、行内代码、高亮
+
+### 搜索 (`plugins/search.ts`)
+
+- `getDocText()` 使用 `doc.textBetween()` 提取文本 + 构建位置映射
+- 支持正则、大小写敏感、全词匹配
+- 文档变更时自动重新搜索
+- `replaceAll` 从后往前替换（避免位置偏移）
+
+### 代码块 (`nodeviews/code-block-view.ts`)
+
+- 每个代码块嵌入独立的 CodeMirror 6 实例
+- 支持 14+ 种语言语法高亮（JS/TS/Python/Go/Java/C/Rust/SQL/HTML/CSS/JSON/XML/YAML/Markdown）
+- 使用 `Compartment` 实现语言和主题的动态切换
+- 暗色模式自动检测（检查 `.app-root` 的 class）
 
 ## 快捷键
 
-| 快捷键 | 功能 | 实现位置 |
-|--------|------|---------|
-| Cmd/Ctrl+N | 新建标签 | App.svelte handleKeydown |
-| Cmd/Ctrl+O | 打开文件 | App.svelte handleKeydown |
-| Cmd/Ctrl+S | 保存 | editor.ts handleKeyDown + App.svelte handleSave |
-| Cmd/Ctrl+B | 切换侧边栏 | App.svelte handleKeydown toggleSidebar |
+| 快捷键 | 功能 |
+|--------|------|
+| Cmd/Ctrl+N | 新建标签 |
+| Cmd/Ctrl+O | 打开文件 |
+| Cmd/Ctrl+S | 保存 |
+| Cmd/Ctrl+B | 切换侧边栏 |
+| Cmd/Ctrl+F | 搜索 |
+| Cmd/Ctrl+/ | 切换源码模式 |
 
 ## IPC 调用模式
 
 ```typescript
-import { ipc } from './lib/commands'
-const result = await ipc<ReturnType>('command_name', { paramInCamelCase: value })
+import { docGetStats, docSetContent, saveFile } from '$lib/commands'
+
+// 文档注册表命令（零拷贝）
+await docOpen(tabId, content)         // 注册文档
+await docSetContent(tabId, markdown)  // 同步内容
+const stats = await docGetStats(tabId) // 获取统计
+
+// 文件操作命令
+await saveFile(path, content)
 ```
 
-`commands.ts` 导出所有命令的高阶封装函数（如 `openFile()`、`saveFile()`、`getDirectoryTree()` 等），以及所有 TypeScript 接口定义（`FileInfo`、`DocStats`、`FileEntry`、`TabState`、`WindowTabs`、`OutlineItem`、`AppConfig`）。
-
-注意：IPC 参数使用 **camelCase**（前端）映射到 **snake_case**（Rust 函数参数）。
+`commands.ts` 导出所有命令的封装函数和 TypeScript 接口定义（`FileInfo`、`DocStats`、`FileEntry`、`TabState`、`WindowTabs`、`OutlineItem`、`AppConfig`、`SearchMatch`、`FileChangeEvent`）。
 
 ## Svelte 5 模式
 
-- **Runes**：使用 `$state()`、`$effect()`、`$props()`，不使用旧版 `$:` 语法
-- **`{#snippet}` / `{@render}`**：WorkSpace.svelte 使用此模式实现递归文件树渲染（`treeNode` snippet 递归调用自身）
-- **`$effect()` 响应式**：
-  - Outline.svelte：内容变化时自动重新加载大纲
-  - WorkSpace.svelte：workspacePath 变化时自动加载文件树
+- **Runes**：使用 `$state()`、`$derived()`、`$effect()`、`$props()`，不使用旧版 `$:` 语法
+- **`{#snippet}` / `{@render}`**：WorkSpace.svelte 使用此模式实现递归文件树渲染
+- **`$effect()` 响应式**：Outline.svelte 在 editor 变化时自动提取大纲；WorkSpace.svelte 在 workspacePath 变化时自动加载文件树
 
 ## 样式约定
 
 - 全局颜色通过 CSS 变量定义在 `app.css` 的 `:root` / `.theme-dark` / `.theme-one-dark`
-- 主要变量：`--bg`、`--bg-secondary`、`--text`、`--text-secondary`、`--border`、`--accent`、`--accent-bg`（选中态背景）、`--menu-hover-bg`、`--menu-hover-text`、`--highlight-bg`（高亮背景色，适配主题）、`--cell-selected-bg`（表格单元格选中色，适配主题）
-- Tiptap 编辑器内容样式写在 `app.css` 的 `.ProseMirror` 选择器下
-- 表格相关 CSS：
-  - `.tableWrapper` — resizable 表格的外层容器（`overflow-x: auto` + `position: relative`）
-  - `.selectedCell` — 选中单元格高亮
-  - `.column-resize-handle` — 列宽调整拖拽手柄
-- 工具栏按钮使用 `.tb-btn` class，分隔线使用 `.tb-sep`
-- 状态栏使用 `.status-bar`，标签栏使用 `.tab-bar`
+- Tiptap 编辑器内容样式写在 `.ProseMirror` 选择器下
+- 工具栏按钮 `.tb-btn`，分隔线 `.tb-sep`，状态栏 `.status-bar`，标签栏 `.tab-bar`
 - 每个组件使用 Svelte scoped `<style>` 块
-
-## 待集成
-
-- **svelte-i18n**：`package.json` 已声明依赖，但未集成（无 locale 文件、无配置代码）

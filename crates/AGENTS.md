@@ -4,9 +4,9 @@
 
 ```
 marktext-rs (src-rust)
-  ├── mt-core          (无外部依赖，仅 ropey/serde/toml/thiserror)
+  ├── mt-core          (ropey/regex/serde/toml/thiserror)
   ├── mt-fs            → mt-core
-  ├── mt-markdown      → mt-core (间接通过 mt-fs 使用)
+  ├── mt-markdown      (pulldown-cmark, 独立)
   └── mt-export        → mt-core, mt-markdown
 ```
 
@@ -16,31 +16,51 @@ marktext-rs (src-rust)
 
 | 模块 | 核心类型 | 说明 |
 |------|---------|------|
-| `document` | `Document` | Rope 文本缓冲区，跟踪 path/dirty/line_ending/encoding。内部存储 LF，读写时自动转换 |
-| `config` | `AppConfig`, `EditorConfig`, `WindowConfig` | TOML 配置，存储在 `~/Library/Application Support/marktext-rs/config.toml` |
+| `document` | `Document` | Rope 文本缓冲区 + regex 搜索，跟踪 path/dirty/line_ending/encoding |
+| `config` | `AppConfig`, `EditorConfig` | TOML 配置，存储在 `~/Library/Application Support/marktext-rs/config.toml` |
 | `error` | `Error` enum | Io / Encoding / Parse / Config / DocumentNotFound / NoFilePath |
-| `theme` | `ThemeId` enum | Light / Dark / OneDark / Graphite / Ulysses / MaterialDark，含 `cycle()`、`label()`、`is_dark()`、`all()` |
+| `theme` | `ThemeId` enum | Light / Dark / OneDark / Graphite / Ulysses / MaterialDark |
 | `tab` | `TabState`, `WindowTabs` | 标签页状态持久化，JSON 格式存储 |
 | `keymap` | `KeyBinding` | 快捷键定义（声明式，尚未接入运行时） |
 
-### Document API 要点
+### Document API
 
 ```rust
-Document::new()                                          // 空文档
-Document::from_content(text, path, encoding)             // 从字符串创建
-doc.text()           → String    // 带原始行尾的完整文本
-doc.text_normalized() → String   // LF 行尾（用于 markdown 处理）
-doc.word_count()     → usize     // CJK 感知词数统计
-doc.file_name()      → String    // 文件名（path 的最后一段）
-doc.path()           → Option<&Path>
-doc.encoding()       → &Encoding
-doc.line_ending()    → &LineEnding
-doc.insert(char_idx, text)
-doc.remove(start..end)
-doc.mark_saved()
+// 创建
+Document::new()                                    // 空文档
+Document::from_content(text, path, encoding)        // 从字符串创建
+
+// 读取
+doc.text()             → String    // 带原始行尾的完整文本
+doc.text_normalized()  → String    // LF 行尾（用于 markdown 处理）
+doc.path()             → Option<&Path>
+doc.file_name()        → &str
+doc.encoding()         → Encoding
+doc.line_ending()      → LineEnding
+doc.is_dirty()         → bool
+doc.is_empty()         → bool
+doc.len_chars()        → usize
+doc.len_lines()        → usize
+
+// 统计
+doc.word_count()       → usize     // CJK 感知：每个 CJK 字符计为一个词
+doc.character_count()  → usize     // 排除空白字符
+
+// 编辑
+doc.insert(char_idx, text)          // 在字符位置插入
+doc.remove(start, end)              // 删除字符范围
+doc.replace(from, to, text)         // 替换字符范围（合并 remove + insert）
+doc.set_content(content)            // 全量替换 rope 内容
+doc.set_path(path)                  // 设置文件路径（Save As）
+doc.mark_saved()                    // 标记为已保存
+
+// 搜索
+doc.search(query, case_sensitive, whole_word, use_regex) → Vec<(usize, usize)>
+// 返回 (from, to) 字符位置对，支持正则/全词/大小写选项
+// 内部使用 regex crate，正确处理 UTF-8 字节偏移到字符偏移的转换
 ```
 
-### AppConfig API 要点
+### AppConfig API
 
 ```rust
 AppConfig::load(path)        → AppConfig
@@ -72,10 +92,9 @@ config.set_language(&mut self, lang)
 walk_directory(path, depth) → Result<Vec<FileEntry>>
 ```
 
-- 递归扫描目录，返回 `FileEntry` 树（`name`、`path`、`is_dir`、`children`、`mtime`）
+- 递归扫描目录，返回 `FileEntry` 树
 - **过滤规则**：仅保留 `.md`、`.markdown`、`.txt` 扩展名的文件
 - **跳过目录**：以 `.` 开头的隐藏目录、`node_modules`、`target`
-- 目录始终包含在结果中（不过滤）
 
 ### FileWatcher
 
@@ -84,22 +103,22 @@ FileWatcher::new() → FileWatcher
 watcher.watch(path, id) → Result<Receiver<FileChangeEvent>>
 ```
 
-- 基于 `notify` crate 实现
-- 支持递归目录监视
+- 基于 `notify` crate，递归目录监视
 - 事件类型：`modified`、`created`、`deleted`
-- 返回 `Receiver<FileChangeEvent>` 用于异步消费
 
 支持的编码：UTF-8、UTF-8 BOM、GBK、Shift_JIS、Big5 及其他 chardetng 可检测的编码。
 
 ## mt-markdown
 
-Markdown 解析，封装 pulldown-cmark。
+Markdown 解析，封装 pulldown-cmark（SIMD 加速）。
 
 | 函数 | 说明 |
 |------|------|
-| `parse_markdown(text) → Vec<Event<'static>>` | 解析为 pulldown-cmark 事件流（启用 tables/footnotes/strikethrough/tasklists） |
-| `extract_headings(text) → Vec<(u8, String)>` | 提取标题层级和文本（用于 TOC） |
+| `parse_markdown(text) → Vec<Event<'static>>` | 解析为 pulldown-cmark 事件流（tables/footnotes/strikethrough/tasklists） |
+| `extract_headings(text) → Vec<(u8, String)>` | 提取标题层级和文本 |
 | `to_html(text) → String` | 转换为 HTML |
+
+注：`MarkdownNode` 枚举已定义但未使用（计划中的 AST）。
 
 ## mt-export
 
@@ -108,12 +127,12 @@ Markdown 解析，封装 pulldown-cmark。
 | 函数 | 说明 |
 |------|------|
 | `export_html(markdown, title, theme_css?) → String` | 生成独立 HTML 文档（内联 GitHub 风格 CSS） |
-| `export_pdf(markdown, path) → Result<()>` | 生成 PDF（使用 printpdf，**硬编码 macOS 字体路径，需跨平台修复**） |
+| `export_pdf(markdown, title, path) → Result<()>` | 生成 PDF（printpdf，**硬编码 macOS 字体路径**） |
 
 ## 开发约定
 
 - 所有 crate 使用 `edition = "2021"`
 - 错误类型统一使用 `thiserror` 派生
-- `mt-core` 是零 IO 的纯数据层，其他 crate 依赖它但不互相依赖（除了 mt-export → mt-markdown）
+- `mt-core` 是零 IO 的纯数据层，其他 crate 依赖它但不互相依赖（除 mt-export → mt-markdown）
 - 新增 crate 时更新根 `Cargo.toml` 的 `[workspace].members`
 - Cargo.lock 已提交到版本控制

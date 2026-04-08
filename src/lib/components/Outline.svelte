@@ -1,30 +1,28 @@
 <script lang="ts">
-  import { getOutline } from '$lib/commands'
   import type { OutlineItem } from '$lib/commands'
+  import type { Editor } from '@tiptap/core'
 
   interface Props {
-    content?: string
+    editor?: Editor | null
     onNavigate?: (item: OutlineItem) => void
   }
 
-  let { content = '', onNavigate }: Props = $props()
+  let { editor = null, onNavigate }: Props = $props()
 
   let outline = $state<OutlineItem[]>([])
-  let loading = $state(false)
 
-  async function loadOutline() {
-    if (!content) {
-      outline = []
-      return
-    }
-    loading = true
-    try {
-      outline = await getOutline(content)
-    } catch (e) {
-      console.error('Failed to load outline:', e)
-      outline = []
-    }
-    loading = false
+  /** Extract headings directly from the ProseMirror document model (no IPC) */
+  function extractOutline(ed: Editor): OutlineItem[] {
+    const items: OutlineItem[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'heading') {
+        items.push({
+          level: node.attrs.level as number,
+          text: node.textContent.trim(),
+        })
+      }
+    })
+    return items
   }
 
   function handleClick(item: OutlineItem) {
@@ -32,8 +30,8 @@
   }
 
   $effect(() => {
-    if (content) {
-      loadOutline()
+    if (editor) {
+      outline = extractOutline(editor)
     } else {
       outline = []
     }
