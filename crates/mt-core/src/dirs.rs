@@ -41,7 +41,7 @@ pub fn home_dir() -> Option<PathBuf> {
     }
 }
 
-/// Get the application config directory (`marktext-rs`).
+/// Get the application config directory (`markpure`).
 pub fn app_config_dir() -> Option<PathBuf> {
-    config_dir().map(|d| d.join("marktext-rs"))
+    config_dir().map(|d| d.join("markpure"))
 }

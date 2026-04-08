@@ -1,6 +1,6 @@
 /**
  * Quick insert command definitions
- * Inspired by MarkText's quick insert config
+ * Quick insert config
  */
 
 export interface QuickInsertItem {

@@ -1,4 +1,4 @@
-# MarkText-RS
+# MarkPure
 
 WYSIWYG Markdown 桌面编辑器。
 
@@ -145,8 +145,31 @@ npm run build          # 构建前端
 cargo build --release  # 构建 Rust 后端（嵌入 dist/）
 
 # 运行
-./target/release/marktext
+./target/release/markpure
 ```
+
+## macOS App 打包
+
+构建 macOS `.app` 应用程序包：
+
+```bash
+# 一键打包（构建 + 打包 + ad-hoc 签名）
+./bundle-macos.sh
+
+# 跳过代码签名
+SIGN=0 ./bundle-macos.sh
+
+# 运行
+open target/MarkPure.app
+```
+
+首次打包前生成应用图标（之后无需重复）：
+
+```bash
+./macos/gen-icns.sh
+```
+
+打包后的应用位于 `target/MarkPure.app`。
 
 ## 其他命令
 

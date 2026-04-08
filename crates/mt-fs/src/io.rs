@@ -106,7 +106,7 @@ mod tests {
     #[tokio::test]
     async fn test_read_utf8_file() {
         let content = "# Hello World\n\nThis is a test.\n";
-        let dir = std::env::temp_dir().join("marktext-rs-test");
+        let dir = std::env::temp_dir().join("markpure-test");
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("test_utf8.md");
         std::fs::write(&path, content.as_bytes()).unwrap();
@@ -119,7 +119,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_write_and_read_roundtrip() {
-        let dir = std::env::temp_dir().join("marktext-rs-test");
+        let dir = std::env::temp_dir().join("markpure-test");
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("test_roundtrip.md");
 

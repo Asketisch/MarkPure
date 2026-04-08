@@ -651,7 +651,7 @@ fn main() -> wry::Result<()> {
         .map(|a| a.trim_start_matches("--child-window=").to_string());
 
     let window = WindowBuilder::new()
-        .with_title("MarkText")
+        .with_title("MarkPure")
         .with_inner_size(tao::dpi::LogicalSize::new(1200, 800))
         .build(&event_loop)
         .unwrap();

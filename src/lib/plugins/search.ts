@@ -27,7 +27,7 @@ export interface SearchState {
   decorations: DecorationSet
 }
 
-export const searchPluginKey = new PluginKey<SearchState>('marktext-search')
+export const searchPluginKey = new PluginKey<SearchState>('markpure-search')
 
 /** Extract text and position map from the document using textBetween */
 function getDocText(doc: PMNode): { text: string; posMap: number[] } {

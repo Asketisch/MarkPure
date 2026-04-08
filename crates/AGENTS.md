@@ -3,7 +3,7 @@
 ## Crate 依赖关系
 
 ```
-marktext-rs (src-rust)
+markpure (src-rust)
   ├── mt-core          (ropey/regex/serde/toml/thiserror)
   ├── mt-fs            → mt-core
   ├── mt-markdown      (pulldown-cmark, 独立)
@@ -17,7 +17,7 @@ marktext-rs (src-rust)
 | 模块 | 核心类型 | 说明 |
 |------|---------|------|
 | `document` | `Document` | Rope 文本缓冲区 + regex 搜索，跟踪 path/dirty/line_ending/encoding |
-| `config` | `AppConfig`, `EditorConfig` | TOML 配置，存储在 `~/Library/Application Support/marktext-rs/config.toml` |
+| `config` | `AppConfig`, `EditorConfig` | TOML 配置，存储在 `~/Library/Application Support/markpure/config.toml` |
 | `error` | `Error` enum | Io / Encoding / Parse / Config / DocumentNotFound / NoFilePath |
 | `theme` | `ThemeId` enum | Light / Dark / OneDark / Graphite / Ulysses / MaterialDark |
 | `tab` | `TabState`, `WindowTabs` | 标签页状态持久化，JSON 格式存储 |

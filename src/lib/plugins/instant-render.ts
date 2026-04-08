@@ -21,7 +21,7 @@ export interface InstantRenderState {
   decorations: DecorationSet
 }
 
-export const instantRenderPluginKey = new PluginKey<InstantRenderState>('marktext-instant-render')
+export const instantRenderPluginKey = new PluginKey<InstantRenderState>('markpure-instant-render')
 
 /** Check if a position is "near" a range (within threshold characters) */
 function isNearCursor(from: number, to: number, cursorPos: number, threshold = 2): boolean {

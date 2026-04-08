@@ -1,5 +1,5 @@
 [package]
-name = "marktext"
+name = "markpure"
 version = "0.1.0"
 description = "A WYSIWYG Markdown editor"
 license = "MIT"

@@ -1,4 +1,4 @@
-# AGENTS.md — MarkText-RS
+# AGENTS.md — MarkPure
 
 WYSIWYG Markdown 桌面编辑器，使用 Rust (wry + tao) + Svelte 5 + Tiptap 构建。
 

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// Available theme IDs matching original MarkText themes
+/// Available theme IDs
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ThemeId {
     Light,

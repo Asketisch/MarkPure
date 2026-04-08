@@ -569,7 +569,7 @@
       <button class="menu-btn" onclick={handleExportHtml}>Export HTML</button>
       <button class="menu-btn" onclick={handleExportPdf}>Export PDF</button>
     </div>
-    <div class="menu-title">MarkText</div>
+    <div class="menu-title">MarkPure</div>
     <div class="menu-actions">
       <button class="menu-btn" onclick={newTab}>+</button>
     </div>

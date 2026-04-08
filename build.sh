@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# MarkText-RS Build Script
+# MarkPure Build Script
 # Usage:
 #   ./build.sh          - debug build
 #   ./build.sh release   - release (optimized) build
@@ -66,9 +66,9 @@ cargo build $CARGO_FLAG
 
 # ---- Done ----
 if [ "$MODE" = "release" ]; then
-    BINARY="$PROJECT_DIR/target/release/marktext"
+    BINARY="$PROJECT_DIR/target/release/markpure"
 else
-    BINARY="$PROJECT_DIR/target/debug/marktext"
+    BINARY="$PROJECT_DIR/target/debug/markpure"
 fi
 
 echo ""
