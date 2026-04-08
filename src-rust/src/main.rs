@@ -573,6 +573,7 @@ fn main() -> wry::Result<()> {
     let state_clone = state.clone();
 
     let mut builder = WebViewBuilder::new()
+        .with_devtools(true)
         .with_custom_protocol("mt".into(), |_id, request| {
             let path = request.uri().path();
             serve_asset(path).map(Into::into)

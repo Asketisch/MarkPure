@@ -4,7 +4,7 @@
 
   interface Props {
     content?: string
-    onNavigate?: (text: string) => void
+    onNavigate?: (item: OutlineItem) => void
   }
 
   let { content = '', onNavigate }: Props = $props()
@@ -28,7 +28,7 @@
   }
 
   function handleClick(item: OutlineItem) {
-    onNavigate?.(item.text)
+    onNavigate?.(item)
   }
 
   $effect(() => {

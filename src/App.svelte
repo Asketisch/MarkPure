@@ -9,13 +9,21 @@
     getDocStats,
     pickDirectory,
     getRecentFiles,
+    getConfig,
+    setConfig,
     exportHtml,
     exportPdf,
     pollFileChanges,
   } from './lib/commands'
   import type { DocStats } from './lib/commands'
   import type { Editor } from '@tiptap/core'
+  import { TextSelection } from '@tiptap/pm/state'
   import SideBar from './lib/components/SideBar.svelte'
+  import SearchBar from './lib/components/SearchBar.svelte'
+  import SourceEditor from './lib/components/SourceEditor.svelte'
+  import QuickInsertPopup from './lib/components/QuickInsertPopup.svelte'
+  import { toggleInstantRender } from './lib/plugins/instant-render'
+  import { searchQuickInsert, type QuickInsertItem } from './lib/extensions/quick-insert-config'
 
   interface Tab {
     id: number
@@ -37,7 +45,16 @@
   let showSidebar = $state(true)
   let recentFiles = $state<string[]>([])
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
+  let showSearch = $state(false)
+  let sourceMode = $state(false)
+  let sourceContent = $state('')
+  let sourceEditorRef: ReturnType<typeof SourceEditor> | null = null
+  let instantRenderEnabled = $state(true)
+  let qiVisible = $state(false)
+  let qiQuery = $state('')
+  let qiPosition = $state({ top: 0, left: 0 })
   let initPending = false
+  let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
   const themes = ['', 'theme-dark', 'theme-one-dark']
 
   function getActiveTab(): Tab | undefined {
@@ -76,6 +93,14 @@
           t.dirty = true
         }
         updateStats(md)
+        // Auto-save with 3 second debounce
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+        autoSaveTimer = setTimeout(() => {
+          const tab = getActiveTab()
+          if (tab?.path && tab.dirty) {
+            handleSave()
+          }
+        }, 3000)
       },
       onSave: handleSave,
     })
@@ -243,6 +268,28 @@
   function cycleTheme() {
     const idx = themes.indexOf(theme)
     theme = themes[(idx + 1) % themes.length]
+    saveCurrentConfig()
+  }
+
+  function toggleSourceMode() {
+    if (sourceMode) {
+      const md = sourceEditorRef?.getContent() ?? sourceContent
+      if (editor && md !== undefined) {
+        setContent(editor, md)
+        const tab = getActiveTab()
+        if (tab) {
+          tab.content = md
+          tab.dirty = true
+        }
+      }
+      sourceMode = false
+      requestAnimationFrame(() => editor?.commands.focus())
+    } else {
+      if (editor) {
+        sourceContent = getMarkdown(editor)
+      }
+      sourceMode = true
+    }
   }
 
   function toggleSidebar() {
@@ -267,11 +314,34 @@
     const path = await pickDirectory()
     if (path) {
       workspacePath = path
+      saveCurrentConfig()
     }
   }
 
-  function handleOutlineNavigate(text: string) {
-    console.log('Navigate to:', text)
+  function handleOutlineNavigate(item: { level: number; text: string }) {
+    if (!editor) return
+    const { level, text } = item
+
+    // Find the heading node in the ProseMirror document
+    let found = false
+    editor.state.doc.descendants((node, pos) => {
+      if (found) return false
+      if (node.type.name === 'heading' && node.attrs.level === level) {
+        // Check if heading text matches
+        const nodeText = node.textContent.trim()
+        if (nodeText === text || nodeText.startsWith(text)) {
+          // Set cursor to the heading and scroll into view
+          const tr = editor!.state.tr.setSelection(
+            TextSelection.create(editor!.state.doc, pos + 1)
+          )
+          tr.scrollIntoView()
+          editor!.view.dispatch(tr)
+          editor!.commands.focus()
+          found = true
+          return false
+        }
+      }
+    })
   }
 
   async function handleExportHtml() {
@@ -299,6 +369,13 @@
   }
 
   let fileChangeInterval: ReturnType<typeof setInterval> | null = null
+
+  function saveCurrentConfig() {
+    setConfig({
+      theme,
+      last_workspace: workspacePath,
+    }).catch(() => {})
+  }
 
   function startFileChangePolling() {
     if (fileChangeInterval) return
@@ -344,13 +421,83 @@
           e.preventDefault()
           toggleSidebar()
           break
+        case 'f':
+          e.preventDefault()
+          showSearch = true
+          break
+        case 'h':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            showSearch = true
+          }
+          break
+        case '/':
+          e.preventDefault()
+          toggleSourceMode()
+          break
       }
     }
   }
 
   onMount(async () => {
+    // Load persisted config
+    try {
+      const config = await getConfig()
+      if (config.theme) theme = config.theme
+      if (config.last_workspace) workspacePath = config.last_workspace
+      if (config.recent_files) recentFiles = config.recent_files
+    } catch (e) {
+      console.error('Failed to load config:', e)
+    }
+
     initEditor()
     window.addEventListener('keydown', handleKeydown)
+
+    // Quick insert popup event listeners
+    const handleQIStart = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      qiVisible = true
+      qiQuery = detail.query ?? ''
+      // Position popup using clientRect from suggestion plugin
+      const rect = detail.clientRect?.()
+      if (rect) {
+        qiPosition = { top: rect.bottom + 4, left: rect.left }
+      } else if (detail.range?.from != null && editor) {
+        const coords = editor.view.coordsAtPos(detail.range.from)
+        qiPosition = { top: coords.bottom + 4, left: coords.left }
+      }
+    }
+    const handleQIUpdate = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      qiQuery = detail.query ?? ''
+      const rect = detail.clientRect?.()
+      if (rect) {
+        qiPosition = { top: rect.bottom + 4, left: rect.left }
+      } else if (detail.range?.from != null && editor) {
+        const coords = editor.view.coordsAtPos(detail.range.from)
+        qiPosition = { top: coords.bottom + 4, left: coords.left }
+      }
+    }
+    const handleQIExit = () => {
+      qiVisible = false
+    }
+
+    window.addEventListener('quick-insert-start', handleQIStart)
+    window.addEventListener('quick-insert-update', handleQIUpdate)
+    window.addEventListener('quick-insert-exit', handleQIExit)
+
+    // Handle Enter selection from extension's onKeyDown
+    const handleQISelect = () => {
+      const props = (window as any).__qi_props
+      if (!props) return
+      const items = searchQuickInsert(props.query ?? '')
+      const activeIdx = (window as any).__qi_activeIndex ?? 0
+      if (items[activeIdx]) {
+        props.command(items[activeIdx])
+      }
+      qiVisible = false
+    }
+    window.addEventListener('quick-insert-select', handleQISelect)
 
     try {
       recentFiles = await getRecentFiles()
@@ -359,7 +506,12 @@
     }
 
     return () => {
+      saveCurrentConfig()
       window.removeEventListener('keydown', handleKeydown)
+      window.removeEventListener('quick-insert-start', handleQIStart)
+      window.removeEventListener('quick-insert-update', handleQIUpdate)
+      window.removeEventListener('quick-insert-exit', handleQIExit)
+      window.removeEventListener('quick-insert-select', handleQISelect)
       editor?.destroy()
     }
   })
@@ -390,6 +542,7 @@
       <SideBar
         {workspacePath}
         editorContent={getActiveContent()}
+        {recentFiles}
         onOpenFile={handleOpenFile}
         onOutlineNavigate={handleOutlineNavigate}
       />
@@ -451,10 +604,35 @@
         <span class="tb-sep"></span>
         <button class="tb-btn" onclick={addTable} title="Insert Table">&#8863;</button>
         <button class="tb-btn" onclick={insertHr} title="Horizontal Rule">&mdash;</button>
+        <span class="tb-sep"></span>
+        <button class="tb-btn" onclick={() => showSearch = !showSearch} title="Find & Replace (Ctrl+F)">&#128269;</button>
+        <span class="tb-sep"></span>
+        <button class="tb-btn" class:active={sourceMode} onclick={toggleSourceMode} title="Source Mode (Ctrl+/)">&lt;/&gt;</button>
+        <button class="tb-btn" class:active={instantRenderEnabled} onclick={() => { if (editor) { toggleInstantRender(editor.view); instantRenderEnabled = !instantRenderEnabled } }} title="Instant Render">&#9660;</button>
       </div>
 
+      <!-- Search Bar -->
+      {#if editor}
+        <SearchBar bind:visible={showSearch} {editor} />
+      {/if}
+
       <!-- Editor Area -->
-      <div class="editor-area" bind:this={editorContainer}></div>
+      {#if sourceMode}
+        <SourceEditor
+          content={sourceContent}
+          onUpdate={(md) => {
+            const tab = getActiveTab()
+            if (tab) {
+              tab.content = md
+              tab.dirty = true
+            }
+            updateStats(md)
+          }}
+          bind:this={sourceEditorRef}
+        />
+      {:else}
+        <div class="editor-area" bind:this={editorContainer}></div>
+      {/if}
 
       <!-- Status Bar -->
       <footer class="status-bar">
@@ -468,6 +646,32 @@
     </div>
   </div>
 </div>
+
+<!-- Quick Insert Popup (teleported outside app-root) -->
+{#if qiVisible}
+  <QuickInsertPopup
+    query={qiQuery}
+    position={qiPosition}
+    onSelect={(item: QuickInsertItem) => {
+      const props = (window as any).__qi_props
+      if (props?.command) {
+        props.command(item)
+      }
+      qiVisible = false
+    }}
+    onClose={() => {
+      qiVisible = false
+      // Clear the @ trigger from editor
+      const w = window as any
+      if (w.__qi_props?.range) {
+        editor?.chain().focus().deleteRange({
+          from: w.__qi_props.range.from,
+          to: w.__qi_props.range.to,
+        }).run()
+      }
+    }}
+  />
+{/if}
 
 <style>
   .app-root {

@@ -11,6 +11,11 @@ import { Image } from '@tiptap/extension-image'
 import { Link } from '@tiptap/extension-link'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { Highlight } from '@tiptap/extension-highlight'
+import { SearchExtension } from './extensions/search-extension'
+import { CodeBlockCMExtension } from './extensions/code-block-cm-extension'
+import { MathExtension } from './extensions/math-extension'
+import { InstantRenderExtension } from './extensions/instant-render-extension'
+import { QuickInsertExtension } from './extensions/quick-insert-extension'
 
 export interface EditorOptions {
   parent: HTMLElement
@@ -28,7 +33,7 @@ export function createEditor(opts: EditorOptions): Editor {
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4, 5, 6] },
-        codeBlock: { HTMLAttributes: { class: 'code-block' } },
+        codeBlock: false,
       }),
       Markdown.configure({
         html: true,
@@ -45,6 +50,11 @@ export function createEditor(opts: EditorOptions): Editor {
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: 'Start writing markdown...' }),
       Highlight,
+      CodeBlockCMExtension,
+      MathExtension,
+      InstantRenderExtension,
+      QuickInsertExtension,
+      SearchExtension,
     ],
     content,
     editorProps: {

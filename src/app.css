@@ -133,6 +133,61 @@ html, body, #app {
   font-size: inherit;
 }
 
+/* CM6 Code Block NodeView */
+.mw-code-block {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 0.6em 0;
+  overflow: hidden;
+}
+.mw-code-block-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.mw-code-block-lang {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 1px 6px;
+  outline: none;
+  cursor: pointer;
+}
+.mw-code-block-lang:focus {
+  border-color: var(--accent);
+}
+.mw-code-block-editor .cm-editor {
+  height: auto;
+}
+.mw-code-block-editor .cm-scroller {
+  padding: 8px 12px;
+}
+.mw-code-block-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Instant Render: syntax markers */
+.mw-syntax-marker {
+  font-size: 0.85em;
+  font-family: inherit;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+  user-select: none;
+}
+.mw-syntax-visible {
+  opacity: 0.5;
+  color: var(--text-secondary);
+}
+.mw-syntax-hidden {
+  display: none;
+}
+
 /* Blockquote */
 .ProseMirror blockquote {
   border-left: 4px solid var(--accent);
@@ -257,7 +312,46 @@ html, body, #app {
   height: 0;
 }
 
+/* Quick insert hint on empty paragraphs */
+.ProseMirror p.is-editor-empty::before {
+  content: 'Type @ to insert';
+  float: right;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  pointer-events: none;
+  font-size: 0.85em;
+}
+
 /* Selection */
 .ProseMirror ::selection {
   background: rgba(9, 105, 218, 0.2);
+}
+
+/* Math (KaTeX) */
+.ProseMirror .math-inline {
+  display: inline;
+  padding: 0 2px;
+}
+.ProseMirror .math-display {
+  display: block;
+  margin: 0.8em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+.ProseMirror .math-error {
+  color: #e74c3c;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+/* Search highlights */
+.mw-search-match {
+  background: var(--highlight-bg);
+  border-radius: 2px;
+}
+.mw-search-match-current {
+  background: #f5a623;
+  color: #000;
+  outline: 2px solid #e8930c;
+  outline-offset: -1px;
 }
