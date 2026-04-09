@@ -15,12 +15,12 @@ exclude:
   - target/
   - node_modules/
   - .git/
-  - *.log
+  - "*.log"
   - dist/
   - "*.md"
   - "*.toml"
   - "*.json"
-  - ".github/"
+  - .github/
   - packaging/
   - docs/
   - src/
