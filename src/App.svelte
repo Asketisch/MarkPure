@@ -8,24 +8,28 @@
     saveFileAs,
     getDocStats,
     pickDirectory,
-    getRecentFiles,
     getConfig,
     setConfig,
     exportHtml,
     exportPdf,
+    exportWord,
     pollFileChanges,
     docOpen,
     docClose,
     docSetContent,
     docGetStats,
   } from './lib/commands'
-  import type { DocStats } from './lib/commands'
+  import type { DocStats, AppConfig } from './lib/commands'
   import type { Editor } from '@tiptap/core'
   import { TextSelection } from '@tiptap/pm/state'
   import SideBar from './lib/components/SideBar.svelte'
   import SearchBar from './lib/components/SearchBar.svelte'
+  import WorkspaceSearch from './lib/components/WorkspaceSearch.svelte'
+  import EmptyState from './lib/components/EmptyState.svelte'
   import SourceEditor from './lib/components/SourceEditor.svelte'
   import QuickInsertPopup from './lib/components/QuickInsertPopup.svelte'
+  import Settings from './lib/components/Settings.svelte'
+  import { createI18n } from './lib/i18n.svelte'
   import { toggleInstantRender } from './lib/plugins/instant-render'
   import { searchQuickInsert, type QuickInsertItem } from './lib/extensions/quick-insert-config'
 
@@ -37,6 +41,8 @@
     content: string
   }
 
+  const i18n = createI18n()
+
   let tabs = $state<Tab[]>([{ id: 1, path: null, name: 'Untitled', dirty: false, content: '' }])
   let activeTabId = $state<number>(1)
   let nextId = $state(2)
@@ -47,9 +53,10 @@
   let saving = $state(false)
   let workspacePath = $state<string | null>(null)
   let showSidebar = $state(true)
-  let recentFiles = $state<string[]>([])
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
   let showSearch = $state(false)
+  let showWorkspaceSearch = $state(false)
+  let showSettings = $state(false)
   let sourceMode = $state(false)
   let sourceContent = $state('')
   let sourceEditorRef: ReturnType<typeof SourceEditor> | null = null
@@ -59,7 +66,7 @@
   let qiPosition = $state({ top: 0, left: 0 })
   let initPending = false
   let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
-  const themes = ['', 'theme-dark', 'theme-one-dark']
+  const themes = ['', 'theme-dark', 'theme-one-dark', 'theme-graphite', 'theme-ulysses', 'theme-material-dark']
 
   function getActiveTab(): Tab | undefined {
     return tabs.find(t => t.id === activeTabId)
@@ -111,12 +118,12 @@
           // Sync content to Rust document
           syncToRust(t.id, md)
         }
-        updateStats(tab.id)
+        updateStats(t?.id ?? tab.id)
         // Auto-save with 3 second debounce
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
         autoSaveTimer = setTimeout(() => {
-          const tab = getActiveTab()
-          if (tab?.path && tab.dirty) {
+          const currentTab = getActiveTab()
+          if (currentTab?.path && currentTab.dirty) {
             handleSave()
           }
         }, 3000)
@@ -133,6 +140,8 @@
 
   function switchTab(id: number) {
     if (activeTabId === id) return
+    // Clear auto-save timer when switching tabs
+    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null }
     const current = getActiveTab()
     if (current && editor) {
       current.content = getMarkdown(editor)
@@ -154,6 +163,8 @@
 
   function closeTab(id: number) {
     if (tabs.length <= 1) return
+    // Clear auto-save timer when closing a tab
+    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null }
     const idx = tabs.findIndex(t => t.id === id)
     const wasActive = activeTabId === id
 
@@ -357,6 +368,33 @@
     }
   }
 
+  async function handleWorkspaceSearchNavigate(file: string, line: number) {
+    // Open the file and navigate to the line
+    try {
+      const info = await openFileByPath(file)
+      if (!info) return
+      const existing = tabs.find(t => t.path === info.path)
+      if (existing) {
+        existing.content = info.content
+        existing.dirty = false
+        syncToRust(existing.id, info.content)
+        switchTab(existing.id)
+      } else {
+        const tab: Tab = {
+          id: nextId++,
+          path: info.path,
+          name: info.file_name,
+          dirty: false,
+          content: info.content,
+        }
+        tabs = [...tabs, tab]
+        switchTab(tab.id)
+      }
+    } catch (e) {
+      console.error('Failed to open file from search:', e)
+    }
+  }
+
   function handleOutlineNavigate(item: { level: number; text: string }) {
     if (!editor) return
     const { level, text } = item
@@ -407,6 +445,18 @@
     }
   }
 
+  async function handleExportWord() {
+    const tab = getActiveTab()
+    if (!tab) return
+    const content = editor ? getMarkdown(editor) : tab.content
+    const title = tab.name.replace(/\.md$/, '')
+    try {
+      await exportWord(content, title)
+    } catch (e) {
+      console.error('Failed to export Word:', e)
+    }
+  }
+
   let fileChangeInterval: ReturnType<typeof setInterval> | null = null
 
   function saveCurrentConfig() {
@@ -414,6 +464,18 @@
       theme,
       last_workspace: workspacePath,
     }).catch(() => {})
+  }
+
+  function applyEditorConfig(cfg: { font_family?: string; font_size?: number }) {
+    const root = document.documentElement
+    if (cfg.font_family) root.style.setProperty('--editor-font-family', cfg.font_family)
+    if (cfg.font_size) root.style.setProperty('--editor-font-size', cfg.font_size + 'px')
+  }
+
+  function handleConfigChange(updates: Partial<AppConfig>) {
+    if (updates.theme !== undefined) theme = updates.theme
+    if (updates.editor) applyEditorConfig(updates.editor)
+    if (updates.language) i18n.changeLocale(updates.language).catch(() => {})
   }
 
   function startFileChangePolling() {
@@ -462,7 +524,11 @@
           break
         case 'f':
           e.preventDefault()
-          showSearch = true
+          if (e.shiftKey) {
+            showWorkspaceSearch = true
+          } else {
+            showSearch = true
+          }
           break
         case 'h':
           if (e.ctrlKey || e.metaKey) {
@@ -479,12 +545,15 @@
   }
 
   onMount(async () => {
+    // Load i18n translations
+    i18n.init().catch((e: unknown) => console.error('Failed to init i18n:', e))
+
     // Load persisted config
     try {
       const config = await getConfig()
       if (config.theme) theme = config.theme
       if (config.last_workspace) workspacePath = config.last_workspace
-      if (config.recent_files) recentFiles = config.recent_files
+      if (config.editor) applyEditorConfig(config.editor)
     } catch (e) {
       console.error('Failed to load config:', e)
     }
@@ -538,12 +607,6 @@
     }
     window.addEventListener('quick-insert-select', handleQISelect)
 
-    try {
-      recentFiles = await getRecentFiles()
-    } catch (e) {
-      console.error('Failed to load recent files:', e)
-    }
-
     return () => {
       saveCurrentConfig()
       window.removeEventListener('keydown', handleKeydown)
@@ -562,14 +625,17 @@
   <!-- Menu Bar -->
   <nav class="menu-bar">
     <div class="menu-group">
-      <button class="menu-btn" onclick={handleOpen}>File</button>
-      <button class="menu-btn" onclick={handleSave}>Edit</button>
-      <button class="menu-btn" onclick={toggleSidebar}>View</button>
-      <button class="menu-btn" onclick={openWorkspace}>Workspace</button>
-      <button class="menu-btn" onclick={handleExportHtml}>Export HTML</button>
-      <button class="menu-btn" onclick={handleExportPdf}>Export PDF</button>
+      <button class="menu-btn" onclick={handleOpen}>{i18n.t('menu.file')}</button>
+      <button class="menu-btn" onclick={handleSave}>{i18n.t('menu.edit')}</button>
+      <button class="menu-btn" onclick={toggleSidebar}>{i18n.t('menu.view')}</button>
+      <button class="menu-btn" onclick={openWorkspace}>{i18n.t('menu.workspace')}</button>
+      <button class="menu-btn" onclick={handleExportHtml}>{i18n.t('menu.export_html')}</button>
+      <button class="menu-btn" onclick={handleExportPdf}>{i18n.t('menu.export_pdf')}</button>
+      <button class="menu-btn" onclick={handleExportWord}>{i18n.t('menu.export_word')}</button>
+      <button class="menu-btn" onclick={() => showWorkspaceSearch = true}>{i18n.t('menu.search')}</button>
+      <button class="menu-btn" onclick={() => showSettings = true}>{i18n.t('menu.settings')}</button>
     </div>
-    <div class="menu-title">MarkPure</div>
+    <div class="menu-title">{i18n.t('app.name')}</div>
     <div class="menu-actions">
       <button class="menu-btn" onclick={newTab}>+</button>
     </div>
@@ -581,7 +647,6 @@
       <SideBar
         {workspacePath}
         {editor}
-        {recentFiles}
         onOpenFile={handleOpenFile}
         onOutlineNavigate={handleOutlineNavigate}
       />
@@ -589,6 +654,12 @@
 
     <!-- Editor Panel -->
     <div class="editor-panel">
+      {#if !workspacePath && tabs.length === 1 && !tabs[0].path && !tabs[0].dirty}
+        <EmptyState
+          onOpenFile={handleOpenFile}
+          onOpenWorkspace={(path) => { workspacePath = path; saveCurrentConfig() }}
+        />
+      {:else}
       <!-- Tab Bar -->
       <div class="tab-bar">
         {#each tabs as tab (tab.id)}
@@ -596,10 +667,11 @@
             class="tab"
             class:active={tab.id === activeTabId}
             onclick={() => switchTab(tab.id)}
+            onauxclick={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(tab.id) } }}
             oncontextmenu={(e) => showTabContextMenu(e, tab.id)}
           >
             <span class="tab-name">
-              {tab.dirty ? '● ' : ''}{tab.name}
+              {tab.dirty ? '● ' : ''}{tab.name === 'Untitled' ? i18n.t('tab.untitled') : tab.name}
             </span>
             {#if tabs.length > 1}
               <span
@@ -616,10 +688,10 @@
       <!-- Tab Context Menu -->
       {#if tabContextMenu}
         <div class="context-menu" style="left: {tabContextMenu.x}px; top: {tabContextMenu.y}px">
-          <button onclick={() => { closeTab(tabContextMenu.tabId); hideTabContextMenu() }}>Close</button>
-          <button onclick={() => { closeOtherTabs(tabContextMenu.tabId); hideTabContextMenu() }}>Close Others</button>
-          <button onclick={() => { closeTabsToRight(tabContextMenu.tabId); hideTabContextMenu() }}>Close to the Right</button>
-          <button onclick={() => { closeAllTabs(); hideTabContextMenu() }}>Close All</button>
+          <button onclick={() => { closeTab(tabContextMenu.tabId); hideTabContextMenu() }}>{i18n.t('action.close')}</button>
+          <button onclick={() => { closeOtherTabs(tabContextMenu.tabId); hideTabContextMenu() }}>{i18n.t('tab.close_others')}</button>
+          <button onclick={() => { closeTabsToRight(tabContextMenu.tabId); hideTabContextMenu() }}>{i18n.t('tab.close_to_right')}</button>
+          <button onclick={() => { closeAllTabs(); hideTabContextMenu() }}>{i18n.t('tab.close_all')}</button>
         </div>
       {/if}
 
@@ -675,13 +747,14 @@
 
       <!-- Status Bar -->
       <footer class="status-bar">
-        <span>{stats.lines} lines</span>
-        <span>{stats.words} words</span>
-        <span>{stats.characters} chars</span>
+        <span>{stats.lines} {i18n.t('status.lines')}</span>
+        <span>{stats.words} {i18n.t('status.words')}</span>
+        <span>{stats.characters} {i18n.t('status.chars')}</span>
         {#if saving}
-          <span class="saving">Saving...</span>
+          <span class="saving">{i18n.t('status.saving')}</span>
         {/if}
       </footer>
+      {/if}
     </div>
   </div>
 </div>
@@ -711,6 +784,16 @@
     }}
   />
 {/if}
+
+<!-- Workspace Search Modal -->
+<WorkspaceSearch
+  workspacePath={workspacePath ?? ''}
+  bind:visible={showWorkspaceSearch}
+  onNavigate={handleWorkspaceSearchNavigate}
+/>
+
+<!-- Settings Modal -->
+<Settings bind:visible={showSettings} onConfigChange={handleConfigChange} />
 
 <style>
   .app-root {

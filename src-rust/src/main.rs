@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
-use std::time::UNIX_EPOCH;
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoop};
 use tao::window::WindowBuilder;
@@ -112,11 +111,6 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         // Outline
         "get_outline" => cmd_get_outline(&msg.params),
 
-        // Recent files
-        "get_recent_files" => cmd_get_recent_files(state),
-        "add_recent_file" => cmd_add_recent_file(&msg.params, state),
-        "clear_recent_files" => cmd_clear_recent_files(state),
-
         // Tabs
         "get_tabs" => cmd_get_tabs(state),
         "save_tabs" => cmd_save_tabs(&msg.params, state),
@@ -129,6 +123,49 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         // Export
         "export_html" => cmd_export_html(&msg.params),
         "export_pdf" => cmd_export_pdf(&msg.params),
+
+        // Search
+        "search_workspace" => cmd_search_workspace(&msg.params),
+
+        // Bookmarks
+        "get_bookmarks" => cmd_get_bookmarks(),
+        "add_bookmark" => cmd_add_bookmark(&msg.params),
+        "update_bookmark" => cmd_update_bookmark(&msg.params),
+        "remove_bookmark" => cmd_remove_bookmark(&msg.params),
+
+        // i18n
+        "get_locale" => cmd_get_locale(state),
+        "set_locale" => cmd_set_locale(&msg.params, state),
+        "get_translations" => cmd_get_translations(&msg.params),
+
+        // Keybindings
+        "get_keybindings" => cmd_get_keybindings(),
+        "set_keybindings" => cmd_set_keybindings(&msg.params),
+        "reset_keybindings" => cmd_reset_keybindings(),
+        "update_keybinding" => cmd_update_keybinding(&msg.params),
+
+        // Assets
+        "save_pasted_image" => cmd_save_pasted_image(&msg.params, state),
+        "upload_image_remote" => cmd_upload_image_remote(&msg.params),
+        "image_to_base64" => cmd_image_to_base64(&msg.params),
+        "get_file_info" => cmd_get_file_info(&msg.params),
+        "track_file" => cmd_track_file(&msg.params),
+        "is_file_modified" => cmd_is_file_modified(&msg.params),
+
+        // Export
+        "export_word" => cmd_export_word(&msg.params),
+
+        // Theme
+        "get_themes" => cmd_get_themes(),
+        "import_theme" => cmd_import_theme(&msg.params),
+        "export_theme" => cmd_export_theme(&msg.params),
+        "delete_theme" => cmd_delete_theme(&msg.params),
+
+        // App info
+        "get_app_info" => cmd_get_app_info(),
+
+        // Spell check
+        "check_spelling" => cmd_check_spelling(&msg.params),
 
         // File watcher events
         "poll_file_changes" => cmd_poll_file_changes(state),
@@ -328,32 +365,6 @@ fn cmd_get_outline(params: &serde_json::Value) -> std::result::Result<serde_json
     Ok(serde_json::to_value(headings).map_err(|e| e.to_string())?)
 }
 
-// Recent files
-
-fn cmd_get_recent_files(state: &AppState) -> std::result::Result<serde_json::Value, String> {
-    let config = state.config.lock().unwrap();
-    Ok(serde_json::to_value(config.get_recent_files()).map_err(|e| e.to_string())?)
-}
-
-fn cmd_add_recent_file(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
-    let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
-    {
-        let mut config = state.config.lock().unwrap();
-        config.add_recent_file(path_str);
-    }
-    state.save_config();
-    Ok(serde_json::Value::Null)
-}
-
-fn cmd_clear_recent_files(state: &AppState) -> std::result::Result<serde_json::Value, String> {
-    {
-        let mut config = state.config.lock().unwrap();
-        config.clear_recent_files();
-    }
-    state.save_config();
-    Ok(serde_json::Value::Null)
-}
-
 // Tabs
 
 fn cmd_get_tabs(state: &AppState) -> std::result::Result<serde_json::Value, String> {
@@ -408,11 +419,18 @@ fn cmd_tearoff_tab(params: &serde_json::Value, state: &AppState) -> std::result:
 
 fn cmd_get_config(state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let config = state.config.lock().unwrap();
+    let theme_class = match config.theme {
+        mt_core::ThemeId::Light => "",
+        mt_core::ThemeId::Dark => "theme-dark",
+        mt_core::ThemeId::OneDark => "theme-one-dark",
+        mt_core::ThemeId::Graphite => "theme-graphite",
+        mt_core::ThemeId::Ulysses => "theme-ulysses",
+        mt_core::ThemeId::MaterialDark => "theme-material-dark",
+    };
     let result = serde_json::json!({
-        "theme": config.theme.to_string(),
+        "theme": theme_class,
         "language": config.language,
         "last_workspace": config.last_workspace,
-        "recent_files": config.recent_files,
         "editor": {
             "font_family": config.editor.font_family,
             "font_size": config.editor.font_size,
@@ -428,15 +446,15 @@ fn cmd_get_config(state: &AppState) -> std::result::Result<serde_json::Value, St
 fn cmd_set_config(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let mut config = state.config.lock().unwrap();
 
-    // Theme
+    // Theme (accept both CSS class names and human-readable labels)
     if let Some(theme_str) = params.get("theme").and_then(|v| v.as_str()) {
         match theme_str {
-            "Cadmium Light" | "Light" => config.theme = mt_core::ThemeId::Light,
-            "Dark" => config.theme = mt_core::ThemeId::Dark,
-            "One Dark" => config.theme = mt_core::ThemeId::OneDark,
-            "Graphite" => config.theme = mt_core::ThemeId::Graphite,
-            "Ulysses" => config.theme = mt_core::ThemeId::Ulysses,
-            "Material Dark" => config.theme = mt_core::ThemeId::MaterialDark,
+            "Cadmium Light" | "Light" | "" => config.theme = mt_core::ThemeId::Light,
+            "Dark" | "theme-dark" => config.theme = mt_core::ThemeId::Dark,
+            "One Dark" | "theme-one-dark" => config.theme = mt_core::ThemeId::OneDark,
+            "Graphite" | "theme-graphite" => config.theme = mt_core::ThemeId::Graphite,
+            "Ulysses" | "theme-ulysses" => config.theme = mt_core::ThemeId::Ulysses,
+            "Material Dark" | "theme-material-dark" => config.theme = mt_core::ThemeId::MaterialDark,
             _ => {}
         }
     }
@@ -512,6 +530,258 @@ fn cmd_export_pdf(params: &serde_json::Value) -> std::result::Result<serde_json:
         .ok_or_else(|| "Cancelled".to_string())?;
 
     mt_export::export_pdf(content, title, &path.to_string_lossy())?;
+
+    Ok(serde_json::json!({ "path": path.to_string_lossy() }))
+}
+
+// Search commands
+
+fn cmd_search_workspace(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
+    let query = params["query"].as_str().ok_or("Missing 'query' parameter")?;
+    let path = PathBuf::from(path_str);
+
+    let options = mt_search::SearchOptions {
+        case_sensitive: params.get("case_sensitive").and_then(|v| v.as_bool()).unwrap_or(false),
+        whole_word: params.get("whole_word").and_then(|v| v.as_bool()).unwrap_or(false),
+        use_regex: params.get("use_regex").and_then(|v| v.as_bool()).unwrap_or(true),
+        max_depth: params.get("max_depth").and_then(|v| v.as_u64()).map(|v| v as usize),
+    };
+
+    let result = mt_search::search_workspace(&path, query, &options)
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+}
+
+// Bookmark commands
+
+fn cmd_get_bookmarks() -> std::result::Result<serde_json::Value, String> {
+    let bookmarks = mt_bookmark::load_bookmarks().map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(bookmarks).map_err(|e| e.to_string())?)
+}
+
+fn cmd_add_bookmark(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let path = params["path"].as_str().ok_or("Missing 'path' parameter")?;
+    let title = params["title"].as_str().ok_or("Missing 'title' parameter")?;
+    let tags = params.get("tags")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(String::from).collect())
+        .unwrap_or_default();
+
+    let bookmark = mt_bookmark::add_bookmark(path, title, tags).map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(bookmark).map_err(|e| e.to_string())?)
+}
+
+fn cmd_update_bookmark(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let id = params["id"].as_str().ok_or("Missing 'id' parameter")?;
+    let title = params.get("title").and_then(|v| v.as_str());
+    let description = params.get("description").and_then(|v| v.as_str());
+    let tags = params.get("tags")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(String::from).collect());
+
+    let bookmark = mt_bookmark::update_bookmark(id, title, description, tags)
+        .map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(bookmark).map_err(|e| e.to_string())?)
+}
+
+fn cmd_remove_bookmark(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let id = params["id"].as_str().ok_or("Missing 'id' parameter")?;
+    mt_bookmark::remove_bookmark(id).map_err(|e| e.to_string())?;
+    Ok(serde_json::Value::Null)
+}
+
+// i18n commands
+
+fn cmd_get_locale(state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let locales = mt_core::i18n::get_locale_codes();
+    let config = state.config.lock().unwrap();
+    let current = config.language.clone().unwrap_or_else(|| "en".to_string());
+    let translations = mt_core::i18n::get_translations(&current);
+    Ok(serde_json::json!({
+        "current": current,
+        "available": locales,
+        "translations": translations,
+    }))
+}
+
+fn cmd_set_locale(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let lang = params["lang"].as_str().ok_or("Missing 'lang' parameter")?;
+    {
+        let mut config = state.config.lock().unwrap();
+        config.set_language(Some(lang.to_string()));
+    }
+    state.save_config();
+    Ok(serde_json::Value::Null)
+}
+
+fn cmd_get_translations(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let lang = params["lang"].as_str().unwrap_or("en");
+    let translations = mt_core::i18n::get_translations(lang);
+    Ok(serde_json::to_value(translations).map_err(|e| e.to_string())?)
+}
+
+// Keybinding commands
+
+fn cmd_get_keybindings() -> std::result::Result<serde_json::Value, String> {
+    let keybindings = mt_core::load_keybindings();
+    Ok(serde_json::to_value(keybindings).map_err(|e| e.to_string())?)
+}
+
+fn cmd_set_keybindings(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let keybindings: Vec<mt_core::KeyBinding> = serde_json::from_value(params.clone())
+        .map_err(|e| e.to_string())?;
+    mt_core::save_keybindings(&keybindings).map_err(|e| e.to_string())?;
+    Ok(serde_json::Value::Null)
+}
+
+fn cmd_reset_keybindings() -> std::result::Result<serde_json::Value, String> {
+    let keybindings = mt_core::reset_keybindings().map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(keybindings).map_err(|e| e.to_string())?)
+}
+
+fn cmd_update_keybinding(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let id = params["id"].as_str().ok_or("Missing 'id' parameter")?;
+    let accelerator = params.get("accelerator")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let keybindings = mt_core::update_keybinding(id, accelerator).map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(keybindings).map_err(|e| e.to_string())?)
+}
+
+// Asset commands
+
+fn cmd_save_pasted_image(params: &serde_json::Value, _state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let workspace_path = params["workspace_path"].as_str()
+        .ok_or("Missing 'workspace_path' parameter")?;
+    let base64_data = params["data"].as_str()
+        .ok_or("Missing 'data' parameter")?;
+    let original_name = params.get("name").and_then(|v| v.as_str());
+
+    let result = mt_assets::save_pasted_image(workspace_path, base64_data, original_name)
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+}
+
+fn cmd_upload_image_remote(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let base64_data = params["data"].as_str()
+        .ok_or("Missing 'data' parameter")?;
+    let upload_url = params["upload_url"].as_str()
+        .ok_or("Missing 'upload_url' parameter")?;
+    let api_key = params.get("api_key").and_then(|v| v.as_str());
+
+    let result = mt_assets::upload_image_remote(base64_data, upload_url, api_key);
+    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+}
+
+// App info
+
+fn cmd_get_app_info() -> std::result::Result<serde_json::Value, String> {
+    Ok(serde_json::json!({
+        "name": "MarkPure",
+        "version": env!("CARGO_PKG_VERSION"),
+        "description": "A WYSIWYG Markdown editor",
+    }))
+}
+
+// Spell check commands
+
+fn cmd_check_spelling(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let text = params["text"].as_str().ok_or("Missing 'text' parameter")?;
+    let lang = params.get("lang").and_then(|v| v.as_str()).unwrap_or("en");
+
+    let result = mt_spellcheck::check_spelling(text, lang);
+    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+}
+
+// Theme commands
+
+fn cmd_get_themes() -> std::result::Result<serde_json::Value, String> {
+    let themes = mt_core::load_custom_themes();
+    Ok(serde_json::to_value(themes).map_err(|e| e.to_string())?)
+}
+
+fn cmd_import_theme(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let file_path = params["path"].as_str().ok_or("Missing 'path' parameter")?;
+    let theme = mt_core::import_theme_from_path(file_path).map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(theme).map_err(|e| e.to_string())?)
+}
+
+fn cmd_export_theme(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let id = params["id"].as_str().ok_or("Missing 'id' parameter")?;
+    let dest_path = params["dest_path"].as_str().ok_or("Missing 'dest_path' parameter")?;
+    mt_core::export_theme_to_path(id, dest_path).map_err(|e| e.to_string())?;
+    Ok(serde_json::Value::Null)
+}
+
+fn cmd_delete_theme(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let id = params["id"].as_str().ok_or("Missing 'id' parameter")?;
+    mt_core::delete_custom_theme(id).map_err(|e| e.to_string())?;
+    Ok(serde_json::Value::Null)
+}
+
+// Asset commands
+
+fn cmd_image_to_base64(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let base64_data = params["data"].as_str()
+        .ok_or("Missing 'data' parameter")?;
+
+    let result = mt_assets::image_to_base64(base64_data)
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({ "data_uri": result }))
+}
+
+fn cmd_get_file_info(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let path = params["path"].as_str()
+        .ok_or("Missing 'path' parameter")?;
+
+    let result = mt_assets::get_file_info(path)
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+}
+
+fn cmd_track_file(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let path = params["path"].as_str()
+        .ok_or("Missing 'path' parameter")?;
+
+    let mtime = mt_assets::track_file(path)
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({ "mtime": mtime }))
+}
+
+fn cmd_is_file_modified(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let path = params["path"].as_str()
+        .ok_or("Missing 'path' parameter")?;
+
+    let is_modified = mt_assets::is_file_modified(path)
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({ "is_modified": is_modified }))
+}
+
+// Export commands
+
+fn cmd_export_word(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let content = params["content"].as_str().ok_or("Missing 'content' parameter")?;
+    let title = params.get("title").and_then(|v| v.as_str()).unwrap_or("Untitled");
+
+    let bytes = mt_export::export_word(content, title)
+        .map_err(|e| e.to_string())?;
+
+    // Prompt save location
+    let path = FileDialog::new()
+        .add_filter("Word Document", &["docx"])
+        .set_file_name(&format!("{}.docx", title))
+        .set_title("Export Word Document")
+        .save_file()
+        .ok_or_else(|| "Cancelled".to_string())?;
+
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({ "path": path.to_string_lossy() }))
 }
@@ -604,10 +874,12 @@ fn cmd_doc_search(params: &serde_json::Value, state: &AppState) -> std::result::
 fn generate_uuid() -> String {
     use std::time::SystemTime;
     let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
+        .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    format!("{:x}", now)
+    // Add a random suffix to avoid collisions when called in rapid succession
+    let rand_suffix = (now as u64).wrapping_mul(2654435761).rotate_left(17);
+    format!("{:x}{:08x}", now, rand_suffix & 0xFFFFFFFF)
 }
 
 // ============ Asset Serving ============
@@ -697,7 +969,18 @@ fn main() -> wry::Result<()> {
             }
         };
 
-        let js_escaped = js.replace('\\', "\\\\").replace('\'', "\\'").replace('\n', "\\n");
+        // Escape JSON for safe embedding in a JavaScript string literal.
+        // serde_json already produces valid JSON, but we need to handle
+        // characters that are valid in JSON but invalid in JS string literals.
+        let js_escaped = js
+            .replace('\\', "\\\\")
+            .replace('\'', "\\'")
+            .replace('\n', "\\n")
+            .replace('\r', "\\r")
+            .replace('\u{2028}', "\\u2028")
+            .replace('\u{2029}', "\\u2029")
+            .replace('\0', "\\0")
+            .replace("</script", "<\\/script");
         if let Ok(wv) = wv_clone.lock() {
             if let Some(ref webview) = *wv {
                 let _ = webview.evaluate_script(&format!("window.__mt_dispatch('{js_escaped}')"));

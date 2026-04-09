@@ -16,4 +16,8 @@ mt-core = { path = "../crates/mt-core" }
 mt-fs = { path = "../crates/mt-fs" }
 mt-markdown = { path = "../crates/mt-markdown" }
 mt-export = { path = "../crates/mt-export" }
+mt-search = { path = "../crates/mt-search" }
+mt-bookmark = { path = "../crates/mt-bookmark" }
+mt-assets = { path = "../crates/mt-assets" }
+mt-spellcheck = { path = "../crates/mt-spellcheck" }
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }

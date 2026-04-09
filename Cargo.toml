@@ -5,5 +5,9 @@ members = [
     "crates/mt-fs",
     "crates/mt-markdown",
     "crates/mt-export",
+    "crates/mt-search",
+    "crates/mt-bookmark",
+    "crates/mt-assets",
+    "crates/mt-spellcheck",
 ]
 resolver = "2"

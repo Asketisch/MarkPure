@@ -5,6 +5,24 @@ use mt_core::error::{Error, Result};
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncReadExt;
 
+/// Validate that a file name does not contain path traversal components.
+/// Rejects names containing `..`, path separators, or null bytes.
+pub fn validate_file_name(name: &str) -> std::result::Result<(), String> {
+    if name.is_empty() {
+        return Err("file name is empty".into());
+    }
+    if name.contains("..") {
+        return Err(format!("invalid file name: '{}' contains '..'", name));
+    }
+    if name.contains('/') || name.contains('\\') {
+        return Err(format!("invalid file name: '{}' contains path separator", name));
+    }
+    if name.contains('\0') {
+        return Err("invalid file name: contains null byte".into());
+    }
+    Ok(())
+}
+
 /// Read a file with automatic encoding detection
 pub async fn read_file(path: &Path) -> Result<Document> {
     let mut file = tokio::fs::File::open(path).await.map_err(Error::Io)?;
@@ -91,9 +109,19 @@ pub async fn delete_file(path: &Path) -> Result<()> {
 /// Rename a file or directory
 /// Returns the new path
 pub async fn rename_file(old_path: &Path, new_name: &str) -> Result<PathBuf> {
+    validate_file_name(new_name).map_err(|e| Error::Other(e))?;
+
     let new_path = old_path.parent().map(|p| p.join(new_name)).ok_or_else(|| {
         Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"))
     })?;
+
+    // Verify the resolved path stays within the same parent directory
+    let parent = old_path.parent().ok_or_else(|| {
+        Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"))
+    })?;
+    if !new_path.starts_with(parent) {
+        return Err(Error::Other("rename escapes parent directory".into()));
+    }
 
     tokio::fs::rename(old_path, &new_path).await.map_err(Error::Io)?;
     Ok(new_path)

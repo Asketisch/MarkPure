@@ -73,7 +73,7 @@
 
   .source-editor-container :global(.cm-editor) {
     height: 100%;
-    font-size: 15px;
+    font-size: var(--editor-font-size, 15px);
     line-height: 1.7;
   }
 

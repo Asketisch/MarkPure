@@ -19,6 +19,9 @@ pub enum Error {
 
     #[error("No file path set")]
     NoFilePath,
+
+    #[error("{0}")]
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
