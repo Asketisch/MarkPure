@@ -18,8 +18,9 @@ markpure (src-rust)
 |------|---------|------|
 | `document` | `Document` | Rope 文本缓冲区 + regex 搜索，跟踪 path/dirty/line_ending/encoding |
 | `config` | `AppConfig`, `EditorConfig` | TOML 配置，存储在 `~/Library/Application Support/markpure/config.toml` |
-| `error` | `Error` enum | Io / Encoding / Parse / Config / DocumentNotFound / NoFilePath |
-| `theme` | `ThemeId` enum | Light / Dark / OneDark / Graphite / Ulysses / MaterialDark |
+| `error` | `Error` enum | Io / Encoding / Parse / Config / DocumentNotFound / NoFilePath / Other(String) |
+| `theme` | `ThemeId` enum | Light / Dark / OneDark / Graphite / Ulysses / MaterialDark，含 `validate_theme_id()` 安全校验 |
+| `i18n` | `Locale`, translations | 71 个翻译 key，支持 en/zh-CN/ja |
 | `tab` | `TabState`, `WindowTabs` | 标签页状态持久化，JSON 格式存储 |
 | `keymap` | `KeyBinding` | 快捷键定义（声明式，尚未接入运行时） |
 
@@ -84,7 +85,8 @@ config.set_language(&mut self, lang)
 | `create_file(path) → Result<()>` | 创建空文件（含父目录） |
 | `create_directory(path) → Result<()>` | 创建目录 |
 | `delete_file(path) → Result<()>` | 删除文件或目录 |
-| `rename_file(path, new_name) → Result<PathBuf>` | 重命名，返回新路径 |
+| `rename_file(path, new_name) → Result<PathBuf>` | 重命名，校验 new_name 无 `..`，验证新路径不超出父目录 |
+| `validate_file_name(name) → Result<()>` | 校验文件名不含 `..`、`/`、`\`、`\0` |
 
 ### walk_directory
 
@@ -128,6 +130,48 @@ Markdown 解析，封装 pulldown-cmark（SIMD 加速）。
 |------|------|
 | `export_html(markdown, title, theme_css?) → String` | 生成独立 HTML 文档（内联 GitHub 风格 CSS） |
 | `export_pdf(markdown, title, path) → Result<()>` | 生成 PDF（printpdf，**硬编码 macOS 字体路径**） |
+| `export_word(markdown, title) → Result<Vec<u8>>` | 生成 DOCX（zip 2.x，手写 Office Open XML） |
+
+DOCX 导出注意：`create_document_xml` 中 title 经 `escape_xml()` 处理，body 内容经 `html_to_docx_body` + `escape_xml()` 处理。
+
+## mt-search
+
+工作区全文搜索。
+
+| 函数 | 说明 |
+|------|------|
+| `search_workspace(path, query, options) → SearchResult` | walkdir 遍历 + regex 匹配，跳过二进制文件 |
+
+`build_pattern` 支持 regex + whole_word 组合（用 `\b(?:...)` 包裹）。
+
+## mt-bookmark
+
+书签 CRUD，JSON 持久化。
+
+| 函数 | 说明 |
+|------|------|
+| `load_bookmarks() → Vec<Bookmark>` | 从 `~/.config/markpure/bookmarks.json` 读取 |
+| `add_bookmark(path, title, tags) → Bookmark` | 添加书签 |
+| `update_bookmark(id, title?, description?, tags?) → Bookmark` | 更新书签 |
+| `remove_bookmark(id)` | 删除书签 |
+
+`generate_id()` 使用纳秒时间戳 + 伪随机后缀避免碰撞。
+
+## mt-assets
+
+图片资源管理，支持三种粘贴模式。
+
+| 函数 | 说明 |
+|------|------|
+| `save_pasted_image(workspace, data, name?) → SavedImage` | 保存到 `.assets/images/` |
+| `upload_image_remote(data, url, api_key?) → RemoteUploadResult` | 远程上传（ureq 3.x multipart POST） |
+| `is_file_readonly(path) → bool` | Unix 权限检查 |
+
+**安全**：`validate_upload_url()` 阻止 SSRF（私有/内网地址、非 http/https 协议）。使用 `url` crate 解析和校验。
+
+## mt-spellcheck
+
+英文拼写检查（Levenshtein 距离建议）。内置词典 `dict_en.txt`，CJK 文本自动跳过。
 
 ## 开发约定
 

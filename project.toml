@@ -1,0 +1,29 @@
+[_]
+schema-version = "0.2"
+id = "com.markpure.app"
+name = "MarkPure"
+version = "0.1.0"
+
+[io.buildpacks]
+# Platform-managed builder for Rust + Node.js application
+builder = "dockership/builder:base"
+
+exclude = [
+    "target/",
+    "node_modules/",
+    ".git/",
+    "*.log",
+    "dist/",
+    "*.md",
+    "*.toml",
+    "*.json",
+    ".github/",
+    "packaging/",
+    "docs/",
+    "src/",
+    "crates/",
+    "public/",
+]
+
+[io.buildpacks.build.env]
+RUST_TARGET = "x86_64-unknown-linux-gnu"

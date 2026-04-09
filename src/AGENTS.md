@@ -10,12 +10,19 @@ src/
 └── lib/
     ├── editor.ts    # Tiptap 编辑器工厂函数（createEditor, getMarkdown, setContent）
     ├── commands.ts  # 自定义 IPC 封装（所有命令 + TypeScript 接口定义）
+    ├── i18n.svelte.ts  # 响应式 i18n（createI18n/useI18n/t()），基于 Svelte 5 runes
     ├── components/
-    │   ├── SideBar.svelte          # 侧边栏容器（文件树/大纲/最近文件标签切换，可折叠）
+    │   ├── SideBar.svelte          # 侧边栏容器（文件树/大纲/书签标签切换，可折叠，横向布局）
     │   ├── WorkSpace.svelte        # 文件树浏览器（搜索、递归树、右键菜单 CRUD）
     │   ├── Outline.svelte          # 文档大纲（直接从 ProseMirror doc 提取标题，零 IPC）
+    │   ├── Bookmarks.svelte        # 书签管理（增删改查、标签过滤、i18n 接入）
     │   ├── SearchBar.svelte        # 搜索替换栏（正则/大小写/全词匹配）
-    │   ├── SourceEditor.svelte     # 源码模式编辑器（CodeMirror 6 原始 Markdown）
+    │   ├── WorkspaceSearch.svelte  # 工作区全文搜索（防抖 + 请求序列号 + i18n）
+    │   ├── Settings.svelte         # 设置面板（通用/外观/快捷键/关于，i18n 接入）
+    │   ├── EmptyState.svelte       # 欢迎页（打开文件/文件夹，i18n 接入）
+    │   ├── ContextMenu.svelte      # 通用右键菜单
+    │   ├── Dialog.svelte           # 模态对话框（确认/输入）
+    │   ├── SourceEditor.svelte     # 源码模式编辑器（CodeMirror 6，字体用 CSS 变量）
     │   └── QuickInsertPopup.svelte # @ 快速插入弹窗（标题、代码块、表格等）
     ├── extensions/
     │   ├── code-block-cm-extension.ts  # Tiptap 扩展：CodeMirror 代码块节点
@@ -37,17 +44,29 @@ src/
 使用 Svelte 5 runes：
 
 ```
-tabs: Tab[]          # 打开的文档列表，每个含 { id, path, name, dirty, content }
-activeTabId: number  # 当前激活的标签 ID
-editor: Editor|null  # Tiptap Editor 实例（标签切换时 destroy 重建）
-stats: DocStats      # 实时统计（通过 Rust 文档注册表计算）
-theme: string        # '' | 'theme-dark' | 'theme-one-dark'
-saving: boolean      # 保存中状态
+i18n: I18n              # 响应式 i18n 实例（createI18n()，通过 Svelte context 向下传递）
+tabs: Tab[]              # 打开的文档列表，每个含 { id, path, name, dirty, content }
+activeTabId: number      # 当前激活的标签 ID
+editor: Editor|null      # Tiptap Editor 实例（标签切换时 destroy 重建）
+stats: DocStats          # 实时统计（通过 Rust 文档注册表计算）
+theme: string            # '' | 'theme-dark' | 'theme-one-dark' | 'theme-graphite' | 'theme-ulysses' | 'theme-material-dark'
+saving: boolean          # 保存中状态
 workspacePath: string | null  # 工作区目录路径
-showSidebar: boolean # 侧边栏可见性
-recentFiles: string[] # 最近打开的文件列表
-sourceMode: boolean  # 源码模式开关
+showSidebar: boolean     # 侧边栏可见性
+sourceMode: boolean      # 源码模式开关
 instantRenderEnabled: boolean  # 即时渲染开关
+```
+
+### 配置变更回调
+
+Settings 组件通过 `onConfigChange` 回调通知 App.svelte，实现设置立即生效：
+
+```typescript
+handleConfigChange(updates) → {
+  theme → 直接更新 CSS class
+  editor → applyEditorConfig() → 设置 CSS 变量 --editor-font-family / --editor-font-size
+  language → i18n.changeLocale() → 所有 t() 自动刷新
+}
 ```
 
 ## 编辑器生命周期
@@ -138,7 +157,22 @@ await saveFile(path, content)
 
 ## 样式约定
 
-- 全局颜色通过 CSS 变量定义在 `app.css` 的 `:root` / `.theme-dark` / `.theme-one-dark`
-- Tiptap 编辑器内容样式写在 `.ProseMirror` 选择器下
+- 全局颜色通过 CSS 变量定义在 `app.css` 的 `:root` / `.theme-dark` / `.theme-one-dark` / `.theme-graphite` / `.theme-ulysses` / `.theme-material-dark`
+- 编辑器字体通过 CSS 变量 `--editor-font-family` 和 `--editor-font-size` 控制，由 `applyEditorConfig()` 动态设置
+- Tiptap 编辑器内容样式写在 `.ProseMirror` 选择器下，字体使用 `var(--editor-font-family)` / `var(--editor-font-size)`
 - 工具栏按钮 `.tb-btn`，分隔线 `.tb-sep`，状态栏 `.status-bar`，标签栏 `.tab-bar`
 - 每个组件使用 Svelte scoped `<style>` 块
+
+## i18n 使用模式
+
+```typescript
+// 在根组件 App.svelte 中创建
+import { createI18n } from '$lib/i18n.svelte'
+const i18n = createI18n()
+// onMount 中调用 i18n.init() 加载翻译
+
+// 在子组件中使用
+import { useI18n } from '$lib/i18n.svelte'
+const i18n = useI18n()
+// 模板中：{i18n.t('menu.file')}
+```

@@ -1,0 +1,262 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  tag:
+    patterns: ['v*']
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Job 1: Test on 3 operating systems in parallel
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.os }}
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo target
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Check frontend
+        run: npm run check
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace -- -D warnings
+
+  # Job 2: Build matrix (6 targets)
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: test
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS ARM64
+            os: macos
+            arch: aarch64
+            target: aarch64-apple-darwin
+            runner: macos-14
+
+          - platform: macOS x64
+            os: macos
+            arch: x86_64
+            target: x86_64-apple-darwin
+            runner: macos-14
+
+          - platform: Windows x64
+            os: windows
+            arch: x86_64
+            target: x86_64-pc-windows-msvc
+            runner: windows-latest
+
+          - platform: Windows ARM64
+            os: windows
+            arch: aarch64
+            target: aarch64-pc-windows-msvc
+            runner: windows-latest
+
+          - platform: Linux x64
+            os: linux
+            arch: x86_64
+            target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+
+          - platform: Linux ARM64
+            os: linux
+            arch: aarch64
+            target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+
+        exclude:
+          # Only run actual builds on tag pushes or main branch pushes
+          - platform: macOS x64
+            os: macos
+          - platform: Windows ARM64
+            os: windows
+          - platform: Linux ARM64
+            os: linux
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npx vite build
+
+      - name: Build Rust
+        run: |
+          touch src-rust/src/main.rs
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare binary
+        shell: bash
+        run: |
+          BINARY_NAME="markpure"
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            BINARY_NAME="${BINARY_NAME}.exe"
+          fi
+          mkdir -p release
+          cp "target/${{ matrix.target }}/release/${BINARY_NAME}" "release/"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: release/*
+          retention-days: 5
+
+  # Job 3: Package (only on tag)
+  package:
+    name: Package
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS
+            artifact: macOS ARM64
+            script: packaging/macos/package.sh
+            artifact_name: MarkPure-${{ github.ref_name }}-macOS-arm64.dmg
+
+          - platform: Linux x64
+            artifact: Linux x64
+            script: packaging/linux/package-deb.sh
+            artifact_name: markpure_${{ github.ref_name }}_amd64.deb
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: ls -la artifacts/
+
+      - name: Package macOS
+        if: matrix.platform == 'macOS'
+        run: |
+          chmod +x ${{ matrix.script }}
+          ${{ matrix.script }}
+
+      - name: Package Linux
+        if: matrix.platform == 'Linux x64'
+        run: |
+          chmod +x ${{ matrix.script }}
+          ${{ matrix.script }}
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-package
+          path: |
+            release/*
+          retention-days: 5
+
+  # Job 4: Release (only on tag)
+  release:
+    name: Release
+    needs: package
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List all artifacts
+        run: |
+          find artifacts -type f -name "*" | head -50
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -76,7 +76,7 @@ struct AppState {
 | 大纲 | `cmd_get_outline` | 调用 `mt_markdown::extract_headings`（旧接口） |
 | 最近文件 | `cmd_get_recent_files` / `cmd_add_recent_file` / `cmd_clear_recent_files` | AppConfig 操作 |
 | 标签页 | `cmd_get_tabs` / `cmd_save_tabs` / `cmd_tearoff_tab` | 标签页状态持久化 |
-| 配置 | `cmd_get_config` / `cmd_set_config` | 主题/语言/编辑器/工作区配置 |
+| 配置 | `cmd_get_config` / `cmd_set_config` | 主题/语言/编辑器/工作区配置。get_config 返回 CSS class 名（如 `theme-dark`），set_config 同时接受 CSS class 和人类可读标签 |
 | 导出 | `cmd_export_html` / `cmd_export_pdf` | 弹出保存对话框 → 导出 → 写入文件 |
 | 文件监视 | `cmd_poll_file_changes` | 非阻塞取出所有积压事件 |
 | **文档注册表** | `cmd_doc_open` | 注册文档到 `documents` HashMap |
@@ -124,5 +124,7 @@ struct Assets;
 - `AppState` 使用持久化 tokio Runtime（`state.rt().block_on(...)`），避免每次命令创建新实例
 - `cmd_save_file` 优先使用 `doc_id` 从文档注册表读取内容，fallback 到 `content` 参数
 - `cmd_doc_set_content` 如果文档未注册会自动注册（容错）
-- `generate_uuid()` 使用纳秒时间戳（非标准 UUID）
+- `generate_uuid()` 使用纳秒时间戳 + 伪随机后缀（避免快速连续调用碰撞）
 - 标签页撕离（tearoff）：Rust 端更新了 tabs 状态，但实际子窗口创建未完成
+- IPC 响应注入 `window.__mt_dispatch` 前完整转义：`\`、`'`、`\n`、`\r`、`\u2028`、`\u2029`、`\0`、`</script`
+- `cmd_get_locale` 返回当前语言的翻译表（不再硬编码 "en"）

@@ -1,0 +1,93 @@
+name: CNB Container Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag'
+        required: false
+        default: 'latest'
+      cnb_platform:
+        description: 'CNB Platform registry'
+        required: false
+        default: ''
+
+env:
+  IMAGE_NAME: markpure
+  BUILDER_IMAGE: dockership/builder:base
+
+jobs:
+  # Build CNB container image
+  build:
+    name: Build CNB Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pack CLI
+        run: |
+          curl -sSL https://github.com/buildpacks/pack/releases/download/v0.36.0/pack-v0.36.0-linux.tgz | tar -xz -C /usr/local/bin
+          chmod +x /usr/local/bin/pack
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Registry
+        if: env.REGISTRY_URL != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+
+      - name: Determine image tag
+        id: tags
+        run: |
+          TAG="${{ github.event.inputs.image_tag || 'latest' }}"
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${TAG:-${{ github.ref_name }}}"
+          else
+            TAG="${TAG:-${{ github.sha }}}"
+          fi
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Build with CNB
+        env:
+          IMAGE_TAG: ${{ steps.tags.outputs.TAG }}
+          REGISTRY: ${{ github.event.inputs.cnb_platform || 'docker.io' }}
+          FULL_IMAGE_NAME: ${{ github.event.inputs.cnb_platform || 'docker.io' }}/${{ env.IMAGE_NAME }}
+        run: |
+          echo "[INFO] Building CNB image: ${FULL_IMAGE_NAME}:${IMAGE_TAG}"
+
+          pack build "${FULL_IMAGE_NAME}:${IMAGE_TAG}" \
+            --builder "${{ env.BUILDER_IMAGE }}" \
+            --trust-builder \
+            --verbose
+
+      - name: Push to Registry
+        env:
+          IMAGE_TAG: ${{ steps.tags.outputs.TAG }}
+          FULL_IMAGE_NAME: ${{ github.event.inputs.cnb_platform || 'docker.io' }}/${{ env.IMAGE_NAME }}
+        run: |
+          echo "[INFO] Pushing image: ${FULL_IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${FULL_IMAGE_NAME}:${IMAGE_TAG}"
+
+          if [[ "$IMAGE_TAG" != "latest" ]]; then
+            echo "[INFO] Also tagging as latest"
+            docker tag "${FULL_IMAGE_NAME}:${IMAGE_TAG}" "${FULL_IMAGE_NAME}:latest"
+            docker push "${FULL_IMAGE_NAME}:latest"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## CNB Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.tags.outputs.TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Builder**: ${{ env.BUILDER_IMAGE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry**: ${{ github.event.inputs.cnb_platform || 'docker.io' }}" >> $GITHUB_STEP_SUMMARY

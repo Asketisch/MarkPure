@@ -1,0 +1,28 @@
+# CNB (Cloud Native Buildpacks) Project Configuration
+
+schema-version: 0.2
+id: com.markpure.app
+name: MarkPure
+version: 0.1.0
+
+builder: dockership/builder:base
+
+build:
+  env:
+    RUST_TARGET: x86_64-unknown-linux-gnu
+
+exclude:
+  - target/
+  - node_modules/
+  - .git/
+  - *.log
+  - dist/
+  - "*.md"
+  - "*.toml"
+  - "*.json"
+  - ".github/"
+  - packaging/
+  - docs/
+  - src/
+  - crates/
+  - public/

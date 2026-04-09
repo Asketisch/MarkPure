@@ -129,14 +129,19 @@ fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
 /// - Linux: DejaVu Sans or Liberation Sans
 fn get_font_paths() -> Result<(PathBuf, PathBuf), String> {
     if cfg!(target_os = "macos") {
-        let path = PathBuf::from("/System/Library/Fonts/Helvetica.ttc");
-        Ok((path.clone(), path))
+        let regular = PathBuf::from("/System/Library/Fonts/Helvetica.ttc");
+        let bold = PathBuf::from("/System/Library/Fonts/Supplemental/Helvetica Bold.ttc");
+        if bold.exists() {
+            Ok((regular, bold))
+        } else {
+            Ok((regular.clone(), regular))
+        }
     } else if cfg!(target_os = "windows") {
         let windir = std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".to_string());
         let base = PathBuf::from(windir).join("Fonts");
         Ok((base.join("arial.ttf"), base.join("arialbd.ttf")))
     } else {
-        // Linux: try common font paths
+        // Linux: try common font paths (both regular and bold must exist)
         let candidates = [
             ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
@@ -146,7 +151,7 @@ fn get_font_paths() -> Result<(PathBuf, PathBuf), String> {
              "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
         ];
         for (regular, bold) in &candidates {
-            if std::path::Path::new(regular).exists() {
+            if std::path::Path::new(regular).exists() && std::path::Path::new(bold).exists() {
                 return Ok((PathBuf::from(*regular), PathBuf::from(*bold)));
             }
         }
@@ -213,4 +218,11 @@ fn strip_markdown(text: &str) -> String {
     }
 
     result
+}
+
+#[test]
+fn test_font_paths_exist() {
+    let (regular, bold) = get_font_paths().expect("should resolve");
+    assert!(regular.exists(), "regular font not found: {:?}", regular);
+    assert!(bold.exists(), "bold font not found: {:?}", bold);
 }
