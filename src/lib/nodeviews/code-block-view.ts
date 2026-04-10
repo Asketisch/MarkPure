@@ -182,14 +182,18 @@ export class CodeBlockView implements NodeView {
     const pos = this.getPos()
     if (pos === undefined) return
 
-    const content = update.state.doc.toString()
+    // Get the current node from the updated document instead of cached this.node
+    const currentNode = update.state.doc.nodeAt(pos)
+    if (!currentNode) return
+
+    const content = currentNode.textContent
     const tr = this.view.state.tr.setNodeMarkup(pos, undefined, {
-      ...this.node.attrs,
+      ...currentNode.attrs,
     })
 
-    // Replace the text content
+    // Use current node's content size instead of cached this.node
     const start = pos + 1
-    const end = start + this.node.content.size
+    const end = start + currentNode.content.size
     if (content) {
       const newSlice = this.view.state.schema.text(content).slice(0)
       tr.replaceWith(start, end, newSlice)

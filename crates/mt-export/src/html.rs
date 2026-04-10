@@ -29,7 +29,7 @@ pub fn export_html(
 </html>"#,
         title = html_escape(title),
         theme = theme,
-        body = body,
+        body = html_escape(&body),
     )
 }
 

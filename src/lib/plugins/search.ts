@@ -64,6 +64,11 @@ function findMatches(
   const { text, posMap } = getDocText(doc)
   const matches: Array<{ from: number; to: number }> = []
 
+  // Limit matches to prevent DoS from catastrophic backtracking
+  const MAX_MATCHES = 1000
+  const startTime = Date.now()
+  const TIMEOUT_MS = 2000
+
   let pattern: string
   let flags = 'g'
   if (!options.caseSensitive) flags += 'i'
@@ -78,6 +83,12 @@ function findMatches(
     let match: RegExpExecArray | null
 
     while ((match = regex.exec(text)) !== null) {
+      // Timeout protection against catastrophic backtracking
+      if (Date.now() - startTime > TIMEOUT_MS) break
+
+      // Limit number of matches to prevent memory exhaustion
+      if (matches.length >= MAX_MATCHES) break
+
       if (match[0].length === 0) {
         regex.lastIndex++
         continue

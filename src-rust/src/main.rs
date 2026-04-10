@@ -14,6 +14,9 @@ use tao::window::WindowBuilder;
 use wry::http::{header::CONTENT_TYPE, Response, StatusCode};
 use wry::WebViewBuilder;
 
+// Maximum number of documents to keep in memory (LRU eviction)
+const MAX_DOCUMENTS: usize = 50;
+
 #[derive(Embed)]
 #[folder = "../dist/"]
 struct Assets;
@@ -45,6 +48,8 @@ struct AppState {
     tabs: Mutex<Vec<WindowTabs>>,
     /// Document registry: tab_id → Document (Rust-owned text buffer)
     documents: Mutex<HashMap<u64, Document>>,
+    /// LRU tracking: ordered list of doc_ids (oldest first, newest last)
+    doc_order: Mutex<Vec<u64>>,
 }
 
 impl AppState {
@@ -65,6 +70,7 @@ impl AppState {
             watcher_rx: Mutex::new(None),
             tabs: Mutex::new(tabs),
             documents: Mutex::new(HashMap::new()),
+            doc_order: Mutex::new(Vec::new()),
         }
     }
 
@@ -811,6 +817,20 @@ fn cmd_doc_open(params: &serde_json::Value, state: &AppState) -> std::result::Re
     let doc_id = params["doc_id"].as_u64().ok_or("Missing 'doc_id' parameter")?;
     let content = params["content"].as_str().unwrap_or("");
 
+    // LRU eviction: remove oldest documents if at capacity
+    {
+        let mut doc_order = state.doc_order.lock().unwrap();
+        while doc_order.len() >= MAX_DOCUMENTS {
+            if let Some(oldest_id) = doc_order.first() {
+                state.documents.lock().unwrap().remove(oldest_id);
+                doc_order.remove(0);
+            }
+        }
+        // Mark this doc as most recently used
+        doc_order.retain(|&id| id != doc_id);
+        doc_order.push(doc_id);
+    }
+
     let doc = Document::from_content(content, None, Encoding::Utf8);
     state.documents.lock().unwrap().insert(doc_id, doc);
 
@@ -820,6 +840,7 @@ fn cmd_doc_open(params: &serde_json::Value, state: &AppState) -> std::result::Re
 fn cmd_doc_close(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let doc_id = params["doc_id"].as_u64().ok_or("Missing 'doc_id' parameter")?;
     state.documents.lock().unwrap().remove(&doc_id);
+    state.doc_order.lock().unwrap().retain(|&id| id != doc_id);
     Ok(serde_json::Value::Null)
 }
 
@@ -830,10 +851,19 @@ fn cmd_doc_set_content(params: &serde_json::Value, state: &AppState) -> std::res
     let mut docs = state.documents.lock().unwrap();
     if let Some(doc) = docs.get_mut(&doc_id) {
         doc.set_content(content);
+        // Update LRU order
+        drop(docs);
+        let mut doc_order = state.doc_order.lock().unwrap();
+        doc_order.retain(|&id| id != doc_id);
+        doc_order.push(doc_id);
     } else {
         // Auto-register if not found
         let doc = Document::from_content(content, None, Encoding::Utf8);
         docs.insert(doc_id, doc);
+        drop(docs);
+        let mut doc_order = state.doc_order.lock().unwrap();
+        doc_order.retain(|&id| id != doc_id);
+        doc_order.push(doc_id);
     }
 
     Ok(serde_json::Value::Null)
@@ -975,12 +1005,14 @@ fn main() -> wry::Result<()> {
         let js_escaped = js
             .replace('\\', "\\\\")
             .replace('\'', "\\'")
+            .replace('`', "\\`")
             .replace('\n', "\\n")
             .replace('\r', "\\r")
             .replace('\u{2028}', "\\u2028")
             .replace('\u{2029}', "\\u2029")
             .replace('\0', "\\0")
-            .replace("</script", "<\\/script");
+            .replace("</script", "<\\/script")
+            .replace("</SCRIPT", "<\\/SCRIPT");
         if let Ok(wv) = wv_clone.lock() {
             if let Some(ref webview) = *wv {
                 let _ = webview.evaluate_script(&format!("window.__mt_dispatch('{js_escaped}')"));

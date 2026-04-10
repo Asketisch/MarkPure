@@ -41,9 +41,7 @@
 <div class="outline">
   <div class="outline-header">Outline</div>
   <div class="outline-content">
-    {#if loading}
-      <div class="outline-empty">Loading...</div>
-    {:else if outline.length === 0}
+    {#if outline.length === 0}
       <div class="outline-empty">No headings</div>
     {:else}
       {#each outline as item}

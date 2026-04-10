@@ -54,8 +54,12 @@ impl FileWatcher {
                             path: path.to_string_lossy().to_string(),
                             kind: kind.to_string(),
                         };
-                        let _ = tx.send(change.clone());
-                        let _ = event_tx.send((path_str.clone(), change));
+                        if tx.send(change.clone()).is_err() {
+                            eprintln!("[FileWatcher] receiver dropped, event dropped: {}", change.path);
+                        }
+                        if event_tx.send((path_str.clone(), change)).is_err() {
+                            eprintln!("[FileWatcher] event_tx dropped, events will not be forwarded");
+                        }
                     }
                 }
             },

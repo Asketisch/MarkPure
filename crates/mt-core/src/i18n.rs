@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::OnceLock;
+
+/// Cache for translations to avoid rebuilding locale data on every access
+static TRANSLATIONS_CACHE: OnceLock<HashMap<String, HashMap<String, String>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocaleConfig {
@@ -312,18 +316,22 @@ pub fn get_locale_codes() -> Vec<(String, String)> {
         .collect()
 }
 
-/// Get translations for a specific locale
+/// Get translations for a specific locale (cached)
 pub fn get_translations(locale: &str) -> HashMap<String, String> {
-    get_all_locales()
-        .into_iter()
-        .find(|l| l.code == locale)
-        .map(|l| l.translations)
+    // Build cache on first access
+    let cache = TRANSLATIONS_CACHE.get_or_init(|| {
+        let mut m = HashMap::new();
+        for loc in get_all_locales() {
+            m.insert(loc.code, loc.translations);
+        }
+        m
+    });
+
+    cache
+        .get(locale)
+        .cloned()
         .unwrap_or_else(|| {
             // Fallback to English
-            get_all_locales()
-                .into_iter()
-                .find(|l| l.code == "en")
-                .map(|l| l.translations)
-                .unwrap_or_default()
+            cache.get("en").cloned().unwrap_or_default()
         })
 }

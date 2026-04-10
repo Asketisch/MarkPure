@@ -65,7 +65,8 @@
   let qiQuery = $state('')
   let qiPosition = $state({ top: 0, left: 0 })
   let initPending = false
-  let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+  // Auto-save timers per tab (fixes race condition with single timer)
+  let autoSaveTimers = $state<Map<number, ReturnType<typeof setTimeout>>>(new Map())
   const themes = ['', 'theme-dark', 'theme-one-dark', 'theme-graphite', 'theme-ulysses', 'theme-material-dark']
 
   function getActiveTab(): Tab | undefined {
@@ -119,14 +120,18 @@
           syncToRust(t.id, md)
         }
         updateStats(t?.id ?? tab.id)
-        // Auto-save with 3 second debounce
-        if (autoSaveTimer) clearTimeout(autoSaveTimer)
-        autoSaveTimer = setTimeout(() => {
+        // Auto-save with 3 second debounce (per-tab timer)
+        const tabId = t?.id ?? tab.id
+        const existing = autoSaveTimers.get(tabId)
+        if (existing) clearTimeout(existing)
+        const timerId = setTimeout(() => {
+          autoSaveTimers.delete(tabId)
           const currentTab = getActiveTab()
-          if (currentTab?.path && currentTab.dirty) {
+          if (currentTab?.path && currentTab.dirty && currentTab.id === tabId) {
             handleSave()
           }
         }, 3000)
+        autoSaveTimers.set(tabId, timerId)
       },
       onSave: handleSave,
     })
@@ -140,8 +145,9 @@
 
   function switchTab(id: number) {
     if (activeTabId === id) return
-    // Clear auto-save timer when switching tabs
-    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null }
+    // Clear auto-save timer for the tab being switched away from
+    const oldTimer = autoSaveTimers.get(activeTabId)
+    if (oldTimer) { clearTimeout(oldTimer); autoSaveTimers.delete(activeTabId) }
     const current = getActiveTab()
     if (current && editor) {
       current.content = getMarkdown(editor)
@@ -163,8 +169,9 @@
 
   function closeTab(id: number) {
     if (tabs.length <= 1) return
-    // Clear auto-save timer when closing a tab
-    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null }
+    // Clear auto-save timer for the tab being closed
+    const timer = autoSaveTimers.get(id)
+    if (timer) { clearTimeout(timer); autoSaveTimers.delete(id) }
     const idx = tabs.findIndex(t => t.id === id)
     const wasActive = activeTabId === id
 
@@ -175,7 +182,7 @@
     }
 
     // Unregister from Rust document registry
-    docClose(id).catch(() => {})
+    docClose(id).catch(err => console.error('[App] Failed to close document:', id, err))
 
     tabs = tabs.filter(t => t.id !== id)
     if (wasActive && tabs.length > 0) {
@@ -192,7 +199,7 @@
     }
     // Unregister closed tabs from Rust
     for (const t of tabs) {
-      if (t.id !== keepId) docClose(t.id).catch(() => {})
+      if (t.id !== keepId) docClose(t.id).catch(err => console.error('[App] Failed to close document:', t.id, err))
     }
     const keepTab = tabs.find(t => t.id === keepId)
     if (!keepTab) return
@@ -204,7 +211,7 @@
   function closeAllTabs() {
     if (tabs.length === 0) return
     // Unregister all tabs from Rust
-    for (const t of tabs) docClose(t.id).catch(() => {})
+    for (const t of tabs) docClose(t.id).catch(err => console.error('[App] Failed to close document:', t.id, err))
     const newTab: Tab = { id: nextId++, path: null, name: 'Untitled', dirty: false, content: '' }
     tabs = [newTab]
     activeTabId = newTab.id
@@ -220,7 +227,7 @@
     }
     // Unregister closed tabs from Rust
     for (let i = idx + 1; i < tabs.length; i++) {
-      docClose(tabs[i].id).catch(() => {})
+      docClose(tabs[i].id).catch(err => console.error('[App] Failed to close document:', tabs[i].id, err))
     }
     tabs = tabs.slice(0, idx + 1)
     if (!tabs.find(t => t.id === activeTabId)) {

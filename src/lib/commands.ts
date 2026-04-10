@@ -64,28 +64,44 @@ export interface AppConfig {
 interface PendingRequest {
   resolve: (value: any) => void
   reject: (reason: any) => void
+  timeoutId?: ReturnType<typeof setTimeout>
 }
 
 let nextId = 1
 const pending = new Map<number, PendingRequest>()
 
+// Default timeout for IPC requests (30 seconds)
+const DEFAULT_TIMEOUT_MS = 30000
+
 // Called by Rust via evaluate_script
 ;(window as any).__mt_dispatch = (json: string) => {
-  const resp = JSON.parse(json)
-  const req = pending.get(resp.id)
-  if (!req) return
-  pending.delete(resp.id)
-  if (resp.error) {
-    req.reject(new Error(resp.error))
-  } else {
-    req.resolve(resp.result)
+  try {
+    const resp = JSON.parse(json)
+    const req = pending.get(resp.id)
+    if (!req) return
+    if (req.timeoutId) clearTimeout(req.timeoutId)
+    pending.delete(resp.id)
+    if (resp.error) {
+      req.reject(new Error(resp.error))
+    } else {
+      req.resolve(resp.result)
+    }
+  } catch (e) {
+    console.error('[IPC] Failed to parse response:', e)
   }
 }
 
-function ipc(cmd: string, params: Record<string, unknown> = {}): Promise<any> {
+function ipc(cmd: string, params: Record<string, unknown> = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<any> {
   return new Promise((resolve, reject) => {
     const id = nextId++
-    pending.set(id, { resolve, reject })
+    const timeoutId = setTimeout(() => {
+      const req = pending.get(id)
+      if (req) {
+        pending.delete(id)
+        req.reject(new Error(`IPC request '${cmd}' timed out after ${timeoutMs}ms`))
+      }
+    }, timeoutMs)
+    pending.set(id, { resolve, reject, timeoutId })
     ;(window as any).ipc.postMessage(JSON.stringify({ id, cmd, params }))
   })
 }

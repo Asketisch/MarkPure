@@ -354,6 +354,20 @@ fn validate_upload_url(url: &str) -> std::result::Result<(), String> {
                 }
             }
         }
+        // Check IPv6 link-local and unique local addresses
+        if host_lower.starts_with("fe80:")  // link-local
+            || host_lower.starts_with("fc00:")  // unique local
+            || host_lower.starts_with("fd00:")  // unique local (alternate)
+        {
+            return Err("upload URL points to an internal/private address".into());
+        }
+        // Check IPv4-mapped IPv6 addresses (::ffff:192.168.x.x)
+        if host_lower.starts_with("::ffff:10.")
+            || host_lower.starts_with("::ffff:192.168.")
+            || host_lower.starts_with("::ffff:172.")
+        {
+            return Err("upload URL points to an internal/private address".into());
+        }
     }
 
     Ok(())
@@ -424,8 +438,8 @@ pub fn upload_image_remote(
     }
 
     match request.send(&body) {
-        Ok(mut response) => {
-            let body_text: String = response.body_mut().read_to_string().unwrap_or_default();
+        Ok(response) => {
+            let body_text = response.into_body().read_to_string().unwrap_or_default();
 
             // Try to extract URL from JSON response
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_text) {

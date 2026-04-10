@@ -204,9 +204,29 @@ pub fn search_file(
 /// Check if a file appears to be binary
 fn is_binary_file(path: &PathBuf) -> bool {
     if let Ok(mut file) = fs::File::open(path) {
-        let mut buffer = [0u8; 8192];
+        // Check more bytes to reduce false positives (16KB instead of 8KB)
+        let mut buffer = vec![0u8; 16384];
         if let Ok(n) = file.read(&mut buffer) {
-            return buffer[..n].contains(&0);
+            let sample = &buffer[..n];
+            // Check for null bytes
+            if sample.contains(&0) {
+                return true;
+            }
+            // Additional heuristic: if more than 20% of non-null bytes are non-printable,
+            // consider it binary
+            let mut non_printable = 0;
+            let mut ascii_count = 0;
+            for &b in sample {
+                if b == 0 { return true; }
+                if b >= 32 && b < 127 {
+                    ascii_count += 1;
+                } else if b != b'\n' && b != b'\r' && b != b'\t' {
+                    non_printable += 1;
+                }
+            }
+            if ascii_count > 0 && non_printable as f64 / (ascii_count + non_printable) as f64 > 0.3 {
+                return true;
+            }
         }
     }
     false

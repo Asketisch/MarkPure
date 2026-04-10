@@ -168,6 +168,13 @@ fn validate_theme_id(id: &str) -> std::result::Result<(), String> {
     if id.contains("..") || id.contains('/') || id.contains('\\') || id.contains('\0') {
         return Err(format!("invalid theme ID: '{}'", id));
     }
+    // Check Windows reserved filenames
+    let upper = id.to_uppercase();
+    if upper == "CON" || upper == "PRN" || upper == "AUX" || upper == "NUL"
+        || upper.starts_with("COM") || upper.starts_with("LPT")
+    {
+        return Err(format!("theme ID '{}' is a reserved Windows filename", id));
+    }
     Ok(())
 }
 
