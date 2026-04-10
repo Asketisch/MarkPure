@@ -1,3 +1,6 @@
+pub mod preview;
+pub mod replace;
+
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -5,6 +8,9 @@ use std::io::Read;
 use std::path::PathBuf;
 use thiserror::Error;
 use walkdir::WalkDir;
+
+pub use preview::{SearchPreview, get_search_preview, get_file_preview};
+pub use replace::{ReplaceResult, ReplaceSummary, ReplacePreview, ReplaceRange, replace_in_files, replace_single, preview_replace};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -252,7 +258,8 @@ mod tests {
             max_depth: Some(10),
         };
         let pattern = build_pattern("hello world", &options).unwrap();
-        assert_eq!(pattern, "hello\\ world");
+        // Space is not a special regex character, so no escaping needed
+        assert_eq!(pattern, "hello world");
     }
 
     #[test]

@@ -1,4 +1,6 @@
-use pulldown_cmark::{Options, Parser, Event, Tag, TagEnd, HeadingLevel};
+use pulldown_cmark::{Options, Parser};
+
+pub use pulldown_cmark::{Event, Tag, TagEnd, HeadingLevel};
 
 /// Parsed markdown element (simplified AST)
 #[derive(Debug, Clone)]

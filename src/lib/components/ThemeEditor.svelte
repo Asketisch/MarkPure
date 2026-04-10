@@ -107,10 +107,21 @@
   async function load() {
     try {
       themes = await getThemes()
-      // Select first custom theme or null
+      // Select first custom theme or initialize with current built-in theme
       if (themes.length > 0) {
         selectedTheme = themes[0]
         editedColors = { ...themes[0].colors }
+      } else if (currentThemeId && builtinThemeColors[currentThemeId]) {
+        // No custom themes - initialize with current built-in theme
+        selectedTheme = {
+          id: currentThemeId,
+          name: currentThemeId === '' ? 'Light' : currentThemeId,
+          author: 'Built-in',
+          description: 'Built-in theme',
+          is_dark: currentThemeId !== '',
+          colors: {} as ThemeColors,
+        }
+        editedColors = { ...builtinThemeColors[currentThemeId] } as ThemeColors
       }
     } catch (e) {
       console.error('Failed to load themes:', e)
