@@ -59,6 +59,10 @@
     if (!editor) return
     replaceAll(editor.view, replacement)
     refreshMatchInfo()
+    // Close search bar after replace all
+    setTimeout(() => {
+      handleClose()
+    }, 500)
   }
 
   function handleClose() {

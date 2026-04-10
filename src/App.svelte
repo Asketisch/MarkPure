@@ -54,6 +54,8 @@
   let workspacePath = $state<string | null>(null)
   let showSidebar = $state(true)
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
+  let showFileMenu = $state(false)
+  let showEditMenu = $state(false)
   let showSearch = $state(false)
   let showWorkspaceSearch = $state(false)
   let showSettings = $state(false)
@@ -366,6 +368,24 @@
   function setHeading(level: number) { editor?.chain().focus().toggleHeading({ level: level as 1|2|3|4|5|6 }).run() }
   function addTable() { editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() }
   function insertHr() { editor?.chain().focus().setHorizontalRule().run() }
+  function handleUndo() { editor?.chain().focus().undo().run() }
+  function handleRedo() { editor?.chain().focus().redo().run() }
+  function handleFind() { showSearch = true }
+  function handleReplace() { showSearch = true }
+  function toggleFileMenu() { showFileMenu = !showFileMenu }
+  function hideFileMenu() { showFileMenu = false }
+  function toggleEditMenu() { showEditMenu = !showEditMenu }
+  function hideEditMenu() { showEditMenu = false }
+  function showExportSubmenu(e: MouseEvent) {
+    const target = e.target as HTMLElement
+    const submenu = target.nextElementSibling as HTMLElement
+    if (submenu) submenu.style.display = 'block'
+  }
+  function hideExportSubmenu(e: MouseEvent) {
+    const target = e.target as HTMLElement
+    const submenu = target.nextElementSibling as HTMLElement
+    if (submenu) submenu.style.display = 'none'
+  }
 
   async function openWorkspace() {
     const path = await pickDirectory()
@@ -547,6 +567,19 @@
           e.preventDefault()
           toggleSourceMode()
           break
+        case 'z':
+          if (e.shiftKey) {
+            e.preventDefault()
+            handleRedo()
+          } else {
+            e.preventDefault()
+            handleUndo()
+          }
+          break
+        case 'y':
+          e.preventDefault()
+          handleRedo()
+          break
       }
     }
   }
@@ -632,14 +665,41 @@
   <!-- Menu Bar -->
   <nav class="menu-bar">
     <div class="menu-group">
-      <button class="menu-btn" onclick={handleOpen}>{i18n.t('menu.file')}</button>
-      <button class="menu-btn" onclick={handleSave}>{i18n.t('menu.edit')}</button>
+      <div class="menu-dropdown">
+        <button class="menu-btn" onclick={toggleFileMenu} onblur={() => setTimeout(hideFileMenu, 200)}>{i18n.t('menu.file')}</button>
+        {#if showFileMenu}
+          <div class="dropdown-menu" onmouseleave={() => hideFileMenu()}>
+            <button class="dropdown-item" onclick={() => { handleOpen(); hideFileMenu() }}>打开文件</button>
+            <button class="dropdown-item" onclick={() => { handleSave(); hideFileMenu() }}>保存</button>
+            <div class="dropdown-sep"></div>
+            <button class="dropdown-item" onclick={() => { openWorkspace(); hideFileMenu() }}>打开工作区</button>
+            <div class="dropdown-sep"></div>
+            <div class="dropdown-submenu">
+              <span class="dropdown-item dropdown-submenu-item" onmouseenter={(e) => showExportSubmenu(e)} onmouseleave={(e) => hideExportSubmenu(e)}>导出 &#9656;</span>
+              <div class="dropdown-submenu-content" id="export-submenu">
+                <button class="dropdown-item" onclick={() => { handleExportHtml(); hideFileMenu() }}>{i18n.t('menu.export_html')}</button>
+                <button class="dropdown-item" onclick={() => { handleExportPdf(); hideFileMenu() }}>{i18n.t('menu.export_pdf')}</button>
+                <button class="dropdown-item" onclick={() => { handleExportWord(); hideFileMenu() }}>{i18n.t('menu.export_word')}</button>
+              </div>
+            </div>
+          </div>
+        {/if}
+      </div>
+      <div class="menu-dropdown">
+        <button class="menu-btn" onclick={toggleEditMenu} onblur={() => setTimeout(hideEditMenu, 200)}>{i18n.t('menu.edit')}</button>
+        {#if showEditMenu}
+          <div class="dropdown-menu" onmouseleave={() => hideEditMenu()}>
+            <button class="dropdown-item" onclick={() => { handleUndo(); hideEditMenu() }}>撤销 (Ctrl+Z)</button>
+            <button class="dropdown-item" onclick={() => { handleRedo(); hideEditMenu() }}>重做 (Ctrl+Shift+Z)</button>
+            <div class="dropdown-sep"></div>
+            <button class="dropdown-item" onclick={() => { handleFind(); hideEditMenu() }}>查找 (Ctrl+F)</button>
+            <button class="dropdown-item" onclick={() => { handleReplace(); hideEditMenu() }}>替换 (Ctrl+H)</button>
+            <div class="dropdown-sep"></div>
+            <button class="dropdown-item" onclick={() => { showWorkspaceSearch = true; hideEditMenu() }}>全局搜索 (Ctrl+Shift+F)</button>
+          </div>
+        {/if}
+      </div>
       <button class="menu-btn" onclick={toggleSidebar}>{i18n.t('menu.view')}</button>
-      <button class="menu-btn" onclick={openWorkspace}>{i18n.t('menu.workspace')}</button>
-      <button class="menu-btn" onclick={handleExportHtml}>{i18n.t('menu.export_html')}</button>
-      <button class="menu-btn" onclick={handleExportPdf}>{i18n.t('menu.export_pdf')}</button>
-      <button class="menu-btn" onclick={handleExportWord}>{i18n.t('menu.export_word')}</button>
-      <button class="menu-btn" onclick={() => showWorkspaceSearch = true}>{i18n.t('menu.search')}</button>
       <button class="menu-btn" onclick={() => showSettings = true}>{i18n.t('menu.settings')}</button>
     </div>
     <div class="menu-title">{i18n.t('app.name')}</div>
@@ -762,6 +822,9 @@
         {/if}
       </footer>
       {/if}
+
+      <!-- Settings Modal -->
+      <Settings bind:visible={showSettings} onConfigChange={handleConfigChange} />
     </div>
   </div>
 </div>
@@ -799,9 +862,6 @@
   onNavigate={handleWorkspaceSearchNavigate}
 />
 
-<!-- Settings Modal -->
-<Settings bind:visible={showSettings} onConfigChange={handleConfigChange} />
-
 <style>
   .app-root {
     display: flex;
@@ -837,6 +897,68 @@
   .menu-btn:hover {
     background: var(--menu-hover-bg);
     color: var(--menu-hover-text);
+  }
+
+  .menu-dropdown {
+    position: relative;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 180px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+  }
+
+  .dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 6px 16px;
+    border: none;
+    background: none;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .dropdown-item:hover {
+    background: var(--menu-hover-bg);
+    color: var(--menu-hover-text);
+  }
+
+  .dropdown-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+
+  .dropdown-submenu {
+    position: relative;
+  }
+
+  .dropdown-submenu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .dropdown-submenu-content {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 140px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   }
 
   .main-area {

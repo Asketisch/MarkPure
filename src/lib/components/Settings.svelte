@@ -93,6 +93,19 @@
     await saveConfig({ theme: cssClass })
   }
 
+  // Convert CSS class name to human-readable label for display
+  function getThemeLabel(cssClass: string): string {
+    const classToLabel: Record<string, string> = {
+      '': 'Cadmium Light',
+      'theme-dark': 'Dark',
+      'theme-one-dark': 'One Dark',
+      'theme-graphite': 'Graphite',
+      'theme-ulysses': 'Ulysses',
+      'theme-material-dark': 'Material Dark',
+    }
+    return classToLabel[cssClass] ?? cssClass
+  }
+
   async function handleImportTheme() {
     try {
       const input = document.createElement('input')
@@ -242,7 +255,7 @@
 
             <div class="setting-row">
               <label>{i18n.t('settings.builtin_theme')}</label>
-              <select value={config?.theme ?? ''} onchange={(e) => changeTheme((e.target as HTMLSelectElement).value)}>
+              <select value={getThemeLabel(config?.theme ?? '')} onchange={(e) => changeTheme((e.target as HTMLSelectElement).value)}>
                 <option value="Cadmium Light">Cadmium Light</option>
                 <option value="Dark">Dark</option>
                 <option value="One Dark">One Dark</option>
