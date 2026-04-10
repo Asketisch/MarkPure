@@ -91,7 +91,7 @@ const DEFAULT_TIMEOUT_MS = 30000
   }
 }
 
-function ipc(cmd: string, params: Record<string, unknown> = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<any> {
+function ipc(cmd: string, params: object = {}, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<any> {
   return new Promise((resolve, reject) => {
     const id = nextId++
     const timeoutId = setTimeout(() => {
@@ -403,6 +403,7 @@ export async function uploadImageRemote(
 // Themes
 
 export interface ThemeColors {
+  // UI 颜色
   bg: string
   bg_secondary: string
   bg_tab_active: string
@@ -410,10 +411,47 @@ export interface ThemeColors {
   text: string
   text_secondary: string
   accent: string
+  accent_hover: string
   border: string
   menu_hover_bg: string
   menu_hover_text: string
   status_bg: string
+  scrollbar_thumb: string
+  highlight_bg: string
+  cell_selected_bg: string
+
+  // 标题颜色
+  heading1_color: string
+  heading2_color: string
+  heading3_color: string
+  heading4_color: string
+  heading5_color: string
+  heading6_color: string
+
+  // 标题字号
+  heading1_size: string
+  heading2_size: string
+  heading3_size: string
+  heading4_size: string
+  heading5_size: string
+  heading6_size: string
+
+  // 代码
+  code_bg: string
+  code_block_bg: string
+
+  // 链接
+  link_color: string
+  link_hover_color: string
+
+  // 引用块
+  blockquote_border: string
+  blockquote_bg: string
+
+  // 其他
+  hr_color: string
+  table_border: string
+  table_header_bg: string
 }
 
 export interface Theme {
@@ -439,6 +477,10 @@ export async function exportTheme(id: string, destPath: string): Promise<void> {
 
 export async function deleteTheme(id: string): Promise<void> {
   await ipc('delete_theme', { id })
+}
+
+export async function saveCustomTheme(theme: Theme): Promise<Theme> {
+  return await ipc('save_theme', theme)
 }
 
 // App Info

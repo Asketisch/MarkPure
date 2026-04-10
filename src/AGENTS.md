@@ -6,7 +6,7 @@
 src/
 ├── main.ts          # 应用入口，mount App 到 #app
 ├── App.svelte       # 主组件：菜单栏、标签栏、工具栏、编辑器容器、状态栏
-├── app.css          # 全局样式 + Tiptap ProseMirror 编辑器渲染样式 + 3 个主题的 CSS 变量
+├── app.css          # 全局样式 + Tiptap ProseMirror 编辑器渲染样式 + 6 个主题的 CSS 变量
 └── lib/
     ├── editor.ts    # Tiptap 编辑器工厂函数（createEditor, getMarkdown, setContent）
     ├── commands.ts  # 自定义 IPC 封装（所有命令 + TypeScript 接口定义）
@@ -23,7 +23,9 @@ src/
     │   ├── ContextMenu.svelte      # 通用右键菜单
     │   ├── Dialog.svelte           # 模态对话框（确认/输入）
     │   ├── SourceEditor.svelte     # 源码模式编辑器（CodeMirror 6，字体用 CSS 变量）
-    │   └── QuickInsertPopup.svelte # @ 快速插入弹窗（标题、代码块、表格等）
+    │   ├── QuickInsertPopup.svelte # @ 快速插入弹窗（标题、代码块、表格等）
+    │   ├── ColorPicker.svelte      # 颜色选择器（主题颜色编辑）
+    │   └── ThemeEditor.svelte      # 主题编辑器（自定义主题编辑）
     ├── extensions/
     │   ├── code-block-cm-extension.ts  # Tiptap 扩展：CodeMirror 代码块节点
     │   ├── math-extension.ts           # Tiptap 扩展：KaTeX 数学公式

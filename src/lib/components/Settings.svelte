@@ -17,6 +17,7 @@
     type LocaleInfo,
   } from '$lib/commands'
   import { useI18n } from '$lib/i18n.svelte'
+  import ThemeEditor from './ThemeEditor.svelte'
 
   const i18n = useI18n()
 
@@ -34,6 +35,7 @@
   let keybindings = $state<KeyBinding[]>([])
   let recordingId = $state<string | null>(null)
   let loading = $state(false)
+  let themeEditorVisible = $state(false)
 
   async function load() {
     loading = true
@@ -162,10 +164,10 @@
       parts.push(key.length === 1 ? key.toUpperCase() : key)
       const accelerator = parts.join('+')
 
-      updateKeybinding(binding.id, accelerator).then(kb => {
+      updateKeybinding(binding.id, accelerator).then((kb: KeyBinding[]) => {
         keybindings = kb
         recordingId = null
-      }).catch(e => {
+      }).catch((e: Error) => {
         console.error('Failed to update keybinding:', e)
         recordingId = null
       })
@@ -283,6 +285,7 @@
 
             <div class="setting-actions">
               <button onclick={handleImportTheme}>{i18n.t('settings.import_theme')}</button>
+              <button onclick={() => themeEditorVisible = true}>{i18n.t('settings.edit_theme')}</button>
             </div>
           </section>
 
@@ -323,6 +326,18 @@
 
       <button class="close-btn" onclick={() => visible = false}>x</button>
     </div>
+  </div>
+{/if}
+
+{#if themeEditorVisible}
+  <div class="theme-editor-wrapper">
+    <ThemeEditor
+      currentThemeId={config?.theme ?? ''}
+      onThemeUpdated={(theme) => {
+        // Optionally refresh themes list
+      }}
+    />
+    <button class="close-btn" onclick={() => themeEditorVisible = false}>x</button>
   </div>
 {/if}
 
@@ -593,5 +608,37 @@
     text-align: center;
     padding: 40px;
     color: var(--text-secondary);
+  }
+
+  .theme-editor-wrapper {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 2001;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .theme-editor-wrapper .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 18px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    z-index: 2002;
+  }
+
+  .theme-editor-wrapper .close-btn:hover {
+    background: var(--menu-hover-bg);
+    color: var(--text);
   }
 </style>

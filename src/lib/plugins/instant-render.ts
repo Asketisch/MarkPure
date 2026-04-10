@@ -11,9 +11,16 @@
  */
 
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { Decoration, DecorationSet, type WidgetDecorationSpec } from '@tiptap/pm/view'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { Node as PMNode, Mark } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
+
+// WidgetDecorationSpec is not exported from @tiptap/pm/view in all versions
+interface WidgetDecorationSpec {
+  side?: number
+  widget?: HTMLElement
+  key?: string
+}
 
 export interface InstantRenderState {
   enabled: boolean

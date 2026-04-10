@@ -5,7 +5,7 @@ WYSIWYG Markdown 桌面编辑器，使用 Rust (wry + tao) + Svelte 5 + Tiptap �
 ## 架构概览
 
 ```
-MarkMe/
+mark-web/
 ├── src/                    # Svelte 5 + TypeScript 前端
 │   ├── App.svelte          # 主应用：布局、标签栏、工具栏、编辑器、状态栏
 │   ├── app.css             # 全局样式 + 主题 CSS 变量 + ProseMirror 编辑器样式
@@ -14,7 +14,7 @@ MarkMe/
 │       ├── editor.ts       # Tiptap WYSIWYG 编辑器封装
 │       ├── commands.ts     # IPC 命令封装 + TypeScript 接口定义
 │       ├── i18n.svelte.ts  # 响应式 i18n（createI18n/useI18n/t()）
-│       ├── components/     # Svelte 组件（12 个）
+│       ├── components/     # Svelte 组件（14 个）
 │       ├── extensions/     # Tiptap 扩展（7 个）
 │       ├── plugins/        # ProseMirror 插件（2 个）
 │       └── nodeviews/      # ProseMirror NodeView（1 个）

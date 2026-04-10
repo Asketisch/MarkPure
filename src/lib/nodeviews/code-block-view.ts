@@ -195,14 +195,14 @@ export class CodeBlockView implements NodeView {
     const start = pos + 1
     const end = start + currentNode.content.size
     if (content) {
-      const newSlice = this.view.state.schema.text(content).slice(0)
-      tr.replaceWith(start, end, newSlice)
+      const textNode = this.view.state.schema.text(content)
+      tr.replaceWith(start, end, textNode)
     } else {
       tr.delete(start, end)
     }
 
     const meta = { fromCodeBlock: true }
-    tr.setMeta(meta, true)
+    tr.setMeta('codeblock', meta)
     this.view.dispatch(tr)
   }
 

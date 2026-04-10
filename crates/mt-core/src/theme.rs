@@ -85,6 +85,7 @@ pub struct Theme {
 /// Theme colors
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeColors {
+    // === UI 颜色 ===
     pub bg: String,
     pub bg_secondary: String,
     pub bg_tab_active: String,
@@ -92,26 +93,101 @@ pub struct ThemeColors {
     pub text: String,
     pub text_secondary: String,
     pub accent: String,
+    pub accent_hover: String,
     pub border: String,
     pub menu_hover_bg: String,
     pub menu_hover_text: String,
     pub status_bg: String,
+    pub scrollbar_thumb: String,
+    pub highlight_bg: String,
+    pub cell_selected_bg: String,
+
+    // === 标题颜色 ===
+    pub heading1_color: String,
+    pub heading2_color: String,
+    pub heading3_color: String,
+    pub heading4_color: String,
+    pub heading5_color: String,
+    pub heading6_color: String,
+
+    // === 标题字号 ===
+    pub heading1_size: String,
+    pub heading2_size: String,
+    pub heading3_size: String,
+    pub heading4_size: String,
+    pub heading5_size: String,
+    pub heading6_size: String,
+
+    // === 代码 ===
+    pub code_bg: String,
+    pub code_block_bg: String,
+
+    // === 链接 ===
+    pub link_color: String,
+    pub link_hover_color: String,
+
+    // === 引用块 ===
+    pub blockquote_border: String,
+    pub blockquote_bg: String,
+
+    // === 其他 ===
+    pub hr_color: String,
+    pub table_border: String,
+    pub table_header_bg: String,
 }
 
 impl Default for ThemeColors {
     fn default() -> Self {
         Self {
+            // UI 颜色
             bg: "#ffffff".to_string(),
-            bg_secondary: "#f5f5f5".to_string(),
+            bg_secondary: "#f6f8fa".to_string(),
             bg_tab_active: "#ffffff".to_string(),
-            bg_tab_inactive: "#e0e0e0".to_string(),
-            text: "#333333".to_string(),
-            text_secondary: "#888888".to_string(),
-            accent: "#4a90d9".to_string(),
-            border: "#e0e0e0".to_string(),
-            menu_hover_bg: "#e8e8e8".to_string(),
-            menu_hover_text: "#333333".to_string(),
-            status_bg: "#f0f0f0".to_string(),
+            bg_tab_inactive: "#e8e8e8".to_string(),
+            text: "#24292e".to_string(),
+            text_secondary: "#586069".to_string(),
+            accent: "#0969da".to_string(),
+            accent_hover: "#0550ae".to_string(),
+            border: "#d0d7de".to_string(),
+            menu_hover_bg: "#0969da".to_string(),
+            menu_hover_text: "#ffffff".to_string(),
+            status_bg: "#f6f8fa".to_string(),
+            scrollbar_thumb: "#c1c1c1".to_string(),
+            highlight_bg: "#fff3b0".to_string(),
+            cell_selected_bg: "rgba(9, 105, 218, 0.1)".to_string(),
+
+            // 标题颜色 (使用主题默认值)
+            heading1_color: "#24292e".to_string(),
+            heading2_color: "#24292e".to_string(),
+            heading3_color: "#24292e".to_string(),
+            heading4_color: "#24292e".to_string(),
+            heading5_color: "#24292e".to_string(),
+            heading6_color: "#586069".to_string(),
+
+            // 标题字号
+            heading1_size: "2em".to_string(),
+            heading2_size: "1.5em".to_string(),
+            heading3_size: "1.25em".to_string(),
+            heading4_size: "1.1em".to_string(),
+            heading5_size: "1em".to_string(),
+            heading6_size: "0.9em".to_string(),
+
+            // 代码
+            code_bg: "#f6f8fa".to_string(),
+            code_block_bg: "#f6f8fa".to_string(),
+
+            // 链接
+            link_color: "#0969da".to_string(),
+            link_hover_color: "#0550ae".to_string(),
+
+            // 引用块
+            blockquote_border: "#0969da".to_string(),
+            blockquote_bg: "#f6f8fa".to_string(),
+
+            // 其他
+            hr_color: "#d0d7de".to_string(),
+            table_border: "#d0d7de".to_string(),
+            table_header_bg: "#f6f8fa".to_string(),
         }
     }
 }

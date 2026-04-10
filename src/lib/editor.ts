@@ -36,9 +36,8 @@ export function createEditor(opts: EditorOptions): Editor {
         codeBlock: false,
       }),
       Markdown.configure({
-        html: true,
-        transformPastedText: true,
-        transformCopiedText: true,
+        // Note: transformPastedText and transformCopiedText options removed -
+        // they may not exist in this version of @tiptap/markdown
       }),
       Table.configure({ resizable: true }),
       TableRow,
@@ -85,5 +84,5 @@ export function getMarkdown(editor: Editor): string {
 }
 
 export function setContent(editor: Editor, markdown: string): void {
-  editor.commands.setContent(markdown, false, { contentType: 'markdown' })
+  editor.commands.setContent(markdown)
 }

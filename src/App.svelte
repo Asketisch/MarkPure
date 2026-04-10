@@ -584,19 +584,18 @@
     }
   }
 
-  onMount(async () => {
+  onMount(() => {
     // Load i18n translations
     i18n.init().catch((e: unknown) => console.error('Failed to init i18n:', e))
 
     // Load persisted config
-    try {
-      const config = await getConfig()
+    getConfig().then(config => {
       if (config.theme) theme = config.theme
       if (config.last_workspace) workspacePath = config.last_workspace
       if (config.editor) applyEditorConfig(config.editor)
-    } catch (e) {
+    }).catch((e: unknown) => {
       console.error('Failed to load config:', e)
-    }
+    })
 
     initEditor()
     window.addEventListener('keydown', handleKeydown)
@@ -754,10 +753,11 @@
 
       <!-- Tab Context Menu -->
       {#if tabContextMenu}
-        <div class="context-menu" style="left: {tabContextMenu.x}px; top: {tabContextMenu.y}px">
-          <button onclick={() => { closeTab(tabContextMenu.tabId); hideTabContextMenu() }}>{i18n.t('action.close')}</button>
-          <button onclick={() => { closeOtherTabs(tabContextMenu.tabId); hideTabContextMenu() }}>{i18n.t('tab.close_others')}</button>
-          <button onclick={() => { closeTabsToRight(tabContextMenu.tabId); hideTabContextMenu() }}>{i18n.t('tab.close_to_right')}</button>
+        {@const menu = tabContextMenu}
+        <div class="context-menu" style="left: {menu.x}px; top: {menu.y}px">
+          <button onclick={() => { closeTab(menu.tabId); hideTabContextMenu() }}>{i18n.t('action.close')}</button>
+          <button onclick={() => { closeOtherTabs(menu.tabId); hideTabContextMenu() }}>{i18n.t('tab.close_others')}</button>
+          <button onclick={() => { closeTabsToRight(menu.tabId); hideTabContextMenu() }}>{i18n.t('tab.close_to_right')}</button>
           <button onclick={() => { closeAllTabs(); hideTabContextMenu() }}>{i18n.t('tab.close_all')}</button>
         </div>
       {/if}
@@ -803,8 +803,8 @@
             if (tab) {
               tab.content = md
               tab.dirty = true
+              updateStats(tab.id)
             }
-            updateStats(md)
           }}
           bind:this={sourceEditorRef}
         />

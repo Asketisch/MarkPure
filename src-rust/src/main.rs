@@ -166,6 +166,7 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         "import_theme" => cmd_import_theme(&msg.params),
         "export_theme" => cmd_export_theme(&msg.params),
         "delete_theme" => cmd_delete_theme(&msg.params),
+        "save_theme" => cmd_save_theme(&msg.params),
 
         // App info
         "get_app_info" => cmd_get_app_info(),
@@ -726,6 +727,13 @@ fn cmd_delete_theme(params: &serde_json::Value) -> std::result::Result<serde_jso
     let id = params["id"].as_str().ok_or("Missing 'id' parameter")?;
     mt_core::delete_custom_theme(id).map_err(|e| e.to_string())?;
     Ok(serde_json::Value::Null)
+}
+
+fn cmd_save_theme(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let theme = serde_json::from_value::<mt_core::Theme>(params.clone())
+        .map_err(|e| e.to_string())?;
+    mt_core::save_custom_theme(&theme).map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(theme).map_err(|e| e.to_string())?)
 }
 
 // Asset commands

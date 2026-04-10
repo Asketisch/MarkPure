@@ -8,10 +8,10 @@
   } from '../commands'
 
   let {
-    workspacePath = '',
+    workspacePath = null as string | null,
     onOpenFile,
   }: {
-    workspacePath: string
+    workspacePath: string | null
     onOpenFile?: (path: string) => void
   } = $props()
 
@@ -39,7 +39,7 @@
   // Filter bookmarks by selected tag
   let filteredBookmarks = $derived(() => {
     if (!selectedTag) return bookmarks
-    return bookmarks.filter(bm => bm.tags.includes(selectedTag))
+    return bookmarks.filter(bm => bm.tags.includes(selectedTag as string))
   })
 
   async function loadBookmarks() {
