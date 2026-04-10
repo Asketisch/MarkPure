@@ -56,6 +56,7 @@
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
   let showFileMenu = $state(false)
   let showEditMenu = $state(false)
+  let showExportSubmenu = $state(false)
   let showSearch = $state(false)
   let showWorkspaceSearch = $state(false)
   let showSettings = $state(false)
@@ -372,20 +373,16 @@
   function handleRedo() { editor?.chain().focus().redo().run() }
   function handleFind() { showSearch = true }
   function handleReplace() { showSearch = true }
-  function toggleFileMenu() { showFileMenu = !showFileMenu }
+  function toggleFileMenu() {
+    showEditMenu = false  // Close edit menu first
+    showFileMenu = !showFileMenu
+  }
   function hideFileMenu() { showFileMenu = false }
-  function toggleEditMenu() { showEditMenu = !showEditMenu }
+  function toggleEditMenu() {
+    showFileMenu = false  // Close file menu first
+    showEditMenu = !showEditMenu
+  }
   function hideEditMenu() { showEditMenu = false }
-  function showExportSubmenu(e: MouseEvent) {
-    const target = e.target as HTMLElement
-    const submenu = target.nextElementSibling as HTMLElement
-    if (submenu) submenu.style.display = 'block'
-  }
-  function hideExportSubmenu(e: MouseEvent) {
-    const target = e.target as HTMLElement
-    const submenu = target.nextElementSibling as HTMLElement
-    if (submenu) submenu.style.display = 'none'
-  }
 
   async function openWorkspace() {
     const path = await pickDirectory()
@@ -673,13 +670,15 @@
             <div class="dropdown-sep"></div>
             <button class="dropdown-item" onclick={() => { openWorkspace(); hideFileMenu() }}>打开工作区</button>
             <div class="dropdown-sep"></div>
-            <div class="dropdown-submenu">
-              <span class="dropdown-item dropdown-submenu-item" onmouseenter={(e) => showExportSubmenu(e)} onmouseleave={(e) => hideExportSubmenu(e)}>导出 &#9656;</span>
-              <div class="dropdown-submenu-content" id="export-submenu">
-                <button class="dropdown-item" onclick={() => { handleExportHtml(); hideFileMenu() }}>{i18n.t('menu.export_html')}</button>
-                <button class="dropdown-item" onclick={() => { handleExportPdf(); hideFileMenu() }}>{i18n.t('menu.export_pdf')}</button>
-                <button class="dropdown-item" onclick={() => { handleExportWord(); hideFileMenu() }}>{i18n.t('menu.export_word')}</button>
-              </div>
+            <div class="dropdown-submenu" onmouseenter={() => showExportSubmenu = true} onmouseleave={() => showExportSubmenu = false}>
+              <span class="dropdown-item dropdown-submenu-item">导出 &#9656;</span>
+              {#if showExportSubmenu}
+                <div class="dropdown-submenu-content">
+                  <button class="dropdown-item" onclick={() => { handleExportHtml(); hideFileMenu() }}>{i18n.t('menu.export_html')}</button>
+                  <button class="dropdown-item" onclick={() => { handleExportPdf(); hideFileMenu() }}>{i18n.t('menu.export_pdf')}</button>
+                  <button class="dropdown-item" onclick={() => { handleExportWord(); hideFileMenu() }}>{i18n.t('menu.export_word')}</button>
+                </div>
+              {/if}
             </div>
           </div>
         {/if}
@@ -949,9 +948,8 @@
   }
 
   .dropdown-submenu-content {
-    display: none;
     position: absolute;
-    left: 100%;
+    right: 100%;
     top: 0;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
