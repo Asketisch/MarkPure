@@ -68,6 +68,10 @@
   --highlight-bg: rgba(255, 200, 50, 0.3);
   --cell-selected-bg: rgba(0, 122, 204, 0.15);
 
+  /* 代码 */
+  --code-bg: #3c3c3c;
+  --code-block-bg: #2d2d2d;
+
   /* 标题颜色 */
   --heading1-color: #e0e0e0;
   --heading2-color: #e0e0e0;
@@ -107,6 +111,10 @@
   --highlight-bg: rgba(97, 175, 239, 0.2);
   --cell-selected-bg: rgba(97, 175, 239, 0.12);
 
+  /* 代码 */
+  --code-bg: #3c3c3c;
+  --code-block-bg: #2c313a;
+
   /* 标题颜色 */
   --heading1-color: #abb2bf;
   --heading2-color: #abb2bf;
@@ -143,8 +151,12 @@
   --menu-hover-bg: #555555;
   --menu-hover-text: #ffffff;
   --scrollbar-thumb: #505050;
-  --highlight-bg: rgba(200, 200, 200, 0.15);
+  --highlight-bg: rgba(200, 200, 0.15);
   --cell-selected-bg: rgba(138, 138, 138, 0.12);
+
+  /* 代码 */
+  --code-bg: #404040;
+  --code-block-bg: #313131;
 
   /* 标题颜色 */
   --heading1-color: #c8c8c8;
@@ -221,8 +233,12 @@
   --menu-hover-bg: #82b1ff;
   --menu-hover-text: #212121;
   --scrollbar-thumb: #424242;
-  --highlight-bg: rgba(130, 177, 255, 0.15);
+--highlight-bg: rgba(130, 177, 255, 0.15);
   --cell-selected-bg: rgba(130, 177, 255, 0.1);
+
+  /* 代码 */
+  --code-bg: #3c3c3c;
+  --code-block-bg: #262626;
 
   /* 标题颜色 */
   --heading1-color: #e0e0e0;

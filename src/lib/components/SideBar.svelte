@@ -12,10 +12,11 @@
     workspacePath?: string | null
     editor?: Editor | null
     onOpenFile?: (path: string) => void
+    onPinTab?: (path: string) => void
     onOutlineNavigate?: (item: OutlineItem) => void
   }
 
-  let { workspacePath = null, editor = null, onOpenFile, onOutlineNavigate }: Props = $props()
+  let { workspacePath = null, editor = null, onOpenFile, onPinTab, onOutlineNavigate }: Props = $props()
 
   let activeTab = $state<'files' | 'outline' | 'bookmarks'>('files')
   let collapsed = $state(false)
@@ -67,7 +68,7 @@
   {#if !collapsed}
     <div class="sidebar-content">
       {#if activeTab === 'files'}
-        <WorkSpace {workspacePath} {onOpenFile} />
+        <WorkSpace {workspacePath} {onOpenFile} {onPinTab} />
       {:else if activeTab === 'outline'}
         <Outline {editor} onNavigate={onOutlineNavigate} />
       {:else if activeTab === 'bookmarks'}

@@ -546,3 +546,13 @@ export interface DroppedFile {
 export async function openDroppedFiles(paths: string[]): Promise<DroppedFile[]> {
   return await ipc('open_dropped_files', { paths })
 }
+
+// File system operations
+
+export async function revealInFinder(path: string): Promise<void> {
+  await ipc('reveal_in_finder', { path })
+}
+
+export async function copyToClipboard(text: string): Promise<void> {
+  await ipc('copy_to_clipboard', { text })
+}

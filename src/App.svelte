@@ -42,6 +42,7 @@
     name: string
     dirty: boolean
     content: string
+    preview?: boolean  // true = preview tab, closed when another file is opened
   }
 
   const i18n = createI18n()
@@ -143,9 +144,22 @@
 
   function openFileInNewTab(path: string, content: string) {
     const name = path.split('/').pop() ?? 'Untitled'
-    const tab: Tab = { id: nextId++, path, name, dirty: false, content }
-    tabs = [...tabs, tab]
-    switchTab(tab.id)
+    // Find a preview tab to replace, or create new
+    const previewTab = tabs.find(t => t.preview)
+    if (previewTab) {
+      previewTab.path = path
+      previewTab.name = name
+      previewTab.content = content
+      previewTab.dirty = false
+      previewTab.preview = true  // Keep as preview
+      docClose(previewTab.id).catch(() => {})
+      docOpen(previewTab.id, content).catch(() => {})
+      switchTab(previewTab.id)
+    } else {
+      const tab: Tab = { id: nextId++, path, name, dirty: false, content, preview: true }
+      tabs = [...tabs, tab]
+      switchTab(tab.id)
+    }
   }
 
   function initEditor() {
@@ -169,6 +183,7 @@
         if (t) {
           t.content = md
           t.dirty = true
+          t.preview = false  // Pin the tab when edited
           // Sync content to Rust document
           syncToRust(t.id, md)
         }
@@ -311,22 +326,78 @@
       if (existing) {
         existing.content = info.content
         existing.dirty = false
+        existing.preview = false  // Pin the tab when explicitly opened
         // Sync updated content to Rust
         syncToRust(existing.id, info.content)
         switchTab(existing.id)
         return
       }
-      const tab: Tab = {
-        id: nextId++,
-        path: info.path,
-        name: info.file_name,
-        dirty: false,
-        content: info.content,
+      // Find a preview tab to replace, or create new
+      const previewTab = tabs.find(t => t.preview)
+      if (previewTab) {
+        previewTab.path = info.path
+        previewTab.name = info.file_name
+        previewTab.content = info.content
+        previewTab.dirty = false
+        previewTab.preview = true  // Keep as preview for single click
+        docClose(previewTab.id).catch(() => {})
+        docOpen(previewTab.id, info.content).catch(() => {})
+        switchTab(previewTab.id)
+      } else {
+        const tab: Tab = {
+          id: nextId++,
+          path: info.path,
+          name: info.file_name,
+          dirty: false,
+          content: info.content,
+          preview: true,  // Mark as preview tab so it gets reused
+        }
+        tabs = [...tabs, tab]
+        switchTab(tab.id)
       }
-      tabs = [...tabs, tab]
-      switchTab(tab.id)
     } catch (e) {
       console.error('Failed to open file:', e)
+    }
+  }
+
+  async function handlePinTab(path: string) {
+    // Double-click opens and pins the tab (makes it permanent)
+    try {
+      const info = await openFileByPath(path)
+      if (!info) return
+      const existing = tabs.find(t => t.path === info.path)
+      if (existing) {
+        existing.content = info.content
+        existing.dirty = false
+        existing.preview = false  // Pin the tab
+        syncToRust(existing.id, info.content)
+        switchTab(existing.id)
+        return
+      }
+      // Find a preview tab to replace, or create new
+      const previewTab = tabs.find(t => t.preview)
+      if (previewTab) {
+        previewTab.path = info.path
+        previewTab.name = info.file_name
+        previewTab.content = info.content
+        previewTab.dirty = false
+        previewTab.preview = false  // Pin the tab
+        docClose(previewTab.id).catch(() => {})
+        docOpen(previewTab.id, info.content).catch(() => {})
+        switchTab(previewTab.id)
+      } else {
+        const tab: Tab = {
+          id: nextId++,
+          path: info.path,
+          name: info.file_name,
+          dirty: false,
+          content: info.content,
+        }
+        tabs = [...tabs, tab]
+        switchTab(tab.id)
+      }
+    } catch (e) {
+      console.error('Failed to pin tab:', e)
     }
   }
 
@@ -801,6 +872,7 @@
         {workspacePath}
         {editor}
         onOpenFile={handleOpenFile}
+        onPinTab={handlePinTab}
         onOutlineNavigate={handleOutlineNavigate}
       />
     {/if}
@@ -819,7 +891,9 @@
           <button
             class="tab"
             class:active={tab.id === activeTabId}
+            class:preview={tab.preview}
             onclick={() => switchTab(tab.id)}
+            ondblclick={() => { tab.preview = false }}
             onauxclick={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(tab.id) } }}
             oncontextmenu={(e) => showTabContextMenu(e, tab.id)}
           >
@@ -1093,6 +1167,10 @@
   .tab.active {
     background: var(--bg-tab-active);
     border-bottom: 2px solid var(--accent);
+  }
+  .tab.preview {
+    font-style: italic;
+    opacity: 0.8;
   }
   .tab-name { font-size: 12px; }
   .tab-close {

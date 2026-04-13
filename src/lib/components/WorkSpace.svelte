@@ -6,15 +6,17 @@
     createDirectory,
     deleteFile,
     renameFile,
+    revealInFinder,
   } from '../commands'
   import type { FileEntry } from '../commands'
 
   interface Props {
     workspacePath?: string | null
     onOpenFile?: (path: string) => void
+    onPinTab?: (path: string) => void
   }
 
-  let { workspacePath = null, onOpenFile }: Props = $props()
+  let { workspacePath = null, onOpenFile, onPinTab }: Props = $props()
 
   let tree = $state<FileEntry[]>([])
   let loading = $state(false)
@@ -69,6 +71,15 @@
     } else {
       selectedPath = entry.path
       onOpenFile?.(entry.path)
+    }
+  }
+
+  async function handleFileDoubleClick(entry: FileEntry) {
+    if (entry.is_dir) {
+      toggleDir(entry.path)
+    } else {
+      selectedPath = entry.path
+      onPinTab?.(entry.path)
     }
   }
 
@@ -146,6 +157,27 @@
     hideContextMenu()
   }
 
+  function handleCopyRelativePath() {
+    if (!contextMenu || !workspacePath) return
+    const relPath = contextMenu.path.replace(workspacePath, '')
+    navigator.clipboard.writeText(relPath.startsWith('/') || relPath.startsWith('\\') ? relPath.slice(1) : relPath)
+    hideContextMenu()
+  }
+
+  function handleCopyAbsolutePath() {
+    if (!contextMenu) return
+    navigator.clipboard.writeText(contextMenu.path)
+    hideContextMenu()
+  }
+
+  function handleRevealInFinder() {
+    if (!contextMenu) return
+    // Use macOS open command to reveal in Finder
+    const dir = contextMenu.isDir ? contextMenu.path : contextMenu.path.substring(0, contextMenu.path.lastIndexOf('/'))
+    revealInFinder(dir)
+    hideContextMenu()
+  }
+
   $effect(() => {
     if (workspacePath) {
       loadTree()
@@ -187,6 +219,10 @@
         <button onclick={handleNewFolder}>New Folder</button>
         <div class="menu-sep"></div>
       {/if}
+      <button onclick={handleCopyRelativePath}>Copy Relative Path</button>
+      <button onclick={handleCopyAbsolutePath}>Copy Absolute Path</button>
+      <button onclick={handleRevealInFinder}>Reveal in Finder</button>
+      <div class="menu-sep"></div>
       <button onclick={handleRename}>Rename</button>
       <button onclick={handleDelete} class="danger">Delete</button>
       <div class="menu-sep"></div>
@@ -202,6 +238,7 @@
     class:selected={selectedPath === entry.path}
     style="padding-left: {12 + depth * 16}px"
     onclick={() => handleFileClick(entry)}
+    ondblclick={() => handleFileDoubleClick(entry)}
     oncontextmenu={(e) => showContextMenu(e, entry)}
     role="button"
     tabindex="0"
