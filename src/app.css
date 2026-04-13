@@ -550,3 +550,59 @@ html, body, #app {
   outline: 2px solid #e8930c;
   outline-offset: -1px;
 }
+
+/* Drag and drop highlighting */
+.drag-highlight {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+/* Wiki links */
+.wikilink {
+  color: var(--accent);
+  cursor: pointer;
+  border-bottom: 1px dashed var(--accent);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.wikilink:hover {
+  color: var(--accent-hover);
+  border-bottom-color: var(--accent-hover);
+}
+
+/* Tags */
+.tag {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  padding: 0 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tag:hover {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Focus / Zen mode */
+.focus-mode .ProseMirror > * {
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.focus-mode .ProseMirror > *:not(:has(*)) {
+  opacity: 0.4;
+  filter: blur(1px);
+}
+
+.focus-mode .ProseMirror > *:has(+ *) {
+  opacity: 0.6;
+  filter: blur(0.5px);
+}
+
+.focus-mode .ProseMirror > *:has(+ * + *) {
+  opacity: 0.4;
+  filter: blur(1px);
+}
+

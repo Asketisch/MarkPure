@@ -1,52 +1,28 @@
 #!/bin/bash
 set -e
 
-# Generate AppIcon.icns from public/favicon.svg
+# Generate AppIcon.icns from icons/markpure_icon.png
 # Usage: ./macos/gen-icns.sh
 # Output: macos/AppIcon.icns
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-SVG="$PROJECT_DIR/public/favicon.svg"
+ICON_PNG="$PROJECT_DIR/icons/markpure_icon.png"
 ICONSET="$PROJECT_DIR/macos/AppIcon.iconset"
 ICNS="$PROJECT_DIR/macos/AppIcon.icns"
 
-if [ ! -f "$SVG" ]; then
-    echo "Error: $SVG not found"
+if [ ! -f "$ICON_PNG" ]; then
+    echo "Error: $ICON_PNG not found"
     exit 1
 fi
 
 rm -rf "$ICONSET"
 mkdir -p "$ICONSET"
 
-# Render SVG to 1024x1024 PNG
+# Use the 1024x1024 PNG as master source
 MASTER="$ICONSET/icon_512x512@2x.png"
+sips -z 1024 1024 "$ICON_PNG" --out "$MASTER" &>/dev/null
 
-if command -v rsvg-convert &>/dev/null; then
-    rsvg-convert -w 1024 -h 1024 "$SVG" -o "$MASTER"
-else
-    # Fallback: use sips to convert SVG (macOS built-in)
-    TMP_PNG="$(mktemp /tmp/markpure_icon_XXXXXX.png)"
-    # qlmanage renders SVG thumbnails
-    qlmanage -t -s 1024 -o /tmp "$SVG" &>/dev/null
-    QLOUT="${SVG}.png"
-    if [ -f "$QLOUT" ]; then
-        mv "$QLOUT" "$TMP_PNG"
-    else
-        # Try the basename version
-        QLOUT="/tmp/$(basename "$SVG").png"
-        if [ -f "$QLOUT" ]; then
-            mv "$QLOUT" "$TMP_PNG"
-        else
-            echo "Error: Failed to render SVG. Install rsvg-convert: brew install librsvg"
-            rm -rf "$ICONSET"
-            exit 1
-        fi
-    fi
-    cp "$TMP_PNG" "$MASTER"
-    rm -f "$TMP_PNG"
-fi
-
-# Generate all required sizes
+# Generate all required sizes for icns
 declare -a SIZES=(16 32 64 128 256 512)
 
 for size in "${SIZES[@]}"; do

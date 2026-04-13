@@ -18,6 +18,8 @@
     docClose,
     docSetContent,
     docGetStats,
+    openDroppedFiles,
+    savePastedImage,
   } from './lib/commands'
   import type { DocStats, AppConfig } from './lib/commands'
   import type { Editor } from '@tiptap/core'
@@ -32,6 +34,7 @@
   import { createI18n } from './lib/i18n.svelte'
   import { toggleInstantRender } from './lib/plugins/instant-render'
   import { searchQuickInsert, type QuickInsertItem } from './lib/extensions/quick-insert-config'
+  import { getPopupActiveIndex } from './lib/extensions/quick-insert-extension'
 
   interface Tab {
     id: number
@@ -70,6 +73,8 @@
   let initPending = false
   // Auto-save timers per tab (fixes race condition with single timer)
   let autoSaveTimers = $state<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+  let autoSaveInterval = $state(3000) // Auto-save interval in ms (loaded from config)
+  let isInTable = $state(false)
   const themes = ['', 'theme-dark', 'theme-one-dark', 'theme-graphite', 'theme-ulysses', 'theme-material-dark']
 
   function getActiveTab(): Tab | undefined {
@@ -98,6 +103,51 @@
     docSetContent(docId, content).catch(() => {})
   }
 
+  async function handleFilesDropped(files: File[]) {
+    const paths = files.map(f => (f as any).path).filter(Boolean)
+    if (paths.length === 0) return
+
+    try {
+      const results = await openDroppedFiles(paths)
+      for (const file of results) {
+        openFileInNewTab(file.path, file.content)
+      }
+    } catch (e) {
+      console.error('[App] Failed to open dropped files:', e)
+    }
+  }
+
+  async function handleImagesDropped(images: { file: File; base64: string }[]) {
+    if (!workspacePath) {
+      console.warn('[App] Cannot save image: no workspace opened')
+      return
+    }
+
+    for (const { file, base64 } of images) {
+      try {
+        const saved = await savePastedImage(workspacePath, base64, file.name)
+        // Insert image into editor at current cursor position
+        if (editor) {
+          const { state, dispatch } = editor.view
+          const imageNode = state.schema.nodes.image.create({
+            src: saved.relative_path,
+            alt: file.name,
+          })
+          dispatch(state.tr.insert(state.selection.from, imageNode))
+        }
+      } catch (e) {
+        console.error('[App] Failed to save dropped image:', e)
+      }
+    }
+  }
+
+  function openFileInNewTab(path: string, content: string) {
+    const name = path.split('/').pop() ?? 'Untitled'
+    const tab: Tab = { id: nextId++, path, name, dirty: false, content }
+    tabs = [...tabs, tab]
+    switchTab(tab.id)
+  }
+
   function initEditor() {
     const tab = getActiveTab()
     if (!tab || !editorContainer) return
@@ -123,20 +173,24 @@
           syncToRust(t.id, md)
         }
         updateStats(t?.id ?? tab.id)
-        // Auto-save with 3 second debounce (per-tab timer)
-        const tabId = t?.id ?? tab.id
-        const existing = autoSaveTimers.get(tabId)
-        if (existing) clearTimeout(existing)
-        const timerId = setTimeout(() => {
-          autoSaveTimers.delete(tabId)
-          const currentTab = getActiveTab()
-          if (currentTab?.path && currentTab.dirty && currentTab.id === tabId) {
-            handleSave()
-          }
-        }, 3000)
-        autoSaveTimers.set(tabId, timerId)
+        // Auto-save with configured interval (per-tab timer, 0 = disabled)
+        if (autoSaveInterval > 0) {
+          const tabId = t?.id ?? tab.id
+          const existing = autoSaveTimers.get(tabId)
+          if (existing) clearTimeout(existing)
+          const timerId = setTimeout(() => {
+            autoSaveTimers.delete(tabId)
+            const currentTab = getActiveTab()
+            if (currentTab?.path && currentTab.dirty && currentTab.id === tabId) {
+              handleSave()
+            }
+          }, autoSaveInterval)
+          autoSaveTimers.set(tabId, timerId)
+        }
       },
       onSave: handleSave,
+      onFilesDropped: handleFilesDropped,
+      onImagesDropped: handleImagesDropped,
     })
     // Initial sync
     const content = tab.content || getMarkdown(editor) || ''
@@ -368,6 +422,12 @@
   function toggleTaskList() { editor?.chain().focus().toggleTaskList().run() }
   function setHeading(level: number) { editor?.chain().focus().toggleHeading({ level: level as 1|2|3|4|5|6 }).run() }
   function addTable() { editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() }
+  function addColumnBefore() { editor?.chain().focus().addColumnBefore().run() }
+  function addColumnAfter() { editor?.chain().focus().addColumnAfter().run() }
+  function deleteColumn() { editor?.chain().focus().deleteColumn().run() }
+  function addRowBefore() { editor?.chain().focus().addRowBefore().run() }
+  function addRowAfter() { editor?.chain().focus().addRowAfter().run() }
+  function deleteRow() { editor?.chain().focus().deleteRow().run() }
   function insertHr() { editor?.chain().focus().setHorizontalRule().run() }
   function handleUndo() { editor?.chain().focus().undo().run() }
   function handleRedo() { editor?.chain().focus().redo().run() }
@@ -498,7 +558,14 @@
 
   function handleConfigChange(updates: Partial<AppConfig>) {
     if (updates.theme !== undefined) theme = updates.theme
-    if (updates.editor) applyEditorConfig(updates.editor)
+    if (updates.editor) {
+      applyEditorConfig(updates.editor)
+      if (updates.editor.auto_save_interval !== undefined) {
+        autoSaveInterval = updates.editor.auto_save_interval > 0
+          ? updates.editor.auto_save_interval * 1000
+          : 0
+      }
+    }
     if (updates.language) i18n.changeLocale(updates.language).catch(() => {})
   }
 
@@ -589,12 +656,26 @@
     getConfig().then(config => {
       if (config.theme) theme = config.theme
       if (config.last_workspace) workspacePath = config.last_workspace
-      if (config.editor) applyEditorConfig(config.editor)
+      if (config.editor) {
+        applyEditorConfig(config.editor)
+        // Apply auto-save interval (convert seconds to milliseconds, 0 = disabled)
+        if (config.editor.auto_save_interval > 0) {
+          autoSaveInterval = config.editor.auto_save_interval * 1000
+        }
+      }
     }).catch((e: unknown) => {
       console.error('Failed to load config:', e)
     })
 
     initEditor()
+
+    // Track if cursor is inside a table
+    const updateTableState = () => {
+      isInTable = editor?.isActive('table') ?? false
+    }
+    editor?.on('selectionUpdate', updateTableState)
+    updateTableState()
+
     window.addEventListener('keydown', handleKeydown)
 
     // Quick insert popup event listeners
@@ -633,10 +714,16 @@
     // Handle Enter selection from extension's onKeyDown
     const handleQISelect = () => {
       const props = (window as any).__qi_props
-      if (!props) return
-      const items = searchQuickInsert(props.query ?? '')
-      const activeIdx = (window as any).__qi_activeIndex ?? 0
+      if (!props) {
+        console.log('[QI] handleQISelect: props is null')
+        return
+      }
+      // Use props.items directly (the filtered items from Suggestion) instead of re-filtering
+      const items = props.items as QuickInsertItem[]
+      const activeIdx = getPopupActiveIndex()
+      console.log('[QI] handleQISelect:', { query: props.query, itemsCount: items.length, activeIdx, item: items[activeIdx] })
       if (items[activeIdx]) {
+        console.log('[QI] Calling command for:', items[activeIdx].title)
         props.command(items[activeIdx])
       }
       qiVisible = false
@@ -650,6 +737,7 @@
       window.removeEventListener('quick-insert-update', handleQIUpdate)
       window.removeEventListener('quick-insert-exit', handleQIExit)
       window.removeEventListener('quick-insert-select', handleQISelect)
+      editor?.off('selectionUpdate', updateTableState)
       editor?.destroy()
     }
   })
@@ -780,6 +868,14 @@
         <button class="tb-btn" onclick={toggleTaskList} title="Task List">&#9744;</button>
         <span class="tb-sep"></span>
         <button class="tb-btn" onclick={addTable} title="Insert Table">&#8863;</button>
+        {#if isInTable}
+          <button class="tb-btn" onclick={addColumnBefore} title="Add Column Before">&#8592;+</button>
+          <button class="tb-btn" onclick={addColumnAfter} title="Add Column After">+&#8594;</button>
+          <button class="tb-btn" onclick={deleteColumn} title="Delete Column">&#8722;Col</button>
+          <button class="tb-btn" onclick={addRowBefore} title="Add Row Before">&#8593;+</button>
+          <button class="tb-btn" onclick={addRowAfter} title="Add Row After">+&#8595;</button>
+          <button class="tb-btn" onclick={deleteRow} title="Delete Row">&#8722;Row</button>
+        {/if}
         <button class="tb-btn" onclick={insertHr} title="Horizontal Rule">&mdash;</button>
         <span class="tb-sep"></span>
         <button class="tb-btn" onclick={() => showSearch = !showSearch} title="Find & Replace (Ctrl+F)">&#128269;</button>

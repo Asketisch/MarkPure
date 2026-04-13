@@ -116,6 +116,8 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
 
         // Outline
         "get_outline" => cmd_get_outline(&msg.params),
+        "get_wikilinks" => cmd_get_wikilinks(&msg.params),
+        "get_tags" => cmd_get_tags(&msg.params),
 
         // Tabs
         "get_tabs" => cmd_get_tabs(state),
@@ -183,6 +185,9 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         "doc_set_content" => cmd_doc_set_content(&msg.params, state),
         "doc_get_stats" => cmd_doc_get_stats(&msg.params, state),
         "doc_search" => cmd_doc_search(&msg.params, state),
+
+        // File drop handling
+        "open_dropped_files" => cmd_open_dropped_files(&msg.params, state),
 
         _ => Err(format!("Unknown command: {}", msg.cmd)),
     };
@@ -370,6 +375,39 @@ fn cmd_get_outline(params: &serde_json::Value) -> std::result::Result<serde_json
     let content = params["content"].as_str().unwrap_or("");
     let headings = mt_markdown::extract_headings(content);
     Ok(serde_json::to_value(headings).map_err(|e| e.to_string())?)
+}
+
+fn cmd_get_wikilinks(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let content = params["content"].as_str().unwrap_or("");
+    let wikilinks = mt_markdown::extract_wikilinks(content);
+    // Convert WikiLink to a serializable format
+    let result: Vec<serde_json::Value> = wikilinks
+        .into_iter()
+        .map(|wl| {
+            serde_json::json!({
+                "page": wl.page,
+                "alias": wl.alias,
+            })
+        })
+        .collect();
+    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+}
+
+fn cmd_get_tags(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let content = params["content"].as_str().unwrap_or("");
+    let tags = mt_markdown::extract_tags(content);
+    // Convert Tag to a serializable format
+    let result: Vec<serde_json::Value> = tags
+        .into_iter()
+        .map(|t| {
+            serde_json::json!({
+                "name": t.name,
+                "start": t.start,
+                "end": t.end,
+            })
+        })
+        .collect();
+    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
 }
 
 // Tabs
@@ -909,6 +947,43 @@ fn cmd_doc_search(params: &serde_json::Value, state: &AppState) -> std::result::
     Ok(serde_json::Value::Array(result))
 }
 
+fn cmd_open_dropped_files(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let paths: Vec<String> = serde_json::from_value(params["paths"].clone())
+        .map_err(|e| format!("Invalid paths parameter: {}", e))?;
+
+    let mut results: Vec<serde_json::Value> = Vec::new();
+
+    for path_str in paths {
+        let path = PathBuf::from(&path_str);
+
+        // Only process text files (markdown, text, etc.)
+        let is_text_file = matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("md") | Some("markdown") | Some("txt") | Some("mdown") | Some("text")
+        );
+
+        if !is_text_file {
+            continue;
+        }
+
+        match state.rt().block_on(mt_fs::read_file(&path)) {
+            Ok(doc) => {
+                results.push(serde_json::json!({
+                    "content": doc.text_normalized(),
+                    "path": path_str,
+                    "file_name": path.file_name().map(|s| s.to_string_lossy().to_string()),
+                }));
+            }
+            Err(e) => {
+                // Log error but continue processing other files
+                eprintln!("[open_dropped_files] Failed to read '{}': {}", path_str, e);
+            }
+        }
+    }
+
+    Ok(serde_json::to_value(results).map_err(|e| e.to_string())?)
+}
+
 fn generate_uuid() -> String {
     use std::time::SystemTime;
     let now = SystemTime::now()
@@ -960,11 +1035,50 @@ fn main() -> wry::Result<()> {
         .find(|a| a.starts_with("--child-window="))
         .map(|a| a.trim_start_matches("--child-window=").to_string());
 
-    let window = WindowBuilder::new()
+    // Load window icon (PNG at 256x256)
+    // Try multiple locations: dev mode (project root) and bundle mode (Resources/)
+    fn find_icon_path() -> Option<std::path::PathBuf> {
+        let dev_path = std::path::Path::new("icons/256x256.png");
+        if dev_path.exists() {
+            return Some(dev_path.to_path_buf());
+        }
+        // Try bundle mode: executable is in Contents/MacOS/, icons in Contents/Resources/icons/
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                let bundle_path = exe_dir
+                    .parent()
+                    .map(|p| p.join("Resources/icons/256x256.png"));
+                if let Some(p) = bundle_path {
+                    if p.exists() {
+                        return Some(p);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    let window_icon = find_icon_path().and_then(|icon_path| {
+        match image::open(&icon_path) {
+            Ok(img) => {
+                let rgba = img.to_rgba8();
+                let (width, height) = rgba.dimensions();
+                tao::window::Icon::from_rgba(rgba.into_raw(), width, height).ok()
+            }
+            Err(e) => {
+                eprintln!("Failed to load icon: {}", e);
+                None
+            }
+        }
+    });
+
+    let mut window_builder = WindowBuilder::new()
         .with_title("MarkPure")
-        .with_inner_size(tao::dpi::LogicalSize::new(1200, 800))
-        .build(&event_loop)
-        .unwrap();
+        .with_inner_size(tao::dpi::LogicalSize::new(1200, 800));
+    if let Some(icon) = window_icon {
+        window_builder = window_builder.with_window_icon(Some(icon));
+    }
+    let window = window_builder.build(&event_loop).unwrap();
 
     let webview: Arc<Mutex<Option<wry::WebView>>> = Arc::new(Mutex::new(None));
     let wv_clone = webview.clone();

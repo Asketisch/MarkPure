@@ -5,7 +5,7 @@ pub mod mermaid;
 pub mod frontmatter;
 pub mod pandoc;
 
-pub use parser::{parse_markdown, extract_headings, to_html};
+pub use parser::{parse_markdown, extract_headings, to_html, extract_wikilinks, WikiLink, extract_tags, MarkdownTag};
 pub use folding::{FoldRange, compute_folding_ranges, toggle_fold, get_collapsed_display_range, position_in_range, get_parent_fold};
 pub use table::{TableStructure, TableOpType, CellAlign, parse_table, render_table, transform_table, validate_table, find_tables};
 pub use mermaid::{DiagramType, MermaidError, MermaidResult, MermaidCompletion, validate_mermaid, extract_mermaid_blocks, parse_mermaid, get_mermaid_suggestions, render_mermaid_with_cli};

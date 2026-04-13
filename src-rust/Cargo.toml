@@ -10,6 +10,7 @@ wry = "0.46"
 tao = "0.34"
 rust-embed = { version = "8", features = ["mime-guess"] }
 rfd = "0.15"
+image = { version = "0.25", default-features = false, features = ["png"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 mt-core = { path = "../crates/mt-core" }

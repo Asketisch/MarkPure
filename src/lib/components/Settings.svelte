@@ -249,6 +249,11 @@
               <label>{i18n.t('settings.word_wrap')}</label>
               <input type="checkbox" checked={config.editor.word_wrap} onchange={(e) => saveConfig({ editor: { ...config!.editor, word_wrap: (e.target as HTMLInputElement).checked } })} />
             </div>
+
+            <div class="setting-row">
+              <label>{i18n.t('settings.auto_save_interval')}</label>
+              <input type="number" min="0" max="300" value={config.editor.auto_save_interval} onchange={(e) => saveConfig({ editor: { ...config!.editor, auto_save_interval: Number((e.target as HTMLInputElement).value) } })} />
+            </div>
           </section>
 
         {:else if activeSection === 'appearance'}

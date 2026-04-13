@@ -19,7 +19,9 @@ export const QuickInsertExtension = Extension.create({
         char: '@',
         command: ({ editor, range, props }: { editor: any; range: any; props: QuickInsertItem }) => {
           editor.chain().focus().deleteRange(range).run()
-          props.action(editor.chain().focus())
+          const chain = editor.chain().focus()
+          props.action(chain)
+          chain.run()
         },
         allowSpaces: false,
         items: ({ query }: { query: string }) => {

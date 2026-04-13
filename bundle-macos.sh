@@ -47,6 +47,14 @@ else
     log_warn "No icon available. App will use default macOS icon."
 fi
 
+# ---- Step 5b: Copy icons directory for window icon ----
+if [ -d "$PROJECT_DIR/icons" ]; then
+    cp -r "$PROJECT_DIR/icons" "$BUNDLE_DIR/Contents/Resources/"
+    log_info "Icons directory copied."
+else
+    log_warn "Icons directory not found."
+fi
+
 # ---- Step 6: Ad-hoc codesign ----
 if [ "${SIGN:-1}" != "0" ]; then
     log_info "Signing app bundle (ad-hoc)..."

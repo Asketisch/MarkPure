@@ -58,6 +58,7 @@ export interface AppConfig {
     soft_tabs: boolean
     line_numbers: boolean
     word_wrap: boolean
+    auto_save_interval: number
   }
 }
 
@@ -511,4 +512,37 @@ export interface SpellCheckResult {
 
 export async function checkSpelling(text: string, lang: string = 'en'): Promise<SpellCheckResult> {
   return await ipc('check_spelling', { text, lang })
+}
+
+// Wiki links
+
+export interface WikiLink {
+  page: string
+  alias: string | null
+}
+
+export async function getWikiLinks(content: string): Promise<WikiLink[]> {
+  return await ipc('get_wikilinks', { content })
+}
+
+export interface Tag {
+  name: string
+  start: number
+  end: number
+}
+
+export async function getTags(content: string): Promise<Tag[]> {
+  return await ipc('get_tags', { content })
+}
+
+// File drop handling
+
+export interface DroppedFile {
+  content: string
+  path: string
+  file_name: string | null
+}
+
+export async function openDroppedFiles(paths: string[]): Promise<DroppedFile[]> {
+  return await ipc('open_dropped_files', { paths })
 }

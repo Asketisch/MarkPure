@@ -45,11 +45,17 @@ log_info "Installing npm dependencies..."
 cd "$PROJECT_DIR"
 npm install --silent 2>/dev/null
 
-# ---- Step 2: Build frontend (Vite) ----
+# ---- Step 2: Generate app icons (PNG + macOS icns) ----
+log_info "Generating app icons..."
+if [ -f "$PROJECT_DIR/macos/gen-icns.sh" ]; then
+    bash "$PROJECT_DIR/macos/gen-icns.sh" || log_warn "Icon generation failed, continuing without icons"
+fi
+
+# ---- Step 3: Build frontend (Vite) ----
 log_info "Building frontend (Vite)..."
 npx vite build
 
-# ---- Step 3: Build Rust backend ----
+# ---- Step 4: Build Rust backend ----
 # Force recompile so rust-embed picks up fresh dist/ assets
 touch "$PROJECT_DIR/src-rust/src/main.rs"
 

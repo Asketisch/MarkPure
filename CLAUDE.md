@@ -2,6 +2,32 @@
 
 WYSIWYG Markdown 桌面编辑器，使用 Rust (wry + tao) + Svelte 5 + Tiptap 构建。
 
+## 架构原则（铁律）
+
+> **前端（src/）仅负责渲染和 UI 交互，所有功能性操作必须通过 IPC 委托给 Rust 后端执行。**
+
+| 前端职责 | 后端职责（Rust） |
+|---------|----------------|
+| Tiptap 编辑器渲染 | 文件 I/O（读写、创建、删除、重命名） |
+| 组件状态管理 | 文档统计（字数、行数、字符数） |
+| UI 事件触发 | Markdown 解析和大纲提取 |
+| 定时器（自动保存防抖） | 工作区全文搜索 |
+| 键盘快捷键分发 | HTML/PDF/Word 导出 |
+| — | 主题管理 |
+| — | 拼写检查 |
+| — | 书签 CRUD |
+| — | 图片处理（粘贴/上传） |
+| — | 配置和标签页状态持久化 |
+| — | 目录树和文件监视 |
+
+**违规示例**：
+- ❌ 前端计算字数统计 → ✅ 调用 `doc_get_stats` IPC
+- ❌ 前端解析 Markdown 提取大纲 → ✅ 调用 `get_outline` IPC
+- ❌ 前端搜索文档内容 → ✅ 调用 `doc_search` IPC
+- ❌ 前端实现导出逻辑 → ✅ 调用 `export_html/pdf/word` IPC
+
+**例外**：大纲提取（`Outline.svelte`）可直接从 ProseMirror 节点提取，因为这是纯本地渲染逻辑，不需要后端参与。
+
 ## 架构概览
 
 ```
@@ -15,7 +41,7 @@ mark-web/
 │       ├── commands.ts     # IPC 命令封装 + TypeScript 接口定义
 │       ├── i18n.svelte.ts  # 响应式 i18n（createI18n/useI18n/t()）
 │       ├── components/     # Svelte 组件（14 个）
-│       ├── extensions/     # Tiptap 扩展（7 个）
+│       ├── extensions/     # Tiptap 扩展（16 个）
 │       ├── plugins/        # ProseMirror 插件（2 个）
 │       └── nodeviews/      # ProseMirror NodeView（1 个）
 ├── src-rust/               # Rust 后端（wry + tao，无 Tauri）
@@ -23,7 +49,7 @@ mark-web/
 └── crates/                 # Rust 库 crate
     ├── mt-core/            # Document (ropey+regex)、AppConfig、TabState、ThemeId、i18n、keymap
     ├── mt-fs/              # 异步文件 I/O + 编码检测 + 目录扫描 + 文件监视
-    ├── mt-markdown/        # Markdown 解析 + HTML 转换 + 标题提取
+    ├── mt-markdown/        # Markdown 解析 + HTML 转换 + 标题提取 + Wiki 链接提取 + Tags 提取
     ├── mt-export/          # HTML/PDF/Word 导出
     ├── mt-search/          # 工作区全文搜索（walkdir + regex）
     ├── mt-bookmark/        # 书签 CRUD（JSON 持久化）
@@ -141,6 +167,17 @@ cargo test --workspace    # 运行所有 Rust 测试（9 个测试，分布在 5
 | 命令 | 参数 | 返回值 |
 |------|------|--------|
 | `get_outline` | `{ content }` | `OutlineItem[]` |
+
+### Wiki 链接和 Tags
+| 命令 | 参数 | 返回值 |
+|------|------|--------|
+| `get_wikilinks` | `{ content }` | `[{page, alias}]` | 提取 [[Page]] 和 [[Page\|Alias]] |
+| `get_tags` | `{ content }` | `[{name, start, end}]` | 提取 #tag |
+
+### 文件拖拽
+| 命令 | 参数 | 返回值 |
+|------|------|--------|
+| `open_dropped_files` | `{ paths: string[] }` | `[{content, path, file_name}]` | 打开拖拽的文件 |
 
 ### 最近文件 / Tab 状态 / 配置
 | 命令 | 参数 | 返回值 |
