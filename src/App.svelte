@@ -35,6 +35,13 @@
   import { toggleInstantRender } from './lib/plugins/instant-render'
   import { searchQuickInsert, type QuickInsertItem } from './lib/extensions/quick-insert-config'
   import { getPopupActiveIndex } from './lib/extensions/quick-insert-extension'
+  import {
+    Heading1, Heading2, Heading3,
+    Bold, Italic, Strikethrough, Code,
+    Quote, List, ListOrdered, ListTodo,
+    Table, Minus, Search, FileCode2,
+    Undo2, Redo2, Sparkles, X
+  } from 'lucide-svelte'
 
   interface Tab {
     id: number
@@ -457,8 +464,13 @@
   }
 
   function toggleSourceMode() {
+    console.log('[toggleSourceMode] sourceMode:', sourceMode)
+    console.log('[toggleSourceMode] editor:', editor)
+    console.log('[toggleSourceMode] sourceEditorRef:', sourceEditorRef)
+
     if (sourceMode) {
       const md = sourceEditorRef?.getContent() ?? sourceContent
+      console.log('[toggleSourceMode] md from sourceEditor:', JSON.stringify(md).substring(0, 100))
       if (editor && md !== undefined) {
         setContent(editor, md)
         const tab = getActiveTab()
@@ -472,6 +484,7 @@
     } else {
       if (editor) {
         sourceContent = getMarkdown(editor)
+        console.log('[toggleSourceMode] sourceContent:', JSON.stringify(sourceContent).substring(0, 100))
       }
       sourceMode = true
     }
@@ -925,23 +938,23 @@
 
       <!-- Toolbar -->
       <div class="toolbar">
-        <button class="tb-btn" onclick={() => setHeading(1)} title="Heading 1">H1</button>
-        <button class="tb-btn" onclick={() => setHeading(2)} title="Heading 2">H2</button>
-        <button class="tb-btn" onclick={() => setHeading(3)} title="Heading 3">H3</button>
+        <button class="tb-btn" onclick={() => setHeading(1)} title="Heading 1"><Heading1 size={16} /></button>
+        <button class="tb-btn" onclick={() => setHeading(2)} title="Heading 2"><Heading2 size={16} /></button>
+        <button class="tb-btn" onclick={() => setHeading(3)} title="Heading 3"><Heading3 size={16} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={toggleBold} title="Bold (Ctrl+B)"><b>B</b></button>
-        <button class="tb-btn" onclick={toggleItalic} title="Italic (Ctrl+I)"><i>I</i></button>
-        <button class="tb-btn" onclick={toggleStrike} title="Strikethrough"><s>S</s></button>
-        <button class="tb-btn" onclick={toggleCode} title="Inline Code">&lt;/&gt;</button>
+        <button class="tb-btn" onclick={toggleBold} title="Bold (Ctrl+B)"><Bold size={15} /></button>
+        <button class="tb-btn" onclick={toggleItalic} title="Italic (Ctrl+I)"><Italic size={15} /></button>
+        <button class="tb-btn" onclick={toggleStrike} title="Strikethrough"><Strikethrough size={15} /></button>
+        <button class="tb-btn" onclick={toggleCode} title="Inline Code"><Code size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={toggleCodeBlock} title="Code Block">{'{ }'}</button>
-        <button class="tb-btn" onclick={toggleBlockquote} title="Blockquote">{'"'}</button>
+        <button class="tb-btn" onclick={toggleCodeBlock} title="Code Block"><FileCode2 size={15} /></button>
+        <button class="tb-btn" onclick={toggleBlockquote} title="Blockquote"><Quote size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={toggleBulletList} title="Bullet List">&#8226;</button>
-        <button class="tb-btn" onclick={toggleOrderedList} title="Ordered List">1.</button>
-        <button class="tb-btn" onclick={toggleTaskList} title="Task List">&#9744;</button>
+        <button class="tb-btn" onclick={toggleBulletList} title="Bullet List"><List size={15} /></button>
+        <button class="tb-btn" onclick={toggleOrderedList} title="Ordered List"><ListOrdered size={15} /></button>
+        <button class="tb-btn" onclick={toggleTaskList} title="Task List"><ListTodo size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={addTable} title="Insert Table">&#8863;</button>
+        <button class="tb-btn" onclick={addTable} title="Insert Table"><Table size={15} /></button>
         {#if isInTable}
           <button class="tb-btn" onclick={addColumnBefore} title="Add Column Before">&#8592;+</button>
           <button class="tb-btn" onclick={addColumnAfter} title="Add Column After">+&#8594;</button>
@@ -950,12 +963,12 @@
           <button class="tb-btn" onclick={addRowAfter} title="Add Row After">+&#8595;</button>
           <button class="tb-btn" onclick={deleteRow} title="Delete Row">&#8722;Row</button>
         {/if}
-        <button class="tb-btn" onclick={insertHr} title="Horizontal Rule">&mdash;</button>
+        <button class="tb-btn" onclick={insertHr} title="Horizontal Rule"><Minus size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={() => showSearch = !showSearch} title="Find & Replace (Ctrl+F)">&#128269;</button>
+        <button class="tb-btn" onclick={() => showSearch = !showSearch} title="Find & Replace (Ctrl+F)"><Search size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" class:active={sourceMode} onclick={toggleSourceMode} title="Source Mode (Ctrl+/)">&lt;/&gt;</button>
-        <button class="tb-btn" class:active={instantRenderEnabled} onclick={() => { if (editor) { toggleInstantRender(editor.view); instantRenderEnabled = !instantRenderEnabled } }} title="Instant Render">&#9660;</button>
+        <button class="tb-btn" class:active={sourceMode} onclick={toggleSourceMode} title="Source Mode (Ctrl+/)"><FileCode2 size={15} /></button>
+        <button class="tb-btn" class:active={instantRenderEnabled} onclick={() => { if (editor) { toggleInstantRender(editor.view); instantRenderEnabled = !instantRenderEnabled } }} title="Instant Render"><Sparkles size={15} /></button>
       </div>
 
       <!-- Search Bar -->
@@ -1044,28 +1057,29 @@
   .menu-bar {
     display: flex;
     align-items: center;
-    height: 32px;
-    padding: 0 8px;
+    height: 40px;
+    padding: 0 12px;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
     -webkit-app-region: drag;
     user-select: none;
   }
-  .menu-group { display: flex; gap: 0; -webkit-app-region: no-drag; }
-  .menu-title { flex: 1; text-align: center; font-weight: 600; font-size: 13px; opacity: 0.7; }
+  .menu-group { display: flex; gap: 4px; -webkit-app-region: no-drag; }
+  .menu-title { flex: 1; text-align: center; font-weight: 600; font-size: 13px; opacity: 0.6; }
   .menu-actions { -webkit-app-region: no-drag; }
   .menu-btn {
     background: none;
     border: none;
-    color: var(--text);
-    padding: 4px 10px;
+    color: var(--text-secondary);
+    padding: 6px 12px;
     cursor: pointer;
     font-size: 13px;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
   }
   .menu-btn:hover {
-    background: var(--menu-hover-bg);
-    color: var(--menu-hover-text);
+    background: var(--bg);
+    color: var(--text);
   }
 
   .menu-dropdown {
@@ -1076,29 +1090,37 @@
     position: absolute;
     top: 100%;
     left: 0;
-    background: var(--bg-secondary);
+    background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 0;
+    border-radius: var(--radius-lg);
+    padding: 6px 0;
     min-width: 180px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-lg);
     z-index: 1000;
+    animation: dropdown-enter 0.15s ease;
+  }
+
+  @keyframes dropdown-enter {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   .dropdown-item {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: 100%;
-    padding: 6px 16px;
+    padding: 8px 14px;
     border: none;
     background: none;
     color: var(--text);
     text-align: left;
     cursor: pointer;
     font-size: 13px;
+    transition: background var(--transition-fast);
   }
   .dropdown-item:hover {
-    background: var(--menu-hover-bg);
-    color: var(--menu-hover-text);
+    background: var(--bg-secondary);
   }
 
   .dropdown-sep {
@@ -1121,12 +1143,12 @@
     position: absolute;
     right: 100%;
     top: 0;
-    background: var(--bg-secondary);
+    background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 0;
+    border-radius: var(--radius-lg);
+    padding: 6px 0;
     min-width: 140px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-lg);
   }
 
   .main-area {
@@ -1145,10 +1167,13 @@
   /* Tab Bar */
   .tab-bar {
     display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
     overflow-x: auto;
-    min-height: 36px;
+    min-height: 40px;
   }
   .tab {
     display: flex;
@@ -1157,28 +1182,37 @@
     padding: 6px 12px;
     border: none;
     background: var(--bg-tab-inactive);
-    color: var(--text);
+    color: var(--text-secondary);
     cursor: pointer;
     font-size: 12px;
-    border-right: 1px solid var(--border);
+    border-radius: var(--radius-full);
     white-space: nowrap;
-    transition: background 0.15s;
+    transition: all var(--transition-fast);
+  }
+  .tab:hover {
+    background: var(--bg);
+    color: var(--text);
   }
   .tab.active {
     background: var(--bg-tab-active);
-    border-bottom: 2px solid var(--accent);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
   }
   .tab.preview {
     font-style: italic;
-    opacity: 0.8;
   }
   .tab-name { font-size: 12px; }
   .tab-close {
-    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    font-size: 12px;
     opacity: 0.5;
-    padding: 0 2px;
-    border-radius: 3px;
+    border-radius: var(--radius-full);
     cursor: pointer;
+    transition: all var(--transition-fast);
   }
   .tab-close:hover {
     opacity: 1;
@@ -1190,32 +1224,37 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 4px 8px;
+    padding: 6px 8px;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
   }
   .tb-btn {
     background: none;
     border: none;
-    color: var(--text);
-    width: 28px;
-    height: 28px;
+    color: var(--text-secondary);
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    border-radius: 4px;
-    font-size: 13px;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
   }
   .tb-btn:hover {
-    background: var(--menu-hover-bg);
-    color: var(--menu-hover-text);
+    background: var(--bg);
+    color: var(--text);
+    transform: scale(1.05);
+  }
+  .tb-btn.active {
+    background: var(--accent);
+    color: white;
   }
   .tb-sep {
     width: 1px;
-    height: 18px;
+    height: 20px;
     background: var(--border);
-    margin: 0 4px;
+    margin: 0 6px;
   }
 
   /* Editor Area */

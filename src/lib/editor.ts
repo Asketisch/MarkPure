@@ -119,5 +119,17 @@ export function getMarkdown(editor: Editor): string {
 }
 
 export function setContent(editor: Editor, markdown: string): void {
-  editor.commands.setContent(markdown)
+  console.log('[setContent] Input markdown:', JSON.stringify(markdown).substring(0, 100))
+  console.log('[setContent] editor.markdown exists:', !!editor.markdown)
+
+  if (editor.markdown) {
+    const jsonContent = editor.markdown.parse(markdown)
+    console.log('[setContent] Parsed JSON content nodes:', jsonContent?.content?.length ?? 0)
+    console.log('[setContent] First node type:', jsonContent?.content?.[0]?.type)
+    editor.commands.setContent(jsonContent)
+    console.log('[setContent] After setContent, editor.getJSON:', JSON.stringify(editor.getJSON()).substring(0, 200))
+  } else {
+    console.warn('[setContent] editor.markdown is undefined, falling back to raw setContent')
+    editor.commands.setContent(markdown)
+  }
 }

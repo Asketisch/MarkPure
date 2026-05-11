@@ -19,6 +19,20 @@
   let themeCompartment = new Compartment()
   let updating = false
 
+  // React to content prop changes (e.g., switching tabs or toggling source mode)
+  $effect(() => {
+    if (cm && content !== undefined) {
+      const current = cm.state.doc.toString()
+      if (current !== content) {
+        updating = true
+        cm.dispatch({
+          changes: { from: 0, to: cm.state.doc.length, insert: content },
+        })
+        updating = false
+      }
+    }
+  })
+
   onMount(() => {
     const isDark = detectDarkTheme()
     cm = new CMView({

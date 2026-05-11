@@ -161,15 +161,15 @@ export function createInstantRenderPlugin(): Plugin {
               enabled,
               cursorPos: prev.cursorPos,
               decorations: enabled
-                ? computeSyntaxDecorations(newState.doc, prev.cursorPos)
+                ? computeSyntaxDecorations(newState.doc, prev.cursorPos >= 0 ? prev.cursorPos : tr.selection.from)
                 : DecorationSet.empty,
             }
           }
           if (meta.type === 'enable') {
             return {
               enabled: true,
-              cursorPos: prev.cursorPos,
-              decorations: computeSyntaxDecorations(newState.doc, prev.cursorPos),
+              cursorPos: newState.selection.from,
+              decorations: computeSyntaxDecorations(newState.doc, newState.selection.from),
             }
           }
           if (meta.type === 'disable') {
