@@ -28,16 +28,47 @@ WYSIWYG Markdown 桌面编辑器，使用 Rust (wry + tao) + Svelte 5 + Tiptap �
 
 **例外**：大纲提取（`Outline.svelte`）可直接从 ProseMirror 节点提取，因为这是纯本地渲染逻辑，不需要后端参与。
 
-## 维护约定
+## 代码组织原则（铁律）
 
-> **每次修改代码后，必须同步更新相关 AGENTS.md 文件。AGENTS.md 是代码的文档镜像，必须与代码保持同步。**
+> **禁止单文件过度膨胀，优先拆分。代码库属于 AI 友好型是最高优先级。**
 
-| 文件 | 说明 |
-|------|------|
-| `backend/crates/AGENTS.md` | Rust crate 依赖树、模块 API、关键类型 |
-| `frontend/src/AGENTS.md` | 前端目录结构、状态模型、IPC 模式 |
-| `frontend/src/lib/components/AGENTS.md` | 组件概览、大组件状态和逻辑 |
-| `frontend/src/lib/plugins/AGENTS.md` | ProseMirror 插件内部状态和更新策略 |
+### Rust 模块拆分阈值
+
+| 文件行数 | 处置 |
+|---------|------|
+| < 300 行 | 允许，保持简洁 |
+| 300-500 行 | 红灯，考虑拆分辅助函数 |
+| > 500 行 | 必须拆分，拆到 `mod.rs` 或同级的多个子模块 |
+
+**拆分策略**：
+- 提取纯函数到独立文件（如 `parse.rs` → `parse_heading.rs` + `parse_table.rs`）
+- 提取工具函数到 `utils.rs` 或 `helpers.rs`
+- 提取常量定义到 `constants.rs`
+- 提取类型定义到 `types.rs`（即使只有类型）
+
+### 前端模块拆分阈值
+
+| 文件行数 | 处置 |
+|---------|------|
+| < 200 行 | 允许，保持简洁 |
+| 200-400 行 | 红灯，考虑拆分工具函数 |
+| > 400 行 | 必须拆分，拆到 `utils/` 或同级的多个子模块 |
+
+**拆分策略**：
+- 提取纯函数到 `utils.ts` 或 `helpers.ts`
+- 提取常量到 `constants.ts`
+- 提取类型到 `types.ts`
+- 提取复杂组件到独立文件
+- ProseMirror 插件超过 200 行必须拆分内部状态处理逻辑
+
+### 为什么重要
+
+AI 阅读小文件的上下文窗口效率远高于阅读大文件。500 行的 Rust 文件会让 AI 消耗大量上下文记住代码位置，降低推理质量。多个小文件（每个 100-150 行）可以让 AI 更好地聚焦和复用代码片段。
+
+**违规示例**：
+- ❌ 一个 `lib.rs` 塞进 2000 行 → ✅ 拆成 `document.rs` + `config.rs` + `i18n.rs` + `keymap.rs` + `utils/` 系列
+- ❌ 一个 `commands.ts` 800 行 → ✅ 拆成 `commands/file.ts` + `commands/doc.ts` + `commands/search.ts`
+- ❌ 一个 `.svelte` 600 行包含复杂逻辑 → ✅ 拆成子组件 + `utils/`
 
 ## 架构概览
 
