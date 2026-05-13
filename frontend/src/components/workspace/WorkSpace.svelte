@@ -346,7 +346,7 @@
   }
 
   .tree-item.selected {
-    background: var(--accent-bg);
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
   }
 
   .dir-icon,
@@ -400,7 +400,7 @@
   }
 
   .context-menu button.danger {
-    color: #e53935;
+    color: var(--error-color);
   }
 
   .menu-sep {

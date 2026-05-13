@@ -50,6 +50,14 @@
   --table-border: #d0d7de;
   --table-header-bg: #f6f8fa;
 
+  /* 错误/警告色 */
+  --error-color: #e74c3c;
+  --warning-color: #f5a623;
+
+  /* 搜索匹配高亮 */
+  --search-match-current-bg: #f5a623;
+  --search-match-current-outline: #e8930c;
+
   /* 阴影系统 */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
   --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
@@ -611,7 +619,7 @@ html, body, #app {
   overflow-x: auto;
 }
 .ProseMirror .math-error {
-  color: #e74c3c;
+  color: var(--error-color);
   font-family: monospace;
   font-size: 0.9em;
 }
@@ -622,9 +630,9 @@ html, body, #app {
   border-radius: 2px;
 }
 .mw-search-match-current {
-  background: #f5a623;
+  background: var(--search-match-current-bg);
   color: #000;
-  outline: 2px solid #e8930c;
+  outline: 2px solid var(--search-match-current-outline);
   outline-offset: -1px;
 }
 

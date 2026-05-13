@@ -503,7 +503,11 @@
     border-radius: 4px;
     background: var(--border);
   }
-  .theme-badge.dark { background: #333; color: #ccc; }
+  .theme-badge.dark {
+    background: var(--bg-secondary);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
 
   .theme-actions button {
     padding: 4px 10px;

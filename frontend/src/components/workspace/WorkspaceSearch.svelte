@@ -325,7 +325,7 @@
 
   .ws-error {
     padding: 8px 16px;
-    color: #e53935;
+    color: var(--error-color);
     font-size: 12px;
   }
 

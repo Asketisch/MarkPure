@@ -18,6 +18,32 @@
     position: { top: number; left: number }
   } = $props()
 
+  let adjustedPosition = $derived.by(() => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 400
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 600
+    const popupWidth = 360
+    const popupHeight = 320
+
+    let top = position.top
+    let left = position.left
+
+    if (left + popupWidth > vw - 16) {
+      left = vw - popupWidth - 16
+    }
+    if (left < 16) {
+      left = 16
+    }
+
+    if (top + popupHeight > vh - 16) {
+      top = position.top - popupHeight - 8
+    }
+    if (top < 16) {
+      top = 16
+    }
+
+    return { top, left }
+  })
+
   let activeIndex = $state(0)
   let container: HTMLElement | null = null
   let filteredItems = $state<QuickInsertItem[]>(quickInsertItems)
@@ -76,7 +102,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="qi-popup"
-  style="top: {position.top}px; left: {position.left}px"
+  style="top: {adjustedPosition.top}px; left: {adjustedPosition.left}px"
   bind:this={container}
 >
   {#if filteredItems.length === 0}

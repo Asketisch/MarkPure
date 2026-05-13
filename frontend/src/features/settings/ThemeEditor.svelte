@@ -455,8 +455,9 @@
   }
 
   .theme-badge.dark {
-    background: #333;
-    color: #ccc;
+    background: var(--bg-secondary);
+    color: var(--text);
+    border: 1px solid var(--border);
   }
 
   .builtin-badge {
