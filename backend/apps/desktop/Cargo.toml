@@ -1,0 +1,24 @@
+[package]
+name = "markpure"
+version = "0.1.0"
+description = "A WYSIWYG Markdown editor"
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+wry = "0.46"
+tao = "0.34"
+rust-embed = { version = "8", features = ["mime-guess"] }
+rfd = "0.15"
+image = { version = "0.25", default-features = false, features = ["png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+mt_core = { path = "../../crates/core-lib" }
+fs = { path = "../../crates/fs" }
+markdown = { path = "../../crates/markdown" }
+export = { path = "../../crates/export" }
+search = { path = "../../crates/search" }
+bookmark = { path = "../../crates/bookmark" }
+assets = { path = "../../crates/assets" }
+spellcheck = { path = "../../crates/spellcheck" }
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }

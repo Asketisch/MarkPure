@@ -4,9 +4,9 @@ WYSIWYG Markdown 桌面编辑器，使用 Rust (wry + tao) + Svelte 5 + Tiptap �
 
 ## 架构原则（铁律）
 
-> **前端（src/）仅负责渲染和 UI 交互，所有功能性操作必须通过 IPC 委托给 Rust 后端执行。**
+> **前端（frontend/src/）仅负责渲染和 UI 交互，所有功能性操作必须通过 IPC 委托给 Rust 后端执行。**
 
-| 前端职责 | 后端职责（Rust） |
+| 前端职责（frontend/src/） | 后端职责（Rust） |
 |---------|----------------|
 | Tiptap 编辑器渲染 | 文件 I/O（读写、创建、删除、重命名） |
 | 组件状态管理 | 文档统计（字数、行数、字符数） |
@@ -28,33 +28,64 @@ WYSIWYG Markdown 桌面编辑器，使用 Rust (wry + tao) + Svelte 5 + Tiptap �
 
 **例外**：大纲提取（`Outline.svelte`）可直接从 ProseMirror 节点提取，因为这是纯本地渲染逻辑，不需要后端参与。
 
+## 维护约定
+
+> **每次修改代码后，必须同步更新相关 AGENTS.md 文件。AGENTS.md 是代码的文档镜像，必须与代码保持同步。**
+
+| 文件 | 说明 |
+|------|------|
+| `backend/crates/AGENTS.md` | Rust crate 依赖树、模块 API、关键类型 |
+| `frontend/src/AGENTS.md` | 前端目录结构、状态模型、IPC 模式 |
+| `frontend/src/lib/components/AGENTS.md` | 组件概览、大组件状态和逻辑 |
+| `frontend/src/lib/plugins/AGENTS.md` | ProseMirror 插件内部状态和更新策略 |
+
 ## 架构概览
 
 ```
-mark-web/
-├── src/                    # Svelte 5 + TypeScript 前端
-│   ├── App.svelte          # 主应用：布局、标签栏、工具栏、编辑器、状态栏
-│   ├── app.css             # 全局样式 + 主题 CSS 变量 + ProseMirror 编辑器样式
-│   ├── main.ts             # 入口
-│   └── lib/
-│       ├── editor.ts       # Tiptap WYSIWYG 编辑器封装
-│       ├── commands.ts     # IPC 命令封装 + TypeScript 接口定义
-│       ├── i18n.svelte.ts  # 响应式 i18n（createI18n/useI18n/t()）
-│       ├── components/     # Svelte 组件（14 个）
-│       ├── extensions/     # Tiptap 扩展（16 个）
-│       ├── plugins/        # ProseMirror 插件（2 个）
-│       └── nodeviews/      # ProseMirror NodeView（1 个）
-├── src-rust/               # Rust 后端（wry + tao，无 Tauri）
-│   └── src/main.rs         # WebView 创建、IPC 处理、文档注册表
-└── crates/                 # Rust 库 crate
-    ├── mt-core/            # Document (ropey+regex)、AppConfig、TabState、ThemeId、i18n、keymap
-    ├── mt-fs/              # 异步文件 I/O + 编码检测 + 目录扫描 + 文件监视
-    ├── mt-markdown/        # Markdown 解析 + HTML 转换 + 标题提取 + Wiki 链接提取 + Tags 提取
-    ├── mt-export/          # HTML/PDF/Word 导出
-    ├── mt-search/          # 工作区全文搜索（walkdir + regex）
-    ├── mt-bookmark/        # 书签 CRUD（JSON 持久化）
-    ├── mt-assets/          # 图片粘贴处理（本地/base64/远程上传）、SSRF 防护
-    └── mt-spellcheck/      # 英文拼写检查（Levenshtein 建议）
+markpure/
+├── frontend/                  # Svelte 5 + TypeScript 前端
+│   └── src/
+│       ├── app/
+│       │   ├── App.svelte     # 主应用：菜单栏、标签栏、工具栏、编辑器、状态栏
+│       │   ├── main.ts        # 入口
+│       │   └── app.css       # 全局样式 + 主题 CSS 变量 + ProseMirror 编辑器样式
+│       ├── editor/           # Tiptap 编辑器核心
+│       │   ├── editor.ts     # Tiptap WYSIWYG 编辑器封装
+│       │   ├── commands.ts   # IPC 命令封装
+│       │   └── types.ts      # TypeScript 类型定义
+│       ├── components/       # Svelte 组件（15 个）
+│       │   ├── ui/          # 通用 UI 组件
+│       │   ├── layout/      # 布局组件
+│       │   └── workspace/   # 工作区相关组件
+│       ├── features/        # 功能模块
+│       │   ├── settings/    # 设置/主题编辑
+│       │   ├── search/      # 工作区搜索
+│       │   ├── quick-insert/ # 快速插入
+│       │   └── outline/    # 大纲面板
+│       ├── extensions/      # Tiptap 扩展（16 个，按功能分组）
+│       │   ├── editing/    # 编辑增强
+│       │   ├── view/       # 视图增强
+│       │   └── blocks/     # 块级扩展
+│       ├── plugins/        # ProseMirror 插件（3 个）
+│       ├── nodeviews/      # ProseMirror NodeView（1 个）
+│       ├── stores/         # Svelte 5 runes 状态管理
+│       └── i18n/           # 国际化
+├── backend/                  # Rust 后端（wry + tao）
+│   ├── apps/
+│   │   └── desktop/        # 桌面应用入口
+│   │       └── src/main.rs # WebView 创建、IPC 处理、文档注册表
+│   └── crates/             # Rust 库 crate
+│       ├── core/           # Document (ropey+regex)、AppConfig、TabState、ThemeId、i18n、keymap
+│       ├── fs/             # 异步文件 I/O + 编码检测 + 目录扫描 + 文件监视
+│       ├── markdown/       # Markdown 解析 + HTML 转换 + 标题提取 + Wiki 链接提取 + Tags 提取
+│       ├── export/         # HTML/PDF/Word 导出
+│       ├── search/         # 工作区全文搜索（walkdir + regex）
+│       ├── bookmark/       # 书签 CRUD（JSON 持久化）
+│       ├── assets/         # 图片粘贴处理（本地/base64/远程上传）、SSRF 防护
+│       └── spellcheck/     # 英文拼写检查（Levenshtein 建议）
+├── scripts/                # 构建脚本
+├── resources/              # 应用资源（图标源文件等）
+└── distribution/           # 分发包配置
 ```
 
 ## 技术栈
@@ -85,24 +116,24 @@ mark-web/
 
 ```bash
 # 开发模式（两个终端）
-npm run dev               # 终端1：前端热重载（端口 5173）
-cargo run -- --dev        # 终端2：Rust 后端（连接 Vite 开发服务器）
+cd frontend && npm run dev     # 终端1：前端热重载（端口 5173）
+cd backend && cargo run -- --dev  # 终端2：Rust 后端（连接 Vite 开发服务器）
 
 # 一键构建
-./build.sh                # debug 构建（npm install + vite build + cargo build）
-./build.sh release        # release 优化构建
-./build.sh run            # 构建并运行
-./build.sh clean          # 清理所有构建产物
+./scripts/build.sh             # debug 构建（npm install + vite build + cargo build）
+./scripts/build.sh release     # release 优化构建
+./scripts/build.sh run        # 构建并运行
+./scripts/build.sh clean      # 清理所有构建产物
 
 # macOS .app 打包
-./bundle-macos.sh         # 构建 + 打包为 target/MarkPure.app + ad-hoc 签名
+./scripts/bundle-macos.sh     # 构建 + 打包为 target/MarkPure.app + ad-hoc 签名
 
 # 检查
-npm run check             # 前端类型检查（svelte-check + tsc）
-cargo check --workspace   # Rust 编译检查
+cd frontend && npm run check   # 前端类型检查（svelte-check + tsc）
+cargo check --workspace        # Rust 编译检查
 
 # 测试
-cargo test --workspace    # 运行所有 Rust 测试（9 个测试，分布在 5 个 crate 中）
+cargo test --workspace         # 运行所有 Rust 测试（9 个测试，分布在 5 个 crate 中）
 # 前端暂无测试框架
 ```
 
@@ -252,7 +283,7 @@ cargo test --workspace    # 运行所有 Rust 测试（9 个测试，分布在 5
 
 ### IPC 实现机制
 
-前端 `commands.ts` 使用自定义 IPC：
+前端 `frontend/src/editor/commands.ts` 使用自定义 IPC：
 - `ipc.postMessage(JSON.stringify({ id, cmd, params }))` 发送到 Rust
 - Rust `ipc_handler` 接收消息，调用 `handle_command`
 - Rust 通过 `webview.evaluate_script("window.__mt_dispatch('{json}')")` 返回结果
@@ -260,7 +291,7 @@ cargo test --workspace    # 运行所有 Rust 测试（9 个测试，分布在 5
 
 ## 主题系统
 
-6 个内置主题（CSS 变量，定义在 `src/app.css`）：
+6 个内置主题（CSS 变量，定义在 `frontend/src/app/app.css`）：
 - `""` (Light) — Cadmium Light（白色背景）
 - `theme-dark` — VS Code Dark 风格
 - `theme-one-dark` — Atom One Dark 风格
@@ -270,7 +301,7 @@ cargo test --workspace    # 运行所有 Rust 测试（9 个测试，分布在 5
 
 主题标识统一使用 CSS class 名。后端 `cmd_get_config` 返回 CSS class（如 `"theme-dark"`），`cmd_set_config` 同时接受 CSS class 和人类可读标签。前端 `<div class="app-root {theme}">` 直接用 class 名。
 
-支持自定义主题导入/导出（JSON 文件存储在 `~/.config/markpure/themes/`），通过 `mt-core::theme` 模块管理。
+支持自定义主题导入/导出（JSON 文件存储在 `~/.config/markpure/themes/`），通过 `backend/crates/core/src/theme.rs` 模块管理。
 
 CSS 变量还包括编辑器字体：`--editor-font-family`（默认系统字体栈）、`--editor-font-size`（默认 15px），通过 Settings 实时修改。
 
@@ -278,14 +309,14 @@ CSS 变量还包括编辑器字体：`--editor-font-family`（默认系统字体
 
 ## i18n 系统
 
-支持 3 种语言（`mt-core/src/i18n.rs`，71 个翻译 key）：
+支持 3 种语言（`backend/crates/core/src/i18n.rs`，71 个翻译 key）：
 - `en` — English
 - `zh-CN` — 简体中文
 - `ja` — 日本語
 
 ### 前端接入
 
-`src/lib/i18n.svelte.ts` 提供响应式 i18n：
+`frontend/src/i18n/index.ts` 提供响应式 i18n：
 - `createI18n()` — 在 App.svelte 根组件创建，设置 Svelte context
 - `useI18n()` — 子组件中获取 i18n 实例
 - `i18n.t(key)` — 翻译函数，语言切换后自动响应更新
@@ -300,23 +331,23 @@ CSS 变量还包括编辑器字体：`--editor-font-family`（默认系统字体
 
 ## 快捷键系统
 
-可配置的键盘快捷键（`mt-core/src/keymap.rs`），支持 JSON 持久化。通过 `get_keybindings` / `set_keybindings` / `reset_keybindings` / `update_keybinding` IPC 命令管理。每个快捷键包含 `id`、`label`、`accelerator` 三个字段。
+可配置的键盘快捷键（`backend/crates/core/src/keymap.rs`），支持 JSON 持久化。通过 `get_keybindings` / `set_keybindings` / `reset_keybindings` / `update_keybinding` IPC 命令管理。每个快捷键包含 `id`、`label`、`accelerator` 三个字段。
 
 ## 安全设计
 
 - **SSRF 防护**：远程图片上传时 `validate_upload_url()` 验证 URL（`url` crate），阻止私有/内网地址（localhost、127.0.0.1、10.x、172.16-31.x、192.168.x、169.254.x 等），仅允许 http/https 协议
-- **路径遍历防护**：`mt-fs::validate_file_name()` 校验文件名不含 `..`、`/`、`\`、`\0`；`rename_file` 额外验证新路径不超出父目录
+- **路径遍历防护**：`backend/crates/fs/src/io.rs` 中 `validate_file_name()` 校验文件名不含 `..`、`/`、`\`、`\0`；`rename_file` 额外验证新路径不超出父目录
 - **自定义主题 ID 验证**：`validate_theme_id()` 检查空值和路径穿越字符，`delete_custom_theme()` 使用 `canonicalize` 确保文件路径不超出 themes 目录
 - **IPC 响应转义**：`window.__mt_dispatch` 注入前完整转义 `\r`、`\u2028`、`\u2029`、`\0`、`</script>` 等危险字符
 - **DOCX 导出安全**：title 经 `escape_xml()` 处理，防止 XML 注入
 
 ## 性能优化要点
 
-- **即时渲染插件** (`plugins/instant-render.ts`)：装饰集缓存在插件状态中，光标移动时仅对受影响的顶层块做增量更新（`findAffectedRange` + `nodesBetween`），不做全文档遍历
-- **搜索插件** (`plugins/search.ts`)：使用 `doc.textBetween()` 提取文本，通过 `tr.mapping` 尝试快速重映射已有匹配
-- **大纲组件** (`components/Outline.svelte`)：直接接收 Tiptap Editor 实例，从 ProseMirror 文档模型提取标题，不经过 IPC
+- **即时渲染插件** (`frontend/src/plugins/instant-render.ts`)：装饰集缓存在插件状态中，光标移动时仅对受影响的顶层块做增量更新（`findAffectedRange` + `nodesBetween`），不做全文档遍历
+- **搜索插件** (`frontend/src/plugins/search.ts`)：使用 `doc.textBetween()` 提取文本，通过 `tr.mapping` 尝试快速重映射已有匹配
+- **大纲组件** (`frontend/src/components/workspace/Outline.svelte`)：直接接收 Tiptap Editor 实例，从 ProseMirror 文档模型提取标题，不经过 IPC
 - **文档注册表**：Rust `AppState.documents` 持有每个标签页的 Document（rope），`doc_get_stats` 和 `doc_search` 直接在 rope 上计算
-- **工作区搜索**：`mt-search` 使用 `walkdir` 并行遍历 + `regex` 匹配，跳过二进制文件
+- **工作区搜索**：`backend/crates/search/src/lib.rs` 使用 `walkdir` 并行遍历 + `regex` 匹配，跳过二进制文件
 
 ## 开发模式
 

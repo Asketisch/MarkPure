@@ -1,13 +1,13 @@
 [workspace]
 members = [
-    "src-rust",
-    "crates/mt-core",
-    "crates/mt-fs",
-    "crates/mt-markdown",
-    "crates/mt-export",
-    "crates/mt-search",
-    "crates/mt-bookmark",
-    "crates/mt-assets",
-    "crates/mt-spellcheck",
+    "backend/apps/desktop",
+    "backend/crates/core-lib",
+    "backend/crates/fs",
+    "backend/crates/markdown",
+    "backend/crates/export",
+    "backend/crates/search",
+    "backend/crates/bookmark",
+    "backend/crates/assets",
+    "backend/crates/spellcheck",
 ]
 resolver = "2"

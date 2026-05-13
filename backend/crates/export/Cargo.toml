@@ -1,0 +1,11 @@
+[package]
+name = "export"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mt_core = { path = "../core-lib" }
+markdown = { path = "../markdown" }
+printpdf = "0.7"
+docx-rs = "0.4"
+zip = "2"
