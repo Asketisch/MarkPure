@@ -397,3 +397,15 @@ CSS 变量还包括编辑器字体：`--editor-font-family`（默认系统字体
 - 拼写检查目前仅支持英文（内置词典 `dict_en.txt`），中日韩文本自动跳过
 - 编码检测使用 `chardetng`，支持 UTF-8、GBK、Shift_JIS、Big5 等编码，写回时保留原始编码
 - 图片粘贴支持三种模式：本地保存（`.assets/images/`）、base64 data URI、远程上传（multipart POST）
+
+## AGENTS.md 导航体系
+
+项目使用分层 AGENTS.md 文件为 AI 代理提供代码链路图。入口为根目录 `AGENTS.md`，按三级结构展开：
+
+| 层级 | 示例 | 作用 |
+|------|------|------|
+| 根级 | `AGENTS.md` | 项目入口，链接到三大模块 |
+| 导航级 | `frontend/src/AGENTS.md` | 列出子目录链接 |
+| 叶子级 | `backend/crates/fs/AGENTS.md` | 列出文件 + 主要函数索引 |
+
+**变更规则**：新增/删除/重命名文件或目录、新增/删除公开函数时，必须同步更新对应层级的 AGENTS.md 及其父级。详见 `.claude/skills/agents-md-guardian/SKILL.md`。

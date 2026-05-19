@@ -6,7 +6,7 @@ set -e
 #   ./bundle-macos.sh          - build and package .app
 #   SIGN=0 ./bundle-macos.sh   - skip ad-hoc codesigning
 
-PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="MarkPure"
 BUNDLE_DIR="$PROJECT_DIR/target/${APP_NAME}.app"
 
@@ -19,7 +19,7 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 
 # ---- Step 1: Build ----
 log_info "Running release build..."
-"$PROJECT_DIR/build.sh" release
+"$PROJECT_DIR/scripts/build.sh" release
 
 # ---- Step 2: Create .app bundle structure ----
 log_info "Creating app bundle..."

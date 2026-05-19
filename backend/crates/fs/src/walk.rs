@@ -15,13 +15,13 @@ pub struct FileEntry {
 
 /// Walk a directory and return a tree structure of files
 /// depth: maximum depth to recurse (0 = unlimited)
-pub async fn walk_directory(path: &Path, depth: u32) -> Result<Vec<FileEntry>> {
+pub async fn walk_directory(path: &Path, depth: u32, show_hidden: bool) -> Result<Vec<FileEntry>> {
     let path = path.to_path_buf();
-    let entries = walk_dir_sync(&path, 0, depth)?;
+    let entries = walk_dir_sync(&path, 0, depth, show_hidden)?;
     Ok(entries)
 }
 
-fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32) -> Result<Vec<FileEntry>> {
+fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32, show_hidden: bool) -> Result<Vec<FileEntry>> {
     let mut entries = Vec::new();
     let read_dir = std::fs::read_dir(path).map_err(Error::Io)?;
 
@@ -31,8 +31,12 @@ fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32) -> 
         let metadata = item.metadata().map_err(Error::Io)?;
         let name = item.file_name().to_string_lossy().to_string();
 
-        // Skip hidden files and common non-markdown directories
-        if name.starts_with('.') || name == "node_modules" || name == "target" {
+        // Skip common non-markdown directories always
+        if name == "node_modules" || name == "target" {
+            continue;
+        }
+        // Skip hidden files/directories unless show_hidden is enabled
+        if !show_hidden && name.starts_with('.') {
             continue;
         }
 
@@ -47,7 +51,7 @@ fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32) -> 
         }
 
         let children = if is_dir && (max_depth == 0 || current_depth < max_depth) {
-            walk_dir_sync(&item_path, current_depth + 1, max_depth)?
+            walk_dir_sync(&item_path, current_depth + 1, max_depth, show_hidden)?
         } else {
             Vec::new()
         };

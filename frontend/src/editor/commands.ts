@@ -136,8 +136,8 @@ export async function pickDirectory(): Promise<string | null> {
 
 // Directory tree
 
-export async function getDirectoryTree(path: string, depth: number = 10): Promise<FileEntry[]> {
-  return await ipc('get_directory_tree', { path, depth })
+export async function getDirectoryTree(path: string, depth: number = 10, show_hidden: boolean = false): Promise<FileEntry[]> {
+  return await ipc('get_directory_tree', { path, depth, show_hidden })
 }
 
 export async function watchDirectory(path: string): Promise<void> {

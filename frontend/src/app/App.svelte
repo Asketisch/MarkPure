@@ -161,9 +161,7 @@
       previewTab.content = content
       previewTab.dirty = false
       previewTab.preview = true  // Keep as preview
-      docClose(previewTab.id).catch(() => {})
-      docOpen(previewTab.id, content).catch(() => {})
-      switchTab(previewTab.id)
+      switchTab(previewTab.id, true)  // Force re-init to show updated content
     } else {
       const tab: Tab = { id: nextId++, path, name, dirty: false, content, preview: true }
       tabs = [...tabs, tab]
@@ -340,17 +338,15 @@
         switchTab(existing.id, true)  // Force re-init to show updated content
         return
       }
-      // Find a preview tab to replace, or create new
+      // Reuse single preview tab for single-click files, update content in place
       const previewTab = tabs.find(t => t.preview)
       if (previewTab) {
         previewTab.path = info.path
         previewTab.name = info.file_name
         previewTab.content = info.content
         previewTab.dirty = false
-        previewTab.preview = true  // Keep as preview for single click
-        docClose(previewTab.id).catch(() => {})
-        docOpen(previewTab.id, info.content).catch(() => {})
-        switchTab(previewTab.id)
+        previewTab.preview = true
+        switchTab(previewTab.id, true)  // Force re-init to show updated content
       } else {
         const tab: Tab = {
           id: nextId++,
@@ -358,7 +354,7 @@
           name: info.file_name,
           dirty: false,
           content: info.content,
-          preview: true,  // Mark as preview tab so it gets reused
+          preview: true,
         }
         tabs = [...tabs, tab]
         switchTab(tab.id)

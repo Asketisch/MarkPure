@@ -6,7 +6,7 @@ set -e
 # Output: macos/AppIcon.icns
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-ICON_PNG="$PROJECT_DIR/icons/markpure_icon.png"
+ICON_PNG="$PROJECT_DIR/resources/icons/1024x1024.png"
 ICONSET="$PROJECT_DIR/macos/AppIcon.iconset"
 ICNS="$PROJECT_DIR/macos/AppIcon.icns"
 

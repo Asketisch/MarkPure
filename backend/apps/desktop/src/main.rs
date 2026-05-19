@@ -294,8 +294,9 @@ fn cmd_get_directory_tree(params: &serde_json::Value, state: &AppState) -> std::
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
     let path = PathBuf::from(path_str);
     let depth = params["depth"].as_u64().unwrap_or(10) as u32;
+    let show_hidden = params["show_hidden"].as_bool().unwrap_or(false);
 
-    let entries = state.rt().block_on(fs::walk_directory(&path, depth)).map_err(|e| e.to_string())?;
+    let entries = state.rt().block_on(fs::walk_directory(&path, depth, show_hidden)).map_err(|e| e.to_string())?;
 
     Ok(serde_json::to_value(entries).map_err(|e| e.to_string())?)
 }

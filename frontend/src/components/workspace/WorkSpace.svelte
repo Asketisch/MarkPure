@@ -21,6 +21,7 @@
   let tree = $state<FileEntry[]>([])
   let loading = $state(false)
   let searchQuery = $state('')
+  let showHidden = $state(true)
   let expandedDirs = $state<Set<string>>(new Set())
   let selectedPath = $state<string | null>(null)
   let contextMenu = $state<{ x: number; y: number; path: string; isDir: boolean } | null>(null)
@@ -37,7 +38,7 @@
     if (!workspacePath) return
     loading = true
     try {
-      tree = await getDirectoryTree(workspacePath, 5)
+      tree = await getDirectoryTree(workspacePath, 5, showHidden)
       expandedDirs = new Set()
     } catch (e) {
       console.error('Failed to load tree:', e)
@@ -195,6 +196,21 @@
       placeholder="Filter files..."
       bind:value={searchQuery}
     />
+    <button
+      class="toggle-hidden-btn"
+      class:active={showHidden}
+      onclick={() => { showHidden = !showHidden; loadTree() }}
+      title={showHidden ? 'Hide hidden files' : 'Show hidden files'}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        {#if showHidden}
+          <path d="M8 3C4.5 3 1.5 6 0 8c1.5 2 4.5 5 8 5s6.5-3 8-5c-1.5-2-4.5-5-8-5z" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+        {:else}
+          <path d="M2 2l12 12M8 3C4.5 3 1.5 6 0 8c.8 1 2 2.5 3.5 3.5M8 13c3.5 0 6.5-3 8-5-.8-1-2-2.5-3.5-3.5M6 8a2 2 0 014 0" stroke="currentColor" stroke-width="1.5"/>
+        {/if}
+      </svg>
+    </button>
   </div>
 
   <div class="workspace-tree">
@@ -274,8 +290,33 @@
   }
 
   .workspace-header {
+    display: flex;
+    gap: 4px;
     padding: 8px;
     border-bottom: 1px solid var(--border);
+  }
+
+  .toggle-hidden-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .toggle-hidden-btn:hover {
+    background: var(--menu-hover-bg);
+  }
+
+  .toggle-hidden-btn.active {
+    color: var(--accent);
+    border-color: var(--accent);
   }
 
   .search-input {
