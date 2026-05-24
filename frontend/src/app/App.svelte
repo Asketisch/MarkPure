@@ -51,11 +51,12 @@
     dirty: boolean
     content: string
     preview?: boolean  // true = preview tab, closed when another file is opened
+    mtime: number | null  // file modification time when opened
   }
 
   const i18n = createI18n()
 
-  let tabs = $state<Tab[]>([{ id: 1, path: null, name: 'Untitled', dirty: false, content: '' }])
+  let tabs = $state<Tab[]>([{ id: 1, path: null, name: 'Untitled', dirty: false, content: '', mtime: null }])
   let activeTabId = $state<number>(1)
   let nextId = $state(2)
   let stats = $state<DocStats>({ words: 0, characters: 0, lines: 0 })
@@ -151,7 +152,7 @@
     }
   }
 
-  function openFileInNewTab(path: string, content: string) {
+  function openFileInNewTab(path: string, content: string, mtime: number | null = null) {
     const name = path.split('/').pop() ?? 'Untitled'
     // Find a preview tab to replace, or create new
     const previewTab = tabs.find(t => t.preview)
@@ -161,9 +162,10 @@
       previewTab.content = content
       previewTab.dirty = false
       previewTab.preview = true  // Keep as preview
+      previewTab.mtime = mtime
       switchTab(previewTab.id, true)  // Force re-init to show updated content
     } else {
-      const tab: Tab = { id: nextId++, path, name, dirty: false, content, preview: true }
+      const tab: Tab = { id: nextId++, path, name, dirty: false, content, preview: true, mtime }
       tabs = [...tabs, tab]
       switchTab(tab.id)
     }
@@ -228,7 +230,7 @@
     const oldTimer = autoSaveTimers.get(activeTabId)
     if (oldTimer) { clearTimeout(oldTimer); autoSaveTimers.delete(activeTabId) }
     const current = getActiveTab()
-    if (current && editor) {
+    if (current && editor && id !== activeTabId) {
       current.content = getMarkdown(editor)
     }
     activeTabId = id
@@ -240,7 +242,7 @@
   }
 
   function newTab() {
-    const tab: Tab = { id: nextId++, path: null, name: 'Untitled', dirty: false, content: '' }
+    const tab: Tab = { id: nextId++, path: null, name: 'Untitled', dirty: false, content: '', mtime: null }
     tabs = [...tabs, tab]
     switchTab(tab.id)
   }
@@ -290,7 +292,7 @@
     if (tabs.length === 0) return
     // Unregister all tabs from Rust
     for (const t of tabs) docClose(t.id).catch(err => console.error('[App] Failed to close document:', t.id, err))
-    const newTab: Tab = { id: nextId++, path: null, name: 'Untitled', dirty: false, content: '' }
+    const newTab: Tab = { id: nextId++, path: null, name: 'Untitled', dirty: false, content: '', mtime: null }
     tabs = [newTab]
     activeTabId = newTab.id
     requestAnimationFrame(() => initEditor())
@@ -333,6 +335,7 @@
         existing.content = info.content
         existing.dirty = false
         existing.preview = false  // Pin the tab when explicitly opened
+        existing.mtime = info.mtime
         // Sync updated content to Rust
         syncToRust(existing.id, info.content)
         switchTab(existing.id, true)  // Force re-init to show updated content
@@ -346,6 +349,7 @@
         previewTab.content = info.content
         previewTab.dirty = false
         previewTab.preview = true
+        previewTab.mtime = info.mtime
         switchTab(previewTab.id, true)  // Force re-init to show updated content
       } else {
         const tab: Tab = {
@@ -355,6 +359,7 @@
           dirty: false,
           content: info.content,
           preview: true,
+          mtime: info.mtime,
         }
         tabs = [...tabs, tab]
         switchTab(tab.id)
@@ -374,6 +379,7 @@
         existing.content = info.content
         existing.dirty = false
         existing.preview = false  // Pin the tab
+        existing.mtime = info.mtime
         syncToRust(existing.id, info.content)
         switchTab(existing.id, true)  // Force re-init to show updated content
         return
@@ -386,6 +392,7 @@
         previewTab.content = info.content
         previewTab.dirty = false
         previewTab.preview = false  // Pin the tab
+        previewTab.mtime = info.mtime
         docClose(previewTab.id).catch(() => {})
         docOpen(previewTab.id, info.content).catch(() => {})
         switchTab(previewTab.id)
@@ -396,6 +403,7 @@
           name: info.file_name,
           dirty: false,
           content: info.content,
+          mtime: info.mtime,
         }
         tabs = [...tabs, tab]
         switchTab(tab.id)
@@ -413,6 +421,7 @@
       if (existing) {
         existing.content = info.content
         existing.dirty = false
+        existing.mtime = info.mtime
         syncToRust(existing.id, info.content)
         switchTab(existing.id)
         return
@@ -423,6 +432,7 @@
         name: info.file_name,
         dirty: false,
         content: info.content,
+        mtime: info.mtime,
       }
       tabs = [...tabs, tab]
       switchTab(tab.id)
@@ -546,6 +556,7 @@
       if (existing) {
         existing.content = info.content
         existing.dirty = false
+        existing.mtime = info.mtime
         syncToRust(existing.id, info.content)
         switchTab(existing.id)
       } else {
@@ -555,6 +566,7 @@
           name: info.file_name,
           dirty: false,
           content: info.content,
+          mtime: info.mtime,
         }
         tabs = [...tabs, tab]
         switchTab(tab.id)
@@ -666,10 +678,15 @@
           if (tab && !tab.dirty) {  // Only reload if user hasn't made changes
             const info = await openFileByPath(event.path)
             if (info) {
-              tab.content = info.content
-              // Update editor if this is the active tab
-              if (tab.id === activeTabId && editor) {
-                setContent(editor, info.content)
+              // Compare mtime to confirm actual change
+              const hasMtimeChanged = tab.mtime === null || info.mtime === null || info.mtime > tab.mtime
+              if (hasMtimeChanged) {
+                tab.content = info.content
+                tab.mtime = info.mtime
+                // Update editor if this is the active tab
+                if (tab.id === activeTabId && editor) {
+                  setContent(editor, info.content)
+                }
               }
             }
           }

@@ -6,6 +6,7 @@ export interface FileInfo {
   file_name: string
   encoding: string
   line_ending: string
+  mtime: number | null
 }
 
 export interface DocStats {

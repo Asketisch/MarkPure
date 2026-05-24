@@ -11,6 +11,7 @@ pub enum ThemeId {
     Graphite,
     Ulysses,
     MaterialDark,
+    BlueTopaz,
 }
 
 impl ThemeId {
@@ -22,13 +23,14 @@ impl ThemeId {
             ThemeId::Graphite => "Graphite",
             ThemeId::Ulysses => "Ulysses",
             ThemeId::MaterialDark => "Material Dark",
+            ThemeId::BlueTopaz => "Blue Topaz",
         }
     }
 
     pub fn is_dark(&self) -> bool {
         matches!(
             self,
-            ThemeId::Dark | ThemeId::OneDark | ThemeId::Graphite | ThemeId::MaterialDark
+            ThemeId::Dark | ThemeId::OneDark | ThemeId::Graphite | ThemeId::MaterialDark | ThemeId::BlueTopaz
         )
     }
 
@@ -41,6 +43,7 @@ impl ThemeId {
             ThemeId::Graphite,
             ThemeId::Ulysses,
             ThemeId::MaterialDark,
+            ThemeId::BlueTopaz,
         ]
     }
 
@@ -60,6 +63,7 @@ impl ThemeId {
             "Graphite" => Some(ThemeId::Graphite),
             "Ulysses" => Some(ThemeId::Ulysses),
             "Material Dark" => Some(ThemeId::MaterialDark),
+            "Blue Topaz" => Some(ThemeId::BlueTopaz),
             _ => None,
         }
     }

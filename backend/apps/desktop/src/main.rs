@@ -237,12 +237,20 @@ fn cmd_open_file(params: &serde_json::Value, state: &AppState) -> std::result::R
     }
     state.save_config();
 
+    // Get file mtime
+    let mtime = std::fs::metadata(&path)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as f64);
+
     let info = serde_json::json!({
         "content": doc.text_normalized(),
         "path": doc.path().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
         "file_name": doc.file_name(),
         "encoding": doc.encoding().label(),
         "line_ending": doc.line_ending().as_str(),
+        "mtime": mtime,
     });
     Ok(info)
 }
@@ -492,6 +500,7 @@ fn cmd_get_config(state: &AppState) -> std::result::Result<serde_json::Value, St
         mt_core::ThemeId::Graphite => "theme-graphite",
         mt_core::ThemeId::Ulysses => "theme-ulysses",
         mt_core::ThemeId::MaterialDark => "theme-material-dark",
+        mt_core::ThemeId::BlueTopaz => "theme-blue-topaz",
     };
     let result = serde_json::json!({
         "theme": theme_class,
@@ -521,6 +530,7 @@ fn cmd_set_config(params: &serde_json::Value, state: &AppState) -> std::result::
             "Graphite" | "theme-graphite" => config.theme = mt_core::ThemeId::Graphite,
             "Ulysses" | "theme-ulysses" => config.theme = mt_core::ThemeId::Ulysses,
             "Material Dark" | "theme-material-dark" => config.theme = mt_core::ThemeId::MaterialDark,
+            "Blue Topaz" | "theme-blue-topaz" => config.theme = mt_core::ThemeId::BlueTopaz,
             _ => {}
         }
     }
@@ -1063,6 +1073,9 @@ fn main() -> wry::Result<()> {
     }
     let window = window_builder.build(&event_loop).unwrap();
 
+    #[cfg(target_os = "macos")]
+    setup_macos_menu();
+
     let webview: Arc<Mutex<Option<wry::WebView>>> = Arc::new(Mutex::new(None));
     let wv_clone = webview.clone();
     let state_clone = state.clone();
@@ -1138,4 +1151,87 @@ fn main() -> wry::Result<()> {
             *control_flow = ControlFlow::Exit;
         }
     });
+}
+
+#[cfg(target_os = "macos")]
+fn setup_macos_menu() {
+    use objc2_foundation::{MainThreadMarker, NSString};
+    use objc2_app_kit::{
+        NSApplication, NSEventModifierFlags, NSMenu, NSMenuItem,
+    };
+
+    let mtm = unsafe { MainThreadMarker::new_unchecked() };
+    let app = NSApplication::sharedApplication(mtm);
+
+    let menubar = NSMenu::new(mtm);
+
+    // App menu
+    let app_menu = NSMenu::new(mtm);
+    let app_item = NSMenuItem::new(mtm);
+    unsafe {
+        app_menu.addItemWithTitle_action_keyEquivalent(
+            &NSString::from_str("Hide MarkPure"),
+            Some(objc2::sel!(hide:)),
+            &NSString::from_str("h"),
+        );
+        app_menu.addItemWithTitle_action_keyEquivalent(
+            &NSString::from_str("Quit MarkPure"),
+            Some(objc2::sel!(terminate:)),
+            &NSString::from_str("q"),
+        );
+        app_item.setSubmenu(Some(&app_menu));
+    }
+    menubar.addItem(&app_item);
+
+    // Edit menu
+    let edit_menu = NSMenu::new(mtm);
+    let edit_item = NSMenuItem::new(mtm);
+    unsafe {
+        edit_item.setTitle(&NSString::from_str("Edit"));
+
+        edit_menu.addItemWithTitle_action_keyEquivalent(
+            &NSString::from_str("Undo"),
+            Some(objc2::sel!(undo:)),
+            &NSString::from_str("z"),
+        );
+
+        let redo = edit_menu.addItemWithTitle_action_keyEquivalent(
+            &NSString::from_str("Redo"),
+            Some(objc2::sel!(redo:)),
+            &NSString::from_str("Z"),
+        );
+        let cmd_shift = NSEventModifierFlags(
+            (NSEventModifierFlags::NSEventModifierFlagCommand
+                | NSEventModifierFlags::NSEventModifierFlagShift).0
+        );
+        redo.setKeyEquivalentModifierMask(cmd_shift);
+
+        edit_menu.addItem(&NSMenuItem::separatorItem(mtm));
+
+        edit_menu.addItemWithTitle_action_keyEquivalent(
+            &NSString::from_str("Cut"),
+            Some(objc2::sel!(cut:)),
+            &NSString::from_str("x"),
+        );
+        edit_menu.addItemWithTitle_action_keyEquivalent(
+            &NSString::from_str("Copy"),
+            Some(objc2::sel!(copy:)),
+            &NSString::from_str("c"),
+        );
+        edit_menu.addItemWithTitle_action_keyEquivalent(
+            &NSString::from_str("Paste"),
+            Some(objc2::sel!(paste:)),
+            &NSString::from_str("v"),
+        );
+        edit_menu.addItemWithTitle_action_keyEquivalent(
+            &NSString::from_str("Select All"),
+            Some(objc2::sel!(selectAll:)),
+            &NSString::from_str("a"),
+        );
+
+        edit_item.setSubmenu(Some(&edit_menu));
+    }
+    menubar.addItem(&edit_item);
+
+    app.setMainMenu(Some(&menubar));
 }
