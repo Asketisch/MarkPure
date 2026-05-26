@@ -2,6 +2,21 @@ use mt_core::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+/// Git file status
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum GitStatus {
+    Unmodified,
+    Added,
+    Modified,
+    Deleted,
+    Renamed,
+    Copied,
+    Untracked,
+    Ignored,
+    Unmerged,
+}
+
 /// File entry in the directory tree
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileEntry {
@@ -11,17 +26,69 @@ pub struct FileEntry {
     #[serde(default)]
     pub children: Vec<FileEntry>,
     pub mtime: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_status: Option<GitStatus>,
 }
 
 /// Walk a directory and return a tree structure of files
 /// depth: maximum depth to recurse (0 = unlimited)
 pub async fn walk_directory(path: &Path, depth: u32, show_hidden: bool) -> Result<Vec<FileEntry>> {
     let path = path.to_path_buf();
-    let entries = walk_dir_sync(&path, 0, depth, show_hidden)?;
+    let repo_root = find_git_root(&path);
+    let git_statuses = if let Some(ref root) = repo_root {
+        load_git_status_map(root)
+    } else {
+        None
+    };
+    let entries = walk_dir_sync(&path, 0, depth, show_hidden, repo_root.as_deref(), git_statuses.as_ref())?;
     Ok(entries)
 }
 
-fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32, show_hidden: bool) -> Result<Vec<FileEntry>> {
+/// Load all git statuses for a repo into a HashMap for fast lookup
+fn load_git_status_map(repo_root: &Path) -> Option<std::collections::HashMap<String, GitStatus>> {
+    let output = std::process::Command::new("git")
+        .args(["status", "--porcelain", "-uall"])
+        .current_dir(repo_root)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut map = std::collections::HashMap::new();
+
+    for line in stdout.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+        let status_chars = &line[..2];
+        let file_path = line[3..].trim().trim_start_matches('"').trim_end_matches('"');
+
+        // Normalize path to use forward slashes for consistent lookup
+        let normalized = file_path.replace('\\', "/");
+
+        let git_status = match (status_chars.chars().next()?, status_chars.chars().nth(1)?) {
+            ('?', '?') => GitStatus::Untracked,
+            ('!', '!') => GitStatus::Ignored,
+            ('u', _) | (_, 'u') | ('U', _) | (_, 'U') => GitStatus::Unmerged,
+            ('A', _) => GitStatus::Added,
+            ('M', _) => GitStatus::Modified,
+            ('D', _) => GitStatus::Deleted,
+            ('R', _) => GitStatus::Renamed,
+            ('C', _) => GitStatus::Copied,
+            (' ', 'M') => GitStatus::Modified,
+            _ => GitStatus::Modified,
+        };
+
+        map.insert(normalized, git_status);
+    }
+
+    Some(map)
+}
+
+fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32, show_hidden: bool, repo_root: Option<&Path>, git_statuses: Option<&std::collections::HashMap<String, GitStatus>>) -> Result<Vec<FileEntry>> {
     let mut entries = Vec::new();
     let read_dir = std::fs::read_dir(path).map_err(Error::Io)?;
 
@@ -51,9 +118,25 @@ fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32, sho
         }
 
         let children = if is_dir && (max_depth == 0 || current_depth < max_depth) {
-            walk_dir_sync(&item_path, current_depth + 1, max_depth, show_hidden)?
+            walk_dir_sync(&item_path, current_depth + 1, max_depth, show_hidden, repo_root, git_statuses)?
         } else {
             Vec::new()
+        };
+
+        let file_git_status = if !is_dir {
+            git_statuses.and_then(|statuses| {
+                let relative = item_path.strip_prefix(repo_root.unwrap_or(&item_path)).ok()?;
+                let normalized = relative.to_string_lossy().replace('\\', "/");
+                statuses.get(&normalized).cloned()
+            })
+        } else {
+            None
+        };
+
+        let git_status = if is_dir {
+            compute_dir_status(&children)
+        } else {
+            file_git_status
         };
 
         entries.push(FileEntry {
@@ -62,6 +145,7 @@ fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32, sho
             is_dir,
             children,
             mtime,
+            git_status,
         });
     }
 
@@ -87,4 +171,36 @@ fn is_markdown_file(name: &str) -> bool {
         || lower.ends_with(".mdwn")
         || lower.ends_with(".mkd")
         || lower.ends_with(".mkdn")
+}
+
+/// Find the .git directory by walking up from the given path
+fn find_git_root(path: &Path) -> Option<std::path::PathBuf> {
+    let mut current = path.to_path_buf();
+    loop {
+        if current.join(".git").is_dir() {
+            return Some(current);
+        }
+        if !current.pop() {
+            break;
+        }
+    }
+    None
+}
+
+/// Compute aggregated git status for a directory based on its children
+fn compute_dir_status(children: &[FileEntry]) -> Option<GitStatus> {
+    for child in children {
+        // File with change
+        if !child.is_dir && child.git_status.is_some() {
+            let s = child.git_status.as_ref().unwrap();
+            if matches!(s, GitStatus::Added | GitStatus::Modified | GitStatus::Deleted | GitStatus::Untracked) {
+                return Some(GitStatus::Modified);
+            }
+        }
+        // Subdirectory with change
+        if child.is_dir && child.git_status.is_some() {
+            return Some(GitStatus::Modified);
+        }
+    }
+    None
 }

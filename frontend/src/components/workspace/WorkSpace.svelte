@@ -272,7 +272,7 @@
         </svg>
       </span>
     {/if}
-    <span class="item-name">{entry.name}</span>
+    <span class="item-name" class:git-added={entry.git_status === 'added'} class:git-modified={entry.git_status === 'modified'} class:git-deleted={entry.git_status === 'deleted'} class:git-untracked={entry.git_status === 'untracked'} class:git-ignored={entry.git_status === 'ignored'}>{entry.name}</span>
   </div>
   {#if entry.is_dir && expandedDirs.has(entry.path)}
     {#each entry.children as child}
@@ -412,6 +412,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
+  .item-name.git-added { color: #4ec9b0; }
+  .item-name.git-modified { color: #dcdcaa; }
+  .item-name.git-deleted { color: #f14c4c; }
+  .item-name.git-untracked { color: #569cd6; }
+  .item-name.git-ignored { color: #808080; }
 
   .context-menu {
     position: fixed;

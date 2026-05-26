@@ -16,12 +16,15 @@ export interface DocStats {
 }
 
 // File tree types
+export type GitStatus = 'unmodified' | 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'untracked' | 'ignored' | 'unmerged'
+
 export interface FileEntry {
   name: string
   path: string
   is_dir: boolean
   children: FileEntry[]
   mtime: number | null
+  git_status?: GitStatus
 }
 
 // Tab types
