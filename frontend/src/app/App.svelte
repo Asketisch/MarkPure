@@ -13,7 +13,10 @@
     exportHtml,
     exportPdf,
     exportWord,
-    pollFileChanges,
+    watchDirectory,
+    unwatchDirectory,
+    onFileChanges,
+    offFileChanges,
     docOpen,
     docClose,
     docSetContent,
@@ -21,7 +24,7 @@
     openDroppedFiles,
     savePastedImage,
   } from '$lib/editor/commands'
-  import type { DocStats, AppConfig } from '$lib/editor/commands'
+  import type { DocStats, AppConfig, FileChangeEvent, FileInfo } from '$lib/editor/commands'
   import type { Editor } from '@tiptap/core'
   import { TextSelection } from '@tiptap/pm/state'
   import SideBar from '$lib/components/layout/SideBar.svelte'
@@ -638,8 +641,6 @@
     }
   }
 
-  let fileChangeInterval: ReturnType<typeof setInterval> | null = null
-
   function saveCurrentConfig() {
     setConfig({
       theme,
@@ -666,49 +667,43 @@
     if (updates.language) i18n.changeLocale(updates.language).catch(() => {})
   }
 
-  function startFileChangePolling() {
-    if (fileChangeInterval) return
-    fileChangeInterval = setInterval(async () => {
-      if (!workspacePath) return
-      try {
-        const events = await pollFileChanges()
-        for (const event of events) {
-          // Check if modified file is open in a tab
-          const tab = tabs.find(t => t.path === event.path)
-          if (tab && !tab.dirty) {  // Only reload if user hasn't made changes
-            const info = await openFileByPath(event.path)
-            if (info) {
-              // Compare mtime to confirm actual change
-              const hasMtimeChanged = tab.mtime === null || info.mtime === null || info.mtime > tab.mtime
-              if (hasMtimeChanged) {
-                tab.content = info.content
-                tab.mtime = info.mtime
-                // Update editor if this is the active tab
-                if (tab.id === activeTabId && editor) {
-                  setContent(editor, info.content)
-                }
-              }
+  function handleFileChanges(events: FileChangeEvent[]) {
+    for (const event of events) {
+      const tab = tabs.find(t => t.path === event.path)
+      if (tab && !tab.dirty) {
+        openFileByPath(event.path).then((info: FileInfo) => {
+          if (!info) return
+          const changed = tab.mtime === null
+            || info.mtime === null
+            || info.mtime > tab.mtime
+          if (changed) {
+            tab.content = info.content
+            tab.mtime = info.mtime
+            if (tab.id === activeTabId && editor) {
+              setContent(editor, info.content)
             }
           }
-        }
-        // Refresh file tree
-        if (events.length > 0) {
-          const path = workspacePath
-          workspacePath = null
-          setTimeout(() => { workspacePath = path }, 0)
-        }
-      } catch {
-        // ignore
+        }).catch(() => {})
       }
-    }, 3000)
-  }
-
-  function stopFileChangePolling() {
-    if (fileChangeInterval) {
-      clearInterval(fileChangeInterval)
-      fileChangeInterval = null
+    }
+    if (events.length > 0) {
+      const path = workspacePath
+      workspacePath = null
+      setTimeout(() => { workspacePath = path }, 0)
     }
   }
+
+  $effect(() => {
+    const path = workspacePath
+    if (path) {
+      watchDirectory(path).catch((e) => console.error('Failed to watch directory:', e))
+      onFileChanges(handleFileChanges)
+    }
+    return () => {
+      offFileChanges()
+      unwatchDirectory().catch(() => {})
+    }
+  })
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.metaKey || e.ctrlKey) {
@@ -848,6 +843,8 @@
 
     return () => {
       saveCurrentConfig()
+      offFileChanges()
+      unwatchDirectory().catch(() => {})
       window.removeEventListener('keydown', handleKeydown)
       window.removeEventListener('quick-insert-start', handleQIStart)
       window.removeEventListener('quick-insert-update', handleQIUpdate)

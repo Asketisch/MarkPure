@@ -263,8 +263,14 @@ export interface FileChangeEvent {
   kind: 'modified' | 'created' | 'deleted'
 }
 
-export async function pollFileChanges(): Promise<FileChangeEvent[]> {
-  return await ipc('poll_file_changes')
+export function onFileChanges(
+  handler: (events: FileChangeEvent[]) => void
+): void {
+  ;(window as any).__mt_on_file_changes = handler
+}
+
+export function offFileChanges(): void {
+  delete (window as any).__mt_on_file_changes
 }
 
 // Workspace Search

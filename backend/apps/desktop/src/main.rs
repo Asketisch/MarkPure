@@ -6,10 +6,9 @@ use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use tao::event::{Event, WindowEvent};
-use tao::event_loop::{ControlFlow, EventLoop};
+use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tao::window::WindowBuilder;
 use wry::http::{header::CONTENT_TYPE, Response, StatusCode};
 use wry::WebViewBuilder;
@@ -40,11 +39,16 @@ struct IpcResponse {
 
 // ============ State ============
 
+#[derive(Debug, Clone)]
+enum AppEvent {
+    FileChanges(Vec<fs::FileChangeEvent>),
+}
+
 struct AppState {
     runtime: tokio::runtime::Runtime,
     config: Mutex<AppConfig>,
     watcher: Mutex<Option<fs::FileWatcher>>,
-    watcher_rx: Mutex<Option<Receiver<fs::FileChangeEvent>>>,
+    proxy: Mutex<Option<EventLoopProxy<AppEvent>>>,
     tabs: Mutex<Vec<WindowTabs>>,
     /// Document registry: tab_id → Document (Rust-owned text buffer)
     documents: Mutex<HashMap<u64, Document>>,
@@ -67,7 +71,7 @@ impl AppState {
             runtime,
             config: Mutex::new(config),
             watcher: Mutex::new(None),
-            watcher_rx: Mutex::new(None),
+            proxy: Mutex::new(None),
             tabs: Mutex::new(tabs),
             documents: Mutex::new(HashMap::new()),
             doc_order: Mutex::new(Vec::new()),
@@ -87,6 +91,19 @@ impl AppState {
     fn rt(&self) -> &tokio::runtime::Runtime {
         &self.runtime
     }
+}
+
+fn escape_for_js(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('\'', "\\'")
+        .replace('`', "\\`")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\u{2028}', "\\u2028")
+        .replace('\u{2029}', "\\u2029")
+        .replace('\0', "\\0")
+        .replace("</script", "<\\/script")
+        .replace("</SCRIPT", "<\\/SCRIPT")
 }
 
 // ============ Command Handlers ============
@@ -170,9 +187,6 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
 
         // Spell check
         "check_spelling" => cmd_check_spelling(&msg.params),
-
-        // File watcher events
-        "poll_file_changes" => cmd_poll_file_changes(state),
 
         // Document registry (Rust-owned text buffer)
         "doc_open" => cmd_doc_open(&msg.params, state),
@@ -321,8 +335,33 @@ fn cmd_watch_directory(params: &serde_json::Value, state: &AppState) -> std::res
     if let Some(ref mut watcher) = *watcher_guard {
         let id = path_str.to_string();
         let rx = watcher.watch(&path, id).map_err(|e| e.to_string())?;
-        // Store the receiver for poll_file_changes
-        *state.watcher_rx.lock().unwrap() = Some(rx);
+
+        let proxy = state.proxy.lock().unwrap().clone()
+            .ok_or("No event loop proxy")?;
+
+        std::thread::spawn(move || {
+            loop {
+                let mut events = match rx.recv() {
+                    Ok(e) => vec![e],
+                    Err(_) => break,
+                };
+                let deadline = std::time::Instant::now()
+                    + std::time::Duration::from_millis(200);
+                while std::time::Instant::now() < deadline {
+                    match rx.try_recv() {
+                        Ok(e) => events.push(e),
+                        Err(_) => break,
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                let mut seen = HashMap::new();
+                for e in events {
+                    seen.insert(e.path.clone(), e);
+                }
+                let deduped: Vec<_> = seen.into_values().collect();
+                let _ = proxy.send_event(AppEvent::FileChanges(deduped));
+            }
+        });
     }
 
     Ok(serde_json::Value::Null)
@@ -330,7 +369,6 @@ fn cmd_watch_directory(params: &serde_json::Value, state: &AppState) -> std::res
 
 fn cmd_unwatch_directory(state: &AppState) -> std::result::Result<serde_json::Value, String> {
     *state.watcher.lock().unwrap() = None;
-    *state.watcher_rx.lock().unwrap() = None;
     Ok(serde_json::Value::Null)
 }
 
@@ -831,24 +869,6 @@ fn cmd_export_word(params: &serde_json::Value) -> std::result::Result<serde_json
     Ok(serde_json::json!({ "path": path.to_string_lossy() }))
 }
 
-// File watcher events
-
-fn cmd_poll_file_changes(state: &AppState) -> std::result::Result<serde_json::Value, String> {
-    let rx_guard = state.watcher_rx.lock().unwrap();
-    let Some(rx) = rx_guard.as_ref() else {
-        return Ok(serde_json::json!([]));
-    };
-
-    let mut events = Vec::new();
-    while let Ok(event) = rx.try_recv() {
-        events.push(serde_json::json!({
-            "path": event.path,
-            "kind": event.kind,
-        }));
-    }
-
-    Ok(serde_json::Value::Array(events))
-}
 
 // Document registry commands
 
@@ -1018,9 +1038,13 @@ fn serve_asset(path: &str) -> Response<Vec<u8>> {
 
 // ============ Main ============
 
-fn main() -> wry::Result<()> {
-    let event_loop = EventLoop::new();
+fn main() {
+    let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     let state = Arc::new(AppState::new());
+    {
+        let proxy = event_loop.create_proxy();
+        state.proxy.lock().unwrap().replace(proxy);
+    }
 
     // Check if this is a child window
     let is_child = std::env::args().any(|a| a.starts_with("--child-window="));
@@ -1117,20 +1141,7 @@ fn main() -> wry::Result<()> {
             }
         };
 
-        // Escape JSON for safe embedding in a JavaScript string literal.
-        // serde_json already produces valid JSON, but we need to handle
-        // characters that are valid in JSON but invalid in JS string literals.
-        let js_escaped = js
-            .replace('\\', "\\\\")
-            .replace('\'', "\\'")
-            .replace('`', "\\`")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
-            .replace('\u{2028}', "\\u2028")
-            .replace('\u{2029}', "\\u2029")
-            .replace('\0', "\\0")
-            .replace("</script", "<\\/script")
-            .replace("</SCRIPT", "<\\/SCRIPT");
+        let js_escaped = escape_for_js(&js);
         if let Ok(wv) = wv_clone.lock() {
             if let Some(ref webview) = *wv {
                 let _ = webview.evaluate_script(&format!("window.__mt_dispatch('{js_escaped}')"));
@@ -1141,14 +1152,29 @@ fn main() -> wry::Result<()> {
     let built = builder.build(&window).unwrap();
     *webview.lock().unwrap() = Some(built);
 
+    let webview_for_el = webview.clone();
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
-        if let Event::WindowEvent {
-            event: WindowEvent::CloseRequested,
-            ..
-        } = event
-        {
-            *control_flow = ControlFlow::Exit;
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
+                *control_flow = ControlFlow::Exit;
+            }
+            Event::UserEvent(AppEvent::FileChanges(events)) => {
+                if let Ok(wv) = webview_for_el.lock() {
+                    if let Some(ref webview) = *wv {
+                        let json = serde_json::to_string(&events)
+                            .unwrap_or_else(|_| "[]".into());
+                        let escaped = escape_for_js(&json);
+                        let _ = webview.evaluate_script(&format!(
+                            "window.__mt_on_file_changes('{escaped}')"
+                        ));
+                    }
+                }
+            }
+            _ => {}
         }
     });
 }
