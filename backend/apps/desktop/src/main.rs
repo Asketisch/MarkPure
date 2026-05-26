@@ -145,6 +145,8 @@ fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         // Config
         "get_config" => cmd_get_config(state),
         "set_config" => cmd_set_config(&msg.params, state),
+        "get_expanded_dirs" => cmd_get_expanded_dirs(state),
+        "set_expanded_dirs" => cmd_set_expanded_dirs(&msg.params, state),
 
         // Export
         "export_html" => cmd_export_html(&msg.params),
@@ -605,6 +607,27 @@ fn cmd_set_config(params: &serde_json::Value, state: &AppState) -> std::result::
         }
     }
 
+    drop(config);
+    state.save_config();
+    Ok(serde_json::Value::Null)
+}
+
+fn cmd_get_expanded_dirs(state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let config = state.config.lock().unwrap();
+    Ok(serde_json::json!({
+        "expanded_dirs": config.get_expanded_dirs()
+    }))
+}
+
+fn cmd_set_expanded_dirs(params: &serde_json::Value, state: &AppState) -> std::result::Result<serde_json::Value, String> {
+    let mut config = state.config.lock().unwrap();
+    if let Some(dirs) = params.get("expanded_dirs").and_then(|v| v.as_array()) {
+        let expanded: Vec<String> = dirs
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
+        config.set_expanded_dirs(expanded);
+    }
     drop(config);
     state.save_config();
     Ok(serde_json::Value::Null)

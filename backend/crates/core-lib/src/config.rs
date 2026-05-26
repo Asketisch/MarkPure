@@ -21,6 +21,9 @@ pub struct AppConfig {
     /// UI language (e.g., "zh", "en")
     #[serde(default)]
     pub language: Option<String>,
+    /// Expanded directory paths in workspace tree
+    #[serde(default)]
+    pub expanded_dirs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +81,7 @@ impl Default for AppConfig {
             recent_files: Vec::new(),
             last_workspace: None,
             language: None,
+            expanded_dirs: Vec::new(),
         }
     }
 }
@@ -144,5 +148,27 @@ impl AppConfig {
     /// Set UI language
     pub fn set_language(&mut self, lang: Option<String>) {
         self.language = lang;
+    }
+
+    /// Get expanded directory paths
+    pub fn get_expanded_dirs(&self) -> &[String] {
+        &self.expanded_dirs
+    }
+
+    /// Set expanded directory paths
+    pub fn set_expanded_dirs(&mut self, dirs: Vec<String>) {
+        self.expanded_dirs = dirs;
+    }
+
+    /// Add an expanded directory
+    pub fn add_expanded_dir(&mut self, path: String) {
+        if !self.expanded_dirs.contains(&path) {
+            self.expanded_dirs.push(path);
+        }
+    }
+
+    /// Remove an expanded directory
+    pub fn remove_expanded_dir(&mut self, path: &str) {
+        self.expanded_dirs.retain(|p| p != path);
     }
 }

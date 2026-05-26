@@ -7,6 +7,8 @@
     deleteFile,
     renameFile,
     revealInFinder,
+    getExpandedDirs,
+    setExpandedDirs,
   } from '$lib/editor/commands'
   import type { FileEntry } from '$lib/editor/commands'
 
@@ -39,7 +41,9 @@
     loading = true
     try {
       tree = await getDirectoryTree(workspacePath, 5, showHidden)
-      expandedDirs = new Set()
+      // Restore expanded dirs from persistent storage
+      const dirs = await getExpandedDirs()
+      expandedDirs = new Set(dirs)
     } catch (e) {
       console.error('Failed to load tree:', e)
     }
@@ -53,6 +57,8 @@
       expandedDirs.add(path)
     }
     expandedDirs = new Set(expandedDirs)
+    // Persist expanded state to backend
+    setExpandedDirs([...expandedDirs]).catch(console.error)
   }
 
   function filterTree(entries: FileEntry[], query: string): FileEntry[] {

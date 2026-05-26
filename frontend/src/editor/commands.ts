@@ -200,6 +200,17 @@ export async function setConfig(config: Partial<AppConfig>): Promise<void> {
   await ipc('set_config', config)
 }
 
+// Expanded directories (workspace tree)
+
+export async function getExpandedDirs(): Promise<string[]> {
+  const result = await ipc('get_expanded_dirs')
+  return result.expanded_dirs || []
+}
+
+export async function setExpandedDirs(dirs: string[]): Promise<void> {
+  await ipc('set_expanded_dirs', { expanded_dirs: dirs })
+}
+
 // Open file by path (no dialog)
 
 export async function openFileByPath(path: string): Promise<FileInfo> {
