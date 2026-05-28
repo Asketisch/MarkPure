@@ -28,6 +28,7 @@
   import type { Editor } from '@tiptap/core'
   import { TextSelection } from '@tiptap/pm/state'
   import SideBar from '$lib/components/layout/SideBar.svelte'
+  import ResizeHandle from '$lib/components/ui/ResizeHandle.svelte'
   import SearchBar from '$lib/components/workspace/SearchBar.svelte'
   import OutlinePanel from '$lib/components/workspace/OutlinePanel.svelte'
   import WorkspaceSearch from '$lib/components/workspace/WorkspaceSearch.svelte'
@@ -69,6 +70,13 @@
   let saving = $state(false)
   let workspacePath = $state<string | null>(null)
   let showSidebar = $state(true)
+  let sidebarWidth = $state(260)
+
+  let sidebarResizing = $state(false)
+
+  function handleSidebarResize(width: number) {
+    sidebarWidth = Math.min(400, Math.max(160, width))
+  }
   let showOutline = $state(false)
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
   let showFileMenu = $state(false)
@@ -910,11 +918,20 @@
   <div class="main-area">
     <!-- Sidebar -->
     {#if showSidebar}
-      <SideBar
-        {workspacePath}
-        onOpenFile={handleOpenFile}
-        onPinTab={handlePinTab}
-      />
+      <div class="sidebar-container" style="--sidebar-width: {sidebarWidth}px">
+        <SideBar
+          {workspacePath}
+          onOpenFile={handleOpenFile}
+          onPinTab={handlePinTab}
+          isResizing={sidebarResizing}
+        />
+        <ResizeHandle
+          currentWidth={sidebarWidth}
+          onResize={handleSidebarResize}
+          onResizeStart={() => sidebarResizing = true}
+          onResizeEnd={() => sidebarResizing = false}
+        />
+      </div>
     {/if}
 
     <!-- Outline Panel (Right Side) -->
@@ -1193,6 +1210,11 @@
     display: flex;
     flex: 1;
     overflow: hidden;
+  }
+
+  .sidebar-container {
+    display: flex;
+    flex-shrink: 0;
   }
 
   .editor-panel {

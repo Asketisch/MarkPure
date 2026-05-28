@@ -8,9 +8,10 @@
     workspacePath?: string | null
     onOpenFile?: (path: string) => void
     onPinTab?: (path: string) => void
+    isResizing?: boolean
   }
 
-  let { workspacePath = null, onOpenFile, onPinTab }: Props = $props()
+  let { workspacePath = null, onOpenFile, onPinTab, isResizing = false }: Props = $props()
 
   let collapsed = $state(false)
 
@@ -19,7 +20,7 @@
   }
 </script>
 
-<div class="sidebar" class:collapsed>
+<div class="sidebar" class:collapsed class:resizing={isResizing}>
   <div class="sidebar-tabs">
     <button
       class="sidebar-tab"
@@ -48,12 +49,16 @@
   .sidebar {
     display: flex;
     flex-direction: row;
-    width: 260px;
+    width: var(--sidebar-width, 260px);
     min-width: 160px;
     max-width: 400px;
     background: var(--bg-secondary);
     border-right: 1px solid var(--border);
     transition: width 0.2s;
+  }
+
+  .sidebar.resizing {
+    transition: none;
   }
 
   .sidebar.collapsed {
