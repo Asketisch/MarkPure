@@ -46,6 +46,13 @@ function fileToBase64(file: File): Promise<string> {
 export interface DropHandlerOptions {
   onFilesDropped?: (files: File[]) => void
   onImagesDropped?: (images: { file: File; base64: string }[]) => void
+  /**
+   * Optional callback invoked when the drop pipeline fails (most
+   * commonly when a dropped image can't be read as base64). The
+   * default behaviour is to log to the console; consumers that
+   * surface toasts should wire this up.
+   */
+  onDropError?: (err: Error) => void
 }
 
 export const DropHandlerExtension = Extension.create<DropHandlerOptions>({
@@ -119,14 +126,30 @@ export const DropHandlerExtension = Extension.create<DropHandlerOptions>({
 
               // Handle image drops (async, don't block)
               if (imageFiles.length > 0) {
+                // Read each image in parallel, with explicit error
+                // handling. A single corrupted file should not
+                // swallow the whole batch as an unhandled rejection.
                 Promise.all(
                   imageFiles.map(async file => ({
                     file,
                     base64: await fileToBase64(file),
                   }))
-                ).then(images => {
-                  options.onImagesDropped?.(images)
-                })
+                )
+                  .then(images => {
+                    options.onImagesDropped?.(images)
+                  })
+                  .catch(err => {
+                    // Log + report to the host (the App catches and
+                    // shows a toast). Without this `.catch` a
+                    // corrupted file would log an unhandled promise
+                    // rejection and leave the editor in a stuck
+                    // "drag-highlight" state.
+                    console.error('[DropHandler] failed to read image:', err)
+                    if (editorEl) {
+                      editorEl.classList.remove('drag-highlight')
+                    }
+                    options.onDropError?.(err)
+                  })
                 return true // Prevent default handling
               }
 

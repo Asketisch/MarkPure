@@ -87,12 +87,42 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    /// Load config from a file, or return default if not found
+    /// Load config from a file, or return default if not found.
+    ///
+    /// Logs (to stderr) any error encountered so a corrupted config
+    /// file doesn't silently throw away the user's settings. We
+    /// still fall back to defaults so the app starts — surfacing the
+    /// error gives the user (or a CI run) a chance to recover or
+    /// report the corruption.
     pub fn load(path: &PathBuf) -> Self {
-        std::fs::read_to_string(path)
-            .ok()
-            .and_then(|s| toml::from_str(&s).ok())
-            .unwrap_or_default()
+        let raw = match std::fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Self::default(),
+            Err(e) => {
+                eprintln!(
+                    "[AppConfig] could not read config at {}: {} — using defaults",
+                    path.display(),
+                    e
+                );
+                return Self::default();
+            }
+        };
+        match toml::from_str(&raw) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                eprintln!(
+                    "[AppConfig] config at {} is corrupted: {} — using defaults. \
+                     The original file has been preserved as config.toml.broken for inspection.",
+                    path.display(),
+                    e
+                );
+                // Preserve the broken file so the user can recover
+                // their settings manually.
+                let backup = path.with_extension("toml.broken");
+                let _ = std::fs::write(&backup, raw);
+                Self::default()
+            }
+        }
     }
 
     /// Save config to a file

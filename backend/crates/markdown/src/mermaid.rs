@@ -176,37 +176,67 @@ pub fn render_mermaid_with_cli(code: &str) -> MermaidResult {
         };
     }
 
-    // Try to use mermaid CLI
+    // `mmdc` (the Mermaid CLI) doesn't read from stdin the way
+    // the old `["-p", "-i", "-"]` arg list suggested — it
+    // requires a real input file. We write the diagram to a
+    // temp file, point mmdc at it, and read the SVG output.
+    // If `mmdc` isn't installed (no executable in PATH), we
+    // gracefully fall back to validation-only so the editor
+    // can still show the original code block.
+    let tmp_dir = std::env::temp_dir().join(format!("markpure-mmd-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let in_path = tmp_dir.join("diagram.mmd");
+    let out_path = tmp_dir.join("diagram.svg");
+
+    if let Err(e) = std::fs::write(&in_path, code) {
+        return MermaidResult {
+            svg: None,
+            error: Some(format!("failed to write temp input: {}", e)),
+            is_valid: true,
+        };
+    }
+
     let result = Command::new("mmdc")
-        .args(["-p", "-i", "-"])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .args([
+            "-i", in_path.to_string_lossy().as_ref(),
+            "-o", out_path.to_string_lossy().as_ref(),
+            "-q", // quiet — suppress the noisy "Generating..." progress
+        ])
         .output();
 
+    let _ = std::fs::remove_file(&in_path);
+
     match result {
-        Ok(output) => {
-            if output.status.success() {
-                let svg = String::from_utf8_lossy(&output.stdout).to_string();
-                MermaidResult {
-                    svg: Some(svg),
-                    error: None,
-                    is_valid: true,
-                }
-            } else {
-                let error = String::from_utf8_lossy(&output.stderr).to_string();
-                MermaidResult {
+        Ok(output) if output.status.success() => {
+            let svg = match std::fs::read_to_string(&out_path) {
+                Ok(s) => s,
+                Err(e) => return MermaidResult {
                     svg: None,
-                    error: Some(error),
-                    is_valid: false,
-                }
-            }
+                    error: Some(format!("mmdc succeeded but output unreadable: {}", e)),
+                    is_valid: true,
+                },
+            };
+            let _ = std::fs::remove_file(&out_path);
+            MermaidResult { svg: Some(svg), error: None, is_valid: true }
         }
-        Err(e) => {
-            // CLI not available, just validate
+        Ok(output) => {
+            let _ = std::fs::remove_file(&out_path);
+            let error = String::from_utf8_lossy(&output.stderr).to_string();
             MermaidResult {
                 svg: None,
-                error: Some(format!("Mermaid CLI not available: {}. Install with: npm install -g @mermaid-js/mermaid-cli", e)),
+                error: Some(if error.is_empty() { "mmdc failed (no stderr)".into() } else { error }),
+                is_valid: false,
+            }
+        }
+        Err(_) => {
+            // CLI not installed. We deliberately treat this as a
+            // soft failure (is_valid: true) so the editor can
+            // show the original mermaid source instead of an
+            // error — installing mmdc is a *user choice*, not
+            // a code bug.
+            MermaidResult {
+                svg: None,
+                error: Some("Mermaid CLI (mmdc) not available. Install with: npm install -g @mermaid-js/mermaid-cli".to_string()),
                 is_valid: true,
             }
         }

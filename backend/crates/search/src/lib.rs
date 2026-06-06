@@ -45,7 +45,15 @@ impl Default for SearchOptions {
 pub struct SearchMatch {
     pub file: String,
     pub line_number: u64,
+    /// Byte offset of the match start in `content` (UTF-8 bytes,
+    /// *not* chars — JS uses UTF-16 indices, the conversion is the
+    /// renderer's job).
     pub column: usize,
+    /// Length of the match in bytes. The frontend needs this to
+    /// highlight a regex match whose length differs from the query
+    /// (and to slice CJK content correctly).
+    #[serde(default)]
+    pub match_length: usize,
     pub content: String,
 }
 
@@ -77,11 +85,30 @@ fn read_file_content(path: &PathBuf) -> Result<String, Error> {
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
+/// Build a `Regex` with the project's ReDoS limits applied.
+///
+/// User-supplied patterns are untrusted. A pathological pattern
+/// like `(a+)+$` against a long line can lock the search thread for
+/// seconds; the regex crate's `size_limit` and `dfa_size_limit` cap
+/// the backtracking budget so the engine gives up cleanly.
+fn compile_search_regex(pattern: &str, case_insensitive: bool) -> Result<Regex, Error> {
+    use regex::RegexBuilder;
+    RegexBuilder::new(pattern)
+        .case_insensitive(case_insensitive)
+        .size_limit(8 * 1024 * 1024)
+        .dfa_size_limit(8 * 1024 * 1024)
+        .build()
+        .map_err(Error::from)
+}
+
 /// Build regex pattern from query
 fn build_pattern(query: &str, options: &SearchOptions) -> Result<String, Error> {
     if options.use_regex {
-        // Validate the regex first
-        Regex::new(query)?;
+        // Validate the regex first (cheap: we don't run it here, just
+        // confirm it parses). Use the same size limits as the running
+        // regex so a pattern that exceeds the cap fails *here*, not
+        // silently during a search.
+        compile_search_regex(query, !options.case_sensitive)?;
         if options.whole_word {
             // Wrap user's regex with word boundaries
             Ok(format!(r"\b(?:{})\b", query))
@@ -106,11 +133,7 @@ pub fn search_workspace(
     options: &SearchOptions,
 ) -> Result<SearchResult, Error> {
     let pattern = build_pattern(query, options)?;
-    let regex = if options.case_sensitive {
-        Regex::new(&pattern)?
-    } else {
-        Regex::new(&format!("(?i){}", pattern))?
-    };
+    let regex = compile_search_regex(&pattern, !options.case_sensitive)?;
 
     let mut matches = Vec::new();
     let mut files_with_matches = std::collections::HashSet::new();
@@ -160,6 +183,7 @@ pub fn search_workspace(
                         file: file_path.clone(),
                         line_number: (line_number + 1) as u64,
                         column: m.start(),
+                        match_length: m.end().saturating_sub(m.start()),
                         content: line.to_string(),
                     });
                 }
@@ -182,11 +206,7 @@ pub fn search_file(
     options: &SearchOptions,
 ) -> Result<Vec<SearchMatch>, Error> {
     let pattern = build_pattern(query, options)?;
-    let regex = if options.case_sensitive {
-        Regex::new(&pattern)?
-    } else {
-        Regex::new(&format!("(?i){}", pattern))?
-    };
+    let regex = compile_search_regex(&pattern, !options.case_sensitive)?;
 
     let mut matches = Vec::new();
     let file_path_str = file_path.to_string_lossy().to_string();
@@ -199,6 +219,7 @@ pub fn search_file(
                 file: file_path_str.clone(),
                 line_number: (line_number + 1) as u64,
                 column: m.start(),
+                match_length: m.end().saturating_sub(m.start()),
                 content: line.to_string(),
             });
         }

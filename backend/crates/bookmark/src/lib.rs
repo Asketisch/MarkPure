@@ -76,12 +76,23 @@ pub fn save_bookmarks(bookmarks: &[Bookmark]) -> Result<(), Error> {
 
 /// Generate a new bookmark ID
 pub fn generate_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    // Two calls in the same nanosecond used to produce the same ID
+    // (and a flaky test). We mix in a process-local monotonic counter
+    // to guarantee uniqueness even under tight back-to-back calls.
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let rand_suffix = (now as u64).wrapping_mul(2654435761).rotate_left(17);
+        .map(|d| d.as_nanos())
+        // System-clock backwards-jump is rare on desktops but possible
+        // (NTP, suspend/resume, manual clock changes). Fall back to 0
+        // rather than unwrapping and panicking the IPC handler.
+        .unwrap_or(0);
+    let rand_suffix = (now as u64).wrapping_mul(2654435761).rotate_left(17) ^ seq;
     format!("{:x}{:08x}", now, rand_suffix & 0xFFFFFFFF)
 }
 

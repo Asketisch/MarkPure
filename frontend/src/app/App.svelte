@@ -23,11 +23,16 @@
     docGetStats,
     openDroppedFiles,
     savePastedImage,
+    getDirectoryTree,
   } from '$lib/editor/commands'
   import type { DocStats, AppConfig, FileChangeEvent, FileInfo } from '$lib/editor/commands'
   import type { Editor } from '@tiptap/core'
   import { TextSelection } from '@tiptap/pm/state'
   import SideBar from '$lib/components/layout/SideBar.svelte'
+  import StatusBar from '$lib/components/layout/StatusBar.svelte'
+  import MenuBar from '$lib/components/layout/MenuBar.svelte'
+  import Tabs from '$lib/components/layout/Tabs.svelte'
+  import TabContextMenu from '$lib/components/layout/TabContextMenu.svelte'
   import ResizeHandle from '$lib/components/ui/ResizeHandle.svelte'
   import SearchBar from '$lib/components/workspace/SearchBar.svelte'
   import OutlinePanel from '$lib/components/workspace/OutlinePanel.svelte'
@@ -36,7 +41,16 @@
   import SourceEditor from '$lib/components/workspace/SourceEditor.svelte'
   import QuickInsertPopup from '$lib/features/quick-insert/QuickInsertPopup.svelte'
   import Settings from '$lib/features/settings/Settings.svelte'
+  import CommandPalette, { type Command } from '$lib/features/command-palette/CommandPalette.svelte'
+  import { commandCatalog } from '$lib/features/command-palette/commandRegistry'
+  import QuickSwitcher from '$lib/features/quick-switcher/QuickSwitcher.svelte'
+  import BookmarkSidebar from '$lib/features/bookmark/BookmarkSidebar.svelte'
   import { createI18n } from '$lib/stores/i18n.svelte'
+  import { logger } from '$lib/logger'
+  import {
+    handleWikiLinkClick as handleWikiLinkClickLib,
+    handleTagClick as handleTagClickLib,
+  } from '$lib/wikiTagActions'
   import { toggleInstantRender } from '$lib/plugins/instant-render'
   import { searchQuickInsert, type QuickInsertItem } from '$lib/extensions/quick-insert-config'
   import { getPopupActiveIndex } from '$lib/extensions/blocks/quick-insert-extension'
@@ -60,9 +74,9 @@
 
   const i18n = createI18n()
 
-  let tabs = $state<Tab[]>([{ id: 1, path: null, name: 'Untitled', dirty: false, content: '', mtime: null }])
-  let activeTabId = $state<number>(1)
-  let nextId = $state(2)
+  let tabs = $state<Tab[]>([])
+  let activeTabId = $state<number | null>(null)
+  let nextId = $state(1)
   let stats = $state<DocStats>({ words: 0, characters: 0, lines: 0 })
   let theme = $state<string>('')
   let editorContainer: HTMLElement
@@ -79,12 +93,12 @@
   }
   let showOutline = $state(false)
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
-  let showFileMenu = $state(false)
-  let showEditMenu = $state(false)
-  let showExportSubmenu = $state(false)
+  // Note: showFileMenu / showEditMenu / showExportSubmenu
+  // moved to MenuBar.svelte (local UI state).
   let showSearch = $state(false)
   let showWorkspaceSearch = $state(false)
   let showSettings = $state(false)
+  let showCommandPalette = $state(false)
   let sourceMode = $state(false)
   let sourceContent = $state('')
   let sourceEditorRef: ReturnType<typeof SourceEditor> | null = null
@@ -97,7 +111,115 @@
   let autoSaveTimers = $state<Map<number, ReturnType<typeof setTimeout>>>(new Map())
   let autoSaveInterval = $state(3000) // Auto-save interval in ms (loaded from config)
   let isInTable = $state(false)
+  // Generation counter incremented on every `initEditor` call. The onChange
+  // closure captures the generation at editor-creation time; if the editor
+  // has been swapped out, the closure silently no-ops. This prevents
+  // stale in-flight Tiptap transactions from writing to the wrong
+  // `tab.id` in the Rust document registry.
+  let editorGeneration = 0
+  // Tracks an in-flight init so a burst of switchTab calls only runs the
+  // most recent initEditor (intermediate ones become no-ops).
+  // TODO(P3): replace this with a single in-flight promise that re-checks
+  // activeTabId before resolving, to avoid the double destroy/create.
+  let initInFlight = false
   const themes = ['', 'theme-dark', 'theme-one-dark', 'theme-graphite', 'theme-ulysses', 'theme-material-dark', 'theme-blue-topaz']
+
+  // Block first paint until i18n translations and config (theme) are
+  // loaded. Without this, the template renders once with empty
+  // `translations` and `theme = ''`, briefly showing raw i18n keys and
+  // the un-themed layout. The bootstrap overlay below is only visible
+  // for the duration of the two IPC roundtrips (sub-100ms in practice).
+  let ready = $state(false)
+
+  // Build the live command list for the palette. We rebuild
+  // once at component mount; if a handler ever needs fresh
+  // state (e.g. theme name) it reads it lazily at run-time.
+  const paletteCommands: Command[] = commandCatalog.map(def => {
+    const cmd: Command = {
+      id: def.id,
+      title: def.title,
+      category: def.category,
+      keywords: def.keywords,
+      run: () => { /* wired below */ },
+    }
+    cmd.run = buildCommandRun(def.id)
+    return cmd
+  })
+
+  function buildCommandRun(id: string): () => void {
+    switch (id) {
+      case 'file.new': return () => newTab()
+      case 'file.open': return () => handleOpenFile()
+      case 'file.open_workspace': return () => openWorkspace()
+      case 'file.save': return () => handleSave()
+      case 'file.save_as': return () => saveFileAs()
+      case 'file.close_tab': return () => { if (activeTabId) closeTab(activeTabId) }
+      case 'file.export_html': return () => handleExportHtml()
+      case 'file.export_pdf': return () => handleExportPdf()
+      case 'file.export_word': return () => handleExportWord()
+      case 'edit.find': return () => { showSearch = true }
+      case 'view.toggle_sidebar': return () => { showSidebar = !showSidebar; saveCurrentConfig() }
+      case 'view.toggle_outline': return () => { showOutline = !showOutline }
+      case 'view.toggle_source_mode': return () => toggleSourceMode()
+      case 'view.toggle_focus_mode': return () => toggleFocusMode()
+      case 'view.toggle_typewriter': return () => toggleTypewriter()
+      case 'search.workspace': return () => { showWorkspaceSearch = true }
+      case 'search.quick_switcher': return () => { showQuickSwitcher = true }
+      case 'theme.cycle': return () => cycleTheme()
+      case 'theme.light': return () => setTheme('')
+      case 'theme.dark': return () => setTheme('theme-dark')
+      case 'theme.one_dark': return () => setTheme('theme-one-dark')
+      case 'theme.graphite': return () => setTheme('theme-graphite')
+      case 'theme.ulysses': return () => setTheme('theme-ulysses')
+      case 'theme.material_dark': return () => setTheme('theme-material-dark')
+      case 'theme.blue_topaz': return () => setTheme('theme-blue-topaz')
+      case 'lang.en': return () => i18n.changeLocale('en')
+      case 'lang.zh': return () => i18n.changeLocale('zh-CN')
+      case 'lang.ja': return () => i18n.changeLocale('ja')
+      case 'tools.settings': return () => { showSettings = true }
+      case 'tools.bookmarks': return () => { showBookmarks = true }
+      case 'insert.mermaid': return () => insertMermaidBlock()
+      case 'insert.frontmatter': return () => insertFrontmatter()
+      case 'insert.toc': return () => insertToc()
+      case 'insert.fold': return () => editor?.commands.foldSection?.()
+      default: return () => {}
+    }
+  }
+
+  function insertMermaidBlock() {
+    if (!editor) return
+    editor.chain().focus().insertMermaid().run()
+  }
+  function insertFrontmatter() {
+    if (!editor) return
+    // Insert at the very top of the doc. The pattern is the
+    // standard Pandoc / Jekyll / Hugo convention.
+    const tr = editor.state.tr.insertText('---\ntitle: \ndate: \n---\n\n', 0)
+    editor.view.dispatch(tr)
+    editor.commands.focus()
+  }
+  function insertToc() {
+    if (!editor) return
+    // `[[TOC]]` is the VSCode / markdown-all-in-one
+    // convention; we render it as a literal placeholder
+    // comment so the user can search-and-replace it once a
+    // real TOC generator is wired up.
+    editor.chain().focus().insertContent('<!-- TOC: replace with auto-generated outline -->\n').run()
+  }
+
+  // Stub handlers that the palette references but App.svelte
+  // doesn't fully implement yet. Each one is a tiny shim so
+  // the palette doesn't have to know which features are
+  // "real" — typing into the palette always works.
+  let showBookmarks = $state(false)
+  let showQuickSwitcher = $state(false)
+
+  function toggleFocusMode() {
+    if (editor) editor.commands.toggleFocusMode()
+  }
+  function toggleTypewriter() {
+    if (editor) editor.commands.toggleTypewriter()
+  }
 
   function getActiveTab(): Tab | undefined {
     return tabs.find(t => t.id === activeTabId)
@@ -163,8 +285,73 @@
     }
   }
 
+  /// Walk the workspace file tree and find the first markdown
+  /// file whose basename (without extension) matches `page`.
+  /// Returns the absolute path or `null` if nothing matched.
+  async function resolveWikiLinkInWorkspace(page: string, root: string): Promise<string | null> {
+    const target = page.toLowerCase()
+    try {
+      const tree = await getDirectoryTree(root, 5, false)
+      const match = (entries: typeof tree): string | null => {
+        for (const e of entries) {
+          const base = e.name.replace(/\.(md|markdown)$/i, '').toLowerCase()
+          if (!e.is_dir && base === target) return e.path
+          if (e.is_dir && e.children?.length) {
+            const found = match(e.children)
+            if (found) return found
+          }
+        }
+        return null
+      }
+      return match(tree)
+    } catch (e) {
+      console.error('[App] resolveWikiLink failed:', e)
+      return null
+    }
+  }
+
+  /// Resolve a `[[Page]]` wikilink click. Thin wrapper around
+  /// `lib/wikiTagActions.handleWikiLinkClick` that injects
+  /// the App-state dependencies. See that module for the
+  /// actual logic.
+  function handleWikiLinkClick(page: string) {
+    void handleWikiLinkClickLib(page, {
+      workspacePath,
+      openFileInNewTab: (path, content, mtime) => {
+        openFileInNewTab(path, content, mtime)
+      },
+      openUntitledTab,
+      setShowWorkspaceSearch: (v) => { showWorkspaceSearch = v },
+    })
+  }
+
+  /// Resolve a `#tag` click. Thin wrapper around
+  /// `lib/wikiTagActions.handleTagClick`.
+  function handleTagClick(tag: string) {
+    handleTagClickLib(tag, {
+      workspacePath,
+      openFileInNewTab: () => {},
+      openUntitledTab: () => {},
+      setShowWorkspaceSearch: (v) => { showWorkspaceSearch = v },
+    })
+  }
+
+  /// Open a path from the Welcome page's recent-files list. We
+  /// re-use the same `openFileByPath` + `openFileInNewTab` path as
+  /// the file tree so a missing file (the user deleted it on
+  /// disk between sessions) shows a clean error rather than a
+  /// silent no-op.
+  async function handleOpenRecent(path: string) {
+    try {
+      const info = await openFileByPath(path)
+      openFileInNewTab(info.path, info.content, info.mtime)
+    } catch (e) {
+      console.error('[App] failed to open recent file:', path, e)
+    }
+  }
+
   function openFileInNewTab(path: string, content: string, mtime: number | null = null) {
-    const name = path.split('/').pop() ?? 'Untitled'
+    const name = path.split('/').pop() ?? i18n.t('tab.untitled')
     // Find a preview tab to replace, or create new
     const previewTab = tabs.find(t => t.preview)
     if (previewTab) {
@@ -186,6 +373,11 @@
     const tab = getActiveTab()
     if (!tab || !editorContainer) return
 
+    // Bump generation BEFORE destroying the old editor so any
+    // in-flight onChange from the old editor is invalidated.
+    const myGeneration = ++editorGeneration
+    const myTabId = tab.id
+
     if (editor) {
       editor.destroy()
       editor = null
@@ -193,12 +385,16 @@
     editorContainer.innerHTML = ''
 
     // Register document in Rust
-    docOpen(tab.id, tab.content).catch(() => {})
+    docOpen(myTabId, tab.content).catch(() => {})
 
     editor = createEditor({
       parent: editorContainer,
       content: tab.content,
+      onWikiLinkClick: handleWikiLinkClick,
+      onTagClick: handleTagClick,
       onChange: (md: string) => {
+        // Drop stale callbacks from a swapped-out editor.
+        if (myGeneration !== editorGeneration) return
         const t = getActiveTab()
         if (t) {
           t.content = md
@@ -207,14 +403,18 @@
           // Sync content to Rust document
           syncToRust(t.id, md)
         }
-        updateStats(t?.id ?? tab.id)
+        updateStats(t?.id ?? myTabId)
         // Auto-save with configured interval (per-tab timer, 0 = disabled)
         if (autoSaveInterval > 0) {
-          const tabId = t?.id ?? tab.id
+          const tabId = t?.id ?? myTabId
           const existing = autoSaveTimers.get(tabId)
           if (existing) clearTimeout(existing)
           const timerId = setTimeout(() => {
             autoSaveTimers.delete(tabId)
+            // Even after the timer fires, re-validate generation: a
+            // tab switch + switch back should not re-fire the previous
+            // editor's auto-save.
+            if (myGeneration !== editorGeneration) return
             const currentTab = getActiveTab()
             if (currentTab?.path && currentTab.dirty && currentTab.id === tabId) {
               handleSave()
@@ -230,9 +430,18 @@
     // Initial sync
     const content = tab.content || getMarkdown(editor) || ''
     if (content) {
-      syncToRust(tab.id, content)
+      syncToRust(myTabId, content)
     }
-    updateStats(tab.id)
+    updateStats(myTabId)
+
+    // The table-toolbar state (isInTable) must follow the *current*
+    // editor, not whatever editor was on the page at component
+    // mount. Binding here, right after `editor = createEditor(...)`,
+    // means initEditor swaps attach fresh listeners. The onMount
+    // cleanup below still removes the listener from the editor
+    // that's live at unmount.
+    editor.on('selectionUpdate', updateTableState)
+    updateTableState()
   }
 
   function switchTab(id: number, force: boolean = false) {
@@ -253,13 +462,21 @@
   }
 
   function newTab() {
-    const tab: Tab = { id: nextId++, path: null, name: 'Untitled', dirty: false, content: '', mtime: null }
+    const tab: Tab = { id: nextId++, path: null, name: i18n.t('tab.untitled'), dirty: false, content: '', mtime: null }
+    tabs = [...tabs, tab]
+    switchTab(tab.id)
+  }
+
+  /// Open a brand-new untitled tab with a custom display
+  /// name. Used by `[[Page]]` wikilinks that resolve to a
+  /// missing file in a no-workspace context.
+  function openUntitledTab(name: string) {
+    const tab: Tab = { id: nextId++, path: null, name, dirty: false, content: '', mtime: null }
     tabs = [...tabs, tab]
     switchTab(tab.id)
   }
 
   function closeTab(id: number) {
-    if (tabs.length <= 1) return
     // Clear auto-save timer for the tab being closed
     const timer = autoSaveTimers.get(id)
     if (timer) { clearTimeout(timer); autoSaveTimers.delete(id) }
@@ -276,10 +493,22 @@
     docClose(id).catch(err => console.error('[App] Failed to close document:', id, err))
 
     tabs = tabs.filter(t => t.id !== id)
-    if (wasActive && tabs.length > 0) {
-      const newIdx = Math.min(idx, tabs.length - 1)
-      activeTabId = tabs[newIdx].id
-      requestAnimationFrame(() => initEditor())
+    if (wasActive) {
+      if (tabs.length > 0) {
+        const newIdx = Math.min(idx, tabs.length - 1)
+        activeTabId = tabs[newIdx].id
+        requestAnimationFrame(() => initEditor())
+      } else {
+        // Last tab closed → return to EmptyState. Tear down the
+        // editor so initInFlight / auto-save timers can't reference
+        // a stale docId.
+        activeTabId = null
+        if (editor) {
+          editor.destroy()
+          editor = null
+        }
+        editorContainer.innerHTML = ''
+      }
     }
   }
 
@@ -303,10 +532,13 @@
     if (tabs.length === 0) return
     // Unregister all tabs from Rust
     for (const t of tabs) docClose(t.id).catch(err => console.error('[App] Failed to close document:', t.id, err))
-    const newTab: Tab = { id: nextId++, path: null, name: 'Untitled', dirty: false, content: '', mtime: null }
-    tabs = [newTab]
-    activeTabId = newTab.id
-    requestAnimationFrame(() => initEditor())
+    tabs = []
+    activeTabId = null
+    if (editor) {
+      editor.destroy()
+      editor = null
+    }
+    editorContainer.innerHTML = ''
   }
 
   function closeTabsToRight(id: number) {
@@ -462,7 +694,7 @@
         const newPath = await saveFileAs(content)
         if (newPath) {
           tab.path = newPath
-          tab.name = newPath.split(/[/\\]/).pop() ?? 'Untitled'
+          tab.name = newPath.split(/[/\\]/).pop() ?? i18n.t('tab.untitled')
           tab.dirty = false
         }
       } else {
@@ -539,16 +771,6 @@
   function handleRedo() { editor?.chain().focus().redo().run() }
   function handleFind() { showSearch = true }
   function handleReplace() { showSearch = true }
-  function toggleFileMenu() {
-    showEditMenu = false  // Close edit menu first
-    showFileMenu = !showFileMenu
-  }
-  function hideFileMenu() { showFileMenu = false }
-  function toggleEditMenu() {
-    showFileMenu = false  // Close file menu first
-    showEditMenu = !showEditMenu
-  }
-  function hideEditMenu() { showEditMenu = false }
 
   async function openWorkspace() {
     const path = await pickDirectory()
@@ -587,19 +809,33 @@
     }
   }
 
-  function handleOutlineNavigate(item: { level: number; text: string }) {
+  function handleOutlineNavigate(item: { level: number; text: string; pos?: number }) {
     if (!editor) return
-    const { level, text } = item
 
-    // Find the heading node in the ProseMirror document
+    // Preferred path: the outline component passes the heading's
+    // ProseMirror position directly (captured during
+    // `descendants` traversal), so click → scroll is a single
+    // exact match. This avoids the "two headings with the
+    // same text" mis-scroll the old text-match approach had.
+    if (typeof item.pos === 'number') {
+      const safePos = Math.max(0, Math.min(item.pos, editor.state.doc.content.size))
+      const tr = editor.state.tr
+        .setSelection(TextSelection.create(editor.state.doc, safePos))
+        .scrollIntoView()
+      editor.view.dispatch(tr)
+      editor.commands.focus()
+      return
+    }
+
+    // Fallback: text match. Only used if a stale callback from
+    // an older build doesn't pass `pos`.
+    const { level, text } = item
     let found = false
     editor.state.doc.descendants((node, pos) => {
       if (found) return false
       if (node.type.name === 'heading' && node.attrs.level === level) {
-        // Check if heading text matches
         const nodeText = node.textContent.trim()
         if (nodeText === text || nodeText.startsWith(text)) {
-          // Set cursor to the heading and scroll into view
           const tr = editor!.state.tr.setSelection(
             TextSelection.create(editor!.state.doc, pos + 1)
           )
@@ -740,6 +976,16 @@
             showSearch = true
           }
           break
+        case 'p':
+          e.preventDefault()
+          if (e.shiftKey) {
+            // Cmd+Shift+P → command palette
+            showCommandPalette = !showCommandPalette
+          } else {
+            // Cmd+P → quick file switcher (P4.4)
+            showQuickSwitcher = !showQuickSwitcher
+          }
+          break
         case 'h':
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault()
@@ -767,33 +1013,54 @@
     }
   }
 
-  onMount(() => {
-    // Load i18n translations
-    i18n.init().catch((e: unknown) => console.error('Failed to init i18n:', e))
-
-    // Load persisted config
-    getConfig().then(config => {
-      if (config.theme) theme = config.theme
-      if (config.last_workspace) workspacePath = config.last_workspace
-      if (config.editor) {
-        applyEditorConfig(config.editor)
-        // Apply auto-save interval (convert seconds to milliseconds, 0 = disabled)
-        if (config.editor.auto_save_interval > 0) {
-          autoSaveInterval = config.editor.auto_save_interval * 1000
-        }
-      }
-    }).catch((e: unknown) => {
-      console.error('Failed to load config:', e)
+  onMount(async () => {
+    // 1) i18n — load in parallel with config, but block on both.
+    const i18nPromise = i18n.init().catch((e: unknown) => {
+      console.error('Failed to init i18n:', e)
     })
 
-    initEditor()
+    // 2) Persisted config (theme, last workspace, editor settings)
+    const configPromise = getConfig()
+      .then(config => {
+        if (config.theme) theme = config.theme
+        if (config.last_workspace) workspacePath = config.last_workspace
+        if (config.editor) {
+          applyEditorConfig(config.editor)
+          // Apply auto-save interval (convert seconds to milliseconds, 0 = disabled)
+          if (config.editor.auto_save_interval > 0) {
+            autoSaveInterval = config.editor.auto_save_interval * 1000
+          }
+        }
+      })
+      .catch((e: unknown) => {
+        console.error('Failed to load config:', e)
+      })
 
-    // Track if cursor is inside a table
-    const updateTableState = () => {
-      isInTable = editor?.isActive('table') ?? false
+    // 3) Wait for both before flipping the ready gate. A 5s timeout
+    //    guards against a hung IPC leaving the bootstrap spinner up
+    //    forever — we always proceed with whatever defaults we have.
+    const timeout = new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), 5000))
+    await Promise.race([
+      Promise.all([i18nPromise, configPromise]).then(() => 'done' as const),
+      timeout,
+    ])
+    ready = true
+
+    // Start in EmptyState — only spin up the editor when a tab exists.
+    // The first user action (Cmd+N, Open File, click recent) calls
+    // newTab/openFileInNewTab/handleOpenRecent → switchTab → initEditor,
+    // which is the same path the runtime already takes when adding a
+    // tab mid-session.
+    if (tabs.length > 0) {
+      initEditor()
+
+      // Track if cursor is inside a table. The listener itself is
+      // attached inside `initEditor` so it follows whichever
+      // editor instance is current — registering it once in
+      // onMount would leak listeners across every tab switch.
+      // We still need to call it once to seed the initial state.
+      updateTableState()
     }
-    editor?.on('selectionUpdate', updateTableState)
-    updateTableState()
 
     window.addEventListener('keydown', handleKeydown)
 
@@ -834,15 +1101,14 @@
     const handleQISelect = () => {
       const props = (window as any).__qi_props
       if (!props) {
-        console.log('[QI] handleQISelect: props is null')
+        logger.warn('[QI] handleQISelect: props is null')
         return
       }
       // Use props.items directly (the filtered items from Suggestion) instead of re-filtering
       const items = props.items as QuickInsertItem[]
       const activeIdx = getPopupActiveIndex()
-      console.log('[QI] handleQISelect:', { query: props.query, itemsCount: items.length, activeIdx, item: items[activeIdx] })
       if (items[activeIdx]) {
-        console.log('[QI] Calling command for:', items[activeIdx].title)
+        logger.debug('[QI] running command', { title: items[activeIdx].title, itemsCount: items.length, activeIdx })
         props.command(items[activeIdx])
       }
       qiVisible = false
@@ -866,54 +1132,31 @@
 
 <svelte:window onclick={hideTabContextMenu} oncontextmenu={hideTabContextMenu} />
 
+{#if !ready}
+  <div class="app-bootstrap" aria-hidden="true">
+    <div class="app-bootstrap-spinner"></div>
+  </div>
+{/if}
+{#if ready}
 <div class="app-root {theme}">
   <!-- Menu Bar -->
-  <nav class="menu-bar">
-    <div class="menu-group">
-      <div class="menu-dropdown">
-        <button class="menu-btn" onclick={toggleFileMenu} onblur={() => setTimeout(hideFileMenu, 200)}>{i18n.t('menu.file')}</button>
-        {#if showFileMenu}
-          <div class="dropdown-menu" onmouseleave={() => hideFileMenu()}>
-            <button class="dropdown-item" onclick={() => { handleOpen(); hideFileMenu() }}>打开文件</button>
-            <button class="dropdown-item" onclick={() => { handleSave(); hideFileMenu() }}>保存</button>
-            <div class="dropdown-sep"></div>
-            <button class="dropdown-item" onclick={() => { openWorkspace(); hideFileMenu() }}>打开工作区</button>
-            <div class="dropdown-sep"></div>
-            <div class="dropdown-submenu" onmouseenter={() => showExportSubmenu = true} onmouseleave={() => showExportSubmenu = false}>
-              <span class="dropdown-item dropdown-submenu-item">导出 &#9656;</span>
-              {#if showExportSubmenu}
-                <div class="dropdown-submenu-content">
-                  <button class="dropdown-item" onclick={() => { handleExportHtml(); hideFileMenu() }}>{i18n.t('menu.export_html')}</button>
-                  <button class="dropdown-item" onclick={() => { handleExportPdf(); hideFileMenu() }}>{i18n.t('menu.export_pdf')}</button>
-                  <button class="dropdown-item" onclick={() => { handleExportWord(); hideFileMenu() }}>{i18n.t('menu.export_word')}</button>
-                </div>
-              {/if}
-            </div>
-          </div>
-        {/if}
-      </div>
-      <div class="menu-dropdown">
-        <button class="menu-btn" onclick={toggleEditMenu} onblur={() => setTimeout(hideEditMenu, 200)}>{i18n.t('menu.edit')}</button>
-        {#if showEditMenu}
-          <div class="dropdown-menu" onmouseleave={() => hideEditMenu()}>
-            <button class="dropdown-item" onclick={() => { handleUndo(); hideEditMenu() }}>撤销 (Ctrl+Z)</button>
-            <button class="dropdown-item" onclick={() => { handleRedo(); hideEditMenu() }}>重做 (Ctrl+Shift+Z)</button>
-            <div class="dropdown-sep"></div>
-            <button class="dropdown-item" onclick={() => { handleFind(); hideEditMenu() }}>查找 (Ctrl+F)</button>
-            <button class="dropdown-item" onclick={() => { handleReplace(); hideEditMenu() }}>替换 (Ctrl+H)</button>
-            <div class="dropdown-sep"></div>
-            <button class="dropdown-item" onclick={() => { showWorkspaceSearch = true; hideEditMenu() }}>全局搜索 (Ctrl+Shift+F)</button>
-          </div>
-        {/if}
-      </div>
-      <button class="menu-btn" onclick={toggleSidebar}>{i18n.t('menu.view')}</button>
-      <button class="menu-btn" onclick={() => showSettings = true}>{i18n.t('menu.settings')}</button>
-    </div>
-    <div class="menu-title">{i18n.t('app.name')}</div>
-    <div class="menu-actions">
-      <button class="menu-btn" onclick={newTab}>+</button>
-    </div>
-  </nav>
+  <MenuBar
+    appName={i18n.t('app.name')}
+    onNewTab={newTab}
+    onOpen={handleOpen}
+    onSave={handleSave}
+    onOpenWorkspace={openWorkspace}
+    onExportHtml={handleExportHtml}
+    onExportPdf={handleExportPdf}
+    onExportWord={handleExportWord}
+    onUndo={handleUndo}
+    onRedo={handleRedo}
+    onFind={handleFind}
+    onReplace={handleReplace}
+    onGlobalSearch={() => { showWorkspaceSearch = true }}
+    onToggleSidebar={toggleSidebar}
+    onOpenSettings={() => { showSettings = true }}
+  />
 
   <div class="main-area">
     <!-- Sidebar -->
@@ -923,6 +1166,7 @@
           {workspacePath}
           onOpenFile={handleOpenFile}
           onPinTab={handlePinTab}
+          onWorkspaceChange={(path) => { workspacePath = path; saveCurrentConfig() }}
           isResizing={sidebarResizing}
         />
         <ResizeHandle
@@ -941,48 +1185,36 @@
 
     <!-- Editor Panel -->
     <div class="editor-panel">
-      {#if !workspacePath && tabs.length === 1 && !tabs[0].path && !tabs[0].dirty}
+      {#if tabs.length === 0}
         <EmptyState
           onOpenFile={handleOpenFile}
           onOpenWorkspace={(path) => { workspacePath = path; saveCurrentConfig() }}
+          onOpenRecent={handleOpenRecent}
         />
       {:else}
       <!-- Tab Bar -->
-      <div class="tab-bar">
-        {#each tabs as tab (tab.id)}
-          <button
-            class="tab"
-            class:active={tab.id === activeTabId}
-            class:preview={tab.preview}
-            onclick={() => switchTab(tab.id)}
-            ondblclick={() => { tab.preview = false }}
-            onauxclick={(e) => { if (e.button === 1) { e.preventDefault(); closeTab(tab.id) } }}
-            oncontextmenu={(e) => showTabContextMenu(e, tab.id)}
-          >
-            <span class="tab-name">
-              {tab.dirty ? '● ' : ''}{tab.name === 'Untitled' ? i18n.t('tab.untitled') : tab.name}
-            </span>
-            {#if tabs.length > 1}
-              <span
-                class="tab-close"
-                onclick={(e: Event) => { e.stopPropagation(); closeTab(tab.id) }}
-                role="button"
-                tabindex="0"
-              >x</span>
-            {/if}
-          </button>
-        {/each}
-      </div>
+      <Tabs
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onSwitch={switchTab}
+        onClose={closeTab}
+        onCloseOthers={closeOtherTabs}
+        onCloseAll={closeAllTabs}
+        onCloseToRight={closeTabsToRight}
+        onContextMenu={showTabContextMenu}
+      />
 
       <!-- Tab Context Menu -->
       {#if tabContextMenu}
-        {@const menu = tabContextMenu}
-        <div class="context-menu" style="left: {menu.x}px; top: {menu.y}px">
-          <button onclick={() => { closeTab(menu.tabId); hideTabContextMenu() }}>{i18n.t('action.close')}</button>
-          <button onclick={() => { closeOtherTabs(menu.tabId); hideTabContextMenu() }}>{i18n.t('tab.close_others')}</button>
-          <button onclick={() => { closeTabsToRight(menu.tabId); hideTabContextMenu() }}>{i18n.t('tab.close_to_right')}</button>
-          <button onclick={() => { closeAllTabs(); hideTabContextMenu() }}>{i18n.t('tab.close_all')}</button>
-        </div>
+        <TabContextMenu
+          x={tabContextMenu.x}
+          y={tabContextMenu.y}
+          onClose={() => closeTab(tabContextMenu.tabId)}
+          onCloseOthers={() => closeOtherTabs(tabContextMenu.tabId)}
+          onCloseAll={() => closeAllTabs()}
+          onCloseToRight={() => closeTabsToRight(tabContextMenu.tabId)}
+          onCloseMenu={hideTabContextMenu}
+        />
       {/if}
 
       <!-- Toolbar -->
@@ -1050,14 +1282,7 @@
       {/if}
 
       <!-- Status Bar -->
-      <footer class="status-bar">
-        <span>{stats.lines} {i18n.t('status.lines')}</span>
-        <span>{stats.words} {i18n.t('status.words')}</span>
-        <span>{stats.characters} {i18n.t('status.chars')}</span>
-        {#if saving}
-          <span class="saving">{i18n.t('status.saving')}</span>
-        {/if}
-      </footer>
+      <StatusBar {stats} {saving} />
       {/if}
 
       <!-- Settings Modal -->
@@ -1065,6 +1290,7 @@
     </div>
   </div>
 </div>
+{/if}
 
 <!-- Quick Insert Popup (teleported outside app-root) -->
 {#if qiVisible}
@@ -1099,269 +1325,22 @@
   onNavigate={handleWorkspaceSearchNavigate}
 />
 
+<!-- Command Palette (Cmd+Shift+P) -->
+<CommandPalette bind:visible={showCommandPalette} commands={paletteCommands} />
+
+<!-- Quick File Switcher (Cmd+P) -->
+<QuickSwitcher bind:visible={showQuickSwitcher} workspacePath={workspacePath ?? ''} onOpen={handleOpenRecent} />
+
+<!-- Bookmark sidebar (Cmd+B) -->
+<BookmarkSidebar bind:visible={showBookmarks} onOpen={handleOpenRecent} />
+
 <style>
-  .app-root {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-  }
-
-  /* Menu Bar */
-  .menu-bar {
-    display: flex;
-    align-items: center;
-    height: 40px;
-    padding: 0 12px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-    -webkit-app-region: drag;
-    user-select: none;
-  }
-  .menu-group { display: flex; gap: 4px; -webkit-app-region: no-drag; }
-  .menu-title { flex: 1; text-align: center; font-weight: 600; font-size: 13px; opacity: 0.6; }
-  .menu-actions { -webkit-app-region: no-drag; }
-  .menu-btn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 13px;
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
-  }
-  .menu-btn:hover {
-    background: var(--bg);
-    color: var(--text);
-  }
-
-  .menu-dropdown {
-    position: relative;
-  }
-
-  .dropdown-menu {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 6px 0;
-    min-width: 180px;
-    box-shadow: var(--shadow-lg);
-    z-index: 1000;
-    animation: dropdown-enter 0.15s ease;
-  }
-
-  @keyframes dropdown-enter {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .dropdown-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 8px 14px;
-    border: none;
-    background: none;
-    color: var(--text);
-    text-align: left;
-    cursor: pointer;
-    font-size: 13px;
-    transition: background var(--transition-fast);
-  }
-  .dropdown-item:hover {
-    background: var(--bg-secondary);
-  }
-
-  .dropdown-sep {
-    height: 1px;
-    background: var(--border);
-    margin: 4px 0;
-  }
-
-  .dropdown-submenu {
-    position: relative;
-  }
-
-  .dropdown-submenu-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .dropdown-submenu-content {
-    position: absolute;
-    right: 100%;
-    top: 0;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 6px 0;
-    min-width: 140px;
-    box-shadow: var(--shadow-lg);
-  }
-
-  .main-area {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  .sidebar-container {
-    display: flex;
-    flex-shrink: 0;
-  }
-
-  .editor-panel {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  /* Tab Bar */
-  .tab-bar {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 8px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    min-height: 40px;
-  }
-  .tab {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border: none;
-    background: var(--bg-tab-inactive);
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 12px;
-    border-radius: var(--radius-full);
-    white-space: nowrap;
-    transition: all var(--transition-fast);
-  }
-  .tab:hover {
-    background: var(--bg);
-    color: var(--text);
-  }
-  .tab.active {
-    background: var(--bg-tab-active);
-    color: var(--text);
-    box-shadow: var(--shadow-sm);
-  }
-  .tab.preview {
-    font-style: italic;
-  }
-  .tab-name { font-size: 12px; }
-  .tab-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    font-size: 12px;
-    opacity: 0.5;
-    border-radius: var(--radius-full);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-  .tab-close:hover {
-    opacity: 1;
-    background: var(--border);
-  }
-
-  /* Toolbar */
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 6px 8px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-  }
-  .tb-btn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
-  }
-  .tb-btn:hover {
-    background: var(--bg);
-    color: var(--text);
-    transform: scale(1.05);
-  }
-  .tb-btn.active {
-    background: var(--accent);
-    color: white;
-  }
-  .tb-sep {
-    width: 1px;
-    height: 20px;
-    background: var(--border);
-    margin: 0 6px;
-  }
-
-  /* Editor Area */
-  .editor-area {
-    flex: 1;
-    overflow: auto;
-    padding: 24px 48px;
-  }
-
-  /* Status Bar */
-  .status-bar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    height: 24px;
-    padding: 0 12px;
-    background: var(--status-bg);
-    border-top: 1px solid var(--border);
-    font-size: 11px;
-    color: var(--text-secondary);
-  }
-  .saving { color: var(--accent); }
-
-  /* Tab Context Menu */
-  .context-menu {
-    position: fixed;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 0;
-    min-width: 160px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
-  }
-  .context-menu button {
-    display: block;
-    width: 100%;
-    padding: 6px 16px;
-    border: none;
-    background: none;
-    color: var(--text);
-    text-align: left;
-    cursor: pointer;
-    font-size: 13px;
-  }
-  .context-menu button:hover {
-    background: var(--menu-hover-bg);
-    color: var(--menu-hover-text);
-  }
+  /* App.svelte's <style> block used to hold the layout shell
+     styles (.app-root, .menu-bar, .main-area, .tab-bar,
+     .toolbar, .editor-area, .context-menu, etc.). After the
+     P11 refactor extracted these elements into child
+     components, the scoped styles no longer reached them —
+     Svelte 5 scoped styles are component-local. All the
+     relevant rules now live in app.css so the children pick
+     them up. */
 </style>

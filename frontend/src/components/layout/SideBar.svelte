@@ -8,10 +8,11 @@
     workspacePath?: string | null
     onOpenFile?: (path: string) => void
     onPinTab?: (path: string) => void
+    onWorkspaceChange?: (path: string) => void
     isResizing?: boolean
   }
 
-  let { workspacePath = null, onOpenFile, onPinTab, isResizing = false }: Props = $props()
+  let { workspacePath = null, onOpenFile, onPinTab, onWorkspaceChange, isResizing = false }: Props = $props()
 
   let collapsed = $state(false)
 
@@ -40,7 +41,7 @@
 
   {#if !collapsed}
     <div class="sidebar-content">
-      <WorkSpace {workspacePath} {onOpenFile} {onPinTab} />
+      <WorkSpace {workspacePath} {onOpenFile} {onPinTab} {onWorkspaceChange} />
     </div>
   {/if}
 </div>

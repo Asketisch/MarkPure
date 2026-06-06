@@ -4,37 +4,66 @@
 
   interface Props {
     editor?: Editor | null
-    onNavigate?: (item: OutlineItem) => void
+    onNavigate?: (item: OutlineItem & { pos: number }) => void
   }
 
   let { editor = null, onNavigate }: Props = $props()
 
-  let outline = $state<OutlineItem[]>([])
+  interface InternalItem extends OutlineItem {
+    /** PM position of the heading's first character (start of content). */
+    pos: number
+    /** Slug for `scrollIntoView({ block: 'start' })` fallback. */
+    slug: string
+  }
+
+  let outline = $state<InternalItem[]>([])
+
+  /// Build a stable, GitHub-style slug from heading text. We
+  /// include the position as a tie-breaker so two identically-
+  /// titled headings can be distinguished.
+  function slugify(text: string, pos: number): string {
+    const base = text
+      .toLowerCase()
+      .replace(/[^\w一-鿿\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .slice(0, 60)
+    return `${base || 'heading'}-${pos}`
+  }
 
   /** Extract headings directly from the ProseMirror document model (no IPC) */
-  function extractOutline(ed: Editor): OutlineItem[] {
-    const items: OutlineItem[] = []
-    ed.state.doc.descendants((node) => {
+  function extractOutline(ed: Editor): InternalItem[] {
+    const items: InternalItem[] = []
+    ed.state.doc.descendants((node, pos) => {
       if (node.type.name === 'heading') {
+        const text = node.textContent.trim()
         items.push({
           level: node.attrs.level as number,
-          text: node.textContent.trim(),
+          text,
+          pos: pos + 1,
+          slug: slugify(text, pos),
         })
       }
     })
     return items
   }
 
-  function handleClick(item: OutlineItem) {
+  function handleClick(item: InternalItem) {
     onNavigate?.(item)
   }
 
   $effect(() => {
-    if (editor) {
-      outline = extractOutline(editor)
-    } else {
+    if (!editor) {
       outline = []
+      return
     }
+    const refresh = () => { outline = extractOutline(editor!) }
+    refresh()
+    // Re-extract on every doc change so the outline reflects
+    // edits immediately. Without this, the user adds a heading
+    // and the panel still shows the old list.
+    editor.on('update', refresh)
+    return () => { editor?.off('update', refresh) }
   })
 </script>
 
@@ -44,7 +73,7 @@
     {#if outline.length === 0}
       <div class="outline-empty">No headings</div>
     {:else}
-      {#each outline as item}
+      {#each outline as item (item.slug)}
         <button
           class="outline-item level-{item.level}"
           onclick={() => handleClick(item)}

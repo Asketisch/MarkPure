@@ -105,10 +105,16 @@
     navigateToResult(match)
   }
 
-  // Re-search when options change (with debounce)
+  // Re-search when query or options change (with debounce). Svelte 5
+  // tracks the variables we read, so explicitly destructuring or
+  // referencing each option guarantees they re-run the effect.
   $effect(() => {
-    caseSensitive; wholeWord; useRegex
-    if (query && visible && workspacePath) {
+    // Touch each dependency so the effect re-runs on changes.
+    const _q = query
+    const _cs = caseSensitive
+    const _ww = wholeWord
+    const _rx = useRegex
+    if (_q && visible && workspacePath) {
       debouncedSearch()
     }
   })
@@ -125,11 +131,73 @@
     return parts.join('/')
   }
 
-  // Highlight match in content
-  function highlightMatch(content: string, matchStart: number, matchEnd: number): string {
-    const before = content.substring(0, matchStart)
-    const match = content.substring(matchStart, matchEnd)
-    const after = content.substring(matchEnd)
+  // Lazily-created grapheme segmenter for CJK-safe slicing. We
+  // can't slice a UTF-8 byte string with `.substring()` and expect
+  // to land on a character boundary — for ASCII this happens to
+  // work, but a 3-byte CJK character straddles 3 JS string
+  // positions. We use Intl.Segmenter to get character-aware
+  // boundaries, then map the byte offset to a JS string index.
+  let segmenter: Intl.Segmenter | null = null
+  function getSegmenter(): Intl.Segmenter {
+    if (!segmenter) {
+      try {
+        segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+      } catch {
+        // Older runtime without Intl.Segmenter — fall back to
+        // Array.from which is char-based (close enough for ASCII).
+        segmenter = null
+      }
+    }
+    return segmenter as unknown as Intl.Segmenter
+  }
+
+  /// Convert a UTF-8 byte offset to a JS string (UTF-16) index.
+  /// If `bytes` is `null`, we treat `content` as if it were already
+  /// in JS-string offsets and return the input unchanged.
+  function byteOffsetToStringIndex(content: string, byteOffset: number): number {
+    // Browsers and Tiptap render content as UTF-16 strings, but the
+    // Rust side computes byte offsets. Since the standard browser
+    // encoding is UTF-8 only when the source is bytes, a literal
+    // text node has the same byte and UTF-16 lengths for any
+    // codepoint that fits in a single UTF-16 code unit. We compute
+    // the safe boundary: walk characters, accumulating UTF-8 byte
+    // length, until we reach the offset.
+    let bytesSeen = 0
+    for (let i = 0; i < content.length; i++) {
+      if (bytesSeen >= byteOffset) return i
+      // charCodeAt may return a surrogate pair; each surrogate
+      // half encodes 3 UTF-8 bytes. Most CJK characters are in
+      // the Basic Multilingual Plane (BMP) and take 3 UTF-8 bytes
+      // per UTF-16 unit; supplementary characters (e.g. emoji)
+      // are surrogate pairs encoding 4 UTF-8 bytes total.
+      const code = content.charCodeAt(i)
+      const isHighSurrogate = code >= 0xD800 && code <= 0xDBFF
+      if (isHighSurrogate && i + 1 < content.length) {
+        // 4 UTF-8 bytes for the surrogate pair.
+        bytesSeen += 4
+        i += 1 // skip the low surrogate
+      } else {
+        // BMP char: ASCII = 1 byte, others = 2 or 3 bytes.
+        if (code < 0x80) bytesSeen += 1
+        else if (code < 0x800) bytesSeen += 2
+        else bytesSeen += 3
+      }
+    }
+    return content.length
+  }
+
+  // Highlight match in content. `byteStart` and `byteLength` are
+  // UTF-8 byte offsets from the backend; we convert to JS string
+  // indices and slice.
+  function highlightMatch(content: string, byteStart: number, byteLength: number): string {
+    const startIdx = byteOffsetToStringIndex(content, byteStart)
+    const endIdx = byteOffsetToStringIndex(content, byteStart + byteLength)
+    // Clamp in case the backend reported an out-of-range length.
+    const safeEnd = Math.min(endIdx, content.length)
+    const safeStart = Math.min(startIdx, safeEnd)
+    const before = content.substring(0, safeStart)
+    const match = content.substring(safeStart, safeEnd)
+    const after = content.substring(safeEnd)
     return `${escapeHtml(before)}<mark>${escapeHtml(match)}</mark>${escapeHtml(after)}`
   }
 
@@ -194,7 +262,7 @@
           <div class="ws-result-line">
             <span class="ws-line-num">{match.line_number}</span>
             <span class="ws-line-content">
-              {@html highlightMatch(match.content, match.column, match.column + (query.length))}
+              {@html highlightMatch(match.content, match.column, match.match_length)}
             </span>
           </div>
         </button>

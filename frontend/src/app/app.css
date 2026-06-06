@@ -691,3 +691,401 @@ html, body, #app {
   filter: blur(1px);
 }
 
+
+/* Mermaid diagram block */
+.mermaid-block {
+  margin: 16px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--code-block-bg);
+  overflow: hidden;
+}
+.mermaid-block .mermaid-svg {
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+  background: #ffffff;
+}
+.mermaid-block .mermaid-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+.mermaid-block .mermaid-loading,
+.mermaid-block .mermaid-fallback {
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.mermaid-block .mermaid-fallback pre {
+  background: var(--bg);
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 12px;
+  margin: 0 0 8px 0;
+  color: var(--text);
+}
+.mermaid-block .mermaid-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(220, 38, 38, 0.1);
+  color: #fca5a5;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.mermaid-block .mermaid-source {
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.mermaid-block .mermaid-source summary {
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11px;
+  user-select: none;
+}
+.mermaid-block .mermaid-source summary:hover { color: var(--text); }
+.mermaid-block .mermaid-source pre {
+  margin: 0;
+  padding: 12px;
+  font-size: 12px;
+  overflow-x: auto;
+  color: var(--text);
+}
+
+/* Task list priority badges (Pandoc ` [!] `, ` [!p] `, ` [!low] `) */
+.ProseMirror ul[data-type="taskList"] li[data-priority="highest"] > label::before,
+.ProseMirror ul[data-type="taskList"] li[data-priority="highest"] > div > label::before {
+  background: #ef4444 !important;
+  box-shadow: 0 0 0 2px #ef4444 !important;
+}
+.ProseMirror ul[data-type="taskList"] li[data-priority="high"] > label::before,
+.ProseMirror ul[data-type="taskList"] li[data-priority="high"] > div > label::before {
+  background: #f97316 !important;
+  box-shadow: 0 0 0 2px #f97316 !important;
+}
+.ProseMirror ul[data-type="taskList"] li[data-priority="medium"] > label::before,
+.ProseMirror ul[data-type="taskList"] li[data-priority="medium"] > div > label::before {
+  background: #eab308 !important;
+  box-shadow: 0 0 0 2px #eab308 !important;
+}
+.ProseMirror ul[data-type="taskList"] li[data-priority="low"] > label::before,
+.ProseMirror ul[data-type="taskList"] li[data-priority="low"] > div > label::before {
+  background: #22c55e !important;
+  box-shadow: 0 0 0 2px #22c55e !important;
+}
+
+/* Code Block toolbar (copy button) */
+.mw-code-block-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.mw-code-block-copy {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.mw-code-block-copy:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.mw-code-block-copy-ok {
+  color: #22c55e !important;
+  border-color: #22c55e !important;
+}
+
+/* ===== Bootstrap loading gate =====
+   Shown for the brief moment between mount and the moment
+   i18n + config IPCs resolve. Uses :root variables so the
+   overlay is always consistent (the user's persisted theme
+   hasn't loaded yet when this is visible). */
+.app-bootstrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 9999;
+}
+.app-bootstrap-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: app-spin 0.8s linear infinite;
+}
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Layout shell =====
+   These rules style the top-level scaffolding that the P11
+   refactor extracted into MenuBar / Tabs / StatusBar /
+   SideBar / etc. They used to live in App.svelte's scoped
+   <style> block — Svelte 5 scoped styles don't reach child
+   components, so the children rendered unstyled. Moving
+   them here makes them global and fixes the broken layout. */
+
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Menu Bar */
+.menu-bar {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.menu-group { display: flex; gap: 4px; -webkit-app-region: no-drag; }
+.menu-title { flex: 1; text-align: center; font-weight: 600; font-size: 13px; opacity: 0.6; }
+.menu-actions { -webkit-app-region: no-drag; }
+.menu-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+.menu-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.menu-dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 6px 0;
+  min-width: 180px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  animation: dropdown-enter 0.15s ease;
+}
+
+@keyframes dropdown-enter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background var(--transition-fast);
+}
+.dropdown-item:hover {
+  background: var(--bg-secondary);
+}
+
+.dropdown-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.dropdown-submenu {
+  position: relative;
+}
+
+.dropdown-submenu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dropdown-submenu-content {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 6px 0;
+  min-width: 140px;
+  box-shadow: var(--shadow-lg);
+}
+
+.main-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar-container {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Tab Bar */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  min-height: 40px;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  background: var(--bg-tab-inactive);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+.tab:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+.tab.active {
+  background: var(--bg-tab-active);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.tab.preview {
+  font-style: italic;
+}
+.tab-name { font-size: 12px; }
+.tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+  opacity: 0.5;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.tab-close:hover {
+  opacity: 1;
+  background: var(--border);
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.tb-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+.tb-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+  transform: scale(1.05);
+}
+.tb-btn.active {
+  background: var(--accent);
+  color: white;
+}
+.tb-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 6px;
+}
+
+/* Editor Area */
+.editor-area {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 48px;
+}
+
+/* Tab Context Menu */
+.context-menu {
+  position: fixed;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+.context-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 16px;
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+}
+.context-menu button:hover {
+  background: var(--menu-hover-bg);
+  color: var(--menu-hover-text);
+}

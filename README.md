@@ -6,50 +6,94 @@ WYSIWYG Markdown 桌面编辑器。
 
 ## 功能特性
 
-- **WYSIWYG 编辑** — 所见即所得的 Markdown 编辑体验
-- **Typora 风格即时渲染** — 光标附近显示 Markdown 语法标记，远离时隐藏（增量更新，高性能）
-- **多标签页** — 同时打开多个文档，支持脏状态追踪
-- **文件树管理** — 打开文件夹作为工作区，浏览、搜索、创建、重命名、删除文件
-- **文档大纲** — 直接从 ProseMirror 文档模型提取标题（零 IPC 开销）
-- **代码块** — CodeMirror 6 嵌入编辑，支持 14+ 种语言语法高亮
-- **数学公式** — KaTeX 渲染行内和块级 LaTeX 公式
-- **搜索替换** — 支持正则、大小写敏感、全词匹配
-- **源码模式** — 切换到 CodeMirror 原始 Markdown 编辑
-- **快速插入** — `@` 触发命令面板，快速插入标题、代码块、表格等
-- **多主题** — 浅色、VS Code Dark、Atom One Dark 三种主题
-- **导出** — 支持导出为 HTML（独立文档）和 PDF
-- **CJK 支持** — CJK 字符感知的词数统计
-- **自动编码检测** — 支持读取 UTF-8、GBK、Shift_JIS、Big5 等编码的文件
-- **最近文件** — 自动记录最近打开的文件
-- **标签页持久化** — 关闭后恢复上次的标签页状态
-- **Rust 文档注册表** — 文档模型下沉到 Rust，统计和搜索直接在 rope 上计算，无需全文 IPC 传输
+| 功能 | 说明 |
+|------|------|
+| **所见即所得** | WYSIWYG Markdown 编辑体验 |
+| **即时渲染** | Typora 风格，光标附近显示 Markdown 语法标记，远离时隐藏 |
+| **多标签页** | 同时打开多个文档，支持脏状态追踪 |
+| **文件树管理** | 打开文件夹作为工作区，浏览、搜索、创建、重命名、删除文件 |
+| **文档大纲** | 直接从 ProseMirror 文档模型提取标题（零 IPC 开销） |
+| **代码块** | CodeMirror 6 嵌入编辑，支持 14+ 种语言语法高亮 |
+| **数学公式** | KaTeX 渲染行内和块级 LaTeX 公式 |
+| **搜索替换** | 支持正则、大小写敏感、全词匹配 |
+| **源码模式** | 切换到 CodeMirror 原始 Markdown 编辑 |
+| **快速插入** | `@` 触发命令面板，快速插入标题、代码块、表格等 |
+| **多主题** | 浅色、VS Code Dark、Atom One Dark 等 6 种主题 |
+| **导出** | 支持导出为 HTML、PDF 和 Word |
+| **CJK 支持** | CJK 字符感知的词数统计 |
+| **自动编码检测** | 支持读取 UTF-8、GBK、Shift_JIS、Big5 等编码的文件 |
+| **最近文件** | 自动记录最近打开的文件 |
+| **标签页持久化** | 关闭后恢复上次的标签页状态 |
+| **书签管理** | 添加、编辑、删除书签 |
+| **拼写检查** | 英文拼写检查，提供修正建议 |
+| **Workspace 搜索** | 工作区全文搜索，支持正则和大小写敏感 |
+
+## 快速开始
+
+### 安装依赖
+
+需要安装 [Node.js](https://nodejs.org/) 和 [Rust](https://www.rust-lang.org/tools/install)。
+
+```bash
+npm install
+```
+
+### 开发模式
+
+两个终端并行运行：
+
+```bash
+# 终端 1：启动前端开发服务器（热重载）
+cd frontend && npm run dev
+
+# 终端 2：启动 Rust 后端（连接前端开发服务器）
+cd backend && cargo run -- --dev
+```
+
+访问 http://localhost:5173 即可。
+
+### 构建
+
+```bash
+# 一键构建（前端 + Rust）
+./scripts/build.sh
+
+# 运行
+./target/release/markpure
+```
+
+### macOS App 打包
+
+```bash
+./scripts/bundle-macos.sh
+open target/MarkPure.app
+```
 
 ## 架构概览
 
 ```
-┌──────────────────────────────────────────┐
-│            Rust 桌面壳 (src-rust/)        │
-│  ┌─────────────────────────────────────┐ │
-│  │   Svelte 5 前端 (src/)              │ │
-│  │   ┌───────────────────────────────┐ │ │
-│  │   │  Tiptap WYSIWYG 编辑器       │ │ │
-│  │   │  + CodeMirror 代码块          │ │ │
-│  │   │  + KaTeX 数学公式             │ │ │
-│  │   │  + 即时渲染插件               │ │ │
-│  │   └───────────────────────────────┘ │ │
-│  │   自定义 IPC JSON 协议              │ │
-│  └─────────────────────────────────────┘ │
-│  wry (WebView) + tao (窗口管理)          │
-│  rust-embed (嵌入前端资源)               │
-│  文档注册表 (HashMap<tab_id, Document>)  │
-└──────────────────────────────────────────┘
-         │
-    ┌────┴────┬──────────┬──────────┐
-    │ mt-core │  mt-fs   │mt-markdown│ mt-export
-    │ 文档/配置│ 文件I/O  │ MD 解析   │ HTML/PDF
-    │ (ropey  │          │(pulldown- │ (printpdf)
-    │ +regex) │          │  cmark)   │
-    └─────────┴──────────┴──────────┘
+┌─────────────────────────────────────────────────────┐
+│              Rust 桌面壳 (backend/)                  │
+│  ┌───────────────────────────────────────────────┐ │
+│  │          Svelte 5 前端 (frontend/src/)         │ │
+│  │  ┌─────────────────────────────────────────┐  │ │
+│  │  │  Tiptap WYSIWYG 编辑器                  │  │ │
+│  │  │  + CodeMirror 6 代码块                   │  │ │
+│  │  │  + KaTeX 数学公式                        │  │ │
+│  │  │  + 即时渲染插件                          │  │ │
+│  │  └─────────────────────────────────────────┘  │ │
+│  │  自定义 IPC JSON 协议                          │ │
+│  └───────────────────────────────────────────────┘ │
+│  wry (WebView) + tao (窗口管理)                       │
+│  rust-embed (嵌入前端资源)                           │
+│  Document 注册表 (HashMap<doc_id, Document>)          │
+└─────────────────────────────────────────────────────┘
+              │
+┌─────────────┼─────────────┬─────────────┬──────────┐
+│  core-lib   │    fs       │  markdown   │  export  │
+│  文档/配置  │  文件 I/O    │  MD 解析    │ HTML/PDF │
+│  (ropey)    │  编码检测    │ (pulldown)  │  Word    │
+└─────────────┴─────────────┴─────────────┴──────────┘
 ```
 
 前端通过自定义 IPC 协议与 Rust 通信：`ipc.postMessage()` 发送请求，`window.__mt_dispatch()` 接收响应。
@@ -59,51 +103,54 @@ Rust 端持有文档的 rope 文本副本（文档注册表），统计和搜索
 ## 目录结构
 
 ```
-MarkMe/
-├── src/                    # Svelte 5 + TypeScript 前端
-│   ├── App.svelte          # 主应用组件
-│   ├── app.css             # 全局样式 + 主题变量 + 编辑器样式
-│   ├── main.ts             # 入口
-│   └── lib/
-│       ├── editor.ts       # Tiptap 编辑器工厂
-│       ├── commands.ts     # IPC 命令封装 + 类型定义
-│       ├── components/     # Svelte 组件
-│       │   ├── SideBar.svelte        # 侧边栏容器
-│       │   ├── WorkSpace.svelte      # 文件树浏览器
-│       │   ├── Outline.svelte        # 文档大纲（前端直接提取）
-│       │   ├── SearchBar.svelte      # 搜索替换栏
-│       │   ├── SourceEditor.svelte   # 源码模式编辑器
-│       │   └── QuickInsertPopup.svelte # @ 快速插入弹窗
-│       ├── extensions/     # Tiptap 扩展
-│       │   ├── code-block-cm-extension.ts  # CodeMirror 代码块
-│       │   ├── math-extension.ts           # KaTeX 数学公式
-│       │   ├── instant-render-extension.ts # 即时渲染
-│       │   ├── search-extension.ts         # 搜索
-│       │   ├── quick-insert-extension.ts   # @ 快速插入
-│       │   ├── quick-insert-config.ts      # 快速插入配置
-│       │   └── cm-theme.ts                 # CodeMirror 主题
-│       ├── plugins/        # ProseMirror 插件
-│       │   ├── instant-render.ts   # 即时渲染核心（增量装饰更新）
-│       │   └── search.ts          # 搜索核心
-│       └── nodeviews/      # ProseMirror NodeView
-│           └── code-block-view.ts  # CodeMirror 代码块视图
-├── src-rust/               # Rust 桌面壳
-│   └── src/main.rs         # WebView 创建、IPC 处理、命令分发、文档注册表
-├── crates/                 # Rust 库 crate
-│   ├── mt-core/            # Document (ropey+regex)、AppConfig、TabState、Error、ThemeId
-│   ├── mt-fs/              # 异步文件 I/O + 编码检测 + 目录扫描 + 文件监视
-│   ├── mt-markdown/        # Markdown 解析 + HTML 转换 + 标题提取
-│   └── mt-export/          # HTML/PDF 导出
-├── build.sh                # 构建脚本 (npm build → cargo build)
-└── index.html              # SPA 入口
+MarkPure/
+├── frontend/                     # Svelte 5 + TypeScript 前端
+│   └── src/
+│       ├── app/                 # 主应用组件
+│       │   ├── App.svelte       # 主应用：菜单栏、标签栏、工具栏、编辑器、状态栏
+│       │   ├── main.ts          # 入口
+│       │   └── app.css          # 全局样式 + 主题变量 + 编辑器样式
+│       ├── editor/              # Tiptap 编辑器封装
+│       │   ├── editor.ts        # 编辑器工厂
+│       │   ├── commands.ts      # IPC 命令封装
+│       │   └── types.ts         # 类型定义
+│       ├── components/          # Svelte 组件（15+ 个）
+│       │   ├── ui/              # 通用 UI（Dialog、ColorPicker、ContextMenu 等）
+│       │   ├── layout/          # 布局组件
+│       │   └── workspace/       # 工作区组件（WorkSpace、Outline、SearchBar 等）
+│       ├── features/            # 功能模块
+│       │   ├── settings/        # 设置/主题编辑
+│       │   ├── search/          # 工作区搜索
+│       │   ├── quick-insert/    # 快速插入
+│       │   └── outline/        # 大纲面板
+│       ├── extensions/         # Tiptap 扩展（16 个）
+│       ├── plugins/            # ProseMirror 插件（5+ 个）
+│       ├── nodeviews/          # ProseMirror NodeView（代码块）
+│       ├── stores/             # Svelte 5 runes 状态管理
+│       └── i18n/               # 国际化
+├── backend/                      # Rust 后端（wry + tao）
+│   ├── apps/desktop/            # 桌面应用入口
+│   │   └── src/main.rs         # WebView 创建、IPC 处理、文档注册表
+│   └── crates/                  # Rust 库 crate
+│       ├── core-lib/           # Document、AppConfig、TabState、Theme、i18n、keymap
+│       ├── fs/                 # 异步文件 I/O + 编码检测 + 目录扫描 + 文件监视
+│       ├── markdown/           # Markdown 解析 + HTML 转换 + 标题提取 + Wiki 链接
+│       ├── export/             # HTML/PDF/Word 导出
+│       ├── search/             # 工作区全文搜索
+│       ├── bookmark/          # 书签 CRUD
+│       ├── assets/            # 图片粘贴处理 + SSRF 防护
+│       └── spellcheck/        # 英文拼写检查
+├── scripts/                     # 构建脚本
+├── resources/                   # 应用资源（图标等）
+└── distribution/                # 分发包配置
 ```
 
 ## 技术栈
 
 | 层 | 技术 | 版本 |
 |---|---|---|
-| 桌面壳 | wry + tao | 0.46 + 0.34（原生 WebView，无 Electron/Tauri） |
-| 前端框架 | Svelte | 5.x (runes: `$state`/`$effect`/`$props`) |
+| 桌面壳 | wry + tao | 0.46 + 0.34 |
+| 前端框架 | Svelte | 5.x (runes) |
 | 构建工具 | Vite | 8.x |
 | WYSIWYG 编辑器 | Tiptap (ProseMirror) | 3.22.x |
 | 代码块编辑器 | CodeMirror | 6.x (14+ 语言) |
@@ -115,67 +162,72 @@ MarkMe/
 | Markdown 解析 | pulldown-cmark | 0.12 (SIMD) |
 | 文件监视 | notify | 8.x |
 | 编码检测 | chardetng + encoding_rs | — |
-| 原生对话框 | rfd | 0.15 |
 | PDF 导出 | printpdf | 0.7 |
+| Word 导出 | docx-rs + zip | 0.4 + 2.x |
 | 前端嵌入 | rust-embed | 8.x |
 
-## 开发
+## 键盘快捷键
 
-需要安装 [Node.js](https://nodejs.org/)、[Rust](https://www.rust-lang.org/tools/install)。
+### 通用
 
-```bash
-# 安装前端依赖
-npm install
+| 快捷键 | 操作 |
+|--------|------|
+| `Cmd/Ctrl + N` | 新建文件 |
+| `Cmd/Ctrl + O` | 打开文件 |
+| `Cmd/Ctrl + S` | 保存 |
+| `Cmd/Ctrl + Shift + S` | 另存为 |
+| `Cmd/Ctrl + W` | 关闭标签页 |
+| `Cmd/Ctrl + Z` | 撤销 |
+| `Cmd/Ctrl + Shift + Z` | 重做 |
+| `Cmd/Ctrl + F` | 查找 |
+| `Cmd/Ctrl + H` | 查找并替换 |
+| `Cmd/Ctrl + B` | 切换侧边栏 / 加粗 |
+| `Cmd/Ctrl + I` | 斜体 |
+| `Cmd/Ctrl + Shift + X` | 删除线 |
+| `` Cmd/Ctrl + ` `` | 行内代码 |
+| `Cmd/Ctrl + Shift + T` | 切换主题 |
+| `Cmd/Ctrl + /` | 切换源码模式 |
+| `Cmd/Ctrl + Shift + F` | 工作区搜索 |
 
-# 终端 1：启动前端开发服务器（热重载）
-npm run dev
+### 快速插入
 
-# 终端 2：启动 Rust 后端（连接前端开发服务器）
-cargo run -- --dev
-```
+| 快捷键 | 插入 |
+|--------|------|
+| `Cmd/Ctrl + 0` | 段落 |
+| `Cmd/Ctrl + 1-6` | 标题 1-6 |
+| `Alt + Cmd + -` | 分隔线 |
+| `Alt + Cmd + C` | 代码块 |
+| `Alt + Cmd + Q` | 引用 |
+| `Shift + Cmd + T` | 表格 |
+| `Alt + Cmd + M` | 数学公式块 |
+| `Alt + Cmd + U` | 无序列表 |
+| `Alt + Cmd + O` | 有序列表 |
+| `Alt + Cmd + X` | 任务列表 |
 
-## 构建
+### 代码块
 
-```bash
-# 一键构建（前端 + Rust）
-./build.sh
+| 快捷键 | 操作 |
+|--------|------|
+| `↓` | 退出代码块（向下） |
+| `↑` | 退出代码块（向上） |
+| `Backspace`（空代码块） | 删除代码块 |
+| `Alt + 点击` | 添加光标 |
 
-# 或分步执行：
-npm run build          # 构建前端
-cargo build --release  # 构建 Rust 后端（嵌入 dist/）
+## 最近更新
 
-# 运行
-./target/release/markpure
-```
-
-## macOS App 打包
-
-构建 macOS `.app` 应用程序包：
-
-```bash
-# 一键打包（构建 + 打包 + ad-hoc 签名）
-./bundle-macos.sh
-
-# 跳过代码签名
-SIGN=0 ./bundle-macos.sh
-
-# 运行
-open target/MarkPure.app
-```
-
-首次打包前生成应用图标（之后无需重复）：
-
-```bash
-./macos/gen-icns.sh
-```
-
-打包后的应用位于 `target/MarkPure.app`。
+- **拖拽 bugfix** — 修复文件拖拽相关问题
+- **文件重命名/渲染 bug 修复** — 修复文件操作和渲染问题
+- **Git 文件状态色值处理** — 目录树显示 Git 状态颜色
+- **更新文件 bug 修复** — 改善文件更新逻辑
+- **粘贴 bug 修复** — 修复图片粘贴问题
+- **目录结构调整** — 优化项目结构
+- **渲染方案调整** — 优化即时渲染性能
 
 ## 其他命令
 
 ```bash
 # 前端类型检查
-npm run check
+cd frontend && npm run check
 
 # Rust 编译检查
 cargo check --workspace
@@ -184,30 +236,10 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-## 当前状态
-
-| 阶段 | 内容 | 状态 |
-|------|------|------|
-| 1 | Rust 基础设施（目录扫描、文件监视、文件 CRUD、Tab 状态） | ✅ 完成 |
-| 2 | Rust IPC 命令（25+ 命令，含文档注册表） | ✅ 完成 |
-| 3 | 前端组件（文件树、侧边栏、大纲、搜索、源码模式、快速插入） | ✅ 完成 |
-| 4 | 性能优化（即时渲染增量更新、文档模型下沉 Rust、大纲零 IPC） | ✅ 完成 |
-| 5 | 标签页撕离多窗口 | 🔧 部分实现 |
-
 ## 已知限制
 
-- PDF 导出使用硬编码的 macOS 字体路径（`/System/Library/Fonts/Helvetica.ttc`），跨平台需修复
-- `svelte-i18n` 已声明为依赖但尚未集成
-- 6 个主题定义中仅 3 个有前端 CSS 实现（Light、Dark、OneDark）
-
-## 性能优化
-
-- **即时渲染增量更新**：光标移动时仅更新受影响的顶层块节点的装饰，而非全文档遍历
-- **文档模型下沉 Rust**：Rust 端维护文档的 rope 副本（`HashMap<tab_id, Document>`），统计/搜索直接在 Rust 端计算，无需 IPC 全文传输
-- **大纲零 IPC**：直接从 ProseMirror 文档模型提取标题，不再序列化到 Rust
-- **搜索优化**：使用 `doc.textBetween()` 替代逐字符遍历构建位置映射
-- **持久化 tokio Runtime**：所有 IPC 命令共享同一个 Runtime 实例
-- **rust-embed**：前端资源编译嵌入二进制，无运行时磁盘读取
+- PDF 导出使用硬编码的 macOS 字体路径，跨平台需修复
+- 部分主题仅有 CSS 实现（完整 6 主题支持进行中）
 
 ## 许可证
 

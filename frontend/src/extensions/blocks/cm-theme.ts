@@ -48,3 +48,40 @@ export function createThemeExtension(isDark: boolean): Extension[] {
 
   return [baseTheme, syntaxHighlighting(defaultHighlightStyle)]
 }
+
+/**
+ * Watch the app root for theme class changes and re-evaluate
+ * `detectDarkTheme()` on every active CodeMirror view. We can't
+ * rebuild the entire editor (that would lose undo history and
+ * scroll position), but we can reconfigure the theme compartment
+ * if the host wired it up. The default CodeMirror theme uses
+ * `var(--text)` etc., so most colors update automatically; the
+ * one bit that doesn't is CodeMirror's own "dark" flag (which
+ * flips a few internal defaults like selection tint).
+ *
+ * The companion `reconfigureTheme` is exposed for callers that
+ * want to call into `compartment.reconfigure(...)`.
+ */
+let observer: MutationObserver | null = null
+const reconfigureListeners = new Set<(isDark: boolean) => void>()
+
+export function onThemeChange(cb: (isDark: boolean) => void): () => void {
+  reconfigureListeners.add(cb)
+  // Fire once with the current value so callers can sync up
+  // immediately.
+  cb(detectDarkTheme())
+  return () => reconfigureListeners.delete(cb)
+}
+
+export function watchAppTheme(): () => void {
+  if (typeof document === 'undefined') return () => {}
+  if (observer) return () => observer!.disconnect()
+
+  observer = new MutationObserver(() => {
+    const isDark = detectDarkTheme()
+    for (const cb of reconfigureListeners) cb(isDark)
+  })
+  const target = document.querySelector('.app-root') ?? document.body
+  observer.observe(target, { attributes: true, attributeFilter: ['class'] })
+  return () => observer?.disconnect()
+}

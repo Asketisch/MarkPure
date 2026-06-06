@@ -1,0 +1,54 @@
+<script lang="ts">
+  /**
+   * Status bar — bottom of the editor area.
+   *
+   * Extracted from App.svelte as part of P7's file-size audit
+   * (App.svelte was 1367 lines). This component is purely
+   * presentational: it receives doc stats + a `saving` flag and
+   * renders them. All translation happens via the i18n prop.
+   */
+  import { useI18n } from '$lib/stores/i18n.svelte'
+
+  interface DocStats {
+    words: number
+    characters: number
+    lines: number
+  }
+
+  let {
+    stats,
+    saving,
+  }: {
+    stats: DocStats
+    saving: boolean
+  } = $props()
+
+  const i18n = useI18n()
+</script>
+
+<footer class="status-bar">
+  <span>{stats.lines} {i18n.t('status.lines')}</span>
+  <span>{stats.words} {i18n.t('status.words')}</span>
+  <span>{stats.characters} {i18n.t('status.chars')}</span>
+  {#if saving}
+    <span class="saving">{i18n.t('status.saving')}</span>
+  {/if}
+</footer>
+
+<style>
+  .status-bar {
+    display: flex;
+    gap: 16px;
+    padding: 4px 12px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+  .saving {
+    margin-left: auto;
+    color: var(--accent);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.5 } }
+</style>

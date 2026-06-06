@@ -177,11 +177,28 @@ impl Document {
         self.encoding.clone()
     }
 
-    /// Replace a character range with new text (combines remove + insert)
+    /// Replace a character range with new text (combines remove + insert).
+    ///
+    /// Out-of-bounds positions are clamped rather than panicking, so a stale
+    /// or malformed call cannot crash the editor.
     pub fn replace(&mut self, from: usize, to: usize, text: &str) {
+        let len = self.rope.len_chars();
+        if len == 0 {
+            // Empty rope: only a zero-position insert is meaningful.
+            if !text.is_empty() && from == 0 {
+                self.rope.insert(0, text);
+                self.dirty = true;
+            }
+            return;
+        }
+        // Clamp `from` to a valid insert position. Rope insert panics if
+        // `from > len_chars`, so we cannot let it escape.
+        let from = from.min(len);
         if from < to {
-            let end = to.min(self.rope.len_chars());
-            self.rope.remove(from..end);
+            let end = to.min(len).max(from);
+            if end > from {
+                self.rope.remove(from..end);
+            }
         }
         if !text.is_empty() {
             self.rope.insert(from, text);
@@ -224,6 +241,12 @@ impl Document {
 
         let re = match RegexBuilder::new(&pattern)
             .case_insensitive(!case_sensitive)
+            // ReDoS guard: cap how much the engine is willing to
+            // backtrack. Without these limits a user-supplied pattern
+            // like `(a+)+$` can lock the IPC thread for seconds
+            // against a long document.
+            .size_limit(8 * 1024 * 1024) // 8 MB compiled-pattern cap
+            .dfa_size_limit(8 * 1024 * 1024) // 8 MB DFA cap
             .build()
         {
             Ok(r) => r,

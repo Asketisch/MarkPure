@@ -26,6 +26,7 @@ import { TagExtension } from '../extensions/editing/tag-extension'
 import { TypewriterScrollExtension } from '../extensions/view/typewriter-scroll-extension'
 import { FocusModeExtension } from '../extensions/view/focus-mode-extension'
 import { UndoTreeExtension } from '../extensions/editing/undo-tree-extension'
+import { MermaidExtension } from '../nodeviews/mermaid-view'
 
 // Extension to wrap multi-cursor plugin
 const MultiCursorExtension = Extension.create({
@@ -43,10 +44,21 @@ export interface EditorOptions {
   onSave?: () => void
   onFilesDropped?: (files: File[]) => void
   onImagesDropped?: (images: { file: File; base64: string }[]) => void
+  /**
+   * Fired when the user clicks a `[[Page]]` wikilink mark. The
+   * host is expected to resolve the page to a file path and
+   * open it (or create-and-open it if it doesn't exist).
+   */
+  onWikiLinkClick?: (page: string) => void
+  /**
+   * Fired when the user clicks a `#tag` mark. Typical hosts
+   * open the workspace search pre-filled with the tag name.
+   */
+  onTagClick?: (tag: string) => void
 }
 
 export function createEditor(opts: EditorOptions): Editor {
-  const { parent, content = '', onChange, onSave, onFilesDropped, onImagesDropped } = opts
+  const { parent, content = '', onChange, onSave, onFilesDropped, onImagesDropped, onWikiLinkClick, onTagClick } = opts
 
   const editor = new Editor({
     element: parent,
@@ -84,11 +96,12 @@ export function createEditor(opts: EditorOptions): Editor {
       PasteHandlerExtension,
       AutoCloseExtension,
       MultiCursorExtension,
-      WikiLinkExtension,
-      TagExtension,
+      WikiLinkExtension.configure({ onClickLink: onWikiLinkClick }),
+      TagExtension.configure({ onClickTag: onTagClick }),
       TypewriterScrollExtension.configure({ enabled: false }),
       FocusModeExtension.configure({ enabled: false }),
       UndoTreeExtension,
+      MermaidExtension,
     ],
     content,
     editorProps: {
@@ -119,10 +132,35 @@ export function getMarkdown(editor: Editor): string {
 }
 
 export function setContent(editor: Editor, markdown: string): void {
-  if (editor.markdown) {
-    const jsonContent = editor.markdown.parse(markdown)
-    editor.commands.setContent(jsonContent)
-  } else {
-    editor.commands.setContent(markdown)
+  // The `@tiptap/markdown` v3 API has bounced between
+  // `editor.markdown.parse(md)` and
+  // `editor.storage.markdown.parser.parse(md)`. Try the documented
+  // shape first, fall back to the storage path, and finally to
+  // `commands.setContent` which the editor will treat as HTML —
+  // not what we want for markdown, but at least non-empty.
+  try {
+    const parser = (editor.markdown as { parse?: (md: string) => unknown })?.parse
+      ?? (editor.storage as Record<string, unknown>)?.markdown
+        ? (editor.storage as { markdown?: { parser?: { parse?: (md: string) => unknown } } })
+            .markdown?.parser?.parse
+        : undefined
+    if (typeof parser === 'function') {
+      const parsed = parser.call(
+        (editor.storage as { markdown?: { parser?: unknown } })?.markdown?.parser
+          ?? editor.markdown,
+        markdown,
+      )
+      editor.commands.setContent(parsed as object)
+      return
+    }
+  } catch (err) {
+    // Fall through to last-resort path below. We log so a missing
+    // or moved parser doesn't silently degrade to HTML rendering.
+    console.error('[editor] markdown parse failed, falling back:', err)
   }
+  // Last resort: hand the markdown string to `setContent`. Tiptap
+  // will parse it as HTML — wrong, but the editor stays open and
+  // the user can correct manually. Better than a blank screen.
+  console.warn('[editor] no markdown parser found; treating content as HTML')
+  editor.commands.setContent(markdown)
 }

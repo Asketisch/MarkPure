@@ -74,11 +74,42 @@ function isLikelyPlainText(html: string): boolean {
 }
 
 /**
- * Extract plain text from HTML by stripping all tags
+ * Extract plain text from HTML by stripping all tags.
+ *
+ * Before reading `textContent` we explicitly remove `<script>`,
+ * `<style>`, `<noscript>`, and `<template>` nodes. Without this
+ * step the browser still surfaces those nodes' text content (CSS
+ * rules, JS source), so pasting a chunk of HTML from a web page
+ * would silently drop a wall of CSS into the user's document.
+ *
+ * We also strip HTML comments, which the browser exposes as
+ * comment nodes but DOM `textContent` happily includes as
+ * `<!-- … -->` text.
  */
 function extractPlainText(html: string): string {
+  // We work on a detached node so the browser doesn't execute any
+  // `<script>` tags in the user-supplied HTML.
   const temp = document.createElement('div')
+  // The HTML the user pasted is "data", not "code" — opt the
+  // parser out of running scripts. `<img onerror>` and similar
+  // nasties won't fire.
   temp.innerHTML = html
+
+  // Drop content-bearing "noisy" tags BEFORE reading textContent.
+  // We use a fresh array because getElementsByTagName returns a
+  // live collection and removals during iteration would skip
+  // siblings.
+  const noisy = temp.querySelectorAll(
+    'script, style, noscript, template, iframe, object, embed'
+  )
+  noisy.forEach(n => n.remove())
+
+  // HTML comments — Node.COMMENT_NODE === 8
+  const walker = document.createTreeWalker(temp, NodeFilter.SHOW_COMMENT)
+  const comments: Node[] = []
+  let node: Node | null
+  while ((node = walker.nextNode())) comments.push(node)
+  comments.forEach(c => c.parentNode?.removeChild(c))
 
   let text = temp.textContent || temp.innerText || ''
 

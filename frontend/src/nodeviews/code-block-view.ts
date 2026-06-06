@@ -64,7 +64,12 @@ export class CodeBlockView implements NodeView {
   node: PMNode
   view: PMView
   getPos: () => number | undefined
-  updating = false
+  // Generation counter for "we are mid PM→CM sync". See `onCMUpdate`
+  // for why this is a number rather than a boolean. The host
+  // increments at the start of a PM→CM dispatch and decrements
+  // inside a microtask so the flag stays set across one round of
+  // CM's async update listener callbacks.
+  private updating = 0
   languageCompartment: Compartment
   themeCompartment: Compartment
 
@@ -111,6 +116,43 @@ export class CodeBlockView implements NodeView {
       this.languageCompartment.reconfigure(getLanguageExtension(normalizeLanguage(newLang)))
     })
     header.appendChild(langSelect)
+
+    // Copy button. We use the legacy `execCommand('copy')` path
+    // because the modern Clipboard API is async + permission-
+    // gated, and code blocks are frequently read by external
+    // paste targets that don't prompt for permission. The
+    // hidden-textarea trick below is the standard fallback.
+    const copyBtn = document.createElement('button')
+    copyBtn.className = 'mw-code-block-copy'
+    copyBtn.type = 'button'
+    copyBtn.title = 'Copy code'
+    copyBtn.setAttribute('aria-label', 'Copy code')
+    copyBtn.textContent = 'Copy'
+    copyBtn.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const text = this.node.textContent
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      try {
+        document.execCommand('copy')
+        copyBtn.textContent = 'Copied'
+        copyBtn.classList.add('mw-code-block-copy-ok')
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy'
+          copyBtn.classList.remove('mw-code-block-copy-ok')
+        }, 1200)
+      } catch (err) {
+        console.error('[CodeBlock] copy failed:', err)
+      } finally {
+        document.body.removeChild(ta)
+      }
+    })
+    header.appendChild(copyBtn)
     this.dom.appendChild(header)
 
     // CM container
@@ -176,7 +218,16 @@ export class CodeBlockView implements NodeView {
   }
 
   private onCMUpdate(update: any): void {
-    if (this.updating) return
+    // `updating` is a *generation counter* rather than a boolean.
+    // ProseMirror's `update(node)` is called synchronously, but
+    // CodeMirror's `updateListener` fires asynchronously on the
+    // next microtask. A boolean set to `true` then `false` around
+    // `cm.dispatch` is racy: a second PM `update` call can land
+    // after `updating = false` but before our CM listener runs,
+    // and the listener then echoes stale content back into PM,
+    // which can loop. The counter — incremented at the start of
+    // PM→CM sync and checked at CM→PM sync — closes that hole.
+    if (this.updating !== 0) return
     if (!update.docChanged) return
 
     const pos = this.getPos()
@@ -231,7 +282,7 @@ export class CodeBlockView implements NodeView {
   update(node: PMNode): boolean {
     if (node.type !== this.node.type) return false
     this.node = node
-    this.updating = true
+    this.updating += 1
     const content = node.textContent
     if (this.cm.state.doc.toString() !== content) {
       this.cm.dispatch({
@@ -241,7 +292,13 @@ export class CodeBlockView implements NodeView {
     // Update language if changed
     const lang = normalizeLanguage(node.attrs.language ?? '')
     this.languageCompartment.reconfigure(getLanguageExtension(lang))
-    this.updating = false
+    // Defer decrementing `updating` to a microtask so any
+    // synchronous PM→CM dispatches that ran above have their
+    // CM listener fire *after* we drop the flag, but the queued
+    // microtask still holds the flag for the current call stack.
+    // This eliminates the "stale echo" loop the previous
+    // synchronous set/clear had.
+    queueMicrotask(() => { this.updating = Math.max(0, this.updating - 1) })
     return true
   }
 
