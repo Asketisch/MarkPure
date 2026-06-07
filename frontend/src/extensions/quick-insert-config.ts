@@ -131,6 +131,30 @@ export const quickInsertItems: QuickInsertItem[] = [
     icon: '∑',
     action: (c) => c.insertContent({ type: 'mathDisplay' }),
   },
+  {
+    title: 'Mermaid Diagram',
+    subtitle: 'graph TD\n  A --> B',
+    label: 'mermaid',
+    category: 'Advanced',
+    icon: '◇',
+    action: (c) => c.insertMermaid(),
+  },
+  {
+    title: 'Table of Contents',
+    subtitle: '<!-- TOC -->',
+    label: 'toc',
+    category: 'Advanced',
+    icon: '☰',
+    action: (c) => c.insertToc(),
+  },
+  {
+    title: 'Footnote Reference',
+    subtitle: '[^id]',
+    label: 'footnote_ref',
+    category: 'Advanced',
+    icon: '¹',
+    action: (c) => c.insertFootnoteRef?.() ?? c.insertContent('[^1]'),
+  },
 
   // Lists
   {

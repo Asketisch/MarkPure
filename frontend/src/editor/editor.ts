@@ -14,6 +14,9 @@ import { Highlight } from '@tiptap/extension-highlight'
 import { SearchExtension } from '../extensions/editing/search-extension'
 import { CodeBlockCMExtension } from '../extensions/blocks/code-block-cm-extension'
 import { MathExtension } from '../extensions/blocks/math-extension'
+import { HeadingIdExtension } from '../extensions/blocks/heading-id-extension'
+import { TocExtension } from '../extensions/blocks/toc-extension'
+import { FootnoteRefExtension } from '../extensions/blocks/footnote-extension'
 import { InstantRenderExtension } from '../extensions/view/instant-render-extension'
 import { QuickInsertExtension } from '../extensions/blocks/quick-insert-extension'
 import { DropHandlerExtension } from '../extensions/blocks/drop-handler-extension'
@@ -71,7 +74,12 @@ export function createEditor(opts: EditorOptions): Editor {
       Markdown.configure({
         // Note: transformPastedText and transformCopiedText options removed -
         // they may not exist in this version of @tiptap/markdown
-        extensions: [Table],
+        // The Mermaid extension is listed here (in addition to being in the
+        // top-level extensions list) so that the @tiptap/markdown round-trip
+        // picks up its `markdownTokenizer` / `parseMarkdown` / `renderMarkdown`
+        // hooks. It owns its own `mermaid` token type to avoid racing with
+        // StarterKit's CodeBlock.
+        extensions: [Table, MermaidExtension],
       }),
       Table.configure({ resizable: true }),
       TableRow,
@@ -85,6 +93,9 @@ export function createEditor(opts: EditorOptions): Editor {
       Highlight,
       CodeBlockCMExtension,
       MathExtension,
+      HeadingIdExtension,
+      TocExtension,
+      FootnoteRefExtension,
       InstantRenderExtension,
       QuickInsertExtension,
       SearchExtension,

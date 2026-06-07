@@ -1,24 +1,20 @@
-//! Pandoc-style Markdown extensions
+//! Pandoc-style Markdown extensions (non-footnote parts).
 //!
-//! Provides parsing and rendering for extended Markdown features
-//! not part of standard CommonMark but supported by Pandoc.
+//! Footnote parsing/rendering lives in `footnote.rs` and is driven
+//! by the pulldown-cmark event stream (with `ENABLE_FOOTNOTES`),
+//! so it stays consistent with the round-trip HTML we emit from
+//! `to_html`.
+//!
+//! This module retains the parts that are still useful:
+//!   - Definition lists (Pandoc's term + indented definition form)
+//!   - Task list items with `[/!!/!!!]` priority markers
+//!   - Example numbering markers
+//!   - Raw HTML block detection (used by tools like the asset
+//!     rewriter that need to know which blocks to leave alone).
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-/// A footnote definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Footnote {
-    /// Footnote identifier (e.g., "1", "note-1")
-    pub id: String,
-    /// The footnote text content
-    pub content: String,
-    /// Position in document (character offset)
-    pub position: usize,
-    /// Line number where defined
-    pub line_number: usize,
-}
 
 /// A definition list item
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,10 +44,14 @@ impl Default for ExtendedCellAlign {
     }
 }
 
-/// Parsed extensions result
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Parsed extensions result. Kept for API compatibility — the
+/// footnote field is now always empty (footnote parsing lives in
+/// `footnote.rs`); callers should use `footnote::render_footnote_section`
+/// instead.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ParsedExtensions {
-    pub footnotes: HashMap<String, Footnote>,
+    #[serde(default)]
+    pub footnotes: HashMap<String, ()>,
     pub definition_lists: Vec<DefinitionItem>,
     pub task_items: Vec<TaskItem>,
 }
@@ -92,84 +92,6 @@ pub struct RawHtmlBlock {
     pub content: String,
     pub position: usize,
     pub line_number: usize,
-}
-
-/// Find all footnotes in content
-pub fn parse_footnotes(content: &str) -> HashMap<String, Footnote> {
-    let mut footnotes: HashMap<String, Footnote> = HashMap::new();
-
-    // Pandoc footnote syntax: [^1] for reference, [^1]: for definition
-    // Also supports: ^[inline footnote]
-
-    // Find inline footnotes: ^[...]
-    let inline_regex = Regex::new(r"\^\[([^\]]+)\]").unwrap();
-
-    for (pos, m) in inline_regex.find_iter(content).enumerate() {
-        let id = format!("i{}", pos);
-        footnotes.insert(id.clone(), Footnote {
-            id,
-            content: m.as_str()[2..m.as_str().len()-1].to_string(),
-            position: m.start(),
-            line_number: content[..m.start()].chars().filter(|&c| c == '\n').count() + 1,
-        });
-    }
-
-    // Find reference footnotes: [^id] and [^id]:
-    let def_regex = Regex::new(r"\[\^([^\]]+)\]:\s*(.+)").unwrap();
-
-    // Find definitions
-    for caps in def_regex.captures_iter(content) {
-        let id = caps.get(1).map(|m| m.as_str()).unwrap_or_default().to_string();
-        let def_content = caps.get(2).map(|m| m.as_str()).unwrap_or_default().trim().to_string();
-
-        // Skip if this looks like a reference (not a definition)
-        if def_content.starts_with('^') || def_content.is_empty() {
-            continue;
-        }
-
-        let position = caps.get(0).map(|m| m.start()).unwrap_or(0);
-        footnotes.insert(id.clone(), Footnote {
-            id,
-            content: def_content,
-            position,
-            line_number: content[..position].chars().filter(|&c| c == '\n').count() + 1,
-        });
-    }
-
-    footnotes
-}
-
-/// Render a footnote reference as HTML
-pub fn render_footnote_ref(id: &str, text: &str, footnotes: &HashMap<String, Footnote>) -> String {
-    if footnotes.contains_key(id) {
-        // Find the actual footnote number
-        let number = footnotes.keys()
-            .position(|k| k == id)
-            .map(|n| n + 1)
-            .unwrap_or(1);
-        format!(r##"<sup class="footnote-ref"><a href="#fn-{id}" id="fnref-{id}">[{number}]</a></sup>"##)
-    } else {
-        // Inline footnote - render as superscript with the content
-        format!(r##"<sup class="footnote-ref"><a href="#fn-{id}" id="fnref-{id}">{text}</a></sup>"##)
-    }
-}
-
-/// Get all footnote references in content (without definitions)
-pub fn get_footnote_references(content: &str) -> Vec<(String, usize, usize)> {
-    let mut refs: Vec<(String, usize, usize)> = Vec::new();
-
-    // Skip definition patterns (followed by colon)
-    let ref_regex = Regex::new(r"\[\^([^\]]+)\](?!:)").unwrap();
-
-    for m in ref_regex.find_iter(content) {
-        if let Some(id_cap) = m.as_str().strip_prefix(r"[\^") {
-            if let Some(id) = id_cap.strip_suffix(']') {
-                refs.push((id.to_string(), m.start(), m.end()));
-            }
-        }
-    }
-
-    refs
 }
 
 /// Parse definition lists
@@ -330,7 +252,7 @@ pub fn parse_raw_html_blocks(content: &str) -> Vec<RawHtmlBlock> {
     while i < lines.len() {
         let line = lines[i].trim();
 
-        // Check for block-level HTML tag
+        // Check if line looks like a block-level HTML tag
         let is_html_block = block_tags.iter().any(|tag| {
             line.starts_with(&format!("<{}", tag))
                 || line.starts_with(&format!("</{}", tag))
@@ -377,7 +299,7 @@ pub fn parse_raw_html_blocks(content: &str) -> Vec<RawHtmlBlock> {
 /// Parse all extended Markdown features
 pub fn parse_markdown_extensions(content: &str) -> ParsedExtensions {
     ParsedExtensions {
-        footnotes: parse_footnotes(content),
+        footnotes: HashMap::new(),
         definition_lists: parse_definition_list(content),
         task_items: parse_task_items(content),
     }
@@ -398,26 +320,6 @@ pub fn render_definition_list_html(items: &[DefinitionItem]) -> String {
     html
 }
 
-/// Render footnotes as HTML
-pub fn render_footnotes_html(footnotes: &HashMap<String, Footnote>) -> String {
-    if footnotes.is_empty() {
-        return String::new();
-    }
-
-    let mut html = String::from("<section class=\"footnotes\">\n<hr>\n<ol>\n");
-
-    for (_i, (_, footnote)) in footnotes.iter().enumerate() {
-        html.push_str(&format!(
-            r##"<li id="fn-{fid}">{content}<a href="#fnref-{fid}">&#8617;</a></li>"##,
-            fid = footnote.id,
-            content = escape_html(&footnote.content)
-        ));
-    }
-
-    html.push_str("</ol>\n</section>\n");
-    html
-}
-
 /// Escape HTML special characters
 fn escape_html(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -429,14 +331,6 @@ fn escape_html(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_parse_inline_footnote() {
-        // Inline footnote syntax: ^[...]
-        let content = "This is text with a footnote ^[inline content].";
-        let footnotes = parse_footnotes(content);
-        assert_eq!(footnotes.len(), 1);
-    }
 
     #[test]
     fn test_parse_definition_list() {

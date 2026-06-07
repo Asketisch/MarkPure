@@ -1,19 +1,24 @@
-use markdown::parser::to_html;
+use markdown::to_html_with_diagrams_and_footnotes;
 
 /// Export markdown text to a standalone HTML document.
 ///
-/// The body is the result of `markdown::parser::to_html` — which may
-/// preserve raw HTML in the markdown source. We do NOT double-escape
-/// the body (that would render literal `&lt;h1&gt;` text), but we do
-/// strip any `<script>`/`<style>`/`<iframe>`/`<object>`/`<embed>` content
-/// as defense in depth, and we ship a CSP meta tag that disables
-/// inline scripts and remote script sources.
+/// The body is the result of `markdown::to_html_with_diagrams_and_footnotes`
+/// — which pre-renders any ` ```mermaid ` code blocks into inline SVG,
+/// rewrites `[^id]` footnote references to `<sup class="footnote-ref">`,
+/// and appends a `<section class="footnotes">` block at the end of the
+/// document. If the Mermaid CLI is unavailable, the blocks fall back to
+/// a styled `<pre class="mermaid-fallback">` showing the source plus
+/// an error message. Non-mermaid raw HTML in the source may pass through;
+/// we do NOT double-escape the body (that would render literal
+/// `&lt;h1&gt;` text), but we do strip any `<script>`/`<style>`/`<iframe>`/
+/// `<object>`/`<embed>` content as defense in depth, and we ship a CSP
+/// meta tag that disables inline scripts and remote script sources.
 pub fn export_html(
     markdown: &str,
     title: &str,
     theme_css: Option<&str>,
 ) -> String {
-    let raw_body = to_html(markdown);
+    let raw_body = to_html_with_diagrams_and_footnotes(markdown);
     let body = sanitize_body(&raw_body);
 
     let theme = theme_css.unwrap_or(DEFAULT_CSS);
@@ -222,6 +227,22 @@ body {
 .markdown-body th, .markdown-body td { border: 1px solid #dfe2e5; padding: 6px 13px; }
 .markdown-body tr:nth-child(even) { background: #f6f8fa; }
 .markdown-body img { max-width: 100%; }
+.markdown-body .mermaid { text-align: center; margin: 1em 0; }
+.markdown-body .mermaid svg { max-width: 100%; height: auto; }
+.markdown-body .mermaid-fallback {
+    background: #f6f8fa; padding: 16px; border-radius: 6px;
+    font-family: monospace; color: #6a737d;
+}
+.markdown-body .mermaid-error { color: #b00; margin-top: 8px; font-size: 0.9em; }
+.markdown-body .footnote-ref { color: var(--accent); }
+.markdown-body .footnote-ref a { text-decoration: none; }
+.markdown-body .footnotes { margin-top: 2em; font-size: 0.9em; color: #555; }
+.markdown-body .footnotes ol { padding-left: 1.5em; }
+.markdown-body .footnotes li { margin: 4px 0; }
+.markdown-body .footnotes .footnote-back {
+    margin-left: 4px;
+    text-decoration: none;
+}
 "#;
 
 #[cfg(test)]

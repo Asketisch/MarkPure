@@ -692,6 +692,51 @@ html, body, #app {
 }
 
 
+/* TOC block (live) */
+.toc-block {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary, transparent);
+}
+
+.toc-block .toc-empty {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.toc-block .toc-list,
+.toc-block ul.toc-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.toc-block .toc-list ul.toc-list {
+  padding-left: 16px;
+}
+
+.toc-block .toc-item {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 2px 0;
+}
+
+.toc-block .toc-link {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.toc-block .toc-link:hover {
+  background: var(--menu-hover-bg);
+  color: var(--menu-hover-text);
+}
+
 /* Mermaid diagram block */
 .mermaid-block {
   margin: 16px 0;
@@ -935,7 +980,7 @@ html, body, #app {
 
 .dropdown-submenu-content {
   position: absolute;
-  right: 100%;
+  left: 100%;
   top: 0;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -1088,4 +1133,14 @@ html, body, #app {
 .context-menu button:hover {
   background: var(--menu-hover-bg);
   color: var(--menu-hover-text);
+}
+
+/* Footnote reference (editor view) */
+.footnote-ref {
+  color: var(--accent, #409eff);
+  cursor: pointer;
+  font-weight: 500;
+}
+.footnote-ref:hover {
+  text-decoration: underline;
 }

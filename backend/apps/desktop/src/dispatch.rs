@@ -104,10 +104,6 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         // Spell check
         "check_spelling" => editor_ops::cmd_check_spelling(&msg.params),
 
-        // Mermaid
-        "validate_mermaid" => editor_ops::cmd_validate_mermaid(&msg.params),
-        "render_mermaid" => editor_ops::cmd_render_mermaid(&msg.params),
-
         // Frontmatter
         "parse_frontmatter" => editor_ops::cmd_parse_frontmatter(&msg.params),
         "update_frontmatter_field" => editor_ops::cmd_update_frontmatter_field(&msg.params),

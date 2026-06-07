@@ -71,5 +71,6 @@ export const commandCatalog: CommandDef[] = [
   { id: 'insert.mermaid', title: 'Insert Mermaid Diagram', category: 'Insert', keywords: ['diagram', 'chart'] },
   { id: 'insert.frontmatter', title: 'Insert YAML Frontmatter', category: 'Insert', keywords: ['metadata', 'header'] },
   { id: 'insert.toc', title: 'Insert Table of Contents', category: 'Insert', keywords: ['outline', 'navigation'] },
+  { id: 'insert.footnote_ref', title: 'Insert Footnote Reference', category: 'Insert', keywords: ['reference', 'note', 'cite'] },
   { id: 'insert.fold', title: 'Fold Section', category: 'Insert' },
 ]

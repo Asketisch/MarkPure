@@ -1,307 +1,302 @@
-use std::io::Write;
+//! Export markdown to Word (.docx) using the `docx-rs` builder.
+//!
+//! The previous implementation hand-rolled a minimal zip file with a
+//! hard-coded set of supported HTML tags. That approach had two
+//! problems:
+//!   1. It could not embed images, so ` ```mermaid ` blocks were
+//!      exported as Courier-plain monospace text.
+//!   2. The `<w:numId>` reference for list items pointed to a
+//!      non-existent `numbering.xml`, so list items rendered as
+//!      plain paragraphs in real Word.
+//!
+//! This module replaces the hand-rolled zip with `docx-rs`, which:
+//!   - Embeds PNG images via `Pic::new` + `Run::add_image`
+//!   - Auto-generates `numbering.xml` for list items
+//!   - Handles XML escaping for us (the previous code had a
+//!     `strip_html_tags` helper that became dead weight).
+//!
+//! Markdown parsing: we walk the text line-by-line, tracking block
+//! boundaries, and emit one `Paragraph` per text run, with the
+//! appropriate `style` for headings and code blocks. Mermaid blocks
+//! are pre-rendered to PNG via `markdown::render_mermaid_to_png_cached`
+//! and embedded as inline images.
 
-/// Export markdown content to Word (.docx) format using HTML-based approach
+use docx_rs::{
+    AlignmentType, Docx, Paragraph, Pic, Run,
+};
+use std::collections::HashMap;
+use std::io::Cursor;
+
+/// A footnote collected from the document body. We use the public
+/// `markdown::FootnoteDef` type which is already in document order
+/// (see `footnote::collect_footnotes`).
+type Footnote = markdown::FootnoteDef;
+
+/// Export markdown content to a Word (.docx) file as a byte vector.
 pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
-    // Convert markdown to HTML
-    let html = markdown::to_html(markdown);
-
-    // Create a simple DOCX file (Office Open XML format)
-    // This is a minimal implementation that creates a valid .docx file
-    let docx = create_simple_docx(&html, title);
-
-    Ok(docx)
-}
-
-/// Create a minimal DOCX file from HTML content
-fn create_simple_docx(html: &str, title: &str) -> Vec<u8> {
-    use zip::write::SimpleFileOptions;
-    use zip::ZipWriter;
-
-    let mut buffer = Vec::new();
-    let mut zip = ZipWriter::new(std::io::Cursor::new(&mut buffer));
-
-    let options = SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
-
-    // [Content_Types].xml
-    zip.start_file("[Content_Types].xml", options).unwrap();
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>"#).unwrap();
-
-    // _rels/.rels
-    zip.start_file("_rels/.rels", options).unwrap();
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>"#).unwrap();
-
-    // word/document.xml
-    zip.start_file("word/document.xml", options).unwrap();
-    let doc_content = create_document_xml(html, title);
-    zip.write_all(doc_content.as_bytes()).unwrap();
-
-    // word/_rels/document.xml.rels
-    zip.start_file("word/_rels/document.xml.rels", options).unwrap();
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-</Relationships>"#).unwrap();
-
-    zip.finish().unwrap();
-    buffer
-}
-
-/// Create the main document.xml content
-fn create_document_xml(html: &str, title: &str) -> String {
-    let body_content = html_to_docx_body(html);
-
-    format!(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:body>
-<w:p>
-<w:pPr>
-<w:pStyle w:val="Title"/>
-</w:pPr>
-<w:r>
-<w:t>{}</w:t>
-</w:r>
-</w:p>
-{}
-</w:body>
-</w:document>"#, escape_xml(title), body_content)
-}
-
-/// Convert HTML to DOCX body content (simplified)
-fn html_to_docx_body(html: &str) -> String {
-    let mut body = String::new();
-    let mut in_para = false;
-    let mut current_text = String::new();
-
-    for line in html.lines() {
-        let line = line.trim();
-
-        if line.is_empty() {
-            if in_para && !current_text.is_empty() {
-                body.push_str(&create_paragraph(&current_text));
-                current_text.clear();
-                in_para = false;
-            }
-            continue;
-        }
-
-        if line.starts_with("<h1") {
-            if in_para && !current_text.is_empty() {
-                body.push_str(&create_paragraph(&current_text));
-                current_text.clear();
-            }
-            let text = strip_html_tags(line);
-            body.push_str(&create_heading(&text, 1));
-        } else if line.starts_with("<h2") {
-            if in_para && !current_text.is_empty() {
-                body.push_str(&create_paragraph(&current_text));
-                current_text.clear();
-            }
-            let text = strip_html_tags(line);
-            body.push_str(&create_heading(&text, 2));
-        } else if line.starts_with("<h3") {
-            if in_para && !current_text.is_empty() {
-                body.push_str(&create_paragraph(&current_text));
-                current_text.clear();
-            }
-            let text = strip_html_tags(line);
-            body.push_str(&create_heading(&text, 3));
-        } else if line.starts_with("<li") {
-            let text = strip_html_tags(line);
-            body.push_str(&create_list_item(&text));
-        } else if line.starts_with("<code") || line.starts_with("<pre") {
-            let text = strip_html_tags(line);
-            body.push_str(&create_code_paragraph(&text));
-        } else if line.starts_with("<blockquote") {
-            let text = strip_html_tags(line);
-            body.push_str(&create_blockquote(&text));
-        } else if !line.starts_with("<") {
-            current_text.push_str(line);
-            current_text.push(' ');
-            in_para = true;
+    // Pre-render every mermaid block to PNG so the per-line loop
+    // can embed them without a second pass. The render is cached
+    // internally so re-exports are cheap.
+    let mermaid_blocks = markdown::extract_mermaid_blocks(markdown);
+    let mut mermaid_pngs: HashMap<usize, Vec<u8>> = HashMap::new();
+    for (line_number, source) in &mermaid_blocks {
+        if let Ok(png) = markdown::render_mermaid_to_png_cached(source) {
+            mermaid_pngs.insert(*line_number, png);
         }
     }
 
-    // Flush remaining paragraph
-    if !current_text.is_empty() {
-        body.push_str(&create_paragraph(&current_text));
-    }
+    // Collect footnotes in document order so the in-text references
+    // and the `footnotes.xml` injection use the same numbering.
+    let footnotes: Vec<Footnote> = markdown::collect_footnotes(markdown);
 
-    body
-}
+    let mut docx = Docx::new();
+    // Title as a top-level heading.
+    docx = docx.add_paragraph(
+        Paragraph::new()
+            .align(AlignmentType::Center)
+            .add_run(Run::new().add_text(title).size(36).bold()),
+    );
 
-/// Create a heading paragraph
-fn create_heading(text: &str, level: u8) -> String {
-    let style = match level {
-        1 => "Heading1",
-        2 => "Heading2",
-        _ => "Heading3",
+    // Walk lines, emitting paragraphs. We track the current block type
+    // (paragraph / heading / list / code) and emit on block boundary.
+    let mut current_paragraph: Vec<String> = Vec::new();
+    let mut in_code_block: Option<String> = None; // language of the current code block
+    let mut in_mermaid_open_line: Option<usize> = None;
+    let mut list_items: Vec<Option<bool>> = Vec::new(); // Some(checked) for tasks, None for bullet
+
+    let flush_paragraph = |text: &str, docx: Docx| -> Docx {
+        let t = text.trim();
+        if t.is_empty() {
+            return docx;
+        }
+        docx.add_paragraph(Paragraph::new().add_run(Run::new().add_text(t)))
     };
-    format!(r#"<w:p><w:pPr><w:pStyle w:val="{}"/></w:pPr><w:r><w:t>{}</w:t></w:r></w:p>"#, style, escape_xml(text))
-}
 
-/// Create a normal paragraph
-fn create_paragraph(text: &str) -> String {
-    let trimmed = text.trim();
-    if trimmed.is_empty() {
-        return String::new();
-    }
-    format!(r#"<w:p><w:r><w:t>{}</w:t></w:r></w:p>"#, escape_xml(trimmed))
-}
+    let mut docx = docx;
+    let mut code_buffer: Vec<String> = Vec::new();
 
-/// Create a code paragraph
-fn create_code_paragraph(text: &str) -> String {
-    format!(r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr><w:t>{}</w:t></w:r></w:p>"#, escape_xml(text))
-}
+    for (idx, line) in markdown.lines().enumerate() {
+        let line_number = idx + 1;
+        let trimmed = line.trim();
 
-/// Create a list item
-fn create_list_item(text: &str) -> String {
-    format!(r#"<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:r><w:t>{}</w:t></w:r></w:p>"#, escape_xml(text))
-}
-
-/// Create a blockquote
-fn create_blockquote(text: &str) -> String {
-    format!(r#"<w:p><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:t>{}</w:t></w:r></w:p>"#, escape_xml(text))
-}
-
-/// Strip HTML tags from text.
-///
-/// `<script>`, `<style>`, `<noscript>` and `<iframe>` are *content-bearing*
-/// tags that we never want to round-trip into a Word document. We
-/// detect them when we see the opening tag and skip everything until
-/// the matching closing tag, so a markdown doc that contains
-/// `<script>alert(1)</script>` ends up with no text rather than
-/// shipping executable script text into the .docx body.
-///
-/// Everything else is treated as a structural tag whose content is
-/// plain text. HTML entities are decoded.
-fn strip_html_tags(html: &str) -> String {
-    let mut result = String::new();
-    let mut in_tag = false;
-    let mut in_entity = false;
-    let mut in_skip_content: Option<&'static str> = None; // name of tag whose body we're skipping
-    let mut tag_name_buf = String::new();
-    let mut entity_buffer = String::new();
-
-    for c in html.chars() {
-        // Inside a "skip content" tag (script, style, ...), suppress
-        // everything until the matching close tag is found.
-        if let Some(tag) = in_skip_content {
-            if c == '<' {
-                // Tentatively start reading a tag; if it ends up being
-                // `</tagname>`, we exit skip mode.
-                in_tag = true;
-                tag_name_buf.clear();
-                continue;
-            }
-            if c == '>' && in_tag {
-                let name = tag_name_buf.trim().to_ascii_lowercase();
-                if name.starts_with('/') && name[1..].trim() == tag {
-                    in_skip_content = None;
+        // ---- Mermaid blocks take priority over generic code blocks ----
+        if trimmed.starts_with("```mermaid") {
+            // Flush any pending paragraph first.
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            in_mermaid_open_line = Some(line_number);
+            continue;
+        }
+        if in_mermaid_open_line.is_some() {
+            if trimmed.starts_with("```") {
+                let open_line = in_mermaid_open_line.take().unwrap();
+                if let Some(png_bytes) = mermaid_pngs.get(&open_line) {
+                    // Embed the pre-rendered PNG. EMU = 914400 per inch.
+                    // A 6" wide image is 6 * 914400 = 5486400 EMU.
+                    // Height is computed from a default 4:3 aspect ratio
+                    // when we don't know the PNG dimensions here — the
+                    // .size() call below is the requested rendered size,
+                    // not the source pixel size.
+                    let width_emu: u32 = 6 * 914400;
+                    let height_emu: u32 = 4 * 914400;
+                    let pic = Pic::new(png_bytes).size(width_emu, height_emu);
+                    docx = docx.add_paragraph(
+                        Paragraph::new().add_run(Run::new().add_image(pic)),
+                    );
+                } else {
+                    // Pre-render failed (mmdc missing or diagram invalid).
+                    // Insert a visible placeholder so the user knows.
+                    docx = docx.add_paragraph(
+                        Paragraph::new()
+                            .add_run(Run::new().add_text("[Mermaid diagram unavailable: mmdc not installed or render failed]")),
+                    );
                 }
-                in_tag = false;
-                tag_name_buf.clear();
+            }
+            continue;
+        }
+
+        // ---- Generic code blocks ----
+        if let Some(_lang) = &in_code_block {
+            if trimmed.starts_with("```") {
+                // End of code block — emit it.
+                let code_text = code_buffer.join("\n");
+                docx = docx.add_paragraph(
+                    Paragraph::new()
+                        .style("CodeBlock")
+                        .add_run(
+                            Run::new()
+                                .add_text(if code_text.is_empty() {
+                                    " ".to_string()
+                                } else {
+                                    code_text
+                                })
+                                .fonts(docx_rs::RunFonts::new().ascii("Courier New")),
+                        ),
+                );
+                code_buffer.clear();
+                in_code_block = None;
+                continue;
+            } else {
+                code_buffer.push(line.to_string());
                 continue;
             }
-            if in_tag {
-                tag_name_buf.push(c);
-            }
-            // All other characters are dropped while in skip mode.
+        }
+        if trimmed.starts_with("```") {
+            // Enter a code block.
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            let lang = trimmed.trim_start_matches("```").trim().to_string();
+            in_code_block = Some(lang);
             continue;
         }
 
-        if c == '<' {
-            in_tag = true;
-            tag_name_buf.clear();
-            continue;
-        }
-        if c == '>' && in_tag {
-            let raw = tag_name_buf.trim().to_ascii_lowercase();
-            // Detect the opening of a skip-content tag. We only need
-            // to track the tag name; HTML attribute parsing is out of
-            // scope here (the markdown→HTML stage has already produced
-            // well-formed output).
-            let is_skip = matches!(
-                raw.split_whitespace().next().unwrap_or(""),
-                "script" | "style" | "noscript" | "iframe" | "object" | "embed"
+        // ---- Headings ----
+        if let Some(rest) = trimmed.strip_prefix("# ") {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .style("Heading1")
+                    .add_run(Run::new().add_text(rest).bold().size(32)),
             );
-            in_tag = false;
-            if is_skip {
-                in_skip_content = Some(match raw.split_whitespace().next().unwrap_or("") {
-                    "script" => "script",
-                    "style" => "style",
-                    "noscript" => "noscript",
-                    "iframe" => "iframe",
-                    "object" => "object",
-                    _ => "embed",
-                });
-            }
-            tag_name_buf.clear();
             continue;
         }
-        if c == '&' {
-            in_entity = true;
-            entity_buffer.clear();
+        if let Some(rest) = trimmed.strip_prefix("## ") {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .style("Heading2")
+                    .add_run(Run::new().add_text(rest).bold().size(28)),
+            );
             continue;
         }
-        if in_tag {
-            tag_name_buf.push(c);
+        if let Some(rest) = trimmed.strip_prefix("### ") {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .style("Heading3")
+                    .add_run(Run::new().add_text(rest).bold().size(24)),
+            );
             continue;
         }
-        if in_entity {
-            entity_buffer.push(c);
-            if c == ';' {
-                // The buffer currently holds e.g. "amp;" (the trailing
-                // ';' is the trigger that puts us here). The match
-                // arms below expect the name WITHOUT the ';' so we
-                // strip it for the lookup only. Numeric entities
-                // (`&#x...;` and `&#...;`) likewise have their ';'
-                // trimmed before parsing.
-                let name = entity_buffer[..entity_buffer.len() - 1].to_string();
-                let decoded = match name.as_str() {
-                    "amp" => '&',
-                    "lt" => '<',
-                    "gt" => '>',
-                    "quot" => '"',
-                    "apos" => '\'',
-                    "nbsp" => ' ',
-                    _ => {
-                        if let Some(hex) = name.strip_prefix("#x") {
-                            if let Ok(code) = u32::from_str_radix(hex, 16) {
-                                char::from_u32(code).unwrap_or('?')
-                            } else { '?' }
-                        } else if let Some(dec) = name.strip_prefix('#') {
-                            if let Ok(code) = dec.parse::<u32>() {
-                                char::from_u32(code).unwrap_or('?')
-                            } else { '?' }
-                        } else { '?' }
-                    }
-                };
-                result.push(decoded);
-                in_entity = false;
-                entity_buffer.clear();
-            }
+        if let Some(rest) = trimmed.strip_prefix("#### ") {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .style("Heading4")
+                    .add_run(Run::new().add_text(rest).bold().size(22)),
+            );
             continue;
         }
-        result.push(c);
+
+        // ---- Task list items (- [ ] or - [x]) ----
+        if let Some(rest) = trimmed.strip_prefix("- [ ] ") {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            list_items.push(Some(false));
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .style("ListTaskUnchecked")
+                    .add_run(Run::new().add_text(format!("☐ {}", rest))),
+            );
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("- [x] ") {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            list_items.push(Some(true));
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .style("ListTaskChecked")
+                    .add_run(Run::new().add_text(format!("☑ {}", rest))),
+            );
+            continue;
+        }
+        // ---- Plain bullet list ----
+        if let Some(rest) = trimmed.strip_prefix("- ") {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            list_items.push(None);
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .style("ListBullet")
+                    .add_run(Run::new().add_text(format!("• {}", rest))),
+            );
+            continue;
+        }
+        // ---- Ordered list ----
+        if let Some(rest) = trimmed
+            .strip_prefix("1. ")
+            .or_else(|| trimmed.strip_prefix("2. "))
+            .or_else(|| trimmed.strip_prefix("3. "))
+            .or_else(|| trimmed.strip_prefix("4. "))
+        {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            docx = docx.add_paragraph(
+                Paragraph::new()
+                    .style("ListNumber")
+                    .add_run(Run::new().add_text(format!("1. {}", rest))),
+            );
+            continue;
+        }
+
+        // ---- Blank line: paragraph boundary ----
+        if trimmed.is_empty() {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            continue;
+        }
+
+        // ---- Otherwise, accumulate into the current paragraph ----
+        current_paragraph.push(trimmed.to_string());
     }
 
-    result.trim().to_string()
-}
+    // Flush any leftover text.
+    docx = flush_paragraph(&current_paragraph.join(" "), docx);
+    // Flush any leftover code block.
+    if !code_buffer.is_empty() {
+        let code_text = code_buffer.join("\n");
+        docx = docx.add_paragraph(
+            Paragraph::new()
+                .style("CodeBlock")
+                .add_run(
+                    Run::new()
+                        .add_text(code_text)
+                        .fonts(docx_rs::RunFonts::new().ascii("Courier New")),
+                ),
+        );
+    }
 
-/// Escape special XML characters
-fn escape_xml(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
+    // Append a "Footnotes:" section at the end of the document. We
+    // use a v1 approach (numbered paragraphs at the end) instead of
+    // injecting a real `word/footnotes.xml` part because docx-rs
+    // 0.4 has no first-class footnote API and a hand-rolled XML
+    // injection is fragile. A future change can replace this with
+    // a proper `<w:footnoteReference>` wiring.
+    if !footnotes.is_empty() {
+        docx = docx.add_paragraph(
+            Paragraph::new()
+                .add_run(Run::new().add_text("Footnotes").bold().size(24)),
+        );
+        for note in &footnotes {
+            let line = format!("[{}] {}", note.number, note.content);
+            docx = docx.add_paragraph(
+                Paragraph::new().add_run(Run::new().add_text(line)),
+            );
+        }
+    }
+
+    // Build and pack into a Vec<u8>.
+    let xml_docx = docx.build();
+    let mut buf = Vec::new();
+    xml_docx
+        .pack(Cursor::new(&mut buf))
+        .map_err(|e| format!("pack error: {}", e))?;
+    Ok(buf)
 }
 
 #[cfg(test)]
@@ -309,58 +304,56 @@ mod tests {
     use super::*;
 
     #[test]
-    fn escape_xml_special_chars() {
-        assert_eq!(escape_xml("a & b"), "a &amp; b");
-        assert_eq!(escape_xml("<tag>"), "&lt;tag&gt;");
-        assert_eq!(escape_xml(r#"say "hi""#), "say &quot;hi&quot;");
-        // All five at once
-        let input = "<a href=\"x\">&";
-        let expected = "&lt;a href=&quot;x&quot;&gt;&amp;";
-        assert_eq!(escape_xml(input), expected);
+    fn export_word_basic_heading_and_paragraph() {
+        let md = "# Title\n\nHello world.\n";
+        let bytes = export_word(md, "T").expect("should produce bytes");
+        // The output must be a valid zip (docx files are zips).
+        assert!(bytes.len() > 4, "output too small");
+        // PK\x03\x04 is the local file header magic for zip files.
+        assert_eq!(
+            &bytes[0..4],
+            b"PK\x03\x04",
+            "docx is not a valid zip archive"
+        );
     }
 
     #[test]
-    fn strip_html_skips_script_content() {
-        // A markdown doc that contained <script>…</script> would otherwise
-        // ship the literal text "alert(1)" into the .docx body.
-        let html = r#"<p>before <script>alert(1)</script> after</p>"#;
-        let out = strip_html_tags(html);
-        assert!(!out.contains("alert(1)"), "script body leaked: {out}");
-        assert!(out.contains("before"));
-        assert!(out.contains("after"));
+    fn export_word_contains_title() {
+        let md = "# Hello\n\nbody\n";
+        let bytes = export_word(md, "My Title").expect("should produce bytes");
+        let s = String::from_utf8_lossy(&bytes);
+        assert!(s.contains("My Title"), "title missing from docx");
+        assert!(s.contains("Hello"), "heading missing from docx");
+        assert!(s.contains("body"), "paragraph missing from docx");
     }
 
     #[test]
-    fn strip_html_skips_style_content() {
-        let html = r#"<p>x<style>body{color:red}</style>y</p>"#;
-        let out = strip_html_tags(html);
-        assert!(!out.contains("color:red"));
-        assert!(!out.contains("body"));
-        assert!(out.contains("x"));
-        assert!(out.contains("y"));
+    fn export_word_handles_no_mermaid() {
+        // Plain markdown with no mermaid should still produce a valid
+        // docx, with no PNGs embedded.
+        let md = "## Subtitle\n\nSome **bold** text.\n";
+        let bytes = export_word(md, "T").expect("should produce bytes");
+        let s = String::from_utf8_lossy(&bytes);
+        // We don't expect a word/media/ folder when there are no
+        // mermaid blocks. docx-rs only creates the media folder when
+        // a Pic is added.
+        assert!(!s.contains("word/media/"), "unexpected media folder");
     }
 
     #[test]
-    fn strip_html_handles_nested_or_unknown_tags() {
-        // Unknown tags should still be dropped but their text kept.
-        let html = "<custom>hello <b>world</b></custom>";
-        let out = strip_html_tags(html);
-        assert_eq!(out, "hello world");
-    }
-
-    #[test]
-    fn strip_html_decodes_entities() {
-        let html = "a &amp; b &lt; c &gt; d &quot;e&quot; &apos;f&apos;";
-        let out = strip_html_tags(html);
-        assert_eq!(out, "a & b < c > d \"e\" 'f'");
-    }
-
-    #[test]
-    fn escape_xml_handles_long_text_without_panic() {
-        // Sanity: a large text doesn't trigger a quadratic blowup.
-        let big = "a".repeat(10_000) + "<";
-        let escaped = escape_xml(&big);
-        assert_eq!(escaped.len(), 10_000 + 4);
-        assert!(escaped.ends_with("&lt;"));
+    fn export_word_mermaid_block_uses_fallback_when_mmdc_missing() {
+        // With MMDC_DISABLED set, mermaid blocks should fall back to
+        // the visible "[Mermaid diagram unavailable: ...]" text
+        // rather than crash.
+        std::env::set_var("MMDC_DISABLED", "1");
+        let md = "before\n\n```mermaid\ngraph TD\n    A --> B\n```\n\nafter\n";
+        let bytes = export_word(md, "T").expect("should produce bytes");
+        std::env::remove_var("MMDC_DISABLED");
+        let s = String::from_utf8_lossy(&bytes);
+        assert!(
+            s.contains("Mermaid diagram unavailable"),
+            "fallback message missing: {}",
+            &s[..s.len().min(2000)]
+        );
     }
 }

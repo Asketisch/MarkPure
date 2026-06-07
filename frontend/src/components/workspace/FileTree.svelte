@@ -1,11 +1,14 @@
 <script lang="ts">
   /**
-   * The file-tree pane: filter input, show/hide-hidden
-   * toggle, and the recursive tree rendering. The host
+   * The file-tree pane: the recursive tree rendering. The host
    * (WorkSpace) supplies the `tree`, `expandedDirs`,
    * `selectedPath`, and the click / context-menu callbacks.
    * The tree is filtered in the component so the host
    * doesn't have to re-implement the matching logic.
+   *
+   * The show/hide-hidden toggle lives in the host's header
+   * (WorkSpace.svelte) — see `.workspace-header` and the
+   * `toggleHidden()` handler.
    */
   import type { FileEntry } from '$lib/editor/commands'
   import { filterTree } from '$lib/fileTreeFilters'
@@ -15,23 +18,19 @@
     expandedDirs,
     selectedPath,
     searchQuery,
-    showHidden,
     loading,
     onSwitch,
     onPin,
     onContextMenu,
-    onToggleHidden,
   }: {
     tree: FileEntry[]
     expandedDirs: Set<string>
     selectedPath: string | null
     searchQuery: string
-    showHidden: boolean
     loading: boolean
     onSwitch: (entry: FileEntry) => void
     onPin: (entry: FileEntry) => void
     onContextMenu: (e: MouseEvent, entry: FileEntry) => void
-    onToggleHidden: () => void
   } = $props()
 </script>
 
@@ -44,17 +43,6 @@
     {/each}
   {/if}
 </div>
-
-<button class="toggle-hidden-btn" class:active={showHidden} onclick={onToggleHidden} title={showHidden ? 'Hide hidden files' : 'Show hidden files'}>
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-    {#if showHidden}
-      <path d="M8 3C4.5 3 1.5 6 0 8c1.5 2 4.5 5 8 5s6.5-3 8-5c-1.5-2-4.5-5-8-5z" stroke="currentColor" stroke-width="1.5"/>
-      <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/>
-    {:else}
-      <path d="M2 2l12 12M8 3C4.5 3 1.5 6 0 8c.8 1 2 2.5 3.5 3.5M8 13c3.5 0 6.5-3 8-5-.8-1-2-2.5-3.5-3.5M6 8a2 2 0 014 0" stroke="currentColor" stroke-width="1.5"/>
-    {/if}
-  </svg>
-</button>
 
 {#snippet treeNode(entry: FileEntry, depth: number)}
   <div
@@ -112,22 +100,6 @@
     color: var(--text-secondary);
     font-size: 13px;
   }
-
-  .toggle-hidden-btn {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
-    cursor: pointer;
-  }
-  .toggle-hidden-btn:hover { background: var(--menu-hover-bg); }
-  .toggle-hidden-btn.active { color: var(--accent); border-color: var(--accent); }
 
   .tree-item {
     display: flex;

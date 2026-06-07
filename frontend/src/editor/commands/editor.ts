@@ -90,22 +90,6 @@ export async function docSearch(
   })
 }
 
-// ============================== Mermaid ==============================
-
-export interface MermaidRenderResult {
-  svg: string | null
-  error: string | null
-  is_valid: boolean
-}
-
-export async function validateMermaid(code: string): Promise<{ valid: boolean; diagram_type: string | null }> {
-  return (await ipc('validate_mermaid', { code })) ?? { valid: false, diagram_type: null }
-}
-
-export async function renderMermaid(code: string): Promise<MermaidRenderResult> {
-  return (await ipc('render_mermaid', { code })) ?? { svg: null, error: null, is_valid: false }
-}
-
 // ============================== Frontmatter ==============================
 
 export interface FrontmatterBounds {

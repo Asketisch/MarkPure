@@ -6,6 +6,10 @@ edition = "2021"
 [dependencies]
 mt_core = { path = "../core-lib" }
 markdown = { path = "../markdown" }
-printpdf = "0.7"
+# `embedded_images` enables `Image::from_dynamic_image` and the
+# higher-level image-embedding helpers. Without it, callers have to
+# hand-construct `ImageXObject`s — a route we don't take.
+printpdf = { version = "0.7", features = ["embedded_images"] }
 docx-rs = "0.4"
 zip = "2"
+image = { version = "0.25", default-features = false, features = ["png"] }

@@ -186,25 +186,6 @@ pub fn cmd_check_spelling(
     Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
 }
 
-// ============================== Mermaid ==============================
-
-pub fn cmd_validate_mermaid(
-    params: &serde_json::Value,
-) -> std::result::Result<serde_json::Value, String> {
-    let code = params["code"].as_str().ok_or("Missing 'code'")?;
-    let valid = markdown::validate_mermaid(code);
-    let kind = markdown::parse_mermaid(code).ok();
-    Ok(serde_json::json!({ "valid": valid, "diagram_type": kind }))
-}
-
-pub fn cmd_render_mermaid(
-    params: &serde_json::Value,
-) -> std::result::Result<serde_json::Value, String> {
-    let code = params["code"].as_str().ok_or("Missing 'code'")?;
-    let result = markdown::render_mermaid_with_cli(code);
-    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
-}
-
 // ============================== Frontmatter ==============================
 
 pub fn cmd_parse_frontmatter(

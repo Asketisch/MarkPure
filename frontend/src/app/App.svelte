@@ -181,6 +181,7 @@
       case 'insert.mermaid': return () => insertMermaidBlock()
       case 'insert.frontmatter': return () => insertFrontmatter()
       case 'insert.toc': return () => insertToc()
+      case 'insert.footnote_ref': return () => insertFootnoteRef()
       case 'insert.fold': return () => editor?.commands.foldSection?.()
       default: return () => {}
     }
@@ -189,6 +190,19 @@
   function insertMermaidBlock() {
     if (!editor) return
     editor.chain().focus().insertMermaid().run()
+  }
+
+  function insertFootnoteRef() {
+    if (!editor) return
+    // Insert a marked footnote reference at the cursor. The mark
+    // (if registered via FootnoteRefExtension) carries the
+    // auto-generated label; falls back to literal text otherwise.
+    const chain = editor.chain().focus()
+    if (chain.insertFootnoteRef) {
+      chain.insertFootnoteRef().run()
+    } else {
+      chain.insertContent('[^1]').run()
+    }
   }
   function insertFrontmatter() {
     if (!editor) return
@@ -200,12 +214,33 @@
   }
   function insertToc() {
     if (!editor) return
-    // `[[TOC]]` is the VSCode / markdown-all-in-one
-    // convention; we render it as a literal placeholder
-    // comment so the user can search-and-replace it once a
-    // real TOC generator is wired up.
-    editor.chain().focus().insertContent('<!-- TOC: replace with auto-generated outline -->\n').run()
+    // Insert a real TOC node. The node round-trips through
+    // markdown as `<!-- TOC -->` (VSCode / markdown-all-in-one
+    // convention) and renders as a live, clickable heading list
+    // in the editor.
+    editor.chain().focus().insertToc().run()
   }
+
+  // Listen for jumps from the TOC node's clickable items.
+  // The TocNodeView dispatches a `toc-jump` window event with
+  // the heading's PM position; we translate that into an
+  // editor command. The outline panel uses the same
+  // `handleOutlineNavigate` path.
+  $effect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number }>).detail
+      if (!editor || !detail) return
+      const safePos = Math.max(0, Math.min(detail.pos, editor.state.doc.content.size))
+      // Use the same shape as `handleOutlineNavigate` above.
+      editor.chain()
+        .focus()
+        .setTextSelection(safePos)
+        .scrollIntoView()
+        .run()
+    }
+    window.addEventListener('toc-jump', handler)
+    return () => window.removeEventListener('toc-jump', handler)
+  })
 
   // Stub handlers that the palette references but App.svelte
   // doesn't fully implement yet. Each one is a tiny shim so
