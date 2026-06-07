@@ -36,6 +36,7 @@
   import ResizeHandle from '$lib/components/ui/ResizeHandle.svelte'
   import SearchBar from '$lib/components/workspace/SearchBar.svelte'
   import OutlinePanel from '$lib/components/workspace/OutlinePanel.svelte'
+  import TagPanel from '$lib/components/workspace/TagPanel.svelte'
   import WorkspaceSearch from '$lib/components/workspace/WorkspaceSearch.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
   import Dialog from '$lib/components/ui/Dialog.svelte'
@@ -102,6 +103,8 @@
     sidebarWidth = Math.min(400, Math.max(160, width))
   }
   let showOutline = $state(false)
+  let showTags = $state(false)
+  let tagPanelRef: { refresh: () => void } | null = null
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
   // Note: showFileMenu / showEditMenu / showExportSubmenu
   // moved to MenuBar.svelte (local UI state).
@@ -170,6 +173,7 @@
       case 'edit.find': return () => { showSearch = true }
       case 'view.toggle_sidebar': return () => { showSidebar = !showSidebar; saveCurrentConfig() }
       case 'view.toggle_outline': return () => { showOutline = !showOutline }
+      case 'view.toggle_tags': return () => { showTags = !showTags }
       case 'view.toggle_source_mode': return () => toggleSourceMode()
       case 'view.toggle_focus_mode': return () => toggleFocusMode()
       case 'view.toggle_zen_mode': return () => toggleZenMode()
@@ -884,6 +888,20 @@
     }
   }
 
+  // P0-7: a click in the Tag Pane opens the workspace search
+  // with the tag pre-filled. The search backend will treat
+  // the query as a regex; escaping the `#` is unnecessary
+  // because the regex engine treats it as a literal. We also
+  // dispatch the same `workspace-search:initial` event the
+  // editor uses for in-document tag clicks so WorkspaceSearch
+  // picks it up uniformly.
+  function handleTagPanelClick(tag: string) {
+    showWorkspaceSearch = true
+    window.dispatchEvent(
+      new CustomEvent('workspace-search:initial', { detail: { query: `#${tag}` } }),
+    )
+  }
+
   function handleOutlineNavigate(item: { level: number; text: string; pos?: number }) {
     if (!editor) return
 
@@ -1025,6 +1043,11 @@
     // one tree reload.
     if (events.length > 0) {
       refreshFileTree?.()
+      // P0-7: the tag index also needs to stay in sync with
+      // disk events. `tagPanelRef.refresh()` is debounced
+      // internally (300ms) so a burst of events only triggers
+      // one rebuild.
+      tagPanelRef?.refresh?.()
     }
   }
 
@@ -1291,6 +1314,18 @@
       <OutlinePanel {editor} onNavigate={handleOutlineNavigate} onClose={() => showOutline = false} />
     {/if}
 
+    <!-- Tag Panel (Right Side, P0-7). Rendered before the
+         editor so it sits left of the OutlinePanel when both
+         are visible. -->
+    {#if showTags && !zenMode}
+      <TagPanel
+        bind:this={tagPanelRef}
+        {workspacePath}
+        onTagClick={handleTagPanelClick}
+        onClose={() => showTags = false}
+      />
+    {/if}
+
     <!-- Editor Panel -->
     <div class="editor-panel">
       {#if tabs.length === 0}
@@ -1365,6 +1400,12 @@
         <button class="tb-btn" class:active={showOutline} onclick={toggleOutline} title="Outline">
           <svg width="15" height="15" viewBox="0 0 16 16">
             <path d="M2 3 L2 15 M6 3 L14 3 M6 8 L14 8 M6 13 L14 13" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          </svg>
+        </button>
+        <button class="tb-btn" class:active={showTags} onclick={() => showTags = !showTags} title="Tags">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <path d="M2 4 L8 4 M2 8 L13 8 M2 12 L10 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <circle cx="14.5" cy="4" r="1.2" fill="currentColor"/>
           </svg>
         </button>
       </div>

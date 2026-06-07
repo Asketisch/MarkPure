@@ -231,6 +231,34 @@ export function offFileChanges(): void {
   delete window.__mt_on_file_changes
 }
 
+// ============================== Workspace tag index (P0-7) ==============================
+
+/** A single entry in the workspace-wide tag index. `count` is the
+ *  total number of occurrences across the workspace, `files` is the
+ *  deduplicated set of file paths that contain the tag at least
+ *  once. */
+export interface WorkspaceTag {
+  name: string
+  count: number
+  files: string[]
+}
+
+/** Aggregate every `#tag` across `path` into a flat
+ *  `WorkspaceTag[]` (alphabetical by name). Scans `.md` /
+ *  `.markdown` / `.mdx` files only. */
+export async function getWorkspaceTags(
+  path: string,
+  maxDepth = 10,
+  showHidden = false,
+): Promise<WorkspaceTag[]> {
+  const result = await ipc<{ tags: WorkspaceTag[] }>('get_workspace_tags', {
+    path,
+    max_depth: maxDepth,
+    show_hidden: showHidden,
+  })
+  return result?.tags ?? []
+}
+
 // ============================== Clipboard ==============================
 
 /** Copy plain text to the OS clipboard. There's no Rust

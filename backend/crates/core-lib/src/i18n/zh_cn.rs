@@ -212,4 +212,13 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("dialog.file_changed_message", "{name} 已在 MarkPure 外部被修改。是否重新加载并放弃你的修改？"),
     ("dialog.reload", "重新加载"),
     ("dialog.keep_mine", "保留我的修改"),
+    ("tag_pane.title", "标签"),
+    ("tag_pane.empty", "未发现标签"),
+    ("tag_pane.no_match", "无匹配标签"),
+    ("tag_pane.loading", "加载中…"),
+    ("tag_pane.error", "加载标签失败：{msg}"),
+    ("tag_pane.refresh", "刷新"),
+    ("tag_pane.close", "关闭"),
+    ("tag_pane.filter_placeholder", "筛选标签…"),
+    ("tag_pane.click_to_filter", "点击以在工作区中筛选 #{name}"),
 ];

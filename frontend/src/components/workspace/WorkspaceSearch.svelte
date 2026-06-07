@@ -1,6 +1,7 @@
 <script lang="ts">
   import { searchWorkspace, type WorkspaceSearchMatch } from '$lib/editor/commands'
   import { useI18n } from '$lib/stores/i18n.svelte'
+  import { onMount } from 'svelte'
 
   const i18n = useI18n()
 
@@ -26,6 +27,20 @@
   let selectedIndex = $state(-1)
   let searchSeq = 0 // request sequence to discard stale results
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+  // P0-7: Tag Pane (and editor inline tag clicks) dispatch a
+  // `workspace-search:initial` event to pre-fill the search
+  // box. We listen for it globally and re-run the search.
+  onMount(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ query: string }>).detail
+      if (!detail || typeof detail.query !== 'string') return
+      visible = true
+      query = detail.query
+    }
+    window.addEventListener('workspace-search:initial', handler)
+    return () => window.removeEventListener('workspace-search:initial', handler)
+  })
 
   async function doSearch() {
     if (!workspacePath || !query.trim()) {

@@ -212,4 +212,13 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("dialog.file_changed_message", "{name} が MarkPure の外部で変更されました。読み込んで変更を破棄しますか？"),
     ("dialog.reload", "再読み込み"),
     ("dialog.keep_mine", "変更を保持"),
+    ("tag_pane.title", "タグ"),
+    ("tag_pane.empty", "タグが見つかりません"),
+    ("tag_pane.no_match", "一致するタグがありません"),
+    ("tag_pane.loading", "読み込み中…"),
+    ("tag_pane.error", "タグの読み込みに失敗: {msg}"),
+    ("tag_pane.refresh", "更新"),
+    ("tag_pane.close", "閉じる"),
+    ("tag_pane.filter_placeholder", "タグをフィルター…"),
+    ("tag_pane.click_to_filter", "クリックでワークスペースを #{name} で絞り込み"),
 ];

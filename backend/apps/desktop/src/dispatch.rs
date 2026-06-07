@@ -125,6 +125,9 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         "update_bookmark" => workspace_ops::cmd_update_bookmark(&msg.params),
         "remove_bookmark" => workspace_ops::cmd_remove_bookmark(&msg.params),
 
+        // Workspace tag index (P0-7)
+        "get_workspace_tags" => workspace_ops::cmd_get_workspace_tags(&msg.params),
+
         // Document registry (Rust-owned text buffer)
         "doc_open" => editor_ops::cmd_doc_open(&msg.params, state),
         "doc_close" => editor_ops::cmd_doc_close(&msg.params, state),

@@ -40,6 +40,7 @@ export const commandCatalog: CommandDef[] = [
   // View
   { id: 'view.toggle_sidebar', title: 'Toggle Sidebar', category: 'View' },
   { id: 'view.toggle_outline', title: 'Toggle Outline', category: 'View' },
+  { id: 'view.toggle_tags', title: 'Toggle Tag Pane', category: 'View', keywords: ['tag', 'hashtag', 'pane'] },
   { id: 'view.toggle_source_mode', title: 'Toggle Source Mode', category: 'View' },
   { id: 'view.toggle_focus_mode', title: 'Toggle Focus Mode', category: 'View' },
   { id: 'view.toggle_zen_mode', title: 'Toggle Zen Mode', category: 'View', keywords: ['fullscreen', 'focus', 'distraction-free'] },

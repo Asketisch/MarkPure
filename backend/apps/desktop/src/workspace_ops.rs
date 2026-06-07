@@ -8,7 +8,101 @@
 
 use super::state::{lock_or_recover, AppState};
 use mt_core::tab::{save_tabs, TabState, WindowTabs};
+use std::collections::HashMap;
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
+use walkdir::WalkDir;
+
+// ============================== Tabs ==============================
+
+/// P0-7: aggregate every `#tag` across the workspace into a
+/// `{name, count, files[]}` index. The renderer uses this to
+/// populate the Tag Pane and to build "filter by tag" search
+/// results.
+///
+/// Scope: only files with a `.md` / `.markdown` / `.mdx`
+/// extension are scanned. Non-text content is skipped via the
+/// same UTF-8 read-and-fallback the workspace search uses
+/// (left as a future improvement; the renderer already
+/// tolerates unreadable files).
+pub fn cmd_get_workspace_tags(
+    params: &serde_json::Value,
+) -> std::result::Result<serde_json::Value, String> {
+    let path_str = params["path"]
+        .as_str()
+        .ok_or("Missing 'path' parameter")?;
+    let root = Path::new(path_str);
+    if !root.exists() {
+        return Err(format!("Workspace path does not exist: {}", path_str));
+    }
+
+    let max_depth = params["max_depth"].as_u64().unwrap_or(10) as usize;
+    let show_hidden = params["show_hidden"].as_bool().unwrap_or(false);
+
+    // tag -> { count, files }
+    let mut index: HashMap<String, (u32, Vec<String>)> = HashMap::new();
+
+    for entry in WalkDir::new(root)
+        .max_depth(max_depth)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| show_hidden || !is_hidden(e))
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let ext = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_ascii_lowercase());
+        if !matches!(ext.as_deref(), Some("md") | Some("markdown") | Some("mdx")) {
+            continue;
+        }
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue, // binary or permission denied — skip
+        };
+        for tag in markdown::extract_tags(&content) {
+            let entry = index.entry(tag.name).or_insert((0, Vec::new()));
+            entry.0 += 1;
+            let path_str = path.to_string_lossy().to_string();
+            if !entry.1.iter().any(|p| p == &path_str) {
+                entry.1.push(path_str);
+            }
+        }
+    }
+
+    // Stable, alphabetical ordering for the renderer.
+    let mut tags: Vec<serde_json::Value> = index
+        .into_iter()
+        .map(|(name, (count, files))| {
+            serde_json::json!({
+                "name": name,
+                "count": count,
+                "files": files,
+            })
+        })
+        .collect();
+    tags.sort_by(|a, b| {
+        let an = a["name"].as_str().unwrap_or("");
+        let bn = b["name"].as_str().unwrap_or("");
+        an.cmp(bn)
+    });
+
+    Ok(serde_json::json!({ "tags": tags }))
+}
+
+/// Cheap "is this entry a dotfile / dotdir?" check that matches
+/// the rule used elsewhere in the fs crate for hidden files.
+fn is_hidden(entry: &walkdir::DirEntry) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| s.starts_with('.'))
+        .unwrap_or(false)
+}
 
 // ============================== Tabs ==============================
 

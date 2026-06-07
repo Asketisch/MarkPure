@@ -212,4 +212,13 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("dialog.file_changed_message", "{name} has been modified outside MarkPure. Reload and lose your changes?"),
     ("dialog.reload", "Reload"),
     ("dialog.keep_mine", "Keep Mine"),
+    ("tag_pane.title", "Tags"),
+    ("tag_pane.empty", "No tags found"),
+    ("tag_pane.no_match", "No matching tags"),
+    ("tag_pane.loading", "Loading…"),
+    ("tag_pane.error", "Failed to load tags: {msg}"),
+    ("tag_pane.refresh", "Refresh"),
+    ("tag_pane.close", "Close"),
+    ("tag_pane.filter_placeholder", "Filter tags…"),
+    ("tag_pane.click_to_filter", "Click to filter workspace by #{name}"),
 ];
