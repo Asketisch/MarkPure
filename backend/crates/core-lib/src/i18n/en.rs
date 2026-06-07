@@ -206,4 +206,10 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("action.find", "Find"),
     ("action.replace", "Replace"),
     ("action.find_and_replace", "Find & Replace"),
+    ("menu.toggle_sidebar", "Toggle Sidebar"),
+    ("view.toggle_zen_mode", "Toggle Zen Mode"),
+    ("dialog.file_changed_title", "File Changed on Disk"),
+    ("dialog.file_changed_message", "{name} has been modified outside MarkPure. Reload and lose your changes?"),
+    ("dialog.reload", "Reload"),
+    ("dialog.keep_mine", "Keep Mine"),
 ];

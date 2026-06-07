@@ -206,4 +206,10 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("action.find", "検索"),
     ("action.replace", "置換"),
     ("action.find_and_replace", "検索と置換"),
+    ("menu.toggle_sidebar", "サイドバー切替"),
+    ("view.toggle_zen_mode", "Zen モード切替"),
+    ("dialog.file_changed_title", "ファイルが外部で変更されました"),
+    ("dialog.file_changed_message", "{name} が MarkPure の外部で変更されました。読み込んで変更を破棄しますか？"),
+    ("dialog.reload", "再読み込み"),
+    ("dialog.keep_mine", "変更を保持"),
 ];

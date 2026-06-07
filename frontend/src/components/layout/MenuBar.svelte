@@ -27,6 +27,7 @@
     onReplace,
     onGlobalSearch,
     onToggleSidebar,
+    onToggleZenMode,
     onOpenSettings,
   }: {
     appName: string
@@ -43,6 +44,7 @@
     onReplace: () => void
     onGlobalSearch: () => void
     onToggleSidebar: () => void
+    onToggleZenMode: () => void
     onOpenSettings: () => void
   } = $props()
 
@@ -50,12 +52,15 @@
 
   let showFileMenu = $state(false)
   let showEditMenu = $state(false)
+  let showViewMenu = $state(false)
   let showExportSubmenu = $state(false)
 
   function toggleFileMenu() { showFileMenu = !showFileMenu }
   function toggleEditMenu() { showEditMenu = !showEditMenu }
+  function toggleViewMenu() { showViewMenu = !showViewMenu }
   function hideFileMenu() { showFileMenu = false; showExportSubmenu = false }
   function hideEditMenu() { showEditMenu = false }
+  function hideViewMenu() { showViewMenu = false }
 
   /// Close any open menu on `blur`. The 200ms timeout lets the
   /// click on a menu item register before the menu unmounts.
@@ -114,7 +119,20 @@
         </div>
       {/if}
     </div>
-    <button class="menu-btn" onclick={onToggleSidebar}>{i18n.t('menu.view')}</button>
+    <div class="menu-dropdown">
+      <button
+        class="menu-btn"
+        onclick={toggleViewMenu}
+        onblur={() => deferHide(hideViewMenu)}
+      >{i18n.t('menu.view')}</button>
+      {#if showViewMenu}
+        <div class="dropdown-menu" onmouseleave={hideViewMenu}>
+          <button class="dropdown-item" onclick={() => { onToggleSidebar(); hideViewMenu() }}>{i18n.t('menu.toggle_sidebar')}</button>
+          <div class="dropdown-sep"></div>
+          <button class="dropdown-item" onclick={() => { onToggleZenMode(); hideViewMenu() }}>{i18n.t('view.toggle_zen_mode')}</button>
+        </div>
+      {/if}
+    </div>
     <button class="menu-btn" onclick={onOpenSettings}>{i18n.t('menu.settings')}</button>
   </div>
   <div class="menu-title">{appName}</div>

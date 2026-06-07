@@ -42,6 +42,7 @@ export const commandCatalog: CommandDef[] = [
   { id: 'view.toggle_outline', title: 'Toggle Outline', category: 'View' },
   { id: 'view.toggle_source_mode', title: 'Toggle Source Mode', category: 'View' },
   { id: 'view.toggle_focus_mode', title: 'Toggle Focus Mode', category: 'View' },
+  { id: 'view.toggle_zen_mode', title: 'Toggle Zen Mode', category: 'View', keywords: ['fullscreen', 'focus', 'distraction-free'] },
   { id: 'view.toggle_typewriter', title: 'Toggle Typewriter Scrolling', category: 'View' },
   { id: 'view.toggle_undo_tree', title: 'Show Undo Tree', category: 'View' },
 

@@ -41,9 +41,15 @@
     onOpenFile?: (path: string) => void
     onPinTab?: (path: string) => void
     onWorkspaceChange?: (path: string) => void
+    // P0-5: invoked once on mount (and again when the workspace
+    // changes) with this component's `loadTree`. The host stores
+    // it and calls it from `handleFileChanges` whenever the file
+    // watcher reports disk activity, replacing the old "toggle
+    // workspacePath to remount the sidebar" hack.
+    onRegisterRefresh?: (refresh: () => void) => void
   }
 
-  let { workspacePath = null, onOpenFile, onPinTab, onWorkspaceChange }: Props = $props()
+  let { workspacePath = null, onOpenFile, onPinTab, onWorkspaceChange, onRegisterRefresh }: Props = $props()
 
   // ----- State (shared across the sub-components) -----
 
@@ -211,6 +217,10 @@
     const _show = showHidden
     if (_path) {
       untrack(() => loadTree())
+      // P0-5: re-register the refresh callback whenever the
+      // workspace changes so the host always holds a `loadTree`
+      // bound to the current `workspacePath`.
+      onRegisterRefresh?.(() => loadTree())
     } else {
       // Workspace was closed: clear the visible tree and any
       // remembered expansion state so a later open of a *different*

@@ -10,9 +10,14 @@
     onPinTab?: (path: string) => void
     onWorkspaceChange?: (path: string) => void
     isResizing?: boolean
+    // P0-5: WorkSpace registers its `loadTree` callback via this
+    // prop on mount. App.svelte stores the latest registration
+    // in `refreshFileTree` and calls it from `handleFileChanges`
+    // so the tree stays in sync with disk events.
+    onRegisterRefresh?: (refresh: () => void) => void
   }
 
-  let { workspacePath = null, onOpenFile, onPinTab, onWorkspaceChange, isResizing = false }: Props = $props()
+  let { workspacePath = null, onOpenFile, onPinTab, onWorkspaceChange, isResizing = false, onRegisterRefresh }: Props = $props()
 
   let collapsed = $state(false)
 
@@ -41,7 +46,7 @@
 
   {#if !collapsed}
     <div class="sidebar-content">
-      <WorkSpace {workspacePath} {onOpenFile} {onPinTab} {onWorkspaceChange} />
+      <WorkSpace {workspacePath} {onOpenFile} {onPinTab} {onWorkspaceChange} {onRegisterRefresh} />
     </div>
   {/if}
 </div>

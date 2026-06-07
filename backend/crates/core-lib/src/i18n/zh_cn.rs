@@ -206,4 +206,10 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("action.find", "查找"),
     ("action.replace", "替换"),
     ("action.find_and_replace", "查找替换"),
+    ("menu.toggle_sidebar", "切换侧边栏"),
+    ("view.toggle_zen_mode", "切换专注模式"),
+    ("dialog.file_changed_title", "文件已外部修改"),
+    ("dialog.file_changed_message", "{name} 已在 MarkPure 外部被修改。是否重新加载并放弃你的修改？"),
+    ("dialog.reload", "重新加载"),
+    ("dialog.keep_mine", "保留我的修改"),
 ];

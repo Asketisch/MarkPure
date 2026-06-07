@@ -38,6 +38,7 @@
   import OutlinePanel from '$lib/components/workspace/OutlinePanel.svelte'
   import WorkspaceSearch from '$lib/components/workspace/WorkspaceSearch.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
+  import Dialog from '$lib/components/ui/Dialog.svelte'
   import SourceEditor from '$lib/components/workspace/SourceEditor.svelte'
   import QuickInsertPopup from '$lib/features/quick-insert/QuickInsertPopup.svelte'
   import Settings from '$lib/features/settings/Settings.svelte'
@@ -82,6 +83,15 @@
   let editorContainer: HTMLElement
   let editor: Editor | null = null
   let saving = $state(false)
+  let zenMode = $state(false)
+  // File-reload prompt state (P0-4). When set, a Dialog is shown asking
+  // the user whether to overwrite their dirty tab with the on-disk
+  // version. `tabId` is the tab to update if the user picks "Reload".
+  let fileReloadPrompt = $state<{ tabId: number; path: string; fileName: string } | null>(null)
+  // Refresh-tree callback supplied by WorkSpace.svelte. App.svelte
+  // invokes it inside `handleFileChanges` so the tree stays in sync
+  // with disk events without re-mounting the sidebar (P0-5).
+  let refreshFileTree: (() => void) | null = null
   let workspacePath = $state<string | null>(null)
   let showSidebar = $state(true)
   let sidebarWidth = $state(260)
@@ -162,6 +172,7 @@
       case 'view.toggle_outline': return () => { showOutline = !showOutline }
       case 'view.toggle_source_mode': return () => toggleSourceMode()
       case 'view.toggle_focus_mode': return () => toggleFocusMode()
+      case 'view.toggle_zen_mode': return () => toggleZenMode()
       case 'view.toggle_typewriter': return () => toggleTypewriter()
       case 'search.workspace': return () => { showWorkspaceSearch = true }
       case 'search.quick_switcher': return () => { showQuickSwitcher = true }
@@ -254,6 +265,35 @@
   }
   function toggleTypewriter() {
     if (editor) editor.commands.toggleTypewriter()
+  }
+
+  // P0-2: Zen mode hides all chrome (MenuBar, SideBar, OutlinePanel,
+  // Tabs, Toolbar, StatusBar) leaving only the editor. It coexists
+  // with the in-editor dimming of FocusModeExtension — the two
+  // are independent toggles.
+  function toggleZenMode() {
+    zenMode = !zenMode
+  }
+
+  // P0-4: re-read a tab from disk without losing editor selection.
+  // Used by the file-reload dialog. Reads the file via the
+  // existing `openFileByPath` IPC and updates the tab's
+  // content/mtime; if the tab is the active one, also re-seeds
+  // the editor's content.
+  async function reloadTabFromDisk(tabId: number) {
+    const tab = tabs.find(t => t.id === tabId)
+    if (!tab || !tab.path) return
+    try {
+      const info = await openFileByPath(tab.path)
+      tab.content = info.content
+      tab.mtime = info.mtime
+      tab.dirty = false
+      if (tab.id === activeTabId && editor) {
+        setContent(editor, info.content)
+      }
+    } catch (e) {
+      logger.warn('Failed to reload tab from disk:', e)
+    }
   }
 
   function getActiveTab(): Tab | undefined {
@@ -947,28 +987,44 @@
   }
 
   function handleFileChanges(events: FileChangeEvent[]) {
+    // P0-4: dirty-tab handling. When the on-disk content changes
+    // for a tab the user has modified, we DO NOT silently
+    // overwrite — we surface a Dialog asking the user what to
+    // do. For non-dirty tabs we keep the legacy silent-update
+    // behaviour.
+    let dirtyPromptNeeded: { tabId: number; path: string; fileName: string } | null = null
     for (const event of events) {
+      if (event.kind === 'deleted') continue  // deletion is a no-op for now
       const tab = tabs.find(t => t.path === event.path)
-      if (tab && !tab.dirty) {
-        openFileByPath(event.path).then((info: FileInfo) => {
-          if (!info) return
-          const changed = tab.mtime === null
-            || info.mtime === null
-            || info.mtime > tab.mtime
-          if (changed) {
-            tab.content = info.content
-            tab.mtime = info.mtime
-            if (tab.id === activeTabId && editor) {
-              setContent(editor, info.content)
-            }
-          }
-        }).catch(() => {})
+      if (!tab) continue
+      if (tab.dirty && tab.id === activeTabId && !fileReloadPrompt) {
+        dirtyPromptNeeded = { tabId: tab.id, path: event.path, fileName: tab.name }
+        continue
       }
+      if (tab.dirty) continue
+      openFileByPath(event.path).then((info: FileInfo) => {
+        if (!info) return
+        const changed = tab.mtime === null
+          || info.mtime === null
+          || info.mtime > tab.mtime
+        if (changed) {
+          tab.content = info.content
+          tab.mtime = info.mtime
+          if (tab.id === activeTabId && editor) {
+            setContent(editor, info.content)
+          }
+        }
+      }).catch(() => {})
     }
+    if (dirtyPromptNeeded) {
+      fileReloadPrompt = dirtyPromptNeeded
+    }
+    // P0-5: tell the file tree to refresh (WorkSpace wired the
+    // callback in via `refreshFileTree`). We do this *after* the
+    // per-event loop so a single batch of events triggers exactly
+    // one tree reload.
     if (events.length > 0) {
-      const path = workspacePath
-      workspacePath = null
-      setTimeout(() => { workspacePath = path }, 0)
+      refreshFileTree?.()
     }
   }
 
@@ -985,6 +1041,19 @@
   })
 
   function handleKeydown(e: KeyboardEvent) {
+    // F11 toggles Zen mode (P0-2). The key is checked before the
+    // metaKey/ctrlKey guard below so a bare F11 still fires — but
+    // F11 inside a text field is suppressed by `target` check to
+    // avoid stomping on IME / accessibility shortcuts.
+    if (e.key === 'F11') {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+        return
+      }
+      e.preventDefault()
+      toggleZenMode()
+      return
+    }
     if (e.metaKey || e.ctrlKey) {
       switch (e.key) {
         case 'n':
@@ -1173,8 +1242,9 @@
   </div>
 {/if}
 {#if ready}
-<div class="app-root {theme}">
+<div class="app-root {theme}" class:zen-mode={zenMode}>
   <!-- Menu Bar -->
+  {#if !zenMode}
   <MenuBar
     appName={i18n.t('app.name')}
     onNewTab={newTab}
@@ -1190,12 +1260,14 @@
     onReplace={handleReplace}
     onGlobalSearch={() => { showWorkspaceSearch = true }}
     onToggleSidebar={toggleSidebar}
+    onToggleZenMode={toggleZenMode}
     onOpenSettings={() => { showSettings = true }}
   />
+  {/if}
 
   <div class="main-area">
     <!-- Sidebar -->
-    {#if showSidebar}
+    {#if showSidebar && !zenMode}
       <div class="sidebar-container" style="--sidebar-width: {sidebarWidth}px">
         <SideBar
           {workspacePath}
@@ -1203,6 +1275,7 @@
           onPinTab={handlePinTab}
           onWorkspaceChange={(path) => { workspacePath = path; saveCurrentConfig() }}
           isResizing={sidebarResizing}
+          onRegisterRefresh={(refresh) => { refreshFileTree = refresh }}
         />
         <ResizeHandle
           currentWidth={sidebarWidth}
@@ -1214,7 +1287,7 @@
     {/if}
 
     <!-- Outline Panel (Right Side) -->
-    {#if showOutline}
+    {#if showOutline && !zenMode}
       <OutlinePanel {editor} onNavigate={handleOutlineNavigate} onClose={() => showOutline = false} />
     {/if}
 
@@ -1228,6 +1301,7 @@
         />
       {:else}
       <!-- Tab Bar -->
+      {#if !zenMode}
       <Tabs
         tabs={tabs}
         activeTabId={activeTabId}
@@ -1238,9 +1312,10 @@
         onCloseToRight={closeTabsToRight}
         onContextMenu={showTabContextMenu}
       />
+      {/if}
 
       <!-- Tab Context Menu -->
-      {#if tabContextMenu}
+      {#if tabContextMenu && !zenMode}
         <TabContextMenu
           x={tabContextMenu.x}
           y={tabContextMenu.y}
@@ -1253,6 +1328,7 @@
       {/if}
 
       <!-- Toolbar -->
+      {#if !zenMode}
       <div class="toolbar">
         <button class="tb-btn" onclick={() => setHeading(1)} title="Heading 1"><Heading1 size={16} /></button>
         <button class="tb-btn" onclick={() => setHeading(2)} title="Heading 2"><Heading2 size={16} /></button>
@@ -1292,6 +1368,7 @@
           </svg>
         </button>
       </div>
+      {/if}
 
       <!-- Search Bar -->
       {#if editor}
@@ -1317,11 +1394,27 @@
       {/if}
 
       <!-- Status Bar -->
+      {#if !zenMode}
       <StatusBar {stats} {saving} />
+      {/if}
       {/if}
 
       <!-- Settings Modal -->
       <Settings bind:visible={showSettings} onConfigChange={handleConfigChange} />
+
+      <!-- File Reload Prompt (P0-4). Shown when the on-disk
+           content for the active dirty tab changes. -->
+      {#if fileReloadPrompt}
+        <Dialog
+          type="confirm"
+          title={i18n.t('dialog.file_changed_title')}
+          message={i18n.t('dialog.file_changed_message').replace('{name}', fileReloadPrompt.fileName)}
+          confirmText={i18n.t('dialog.reload')}
+          cancelText={i18n.t('dialog.keep_mine')}
+          onConfirm={() => { void reloadTabFromDisk(fileReloadPrompt!.tabId) }}
+          onClose={() => { fileReloadPrompt = null }}
+        />
+      {/if}
     </div>
   </div>
 </div>

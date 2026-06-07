@@ -77,6 +77,11 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
             label: "Toggle Source Mode".into(),
             accelerator: Some("CmdOrCtrl+/".into()),
         },
+        KeyBinding {
+            id: "view.toggle_zen_mode".into(),
+            label: "Toggle Zen Mode".into(),
+            accelerator: Some("F11".into()),
+        },
         // Workspace
         KeyBinding {
             id: "workspace.search".into(),
