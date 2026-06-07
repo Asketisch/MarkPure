@@ -45,6 +45,11 @@ pub fn cmd_export_pdf(params: &serde_json::Value) -> std::result::Result<serde_j
         .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("Untitled");
+    // P0-9: optional source file path so the PDF renderer can
+    // resolve relative image references like `![](./img.png)`.
+    // `None` is fine — relative images will simply be skipped
+    // (matching the pre-P0-9 behaviour for unresolvable URLs).
+    let source_path = params.get("source_path").and_then(|v| v.as_str());
 
     let path = FileDialog::new()
         .add_filter("PDF", &["pdf"])
@@ -53,7 +58,7 @@ pub fn cmd_export_pdf(params: &serde_json::Value) -> std::result::Result<serde_j
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())?;
 
-    export::export_pdf(content, title, &path.to_string_lossy())?;
+    export::export_pdf(content, title, &path.to_string_lossy(), source_path)?;
 
     Ok(serde_json::json!({ "path": path.to_string_lossy() }))
 }

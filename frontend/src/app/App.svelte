@@ -1047,7 +1047,10 @@
     const content = editor ? getMarkdown(editor) : tab.content
     const title = tab.name.replace(/\.md$/, '')
     try {
-      await exportPdf(content, title)
+      // P0-9: pass the source file path so the PDF export
+      // can resolve relative image references (e.g.
+      // ![](./images/foo.png)).
+      await exportPdf(content, title, tab.path)
     } catch (e) {
       console.error('Failed to export PDF:', e)
     }

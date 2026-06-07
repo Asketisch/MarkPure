@@ -22,8 +22,9 @@ export async function exportHtml(
 export async function exportPdf(
   content: string,
   title: string,
+  sourcePath?: string | null,
 ): Promise<{ path: string }> {
-  return await ipc('export_pdf', { content, title })
+  return await ipc('export_pdf', { content, title, source_path: sourcePath ?? null })
 }
 
 export async function exportWord(

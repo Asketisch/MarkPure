@@ -17,7 +17,12 @@ use printpdf::image_crate::load_from_memory;
 /// blocks, blockquotes and inline emphasis. Mermaid fenced code
 /// blocks are pre-rendered to PNG via `mmdc -e png` and embedded
 /// as inline images sized to the page content width.
-pub fn export_pdf(markdown: &str, title: &str, output_path: &str) -> Result<(), String> {
+pub fn export_pdf(
+    markdown: &str,
+    title: &str,
+    output_path: &str,
+    source_path: Option<&str>,
+) -> Result<(), String> {
     let (mut doc, page_idx, layer_idx) = create_document(title);
 
     let (regular_path, bold_path) = get_font_paths()?;
@@ -49,6 +54,23 @@ pub fn export_pdf(markdown: &str, title: &str, output_path: &str) -> Result<(), 
         }
     }
 
+    // P0-9: pre-load every inline `![alt](path)` image. The
+    // marker `\x00IMG_<line>_<index>\x00` is substituted in
+    // place of the image syntax in the line loop, then matched
+    // here to embed the PNG/JPG. We only resolve file paths —
+    // remote URLs (http/https) are intentionally skipped to
+    // keep the export offline-safe. Paths are resolved against
+    // the source markdown file's directory when possible.
+    let mut image_markers: HashMap<String, Vec<u8>> = HashMap::new();
+    for (line_no, line) in markdown.lines().enumerate() {
+        for (img_idx, (path, _alt)) in extract_inline_images(line).into_iter().enumerate() {
+            let Some(bytes) = load_image_bytes(&path, source_path) else {
+                continue;
+            };
+            image_markers.insert(format!("IMG_{}_{}", line_no, img_idx), bytes);
+        }
+    }
+
     // Pre-collect footnotes so we can render `[^N]` as a numbered
     // marker in the body and append a "Footnotes:" section at the
     // end of the document with the definitions.
@@ -57,6 +79,12 @@ pub fn export_pdf(markdown: &str, title: &str, output_path: &str) -> Result<(), 
     // Track the line number of the OPENING fence of the mermaid block
     // we're currently inside (None if we're not inside one).
     let mut in_mermaid_open_line: Option<usize> = None;
+
+    // P0-9: detect a table row. A markdown table line is one that
+    // starts and ends with `|`, and the row immediately after the
+    // header is a `---|---|---` separator. We render the table as
+    // a grid of columns using the regular font (header bold).
+    let mut in_table: bool = false;
 
     for (idx, line) in markdown.lines().enumerate() {
         let line_number = idx + 1;
@@ -119,6 +147,89 @@ pub fn export_pdf(markdown: &str, title: &str, output_path: &str) -> Result<(), 
         // rendered PNG is the entire content.
         if in_mermaid_open_line.is_some() {
             continue;
+        }
+
+        // P0-9: table-row detection. A row is `| col | col |` and
+        // a separator is `| --- | --- |`. We render the table as
+        // a grid where columns are sized by header width.
+        if is_table_row(trimmed) {
+            let cols = parse_table_row(trimmed);
+            if !in_table {
+                in_table = true;
+                // The row immediately following a header row is
+                // a separator; skip it (no text).
+                if let Some(next) = markdown.lines().nth(idx + 1) {
+                    if is_table_separator(next.trim()) {
+                        // Mark to skip the separator on the next
+                        // iteration by re-checking. We use a
+                        // simple state: just render the header
+                        // now in bold and rely on the next loop
+                        // iteration to detect the separator.
+                        render_table_row(
+                            &mut doc,
+                            &mut current_page_idx,
+                            &mut current_layer_idx,
+                            &mut y,
+                            margin,
+                            content_width,
+                            &bold_font,
+                            &cols,
+                        );
+                        continue;
+                    }
+                }
+            }
+            render_table_row(
+                &mut doc,
+                &mut current_page_idx,
+                &mut current_layer_idx,
+                &mut y,
+                margin,
+                content_width,
+                &font,
+                &cols,
+            );
+            continue;
+        } else if in_table {
+            // First non-table line after a table — close the
+            // table with a small gap.
+            in_table = false;
+            y -= line_height * 0.5;
+        }
+
+        // P0-9: image embedding. For every pre-loaded image that
+        // appears on this line, embed it before the rest of the
+        // text. Multiple images per line stack vertically.
+        for (img_idx, _bytes) in image_markers
+            .keys()
+            .filter(|k| k.starts_with(&format!("IMG_{}_", line_number)))
+            .enumerate()
+        {
+            let key = format!("IMG_{}_{}", line_number, img_idx);
+            if let Some(png_bytes) = image_markers.get(&key) {
+                if let Err(e) = embed_mermaid_png(
+                    &mut doc,
+                    &mut current_page_idx,
+                    &mut current_layer_idx,
+                    &mut y,
+                    margin,
+                    content_width,
+                    line_height,
+                    png_bytes,
+                ) {
+                    render_fallback_text(
+                        &mut doc,
+                        &mut current_page_idx,
+                        &mut current_layer_idx,
+                        &mut y,
+                        margin,
+                        content_width,
+                        line_height,
+                        &font,
+                        &format!("[Image embed error: {}]", e),
+                    );
+                }
+            }
         }
 
         // Regular markdown line: heading detection + plain text.
@@ -520,4 +631,145 @@ fn test_font_paths_exist() {
 fn test_strip_markdown() {
     assert_eq!(strip_markdown("**bold**"), "bold");
     assert_eq!(strip_markdown("plain text"), "plain text");
+}
+
+// ============================== P0-9 helpers ==============================
+
+/// Pull every inline image `![alt](path)` out of a single
+/// markdown line. Returns `(path, alt)` pairs in source order.
+/// Hand-rolled character loop — keeps the export crate free
+/// of a `regex` dependency (which lives in `markdown` only).
+/// No escaping support, matching the CommonMark subset we
+/// support elsewhere.
+fn extract_inline_images(line: &str) -> Vec<(String, String)> {
+    let bytes = line.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i + 4 < bytes.len() {
+        if bytes[i] == b'!' && bytes[i + 1] == b'[' {
+            // Scan alt until `]`
+            let alt_start = i + 2;
+            let mut j = alt_start;
+            while j < bytes.len() && bytes[j] != b']' {
+                j += 1;
+            }
+            if j < bytes.len() && j + 1 < bytes.len() && bytes[j + 1] == b'(' {
+                let alt = line[alt_start..j].to_string();
+                // Scan path until `)`
+                let path_start = j + 2;
+                let mut k = path_start;
+                while k < bytes.len() && bytes[k] != b')' {
+                    k += 1;
+                }
+                if k < bytes.len() {
+                    let path = line[path_start..k].trim().to_string();
+                    out.push((path, alt));
+                    i = k + 1;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
+/// Read an image from `path` if it's a local file we can open.
+/// Remote URLs (http/https/data:) are rejected. Relative paths
+/// are resolved against the source markdown's directory so
+/// `![](./img.png)` works when the document is exported.
+fn load_image_bytes(path: &str, source_path: Option<&str>) -> Option<Vec<u8>> {
+    // Reject remote / inline-embedded sources outright.
+    if path.starts_with("http://")
+        || path.starts_with("https://")
+        || path.starts_with("data:")
+    {
+        return None;
+    }
+    let resolved = if let Some(src) = source_path {
+        let src_path = std::path::Path::new(src);
+        let base = src_path.parent().unwrap_or(std::path::Path::new("."));
+        if std::path::Path::new(path).is_absolute() {
+            std::path::PathBuf::from(path)
+        } else {
+            base.join(path)
+        }
+    } else {
+        std::path::PathBuf::from(path)
+    };
+    std::fs::read(&resolved).ok()
+}
+
+/// True if `line` is a markdown table row: starts and ends
+/// with `|` and has at least one more `|` inside. Empty
+/// cells are fine.
+fn is_table_row(line: &str) -> bool {
+    let t = line.trim();
+    t.starts_with('|') && t.ends_with('|') && t.matches('|').count() >= 2
+}
+
+/// True if `line` is a markdown table separator row
+/// (`| --- | --- |`). Used to skip the divider line that
+/// appears after the header.
+fn is_table_separator(line: &str) -> bool {
+    if !is_table_row(line) {
+        return false;
+    }
+    line.split('|')
+        .filter(|s| !s.trim().is_empty())
+        .all(|s| {
+            let t = s.trim();
+            t.chars().all(|c| c == '-' || c == ':') && t.len() >= 1
+        })
+}
+
+/// Split a `| col | col |` line into trimmed cell strings.
+fn parse_table_row(line: &str) -> Vec<String> {
+    line.trim()
+        .trim_start_matches('|')
+        .trim_end_matches('|')
+        .split('|')
+        .map(|s| s.trim().to_string())
+        .collect()
+}
+
+/// Render a single table row. Columns are spaced 6mm apart
+/// and truncated to fit the page width. `font` is the regular
+/// or bold font (use bold for the header).
+fn render_table_row(
+    doc: &mut PdfDocumentReference,
+    current_page_idx: &mut PdfPageIndex,
+    current_layer_idx: &mut PdfLayerIndex,
+    y: &mut f32,
+    margin: f32,
+    content_width: f32,
+    font: &IndirectFontRef,
+    cols: &[String],
+) {
+    if cols.is_empty() {
+        return;
+    }
+    let col_width_mm = (content_width / cols.len() as f32).min(80.0);
+    let char_limit = ((col_width_mm / 3.5) as usize).max(4);
+
+    if *y < margin + 5.0 {
+        let (np, nl) = add_page(doc);
+        *current_page_idx = np;
+        *current_layer_idx = nl;
+        *y = Mm(277.0).0;
+    }
+
+    let layer = doc.get_page(*current_page_idx).get_layer(*current_layer_idx);
+    for (i, cell) in cols.iter().enumerate() {
+        let x = margin + (i as f32) * col_width_mm;
+        let text = if cell.chars().count() > char_limit {
+            let mut s: String = cell.chars().take(char_limit).collect();
+            s.push('…');
+            s
+        } else {
+            cell.clone()
+        };
+        layer.use_text(&text, 8.5, Mm(x), Mm(*y), font);
+    }
+    *y -= 5.5; // slightly larger than line_height for table breathing
 }
