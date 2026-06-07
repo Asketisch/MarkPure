@@ -1141,6 +1141,40 @@ html, body, #app {
   padding: 24px 48px;
 }
 
+/* P0-1: Split view (wysiwyg + source side-by-side). The
+   container fills the editor-panel; each pane is a flex
+   child sized by inline width%; the ResizeHandle (in-flow)
+   supplies the 4px draggable gap. */
+.split-container {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.split-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.split-pane .editor-area {
+  padding: 16px 24px;
+  height: 100%;
+}
+
+/* The SourceEditor inside a split-pane should fill its
+   container rather than applying the standalone
+   padding: 24px 48px. */
+.split-pane :global(.source-editor-container) {
+  padding: 16px 24px;
+  height: 100%;
+}
+
 /* Tab Context Menu */
 .context-menu {
   position: fixed;

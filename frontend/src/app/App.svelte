@@ -115,6 +115,16 @@
   let sourceMode = $state(false)
   let sourceContent = $state('')
   let sourceEditorRef: ReturnType<typeof SourceEditor> | null = null
+  // P0-1: split view. `viewMode` tracks the editor layout:
+  //   'wysiwyg' — Tiptap only (default)
+  //   'source'  — CodeMirror only
+  //   'split'   — Tiptap (left) + CodeMirror (right) side-by-side
+  // `sourceMode` (legacy) is kept in sync as a derived flag so
+  // any other call site (toolbar tooltip, command palette) that
+  // tests the boolean still works.
+  let viewMode = $state<'wysiwyg' | 'source' | 'split'>('wysiwyg')
+  let splitWidth = $state(50) // percent for the WYSIWYG half
+  let splitResizing = $state(false)
   let instantRenderEnabled = $state(false)
   let qiVisible = $state(false)
   let qiQuery = $state('')
@@ -482,6 +492,18 @@
           // Sync content to Rust document
           syncToRust(t.id, md)
         }
+        // P0-1: in split view, also keep the SourceEditor in
+        // sync with the WYSIWYG half. We skip the update when
+        // the SourceEditor initiated the change (i.e. its
+        // `updating` flag is true); but since the SourceEditor
+        // toggles that flag on its own setContent path, we
+        // can simplify by always re-applying here — the
+        // resulting transaction is a no-op when the docs
+        // already match.
+        if (viewMode === 'split') {
+          sourceContent = md
+          sourceEditorRef?.setContent(md)
+        }
         updateStats(t?.id ?? myTabId)
         // Auto-save with configured interval (per-tab timer, 0 = disabled)
         if (autoSaveInterval > 0) {
@@ -793,7 +815,35 @@
   }
 
   function toggleSourceMode() {
-    if (sourceMode) {
+    // P0-1: legacy two-state toggle is now a 3-state cycle:
+    // wysiwyg → source → split → wysiwyg. The implementation
+    // is delegated to `cycleViewMode` so the command palette
+    // entry and the keyboard shortcut (Ctrl+/) hit the same
+    // path.
+    cycleViewMode()
+  }
+
+  // P0-1: cycle through the three editor layouts. Persists
+  // the markdown through `sourceContent` so the SourceEditor
+  // can read the latest content on first paint.
+  function cycleViewMode() {
+    const next: 'wysiwyg' | 'source' | 'split' =
+      viewMode === 'wysiwyg' ? 'source'
+      : viewMode === 'source' ? 'split'
+      : 'wysiwyg'
+    setViewMode(next)
+  }
+
+  function setViewMode(mode: 'wysiwyg' | 'source' | 'split') {
+    if (viewMode === mode) return
+    if (viewMode === 'wysiwyg') {
+      // Going to source/split: snapshot the current markdown
+      // so the source editor has fresh content to show.
+      if (editor) sourceContent = getMarkdown(editor)
+    } else if (viewMode === 'source' && mode !== 'source') {
+      // Leaving source-only: pull any pending edits from the
+      // source editor back into the tab content so the Tiptap
+      // editor (or both) reflects them.
       const md = sourceEditorRef?.getContent() ?? sourceContent
       if (md !== undefined) {
         const tab = getActiveTab()
@@ -802,21 +852,24 @@
           tab.dirty = true
         }
       }
-      sourceMode = false
-      requestAnimationFrame(() => {
-        // Re-find the editor container since it was replaced by SourceEditor
-        const container = document.querySelector('.editor-area') as HTMLElement | null
-        if (container && editor) {
-          editorContainer = container
-          initEditor()
-        }
-      })
-    } else {
-      if (editor) {
-        sourceContent = getMarkdown(editor)
+      if (mode === 'wysiwyg') {
+        // Re-attach the Tiptap editor to a fresh container.
+        requestAnimationFrame(() => {
+          const container = document.querySelector('.editor-area') as HTMLElement | null
+          if (container && editor) {
+            editorContainer = container
+            initEditor()
+          }
+        })
       }
-      sourceMode = true
     }
+    viewMode = mode
+    // Keep legacy flag in sync for any other call site.
+    sourceMode = mode === 'source'
+  }
+
+  function handleSplitResize(widthPercent: number) {
+    splitWidth = Math.min(80, Math.max(20, widthPercent))
   }
 
   function toggleSidebar() {
@@ -1394,7 +1447,7 @@
         <span class="tb-sep"></span>
         <button class="tb-btn" onclick={() => showSearch = !showSearch} title="Find & Replace (Ctrl+F)"><Search size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" class:active={sourceMode} onclick={toggleSourceMode} title="Source Mode (Ctrl+/)"><FileCode2 size={15} /></button>
+        <button class="tb-btn" class:active={viewMode !== 'wysiwyg'} onclick={toggleSourceMode} title="Cycle View Mode (Ctrl+/)"><FileCode2 size={15} /></button>
         <button class="tb-btn" class:active={instantRenderEnabled} onclick={() => { if (editor) { toggleInstantRender(editor.view); instantRenderEnabled = !instantRenderEnabled } }} title="Instant Render"><Sparkles size={15} /></button>
         <span class="tb-sep"></span>
         <button class="tb-btn" class:active={showOutline} onclick={toggleOutline} title="Outline">
@@ -1416,8 +1469,8 @@
         <SearchBar bind:visible={showSearch} {editor} />
       {/if}
 
-      <!-- Editor Area -->
-      {#if sourceMode}
+      <!-- Editor Area (P0-1: three layouts) -->
+      {#if viewMode === 'source'}
         <SourceEditor
           content={sourceContent}
           onUpdate={(md) => {
@@ -1430,6 +1483,38 @@
           }}
           bind:this={sourceEditorRef}
         />
+      {:else if viewMode === 'split'}
+        <div class="split-container">
+          <div class="split-pane" style="width: {splitWidth}%">
+            <div class="editor-area" bind:this={editorContainer}></div>
+          </div>
+          <ResizeHandle
+            currentWidth={splitWidth}
+            onResize={handleSplitResize}
+            onResizeStart={() => splitResizing = true}
+            onResizeEnd={() => splitResizing = false}
+          />
+          <div class="split-pane" style="width: {100 - splitWidth}%">
+            <SourceEditor
+              content={sourceContent}
+              onUpdate={(md) => {
+                const tab = getActiveTab()
+                if (tab) {
+                  tab.content = md
+                  tab.dirty = true
+                  updateStats(tab.id)
+                  // In split mode, also push the new markdown
+                  // into the Tiptap editor so the WYSIWYG half
+                  // stays in sync. We rely on the editor's
+                  // existing onChange to update `tab.content`
+                  // a second time (idempotent).
+                  if (editor) setContent(editor, md)
+                }
+              }}
+              bind:this={sourceEditorRef}
+            />
+          </div>
+        </div>
       {:else}
         <div class="editor-area" bind:this={editorContainer}></div>
       {/if}
