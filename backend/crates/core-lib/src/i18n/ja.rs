@@ -221,4 +221,12 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("tag_pane.close", "閉じる"),
     ("tag_pane.filter_placeholder", "タグをフィルター…"),
     ("tag_pane.click_to_filter", "クリックでワークスペースを #{name} で絞り込み"),
+    ("backlinks_pane.title", "バックリンク"),
+    ("backlinks_pane.empty", "バックリンクなし"),
+    ("backlinks_pane.loading", "読み込み中…"),
+    ("backlinks_pane.error", "バックリンクの読み込みに失敗: {msg}"),
+    ("backlinks_pane.refresh", "更新"),
+    ("backlinks_pane.close", "閉じる"),
+    ("backlinks_pane.no_active_page", "ドキュメントを開くとバックリンクが表示されます"),
+    ("backlinks_pane.open_source", "ソースを開く"),
 ];

@@ -221,4 +221,12 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("tag_pane.close", "Close"),
     ("tag_pane.filter_placeholder", "Filter tags…"),
     ("tag_pane.click_to_filter", "Click to filter workspace by #{name}"),
+    ("backlinks_pane.title", "Backlinks"),
+    ("backlinks_pane.empty", "No backlinks"),
+    ("backlinks_pane.loading", "Loading…"),
+    ("backlinks_pane.error", "Failed to load backlinks: {msg}"),
+    ("backlinks_pane.refresh", "Refresh"),
+    ("backlinks_pane.close", "Close"),
+    ("backlinks_pane.no_active_page", "Open a document to see its backlinks"),
+    ("backlinks_pane.open_source", "Open source document"),
 ];

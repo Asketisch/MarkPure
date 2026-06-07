@@ -94,6 +94,107 @@ pub fn cmd_get_workspace_tags(
     Ok(serde_json::json!({ "tags": tags }))
 }
 
+// ============================== Backlinks (P0-6) ==============================
+
+/// A single backlink hit: a file that links *to* the queried
+/// page, with a 1-line context excerpt so the renderer can
+/// show the user where the link is.
+#[derive(Debug, Clone, serde::Serialize)]
+struct Backlink {
+    /// Absolute path of the file containing the [[link]].
+    source_path: String,
+    /// 1-based line number where the link was found.
+    line: u64,
+    /// Trimmed content of the line (truncated to 240 chars).
+    context: String,
+}
+
+/// P0-6: return every [[Page]] / [[Page|Alias]] in the
+/// workspace whose `page` matches the given name (case
+/// insensitive, exact match — aliases don't match the
+/// target).
+///
+/// Scope: same as `cmd_get_workspace_tags` — `.md` /
+/// `.markdown` / `.mdx` only, up to `max_depth` deep.
+/// Unreadable files are skipped silently. The result is
+/// not paginated; the renderer is expected to handle
+/// long lists with virtual scrolling.
+pub fn cmd_get_backlinks(
+    params: &serde_json::Value,
+) -> std::result::Result<serde_json::Value, String> {
+    let page = params["page"]
+        .as_str()
+        .ok_or("Missing 'page' parameter")?;
+    let path_str = params["path"]
+        .as_str()
+        .ok_or("Missing 'path' parameter")?;
+    let root = Path::new(path_str);
+    if !root.exists() {
+        return Err(format!("Workspace path does not exist: {}", path_str));
+    }
+
+    let max_depth = params["max_depth"].as_u64().unwrap_or(10) as usize;
+    let show_hidden = params["show_hidden"].as_bool().unwrap_or(false);
+    let target = page.to_ascii_lowercase();
+
+    let mut hits: Vec<Backlink> = Vec::new();
+
+    for entry in WalkDir::new(root)
+        .max_depth(max_depth)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| show_hidden || !is_hidden(e))
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let ext = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_ascii_lowercase());
+        if !matches!(ext.as_deref(), Some("md") | Some("markdown") | Some("mdx")) {
+            continue;
+        }
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        for (line_no, line) in content.lines().enumerate() {
+            for link in markdown::extract_wikilinks(line) {
+                if link.page.to_ascii_lowercase() == target {
+                    let context = if line.chars().count() > 240 {
+                        let mut s: String = line.chars().take(240).collect();
+                        s.push('…');
+                        s
+                    } else {
+                        line.to_string()
+                    };
+                    hits.push(Backlink {
+                        source_path: path.to_string_lossy().to_string(),
+                        line: (line_no as u64) + 1,
+                        context,
+                    });
+                }
+            }
+        }
+    }
+
+    // Stable ordering: by file then line — easier to scan
+    // than the read order, which is filesystem-dependent.
+    hits.sort_by(|a, b| a.source_path.cmp(&b.source_path).then(a.line.cmp(&b.line)));
+
+    Ok(serde_json::json!({
+        "page": page,
+        "backlinks": hits.iter().map(|b| serde_json::json!({
+            "source_path": b.source_path,
+            "line": b.line,
+            "context": b.context,
+        })).collect::<Vec<_>>(),
+    }))
+}
+
 /// Cheap "is this entry a dotfile / dotdir?" check that matches
 /// the rule used elsewhere in the fs crate for hidden files.
 fn is_hidden(entry: &walkdir::DirEntry) -> bool {

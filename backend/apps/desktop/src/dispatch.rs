@@ -128,6 +128,9 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         // Workspace tag index (P0-7)
         "get_workspace_tags" => workspace_ops::cmd_get_workspace_tags(&msg.params),
 
+        // Backlinks (P0-6)
+        "get_backlinks" => workspace_ops::cmd_get_backlinks(&msg.params),
+
         // Document registry (Rust-owned text buffer)
         "doc_open" => editor_ops::cmd_doc_open(&msg.params, state),
         "doc_close" => editor_ops::cmd_doc_close(&msg.params, state),

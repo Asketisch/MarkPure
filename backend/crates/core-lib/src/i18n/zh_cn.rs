@@ -221,4 +221,12 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("tag_pane.close", "关闭"),
     ("tag_pane.filter_placeholder", "筛选标签…"),
     ("tag_pane.click_to_filter", "点击以在工作区中筛选 #{name}"),
+    ("backlinks_pane.title", "反链"),
+    ("backlinks_pane.empty", "无反链"),
+    ("backlinks_pane.loading", "加载中…"),
+    ("backlinks_pane.error", "加载反链失败：{msg}"),
+    ("backlinks_pane.refresh", "刷新"),
+    ("backlinks_pane.close", "关闭"),
+    ("backlinks_pane.no_active_page", "打开文档以查看其反链"),
+    ("backlinks_pane.open_source", "打开源文档"),
 ];

@@ -259,6 +259,35 @@ export async function getWorkspaceTags(
   return result?.tags ?? []
 }
 
+// ============================== Backlinks (P0-6) ==============================
+
+/** A single backlink hit: `source_path` is the file that
+ *  contains a `[[page]]`, `line` is the 1-based line number,
+ *  `context` is a trimmed excerpt of the line. */
+export interface Backlink {
+  source_path: string
+  line: number
+  context: string
+}
+
+/** Return every workspace document that links to `page` via
+ *  `[[page]]` or `[[page|alias]]` (alias ignored for matching).
+ *  Case-insensitive exact-name match. */
+export async function getBacklinks(
+  page: string,
+  path: string,
+  maxDepth = 10,
+  showHidden = false,
+): Promise<Backlink[]> {
+  const result = await ipc<{ backlinks: Backlink[] }>('get_backlinks', {
+    page,
+    path,
+    max_depth: maxDepth,
+    show_hidden: showHidden,
+  })
+  return result?.backlinks ?? []
+}
+
 // ============================== Clipboard ==============================
 
 /** Copy plain text to the OS clipboard. There's no Rust

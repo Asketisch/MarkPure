@@ -37,6 +37,7 @@
   import SearchBar from '$lib/components/workspace/SearchBar.svelte'
   import OutlinePanel from '$lib/components/workspace/OutlinePanel.svelte'
   import TagPanel from '$lib/components/workspace/TagPanel.svelte'
+  import BacklinksPanel from '$lib/components/workspace/BacklinksPanel.svelte'
   import WorkspaceSearch from '$lib/components/workspace/WorkspaceSearch.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
   import Dialog from '$lib/components/ui/Dialog.svelte'
@@ -105,6 +106,8 @@
   let showOutline = $state(false)
   let showTags = $state(false)
   let tagPanelRef: { refresh: () => void } | null = null
+  let showBacklinks = $state(false)
+  let backlinksPanelRef: { refresh: () => void } | null = null
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
   // Note: showFileMenu / showEditMenu / showExportSubmenu
   // moved to MenuBar.svelte (local UI state).
@@ -184,6 +187,7 @@
       case 'view.toggle_sidebar': return () => { showSidebar = !showSidebar; saveCurrentConfig() }
       case 'view.toggle_outline': return () => { showOutline = !showOutline }
       case 'view.toggle_tags': return () => { showTags = !showTags }
+      case 'view.toggle_backlinks': return () => { showBacklinks = !showBacklinks }
       case 'view.toggle_source_mode': return () => toggleSourceMode()
       case 'view.toggle_focus_mode': return () => toggleFocusMode()
       case 'view.toggle_zen_mode': return () => toggleZenMode()
@@ -313,6 +317,25 @@
   function getActiveTab(): Tab | undefined {
     return tabs.find(t => t.id === activeTabId)
   }
+
+  // P0-6: derived "page name" for the backlinks pane. We use
+  // the basename minus the `.md`/`.markdown`/`.mdx` extension
+  // so it matches the wikilink `[[Page]]` syntax. For untitled
+  // tabs (path === null) we fall back to the tab's display
+  // name, which is the placeholder the user sees in the
+  // tab bar.
+  function pageNameFromPath(path: string | null, fallback: string): string {
+    if (!path) return fallback
+    const sep = path.lastIndexOf('/')
+    const base = sep >= 0 ? path.slice(sep + 1) : path
+    return base.replace(/\.(md|markdown|mdx)$/i, '')
+  }
+
+  let currentBacklinkPage = $derived.by(() => {
+    const t = getActiveTab()
+    if (!t) return null
+    return pageNameFromPath(t.path, t.name.replace(/\.(md|markdown|mdx)$/i, ''))
+  })
 
   function getActiveContent(): string {
     const tab = getActiveTab()
@@ -955,6 +978,17 @@
     )
   }
 
+  // P0-6: open the source file backing a backlink hit. We
+  // reuse the existing `handleOpenFile` path so the new file
+  // gets pinned, registered in the Rust document registry,
+  // and rendered in the editor. The `line` argument is
+  // captured for a future "scroll to line" enhancement; the
+  // current `openFile` IPC doesn't accept a line number, so
+  // we ignore it for now.
+  async function handleBacklinkOpen(path: string, _line?: number) {
+    await handleOpenFile(path)
+  }
+
   function handleOutlineNavigate(item: { level: number; text: string; pos?: number }) {
     if (!editor) return
 
@@ -1101,6 +1135,9 @@
       // internally (300ms) so a burst of events only triggers
       // one rebuild.
       tagPanelRef?.refresh?.()
+      // P0-6: backlinks can change when any file is edited
+      // (a new `[[link]]` may have been added or removed).
+      backlinksPanelRef?.refresh?.()
     }
   }
 
@@ -1379,6 +1416,18 @@
       />
     {/if}
 
+    <!-- Backlinks Panel (P0-6) — shows every workspace doc
+         that links to the active tab's page. -->
+    {#if showBacklinks && !zenMode}
+      <BacklinksPanel
+        bind:this={backlinksPanelRef}
+        {workspacePath}
+        currentPage={currentBacklinkPage}
+        onOpenFile={handleBacklinkOpen}
+        onClose={() => showBacklinks = false}
+      />
+    {/if}
+
     <!-- Editor Panel -->
     <div class="editor-panel">
       {#if tabs.length === 0}
@@ -1459,6 +1508,12 @@
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
             <path d="M2 4 L8 4 M2 8 L13 8 M2 12 L10 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
             <circle cx="14.5" cy="4" r="1.2" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="tb-btn" class:active={showBacklinks} onclick={() => showBacklinks = !showBacklinks} title="Backlinks">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <path d="M2.5 8 L13 8 M9 4 L13 8 L9 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M3 4 L5 4 M3 8 L5 8 M3 12 L5 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
           </svg>
         </button>
       </div>
