@@ -229,4 +229,6 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("backlinks_pane.close", "Close"),
     ("backlinks_pane.no_active_page", "Open a document to see its backlinks"),
     ("backlinks_pane.open_source", "Open source document"),
+    ("toolbar.superscript", "Superscript"),
+    ("toolbar.subscript", "Subscript"),
 ];

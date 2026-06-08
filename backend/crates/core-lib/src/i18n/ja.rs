@@ -229,4 +229,6 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("backlinks_pane.close", "閉じる"),
     ("backlinks_pane.no_active_page", "ドキュメントを開くとバックリンクが表示されます"),
     ("backlinks_pane.open_source", "ソースを開く"),
+    ("toolbar.superscript", "上付き文字"),
+    ("toolbar.subscript", "下付き文字"),
 ];

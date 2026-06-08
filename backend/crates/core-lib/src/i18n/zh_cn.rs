@@ -229,4 +229,6 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("backlinks_pane.close", "关闭"),
     ("backlinks_pane.no_active_page", "打开文档以查看其反链"),
     ("backlinks_pane.open_source", "打开源文档"),
+    ("toolbar.superscript", "上标"),
+    ("toolbar.subscript", "下标"),
 ];

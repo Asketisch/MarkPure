@@ -78,7 +78,12 @@
     if (!workspacePath) return
     loading = true
     try {
-      tree = await getDirectoryTree(workspacePath, 5, showHidden)
+      // P1-10: depth bumped from 5 → 15. Five was the pre-fix
+      // ceiling; 15 covers the common "year/month/day/title"
+      // note-organising pattern plus a few extra levels. A
+      // future improvement is lazy-load on expand (see
+      // COMPETITOR_TODO P1-10).
+      tree = await getDirectoryTree(workspacePath, 15, showHidden)
       const dirs = await getExpandedDirs()
       expandedDirs = new Set(dirs)
     } catch (e) {

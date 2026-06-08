@@ -10,13 +10,21 @@ export function getPopupActiveIndex() { return popupActiveIndex }
 export function setPopupActiveIndex(i: number) { popupActiveIndex = i }
 export function getFilteredItemsCount() { return filteredItemsCount }
 
-export const QuickInsertExtension = Extension.create({
+export const QuickInsertExtension = Extension.create<{ triggerChar: string }>({
   name: 'quickInsert',
 
   addOptions() {
     return {
-      suggestion: {
-        char: '@',
+      triggerChar: '@',
+    }
+  },
+
+  addProseMirrorPlugins() {
+    const trigger = this.options.triggerChar
+    return [
+      Suggestion({
+        editor: this.editor,
+        char: trigger,
         command: ({ editor, range, props }: { editor: any; range: any; props: QuickInsertItem }) => {
           editor.chain().focus().deleteRange(range).run()
           const chain = editor.chain().focus()
@@ -72,15 +80,6 @@ export const QuickInsertExtension = Extension.create({
             },
           }
         },
-      },
-    }
-  },
-
-  addProseMirrorPlugins() {
-    return [
-      Suggestion({
-        editor: this.editor,
-        ...this.options.suggestion,
       }),
     ]
   },

@@ -36,6 +36,11 @@ export const commandCatalog: CommandDef[] = [
   { id: 'edit.find', title: 'Find in File', category: 'Edit', keywords: ['search'] },
   { id: 'edit.replace', title: 'Replace in File', category: 'Edit' },
   { id: 'edit.select_same_word', title: 'Select Next Same Word', category: 'Edit' },
+  { id: 'edit.copy_as_markdown', title: 'Copy as Markdown', category: 'Edit', keywords: ['clipboard', 'paste'] },
+  { id: 'edit.copy_as_html', title: 'Copy as HTML', category: 'Edit', keywords: ['clipboard', 'paste', 'rich'] },
+  { id: 'edit.copy_as_plain', title: 'Copy as Plain Text', category: 'Edit', keywords: ['clipboard', 'paste', 'text'] },
+  { id: 'format.superscript', title: 'Toggle Superscript', category: 'Format', keywords: ['sup', 'exponent', 'power'] },
+  { id: 'format.subscript', title: 'Toggle Subscript', category: 'Format', keywords: ['sub', 'index', 'chemical'] },
 
   // View
   { id: 'view.toggle_sidebar', title: 'Toggle Sidebar', category: 'View' },

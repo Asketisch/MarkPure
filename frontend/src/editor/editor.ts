@@ -1,4 +1,4 @@
-import { Editor, Extension } from '@tiptap/core'
+import { Editor, Extension, mergeAttributes } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
 import { Table } from '@tiptap/extension-table'
@@ -11,6 +11,7 @@ import { Image } from '@tiptap/extension-image'
 import { Link } from '@tiptap/extension-link'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { Highlight } from '@tiptap/extension-highlight'
+import { SupSubExtension } from '../extensions/editing/sup-sub-extension'
 import { SearchExtension } from '../extensions/editing/search-extension'
 import { CodeBlockCMExtension } from '../extensions/blocks/code-block-cm-extension'
 import { MathExtension } from '../extensions/blocks/math-extension'
@@ -97,7 +98,15 @@ export function createEditor(opts: EditorOptions): Editor {
       TocExtension,
       FootnoteRefExtension,
       InstantRenderExtension,
-      QuickInsertExtension,
+      QuickInsertExtension.configure({ triggerChar: '@' }),
+      // P1-1: slash command mirrors the @ quick-insert popup
+      // but uses `/` as the trigger. Both can coexist; the
+      // popup state is shared via the existing window global.
+      QuickInsertExtension.configure({ triggerChar: '/' }),
+      // P2-1: inline sup/sub marks. See
+      // `extensions/editing/sup-sub-extension.ts` for the mark
+      // definitions.
+      SupSubExtension,
       SearchExtension,
       DropHandlerExtension.configure({
         onFilesDropped,

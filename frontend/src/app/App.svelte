@@ -62,7 +62,8 @@
     Bold, Italic, Strikethrough, Code,
     Quote, List, ListOrdered, ListTodo,
     Table, Minus, Search, FileCode2,
-    Undo2, Redo2, Sparkles, X
+    Undo2, Redo2, Sparkles, X,
+    Superscript as Sup, Subscript as Sub
   } from 'lucide-svelte'
 
   interface Tab {
@@ -184,6 +185,11 @@
       case 'file.export_pdf': return () => handleExportPdf()
       case 'file.export_word': return () => handleExportWord()
       case 'edit.find': return () => { showSearch = true }
+      case 'edit.copy_as_markdown': return () => { void handleCopyAs('markdown') }
+      case 'edit.copy_as_html': return () => { void handleCopyAs('html') }
+      case 'edit.copy_as_plain': return () => { void handleCopyAs('plain') }
+      case 'format.superscript': return () => { editor?.chain().focus().toggleMark('superscript').run() }
+      case 'format.subscript': return () => { editor?.chain().focus().toggleMark('subscript').run() }
       case 'view.toggle_sidebar': return () => { showSidebar = !showSidebar; saveCurrentConfig() }
       case 'view.toggle_outline': return () => { showOutline = !showOutline }
       case 'view.toggle_tags': return () => { showTags = !showTags }
@@ -1029,6 +1035,30 @@
     })
   }
 
+  // P1-6: copy the current selection (or full doc) in a
+  // specific format to the system clipboard. Three modes:
+  //   - 'markdown' → the raw `getMarkdown()` output
+  //   - 'html'     → the editor's rendered HTML
+  //   - 'plain'    → the editor's plain text
+  // The browser's Clipboard API is fine for all three; we
+  // don't need a Rust IPC for a pure copy.
+  async function handleCopyAs(format: 'markdown' | 'html' | 'plain') {
+    if (!editor) return
+    let text = ''
+    if (format === 'markdown') {
+      text = getMarkdown(editor)
+    } else if (format === 'html') {
+      text = editor.getHTML()
+    } else {
+      text = editor.getText()
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch (e) {
+      console.error('Failed to copy:', e)
+    }
+  }
+
   async function handleExportHtml() {
     const tab = getActiveTab()
     if (!tab) return
@@ -1478,6 +1508,8 @@
         <button class="tb-btn" onclick={toggleItalic} title="Italic (Ctrl+I)"><Italic size={15} /></button>
         <button class="tb-btn" onclick={toggleStrike} title="Strikethrough"><Strikethrough size={15} /></button>
         <button class="tb-btn" onclick={toggleCode} title="Inline Code"><Code size={15} /></button>
+        <button class="tb-btn" onclick={() => editor?.chain().focus().toggleMark('superscript').run()} title="Superscript (P2-1)"><Sup size={15} /></button>
+        <button class="tb-btn" onclick={() => editor?.chain().focus().toggleMark('subscript').run()} title="Subscript (P2-1)"><Sub size={15} /></button>
         <span class="tb-sep"></span>
         <button class="tb-btn" onclick={toggleCodeBlock} title="Code Block"><FileCode2 size={15} /></button>
         <button class="tb-btn" onclick={toggleBlockquote} title="Blockquote"><Quote size={15} /></button>
