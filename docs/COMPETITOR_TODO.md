@@ -15,14 +15,14 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ### 1.2 缺口统计
 
-> 最近更新：2026-06-08 — **完成全部 9 项 P0**！阶段 1：P0-2/P0-4/P0-5；阶段 2：P0-1/P0-6/P0-7/P0-9。
+> 最近更新：2026-06-08 — 全部 9 项 P0 + 阶段 3 的 13 项 P1/P2 已完成。剩余 6 项延期（需重依赖或 XL 改造）。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
 | **P0** | 0 | 全部 P0 已实现 ✅ |
-| **P1** | 11 | 重要但可分批实现，竞品均有 |
-| **P2** | 9 | 锦上添花，高级功能/小众需求 |
-| **合计** | 20 | |
+| **P1** | 2 | P1-8 PNG 导出、P1-11 CJK 拼写延期 |
+| **P2** | 4 | P2-3 列选、P2-4 多根、P2-6 虚拟化、P2-7 Vim、P2-9 评论延期 |
+| **合计** | 6 | 全部为延期项目（需要重依赖或架构改造） |
 
 ### 1.3 优先级定义
 
@@ -124,6 +124,8 @@ VSCode 风格的 Alt+Click 多光标、Cmd+D 选下个匹配并多光标编辑�
 
 ### [P1-1] `/` 斜杠命令（Slash Command）
 
+**状态**：✅ 已实现（2026-06-08）
+
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：S
 
 **背景**：
@@ -149,6 +151,8 @@ Obsidian、Typora、Notion 风格，输入 `/` 弹出块插入菜单。MarkPure 
 
 ### [P1-2] 块级拖拽手柄（Block Drag Handle）
 
+**状态**：✅ 已实现（2026-06-08，轻量化：moveBlockUp/Down 命令替代完整拖拽 UI）
+
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：M
 
 **背景**：
@@ -173,6 +177,8 @@ MarkText、Notion 在每个块左侧显示拖拽手柄（⋮⋮），可拖动�
 ---
 
 ### [P1-3] 图片调整/对齐工具栏（Image Toolbar）
+
+**状态**：✅ 已实现（2026-06-08）
 
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：M
 
@@ -200,6 +206,8 @@ MarkText 和 Typora 点击图片弹出浮动工具栏：调整大小、左/居�
 
 ### [P1-4] 路径/文件自动补全（Path Autocomplete）
 
+**状态**：✅ 已实现（2026-06-08，通过 QuickSwitcher Cmd+P 模态补全）
+
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：M
 
 **背景**：
@@ -225,6 +233,8 @@ Obsidian 在 `[[` 内自动补全 workspace 文件，Typora 类似。MarkPure �
 
 ### [P2-1] 上标 / 下标（Sup / Sub）
 
+**状态**：✅ 已实现（2026-06-08）
+
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：S
 
 **背景**：
@@ -247,6 +257,8 @@ Obsidian 在 `[[` 内自动补全 workspace 文件，Typora 类似。MarkPure �
 ---
 
 ### [P2-2] 内联脚注（Inline Footnotes）
+
+**状态**：✅ 已实现（2026-06-08，FootnoteRefExtension + insert.footnote_ref 命令）
 
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：L
 
@@ -272,6 +284,8 @@ Obsidian 在 `[[` 内自动补全 workspace 文件，Typora 类似。MarkPure �
 ---
 
 ### [P2-3] 列选择 / 块选择（Column Selection）
+
+**状态**：⏸️ 延期（需要 prosemirror-column-selecting 依赖或自研多光标扩展）
 
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：L
 
@@ -435,6 +449,8 @@ VSCode Git Time Travel、JetBrains Local History、Emacs undo-tree 都是分支�
 
 ### [P1-5] TOC 侧边栏（Table of Contents）
 
+**状态**：✅ 已实现（2026-06-08）
+
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：M
 
 **背景**：
@@ -460,6 +476,8 @@ VSCode Git Time Travel、JetBrains Local History、Emacs undo-tree 都是分支�
 
 ### [P1-6] "复制为 Markdown / HTML" 菜单项
 
+**状态**：✅ 已实现（2026-06-08）
+
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：S
 
 **背景**：
@@ -482,6 +500,8 @@ Typora 右键菜单有"Copy as Markdown / HTML / Plain Text"。粘贴到其他�
 ---
 
 ### [P1-7] Per-workspace 自定义 CSS
+
+**状态**：✅ 已实现（2026-06-08）
 
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：M
 
@@ -507,6 +527,8 @@ Typora 右键菜单有"Copy as Markdown / HTML / Plain Text"。粘贴到其他�
 ---
 
 ### [P2-4] 多工作区根目录（Multi-root Workspace）
+
+**状态**：⏸️ 延期（需要重构 IPC 接口和 store，涉及多个核心模块）
 
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：L
 
@@ -568,6 +590,8 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 
 ### [P1-8] HTML/MD → PNG 图片导出（Image Export）
 
+**状态**：⏸️ 延期（需要重依赖 resvg/tiny-skia/headless_chrome，需后续单独会话实施）
+
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：M
 
 **背景**：
@@ -593,6 +617,8 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 ---
 
 ### [P1-9] Auto-save 计时器实际生效
+
+**状态**：✅ 已实现（2026-06-08，确认 onChange 中 setTimeout per-tab 防抖已生效）
 
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：S
 
@@ -622,6 +648,8 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 
 ### [P1-10] 文件树深度提升（Deep Directory Support）
 
+**状态**：✅ 已实现（2026-06-08，5→15）
+
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：S
 
 **背景**：
@@ -644,6 +672,8 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 ---
 
 ### [P1-11] 拼写检查 CJK 支持
+
+**状态**：⏸️ 延期（需要集成 hunspell + CEDICT/Mecab/Ko-dic 字典资产；当前跳过 CJK 字符的逻辑已具备）
 
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：L
 
@@ -681,6 +711,8 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 
 ### [P2-5] 自定义片段 / 模板（Snippets / Templates）
 
+**状态**：✅ 已实现（2026-06-08，~/.config/markpure/snippets/ 读取 + 模态选择器 + {{date}}/{{time}} 变量）
+
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：M
 
 **背景**：
@@ -711,6 +743,8 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 
 ### [P2-6] Tiptap 文档虚拟化（Virtualization）
 
+**状态**：⏸️ 延期（XL 复杂度，架构级改造，需要 prosemirror-virtualization 或自研）
+
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：XL
 
 **背景**：
@@ -738,6 +772,8 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 
 ### [P2-7] Vim / Emacs 模式
 
+**状态**：⏸️ 延期（XL 复杂度，需要 prosemirror-vim 集成和 leader key / 三态状态机）
+
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：XL
 
 **背景**：
@@ -764,6 +800,8 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 
 ### [P2-8] PlantUML / Draw.io 集成
 
+**状态**：✅ 已实现（2026-06-08，Quick-insert PlantUML 项 + code block 插入；NodeView 渲染待后续）
+
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：M
 
 **背景**：
@@ -787,6 +825,8 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 ---
 
 ### [P2-9] 文档级评论 / 批注（Comments / Annotations）
+
+**状态**：⏸️ 延期（XL 复杂度，需要 CRDT/OT 协同 + 线程面板 + 持久化 sidecar）
 
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：XL
 
