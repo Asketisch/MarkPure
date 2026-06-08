@@ -131,6 +131,12 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> IpcResponse {
         // Backlinks (P0-6)
         "get_backlinks" => workspace_ops::cmd_get_backlinks(&msg.params),
 
+        // Per-workspace CSS (P1-7)
+        "load_workspace_styles" => workspace_ops::cmd_load_workspace_styles(&msg.params),
+
+        // Snippets (P2-5)
+        "list_snippets" => workspace_ops::cmd_list_snippets(),
+
         // Document registry (Rust-owned text buffer)
         "doc_open" => editor_ops::cmd_doc_open(&msg.params, state),
         "doc_close" => editor_ops::cmd_doc_close(&msg.params, state),

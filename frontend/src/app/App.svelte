@@ -24,6 +24,8 @@
     openDroppedFiles,
     savePastedImage,
     getDirectoryTree,
+    loadWorkspaceStyles,
+    listSnippets,
   } from '$lib/editor/commands'
   import type { DocStats, AppConfig, FileChangeEvent, FileInfo } from '$lib/editor/commands'
   import type { Editor } from '@tiptap/core'
@@ -109,6 +111,12 @@
   let tagPanelRef: { refresh: () => void } | null = null
   let showBacklinks = $state(false)
   let backlinksPanelRef: { refresh: () => void } | null = null
+  // P1-7: per-workspace CSS. `workspaceStyles` is the
+  // concatenated contents of `<workspace>/.markpure/styles/*.css`
+  // and is rendered into a global <style> via the svelte:head
+  // block below. We re-fetch whenever the workspace changes
+  // and on file-change events that touch the styles dir.
+  let workspaceStyles = $state('')
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
   // Note: showFileMenu / showEditMenu / showExportSubmenu
   // moved to MenuBar.svelte (local UI state).
@@ -190,6 +198,13 @@
       case 'edit.copy_as_plain': return () => { void handleCopyAs('plain') }
       case 'format.superscript': return () => { editor?.chain().focus().toggleMark('superscript').run() }
       case 'format.subscript': return () => { editor?.chain().focus().toggleMark('subscript').run() }
+      case 'block.move_up': return () => { (editor as any)?.commands.moveBlockUp?.() }
+      case 'block.move_down': return () => { (editor as any)?.commands.moveBlockDown?.() }
+      case 'image.align_left': return () => setImageAlign('left')
+      case 'image.align_center': return () => setImageAlign('center')
+      case 'image.align_right': return () => setImageAlign('right')
+      case 'image.align_inline': return () => setImageAlign('inline')
+      case 'image.delete': return () => { editor?.chain().focus().deleteSelection().run() }
       case 'view.toggle_sidebar': return () => { showSidebar = !showSidebar; saveCurrentConfig() }
       case 'view.toggle_outline': return () => { showOutline = !showOutline }
       case 'view.toggle_tags': return () => { showTags = !showTags }
@@ -218,6 +233,7 @@
       case 'insert.toc': return () => insertToc()
       case 'insert.footnote_ref': return () => insertFootnoteRef()
       case 'insert.fold': return () => editor?.commands.foldSection?.()
+      case 'insert.snippet': return () => { void openSnippetPicker() }
       default: return () => {}
     }
   }
@@ -1035,6 +1051,83 @@
     })
   }
 
+  // P2-5: simple snippet picker. We don't yet support
+  // shortcode+Tab (the `bodyParser` would need to intercept
+  // keystrokes mid-line) — instead the user invokes this
+  // via the command palette and gets a quick input modal.
+  // The body's `{{date}}` / `{{time}}` placeholders are
+  // expanded before insertion.
+  let snippetPickerOpen = $state(false)
+  let snippetFilter = $state('')
+  let snippetCache = $state<{ name: string; content: string }[]>([])
+
+  async function openSnippetPicker() {
+    if (!editor) return
+    try {
+      snippetCache = await listSnippets()
+    } catch (e) {
+      console.error('Failed to load snippets:', e)
+      snippetCache = []
+    }
+    snippetFilter = ''
+    snippetPickerOpen = true
+  }
+
+  function expandSnippetVars(s: string): string {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return s
+      .replaceAll('{{date}}', `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`)
+      .replaceAll('{{time}}', `${pad(now.getHours())}:${pad(now.getMinutes())}`)
+      .replaceAll('{{year}}', String(now.getFullYear()))
+  }
+
+  function applySnippet(s: { name: string; content: string }) {
+    if (!editor) return
+    const expanded = expandSnippetVars(s.content)
+    editor.chain().focus().insertContent(expanded).run()
+    snippetPickerOpen = false
+  }
+
+  let visibleSnippets = $derived(
+    snippetFilter.trim()
+      ? snippetCache.filter(s => s.name.toLowerCase().includes(snippetFilter.toLowerCase()))
+      : snippetCache,
+  )
+
+  // P1-3: write the `align` attribute on the currently
+  // selected image node.
+  function setImageAlign(align: 'left' | 'center' | 'right' | 'inline') {
+    if (!editor) return
+    const { state } = editor
+    const { selection } = state
+    const fromPos = selection.$from
+    let imagePos: number | null = null
+    state.doc.nodesBetween(fromPos.pos, fromPos.pos, (node, pos) => {
+      if (node.type.name === 'image') {
+        imagePos = pos
+        return false
+      }
+    })
+    if (imagePos === null) {
+      // Selection might be on the figure — check the
+      // resolved parent.
+      for (let d = fromPos.depth; d > 0; d--) {
+        const n = fromPos.node(d)
+        if (n.type.name === 'image') {
+          imagePos = fromPos.before(d)
+          break
+        }
+      }
+    }
+    if (imagePos === null) return
+    const tr = editor.state.tr.setNodeMarkup(imagePos, undefined, {
+      ...state.doc.nodeAt(imagePos)?.attrs,
+      align,
+    })
+    editor.view.dispatch(tr)
+  }
+
   // P1-6: copy the current selection (or full doc) in a
   // specific format to the system clipboard. Three modes:
   //   - 'markdown' → the raw `getMarkdown()` output
@@ -1171,6 +1264,18 @@
       // P0-6: backlinks can change when any file is edited
       // (a new `[[link]]` may have been added or removed).
       backlinksPanelRef?.refresh?.()
+      // P1-7: if a CSS file under .markpure/styles/ was
+      // changed, re-load the styles. We debounce 300ms via
+      // a small in-place timer to coalesce rapid save bursts.
+      const styleChange = events.some(e => e.path.includes('.markpure/styles/') && e.path.endsWith('.css'))
+      if (styleChange && workspacePath) {
+        clearTimeout((window as any).__mt_style_reload_timer)
+        ;(window as any).__mt_style_reload_timer = setTimeout(() => {
+          void loadWorkspaceStyles(workspacePath!).then(s => {
+            workspaceStyles = s.css
+          })
+        }, 300)
+      }
     }
   }
 
@@ -1179,6 +1284,12 @@
     if (path) {
       watchDirectory(path).catch((e) => console.error('Failed to watch directory:', e))
       onFileChanges(handleFileChanges)
+      // P1-7: load any per-workspace CSS snippets.
+      void loadWorkspaceStyles(path).then(s => {
+        workspaceStyles = s.css
+      })
+    } else {
+      workspaceStyles = ''
     }
     return () => {
       offFileChanges()
@@ -1382,6 +1493,15 @@
 
 <svelte:window onclick={hideTabContextMenu} oncontextmenu={hideTabContextMenu} />
 
+<!-- P1-7: per-workspace CSS. Re-rendered whenever
+     `workspaceStyles` changes; the svelte:head approach
+     makes the styles global to the document. -->
+<svelte:head>
+  {#if workspaceStyles}
+    {@html `<style data-source="workspace-styles">${workspaceStyles}</style>`}
+  {/if}
+</svelte:head>
+
 {#if !ready}
   <div class="app-bootstrap" aria-hidden="true">
     <div class="app-bootstrap-spinner"></div>
@@ -1434,7 +1554,12 @@
 
     <!-- Outline Panel (Right Side) -->
     {#if showOutline && !zenMode}
-      <OutlinePanel {editor} onNavigate={handleOutlineNavigate} onClose={() => showOutline = false} />
+      <OutlinePanel
+        {editor}
+        onNavigate={handleOutlineNavigate}
+        onClose={() => showOutline = false}
+        onInsertToc={() => insertToc()}
+      />
     {/if}
 
     <!-- Tag Panel (Right Side, P0-7). Rendered before the
@@ -1630,6 +1755,39 @@
           onConfirm={() => { void reloadTabFromDisk(fileReloadPrompt!.tabId) }}
           onClose={() => { fileReloadPrompt = null }}
         />
+      {/if}
+
+      <!-- Snippet Picker (P2-5). A simple list + filter modal
+           overlaid on top of the editor. Selection inserts the
+           expanded snippet at the cursor. -->
+      {#if snippetPickerOpen}
+        <div class="snippet-picker-backdrop" onclick={() => snippetPickerOpen = false}>
+          <div class="snippet-picker" onclick={(e) => e.stopPropagation()}>
+            <div class="snippet-picker-header">
+              <input
+                type="text"
+                class="snippet-picker-input"
+                placeholder="Filter snippets…"
+                bind:value={snippetFilter}
+                autofocus
+              />
+            </div>
+            <ul class="snippet-picker-list">
+              {#each visibleSnippets as s (s.name)}
+                <li>
+                  <button class="snippet-picker-item" onclick={() => applySnippet(s)}>
+                    <span class="snippet-picker-name">{s.name}</span>
+                    <span class="snippet-picker-preview">{s.content.slice(0, 80).replaceAll('\n', ' ⏎ ')}</span>
+                  </button>
+                </li>
+              {:else}
+                <li class="snippet-picker-empty">
+                  {snippetCache.length === 0 ? 'No snippets found. Add .md files to ~/.config/markpure/snippets/.' : 'No matching snippets.'}
+                </li>
+              {/each}
+            </ul>
+          </div>
+        </div>
       {/if}
     </div>
   </div>

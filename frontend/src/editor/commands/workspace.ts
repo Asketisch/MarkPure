@@ -288,6 +288,36 @@ export async function getBacklinks(
   return result?.backlinks ?? []
 }
 
+// ============================== Per-workspace CSS (P1-7) ==============================
+
+export interface WorkspaceStyles {
+  css: string
+  files: string[]
+}
+
+/** Read every `*.css` under `<workspace>/.markpure/styles/`
+ *  and return the concatenated text plus the list of file
+ *  names. Empty when the directory doesn't exist. */
+export async function loadWorkspaceStyles(path: string): Promise<WorkspaceStyles> {
+  const result = await ipc<WorkspaceStyles>('load_workspace_styles', { path })
+  return result ?? { css: '', files: [] }
+}
+
+// ============================== Snippets (P2-5) ==============================
+
+export interface Snippet {
+  name: string
+  content: string
+}
+
+/** List all user-defined snippets stored under
+ *  `~/.config/markpure/snippets/`. Each `.md` file becomes
+ *  one snippet (filename minus `.md` is the shortcode). */
+export async function listSnippets(): Promise<Snippet[]> {
+  const result = await ipc<{ snippets: Snippet[] }>('list_snippets')
+  return result?.snippets ?? []
+}
+
 // ============================== Clipboard ==============================
 
 /** Copy plain text to the OS clipboard. There's no Rust

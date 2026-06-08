@@ -140,6 +140,24 @@ export const quickInsertItems: QuickInsertItem[] = [
     action: (c) => c.insertMermaid(),
   },
   {
+    // P2-8: PlantUML block. We currently insert a fenced
+    // ```plantuml code block (mirroring mermaid). A future
+    // addition is a PlantUML nodeview that previews the
+    // rendered diagram via a PlantUML server or jar; the
+    // fenced block round-trips through the markdown export
+    // pipeline unchanged.
+    title: 'PlantUML Diagram',
+    subtitle: '@startuml\n  A --> B\n@enduml',
+    label: 'plantuml',
+    category: 'Advanced',
+    icon: '◊',
+    action: (c) => c.insertContent({
+      type: 'codeBlock',
+      attrs: { language: 'plantuml' },
+      content: [{ type: 'text', text: '@startuml\n  Alice -> Bob: Hello\n@enduml' }],
+    }),
+  },
+  {
     title: 'Table of Contents',
     subtitle: '<!-- TOC -->',
     label: 'toc',

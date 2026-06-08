@@ -8,10 +8,12 @@ import { TableHeader } from '@tiptap/extension-table-header'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import { Image } from '@tiptap/extension-image'
+import { ImageWithAlign } from '../extensions/blocks/image-extension'
 import { Link } from '@tiptap/extension-link'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { Highlight } from '@tiptap/extension-highlight'
 import { SupSubExtension } from '../extensions/editing/sup-sub-extension'
+import { MoveBlockExtension } from '../extensions/editing/move-block-extension'
 import { SearchExtension } from '../extensions/editing/search-extension'
 import { CodeBlockCMExtension } from '../extensions/blocks/code-block-cm-extension'
 import { MathExtension } from '../extensions/blocks/math-extension'
@@ -88,7 +90,13 @@ export function createEditor(opts: EditorOptions): Editor {
       TableHeader,
       TaskList,
       TaskItem.configure({ nested: true }),
-      Image,
+      ImageWithAlign.configure({
+        // P1-3: enable the extended `align` and `width` attrs
+        // declared in image-extension.ts. The base Image
+        // extension is kept imported for its other helpers
+        // (paste rule, etc.) but the registered schema is
+        // ImageWithAlign.
+      }),
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: 'Start writing markdown...' }),
       Highlight,
@@ -107,6 +115,12 @@ export function createEditor(opts: EditorOptions): Editor {
       // `extensions/editing/sup-sub-extension.ts` for the mark
       // definitions.
       SupSubExtension,
+      // P1-2 (lightweight): move the current top-level block
+      // up/down. Pairs with toolbar buttons / command-palette
+      // entries. A full drag-handle UI requires
+      // tiptap-extension-global-drag-handle (not installed);
+      // see COMPETITOR_TODO P1-2.
+      MoveBlockExtension,
       SearchExtension,
       DropHandlerExtension.configure({
         onFilesDropped,

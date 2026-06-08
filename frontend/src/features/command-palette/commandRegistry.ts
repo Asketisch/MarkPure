@@ -41,6 +41,13 @@ export const commandCatalog: CommandDef[] = [
   { id: 'edit.copy_as_plain', title: 'Copy as Plain Text', category: 'Edit', keywords: ['clipboard', 'paste', 'text'] },
   { id: 'format.superscript', title: 'Toggle Superscript', category: 'Format', keywords: ['sup', 'exponent', 'power'] },
   { id: 'format.subscript', title: 'Toggle Subscript', category: 'Format', keywords: ['sub', 'index', 'chemical'] },
+  { id: 'block.move_up', title: 'Move Block Up', category: 'Block', keywords: ['reorder', 'drag', 'organize'] },
+  { id: 'block.move_down', title: 'Move Block Down', category: 'Block', keywords: ['reorder', 'drag', 'organize'] },
+  { id: 'image.align_left', title: 'Align Image Left', category: 'Image', keywords: ['picture', 'float', 'wrap'] },
+  { id: 'image.align_center', title: 'Align Image Center', category: 'Image', keywords: ['picture', 'center'] },
+  { id: 'image.align_right', title: 'Align Image Right', category: 'Image', keywords: ['picture', 'float', 'wrap'] },
+  { id: 'image.align_inline', title: 'Align Image Inline', category: 'Image', keywords: ['picture', 'inline'] },
+  { id: 'image.delete', title: 'Delete Image', category: 'Image', keywords: ['picture', 'remove'] },
 
   // View
   { id: 'view.toggle_sidebar', title: 'Toggle Sidebar', category: 'View' },
@@ -81,4 +88,5 @@ export const commandCatalog: CommandDef[] = [
   { id: 'insert.toc', title: 'Insert Table of Contents', category: 'Insert', keywords: ['outline', 'navigation'] },
   { id: 'insert.footnote_ref', title: 'Insert Footnote Reference', category: 'Insert', keywords: ['reference', 'note', 'cite'] },
   { id: 'insert.fold', title: 'Fold Section', category: 'Insert' },
+  { id: 'insert.snippet', title: 'Insert Snippet…', category: 'Insert', keywords: ['template', 'shortcode', 'reuse'] },
 ]

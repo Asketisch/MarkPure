@@ -561,12 +561,132 @@ html, body, #app {
   margin: 1.2em 0;
 }
 
+/* P2-5: snippet picker modal. Sits above the editor-area
+   z-index, no portal needed. */
+.snippet-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 20vh;
+  z-index: 9000;
+}
+
+.snippet-picker {
+  width: 480px;
+  max-width: 90vw;
+  max-height: 60vh;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.snippet-picker-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.snippet-picker-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.snippet-picker-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.snippet-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.snippet-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.snippet-picker-item:hover {
+  background: var(--menu-hover-bg);
+}
+
+.snippet-picker-name {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.snippet-picker-preview {
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.snippet-picker-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 /* Image */
 .ProseMirror img {
   max-width: 100%;
   height: auto;
   border-radius: 4px;
   margin: 0.5em 0;
+}
+
+/* P1-3: image alignment via the figure wrapper. The
+   floating image toolbar writes `align-left|center|right`
+   onto the figure; CSS floats/inlines accordingly. */
+.ProseMirror figure.align-left {
+  float: left;
+  margin-right: 1em;
+  max-width: 50%;
+}
+.ProseMirror figure.align-right {
+  float: right;
+  margin-left: 1em;
+  max-width: 50%;
+}
+.ProseMirror figure.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+.ProseMirror figure.align-left img,
+.ProseMirror figure.align-right img,
+.ProseMirror figure.align-center img {
+  display: inline-block;
 }
 
 /* Link */
