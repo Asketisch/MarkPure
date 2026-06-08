@@ -74,22 +74,41 @@
     }
   }
 
+  // Sequence counter for loadTree() so concurrent calls don't
+  // clobber each other out of order. Module-scoped `let`, NOT
+  // `$state` — we don't want Svelte to react to it.
+  let loadSeq = 0
+
   async function loadTree() {
     if (!workspacePath) return
-    loading = true
+    // P0-5 flicker fix: only flash the "Loading…" overlay on
+    // the *initial* load when the tree is empty. Background
+    // refreshes from the file watcher keep the existing tree
+    // on screen until the new tree is in hand, eliminating the
+    // 1-3 Hz "Loading…" / real-tree swap the user was seeing
+    // as constant flicker. `isInitial` is captured once at
+    // entry so an await that races a workspace close doesn't
+    // flip the loading state.
+    const isInitial = tree.length === 0
+    if (isInitial) loading = true
+    const seq = ++loadSeq
     try {
       // P1-10: depth bumped from 5 → 15. Five was the pre-fix
       // ceiling; 15 covers the common "year/month/day/title"
       // note-organising pattern plus a few extra levels. A
       // future improvement is lazy-load on expand (see
       // COMPETITOR_TODO P1-10).
-      tree = await getDirectoryTree(workspacePath, 15, showHidden)
+      const next = await getDirectoryTree(workspacePath, 15, showHidden)
+      if (seq !== loadSeq) return  // a newer call superseded us
+      tree = next
       const dirs = await getExpandedDirs()
+      if (seq !== loadSeq) return
       expandedDirs = new Set(dirs)
     } catch (e) {
       console.error('Failed to load tree:', e)
+    } finally {
+      if (isInitial) loading = false
     }
-    loading = false
   }
 
   function toggleDir(path: string) {
