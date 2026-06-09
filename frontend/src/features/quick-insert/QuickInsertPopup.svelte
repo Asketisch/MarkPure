@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { quickInsertItems, searchQuickInsert, type QuickInsertItem } from '$lib/extensions/quick-insert-config'
-  import { getPopupActiveIndex, setPopupActiveIndex } from '$lib/extensions/blocks/quick-insert-extension'
   import { useI18n } from '$lib/stores/i18n.svelte'
 
   const i18n = useI18n()
@@ -73,9 +72,21 @@
   }
 
   onMount(() => {
-    // Listen for keyboard-driven navigation from the extension
+    // Listen for keyboard-driven navigation from the extension.
+    // The extension emits a *delta* (+1 / -1) rather than an
+    // absolute index, so the popup applies the delta to its own
+    // activeIndex. This keeps index state local to the popup,
+    // which means two QuickInsertExtension instances (e.g. one
+    // for `@` and one for `/`) can no longer clobber each
+    // other's selection — the previous bug that left the
+    // Suggestion plugin in a state that swallowed input.
     const handleNavigate = (e: Event) => {
-      activeIndex = (e as CustomEvent).detail
+      const detail = (e as CustomEvent).detail
+      const delta = detail?.delta
+      if (typeof delta !== 'number') return
+      const n = filteredItems.length
+      if (n === 0) return
+      activeIndex = ((activeIndex + delta) % n + n) % n
       scrollToActive()
     }
     window.addEventListener('quick-insert-navigate', handleNavigate)
@@ -102,6 +113,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="qi-popup"
+  data-active-index={activeIndex}
   style="top: {adjustedPosition.top}px; left: {adjustedPosition.left}px"
   bind:this={container}
 >
@@ -115,7 +127,7 @@
           class="qi-item"
           class:active={globalIndex === activeIndex}
           onclick={() => onSelect(item)}
-          onmouseenter={() => { activeIndex = globalIndex; setPopupActiveIndex(globalIndex) }}
+          onmouseenter={() => { activeIndex = globalIndex }}
         >
           <span class="qi-icon">{item.icon}</span>
           <span class="qi-info">

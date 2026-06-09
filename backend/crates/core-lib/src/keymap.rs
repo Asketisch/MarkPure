@@ -2,6 +2,16 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+/// Default accelerator for "Toggle Zen Mode".
+/// On macOS the bare F11 is reserved by WKWebView/macOS itself
+/// (it triggers a system fullscreen transition that races with
+/// the in-page handler), so we use the macOS-conventional
+/// "Cmd+Ctrl+F" shortcut instead. Other platforms keep F11.
+#[cfg(target_os = "macos")]
+const ZEN_MODE_ACCELERATOR: &str = "Cmd+Ctrl+F";
+#[cfg(not(target_os = "macos"))]
+const ZEN_MODE_ACCELERATOR: &str = "F11";
+
 /// Keyboard shortcut definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyBinding {
@@ -80,7 +90,7 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
         KeyBinding {
             id: "view.toggle_zen_mode".into(),
             label: "Toggle Zen Mode".into(),
-            accelerator: Some("F11".into()),
+            accelerator: Some(ZEN_MODE_ACCELERATOR.into()),
         },
         // Workspace
         KeyBinding {

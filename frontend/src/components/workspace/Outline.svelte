@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Editor } from '@tiptap/core'
   import { extractOutline, type OutlineItem } from '$lib/editor/outline-extract'
+  import { useI18n } from '$lib/stores/i18n.svelte'
 
   interface Props {
     editor?: Editor | null
@@ -8,6 +9,8 @@
   }
 
   let { editor = null, onNavigate }: Props = $props()
+
+  const i18n = useI18n()
 
   let outline = $state<OutlineItem[]>([])
   let search = $state('')
@@ -28,14 +31,27 @@
     refresh()
     // Re-extract on every doc change so the outline reflects
     // edits immediately. Without this, the user adds a heading
-    // and the panel still shows the old list.
-    editor.on('update', refresh)
+    // and the panel still shows the old list. The update event
+    // fires on every transaction (incl. selection changes) which
+    // is O(n) per call — debounce so a burst of typing or a
+    // chain of selection moves doesn't pile up full re-extractions
+    // and freeze the UI.
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null
+        if (editor) outline = extractOutline(editor)
+      }, 100)
+    }
+    editor.on('update', scheduleRefresh)
     // Track selection so we can highlight the current heading.
     const onSel = () => { selectionFrom = editor!.state.selection.from }
     editor.on('selectionUpdate', onSel)
     onSel()
     return () => {
-      editor?.off('update', refresh)
+      if (refreshTimer) clearTimeout(refreshTimer)
+      editor?.off('update', scheduleRefresh)
       editor?.off('selectionUpdate', onSel)
     }
   })
@@ -91,26 +107,26 @@
 </script>
 
 <div class="outline">
-  <div class="outline-header">Outline</div>
+  <div class="outline-header">{i18n.t('outline.title')}</div>
   <div class="outline-toolbar">
     <input
       class="outline-search"
       type="text"
-      placeholder="Search headings…"
+      placeholder={i18n.t('outline.search_placeholder')}
       bind:value={search}
     />
-    <select class="outline-depth" bind:value={maxDepth} title="Max heading depth">
-      <option value={1}>H1</option>
-      <option value={2}>H1–H2</option>
-      <option value={3}>H1–H3</option>
-      <option value={4}>H1–H4</option>
-      <option value={5}>H1–H5</option>
-      <option value={6}>All</option>
+    <select class="outline-depth" bind:value={maxDepth} title={i18n.t('outline.max_depth')}>
+      <option value={1}>{i18n.t('outline.depth.h1')}</option>
+      <option value={2}>{i18n.t('outline.depth.h1_h2')}</option>
+      <option value={3}>{i18n.t('outline.depth.h1_h3')}</option>
+      <option value={4}>{i18n.t('outline.depth.h1_h4')}</option>
+      <option value={5}>{i18n.t('outline.depth.h1_h5')}</option>
+      <option value={6}>{i18n.t('outline.depth.all')}</option>
     </select>
   </div>
   <div class="outline-content">
     {#if tree.length === 0}
-      <div class="outline-empty">No headings</div>
+      <div class="outline-empty">{i18n.t('outline.no_headings')}</div>
     {:else}
       {@render renderNode(tree, 1)}
     {/if}

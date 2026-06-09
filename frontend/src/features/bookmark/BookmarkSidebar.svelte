@@ -73,10 +73,10 @@
 </script>
 
 {#if visible}
-  <aside class="bookmark-panel" aria-label="Bookmarks">
+  <aside class="bookmark-panel" aria-label={i18n.t('sidebar.bookmarks')}>
     <header class="bp-header">
-      <h3 class="bp-title">Bookmarks</h3>
-      <button class="bp-close" onclick={() => (visible = false)} aria-label="Close bookmarks">×</button>
+      <h3 class="bp-title">{i18n.t('sidebar.bookmarks')}</h3>
+      <button class="bp-close" onclick={() => (visible = false)} aria-label={i18n.t('bookmarks.close_aria')}>×</button>
     </header>
 
     <div class="bp-add">
@@ -115,7 +115,7 @@
               <span class="bp-item-title">{bm.title}</span>
               <span class="bp-item-path">{basename(bm.path)}</span>
             </button>
-            <button class="bp-remove" onclick={() => handleRemove(bm.id)} aria-label="Remove">×</button>
+            <button class="bp-remove" onclick={() => handleRemove(bm.id)} aria-label={i18n.t('bookmarks.remove_aria')}>×</button>
           </div>
         {/each}
       {/if}

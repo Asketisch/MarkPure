@@ -9,7 +9,12 @@
     "noEmit": true,
     "allowJs": true,
     "checkJs": true,
-    "moduleDetection": "force"
+    "moduleDetection": "force",
+    "baseUrl": ".",
+    "paths": {
+      "$lib": ["frontend/src"],
+      "$lib/*": ["frontend/src/*"]
+    }
   },
   "include": ["frontend/src/**/*.ts", "frontend/src/**/*.js", "frontend/src/**/*.svelte"]
 }

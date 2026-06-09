@@ -6,87 +6,100 @@
  * relevant app state. The palette itself stays a dumb
  * presentational component.
  *
+ * Each entry stores `titleKey` + `categoryKey` (i18n keys) rather
+ * than literal strings. The host resolves them to the current
+ * language via `i18n.t(key)` when building the live command
+ * list, and rebuilds the list on every `i18n.locale` change so
+ * the palette reflects the active language.
+ *
  * Categories are loose strings used to section the results.
  */
 
 export interface CommandDef {
   id: string
-  title: string
-  category: string
+  /// i18n key for the command's display title
+  titleKey: string
+  /// i18n key for the section header (category)
+  categoryKey: string
   keywords?: string[]
 }
 
 /// Static catalogue of all available commands. The host attaches
 /// run() functions when building the live command list.
+///
+/// Many entries reuse existing keys (`menu.*`, `action.*`,
+/// `toolbar.*`, `quick_insert.*`, `sidebar.*`, etc.) so we don't
+/// duplicate translations. The `cmd.*` namespace is reserved for
+/// strings that don't have an exact pre-existing match.
 export const commandCatalog: CommandDef[] = [
   // File
-  { id: 'file.new', title: 'New File', category: 'File', keywords: ['create', 'document'] },
-  { id: 'file.open', title: 'Open File…', category: 'File', keywords: ['browse', 'load'] },
-  { id: 'file.open_workspace', title: 'Open Workspace…', category: 'File', keywords: ['folder', 'directory'] },
-  { id: 'file.save', title: 'Save', category: 'File', keywords: ['write', 'persist'] },
-  { id: 'file.save_as', title: 'Save As…', category: 'File', keywords: ['export', 'rename'] },
-  { id: 'file.close_tab', title: 'Close Tab', category: 'File', keywords: ['close'] },
-  { id: 'file.export_html', title: 'Export as HTML', category: 'File' },
-  { id: 'file.export_pdf', title: 'Export as PDF', category: 'File' },
-  { id: 'file.export_word', title: 'Export as Word (.docx)', category: 'File' },
+  { id: 'file.new', titleKey: 'dialog.new_file', categoryKey: 'menu.file', keywords: ['create', 'document'] },
+  { id: 'file.open', titleKey: 'menu.open_file', categoryKey: 'menu.file', keywords: ['browse', 'load'] },
+  { id: 'file.open_workspace', titleKey: 'menu.open_workspace', categoryKey: 'menu.file', keywords: ['folder', 'directory'] },
+  { id: 'file.save', titleKey: 'action.save', categoryKey: 'menu.file', keywords: ['write', 'persist'] },
+  { id: 'file.save_as', titleKey: 'cmd.file.save_as', categoryKey: 'menu.file', keywords: ['export', 'rename'] },
+  { id: 'file.close_tab', titleKey: 'cmd.file.close_tab', categoryKey: 'menu.file', keywords: ['close'] },
+  { id: 'file.export_html', titleKey: 'menu.export_html', categoryKey: 'menu.file' },
+  { id: 'file.export_pdf', titleKey: 'menu.export_pdf', categoryKey: 'menu.file' },
+  { id: 'file.export_word', titleKey: 'menu.export_word', categoryKey: 'menu.file' },
 
   // Edit
-  { id: 'edit.undo', title: 'Undo', category: 'Edit', keywords: ['revert'] },
-  { id: 'edit.redo', title: 'Redo', category: 'Edit' },
-  { id: 'edit.find', title: 'Find in File', category: 'Edit', keywords: ['search'] },
-  { id: 'edit.replace', title: 'Replace in File', category: 'Edit' },
-  { id: 'edit.select_same_word', title: 'Select Next Same Word', category: 'Edit' },
-  { id: 'edit.copy_as_markdown', title: 'Copy as Markdown', category: 'Edit', keywords: ['clipboard', 'paste'] },
-  { id: 'edit.copy_as_html', title: 'Copy as HTML', category: 'Edit', keywords: ['clipboard', 'paste', 'rich'] },
-  { id: 'edit.copy_as_plain', title: 'Copy as Plain Text', category: 'Edit', keywords: ['clipboard', 'paste', 'text'] },
-  { id: 'format.superscript', title: 'Toggle Superscript', category: 'Format', keywords: ['sup', 'exponent', 'power'] },
-  { id: 'format.subscript', title: 'Toggle Subscript', category: 'Format', keywords: ['sub', 'index', 'chemical'] },
-  { id: 'block.move_up', title: 'Move Block Up', category: 'Block', keywords: ['reorder', 'drag', 'organize'] },
-  { id: 'block.move_down', title: 'Move Block Down', category: 'Block', keywords: ['reorder', 'drag', 'organize'] },
-  { id: 'image.align_left', title: 'Align Image Left', category: 'Image', keywords: ['picture', 'float', 'wrap'] },
-  { id: 'image.align_center', title: 'Align Image Center', category: 'Image', keywords: ['picture', 'center'] },
-  { id: 'image.align_right', title: 'Align Image Right', category: 'Image', keywords: ['picture', 'float', 'wrap'] },
-  { id: 'image.align_inline', title: 'Align Image Inline', category: 'Image', keywords: ['picture', 'inline'] },
-  { id: 'image.delete', title: 'Delete Image', category: 'Image', keywords: ['picture', 'remove'] },
+  { id: 'edit.undo', titleKey: 'action.undo', categoryKey: 'menu.edit', keywords: ['revert'] },
+  { id: 'edit.redo', titleKey: 'action.redo', categoryKey: 'menu.edit' },
+  { id: 'edit.find', titleKey: 'action.find', categoryKey: 'menu.edit', keywords: ['search'] },
+  { id: 'edit.replace', titleKey: 'action.replace', categoryKey: 'menu.edit' },
+  { id: 'edit.select_same_word', titleKey: 'cmd.edit.select_same_word', categoryKey: 'menu.edit' },
+  { id: 'edit.copy_as_markdown', titleKey: 'cmd.edit.copy_as_markdown', categoryKey: 'menu.edit', keywords: ['clipboard', 'paste'] },
+  { id: 'edit.copy_as_html', titleKey: 'cmd.edit.copy_as_html', categoryKey: 'menu.edit', keywords: ['clipboard', 'paste', 'rich'] },
+  { id: 'edit.copy_as_plain', titleKey: 'cmd.edit.copy_as_plain', categoryKey: 'menu.edit', keywords: ['clipboard', 'paste', 'text'] },
+  { id: 'format.superscript', titleKey: 'toolbar.superscript', categoryKey: 'cmd.category.format', keywords: ['sup', 'exponent', 'power'] },
+  { id: 'format.subscript', titleKey: 'toolbar.subscript', categoryKey: 'cmd.category.format', keywords: ['sub', 'index', 'chemical'] },
+  { id: 'block.move_up', titleKey: 'cmd.block.move_up', categoryKey: 'cmd.category.block', keywords: ['reorder', 'drag', 'organize'] },
+  { id: 'block.move_down', titleKey: 'cmd.block.move_down', categoryKey: 'cmd.category.block', keywords: ['reorder', 'drag', 'organize'] },
+  { id: 'image.align_left', titleKey: 'cmd.image.align_left', categoryKey: 'cmd.category.image', keywords: ['picture', 'float', 'wrap'] },
+  { id: 'image.align_center', titleKey: 'cmd.image.align_center', categoryKey: 'cmd.category.image', keywords: ['picture', 'center'] },
+  { id: 'image.align_right', titleKey: 'cmd.image.align_right', categoryKey: 'cmd.category.image', keywords: ['picture', 'float', 'wrap'] },
+  { id: 'image.align_inline', titleKey: 'cmd.image.align_inline', categoryKey: 'cmd.category.image', keywords: ['picture', 'inline'] },
+  { id: 'image.delete', titleKey: 'cmd.image.delete', categoryKey: 'cmd.category.image', keywords: ['picture', 'remove'] },
 
   // View
-  { id: 'view.toggle_sidebar', title: 'Toggle Sidebar', category: 'View' },
-  { id: 'view.toggle_outline', title: 'Toggle Outline', category: 'View' },
-  { id: 'view.toggle_tags', title: 'Toggle Tag Pane', category: 'View', keywords: ['tag', 'hashtag', 'pane'] },
-  { id: 'view.toggle_backlinks', title: 'Toggle Backlinks Pane', category: 'View', keywords: ['backlink', 'wiki', 'reference', 'incoming'] },
-  { id: 'view.toggle_source_mode', title: 'Toggle Source Mode', category: 'View' },
-  { id: 'view.toggle_focus_mode', title: 'Toggle Focus Mode', category: 'View' },
-  { id: 'view.toggle_zen_mode', title: 'Toggle Zen Mode', category: 'View', keywords: ['fullscreen', 'focus', 'distraction-free'] },
-  { id: 'view.toggle_typewriter', title: 'Toggle Typewriter Scrolling', category: 'View' },
-  { id: 'view.toggle_undo_tree', title: 'Show Undo Tree', category: 'View' },
+  { id: 'view.toggle_sidebar', titleKey: 'menu.toggle_sidebar', categoryKey: 'menu.view' },
+  { id: 'view.toggle_outline', titleKey: 'toolbar.outline', categoryKey: 'menu.view' },
+  { id: 'view.toggle_tags', titleKey: 'toolbar.tags', categoryKey: 'menu.view', keywords: ['tag', 'hashtag', 'pane'] },
+  { id: 'view.toggle_backlinks', titleKey: 'toolbar.backlinks', categoryKey: 'menu.view', keywords: ['backlink', 'wiki', 'reference', 'incoming'] },
+  { id: 'view.toggle_source_mode', titleKey: 'toolbar.source_mode', categoryKey: 'menu.view' },
+  { id: 'view.toggle_focus_mode', titleKey: 'cmd.view.toggle_focus_mode', categoryKey: 'menu.view' },
+  { id: 'view.toggle_zen_mode', titleKey: 'view.toggle_zen_mode', categoryKey: 'menu.view', keywords: ['fullscreen', 'focus', 'distraction-free'] },
+  { id: 'view.toggle_typewriter', titleKey: 'cmd.view.toggle_typewriter', categoryKey: 'menu.view' },
+  { id: 'view.toggle_undo_tree', titleKey: 'cmd.view.toggle_undo_tree', categoryKey: 'menu.view' },
 
   // Search
-  { id: 'search.workspace', title: 'Search in Workspace…', category: 'Search' },
-  { id: 'search.quick_switcher', title: 'Quick File Switcher…', category: 'Search', keywords: ['open', 'jump'] },
+  { id: 'search.workspace', titleKey: 'search.workspace_title', categoryKey: 'menu.search' },
+  { id: 'search.quick_switcher', titleKey: 'empty.quick_switcher', categoryKey: 'menu.search', keywords: ['open', 'jump'] },
 
   // Theme
-  { id: 'theme.cycle', title: 'Cycle Theme', category: 'Theme' },
-  { id: 'theme.light', title: 'Theme: Light', category: 'Theme' },
-  { id: 'theme.dark', title: 'Theme: Dark', category: 'Theme' },
-  { id: 'theme.one_dark', title: 'Theme: One Dark', category: 'Theme' },
-  { id: 'theme.graphite', title: 'Theme: Graphite', category: 'Theme' },
-  { id: 'theme.ulysses', title: 'Theme: Ulysses', category: 'Theme' },
-  { id: 'theme.material_dark', title: 'Theme: Material Dark', category: 'Theme' },
-  { id: 'theme.blue_topaz', title: 'Theme: Blue Topaz', category: 'Theme' },
+  { id: 'theme.cycle', titleKey: 'cmd.theme.cycle', categoryKey: 'settings.theme' },
+  { id: 'theme.light', titleKey: 'cmd.theme.light', categoryKey: 'settings.theme' },
+  { id: 'theme.dark', titleKey: 'cmd.theme.dark', categoryKey: 'settings.theme' },
+  { id: 'theme.one_dark', titleKey: 'cmd.theme.one_dark', categoryKey: 'settings.theme' },
+  { id: 'theme.graphite', titleKey: 'cmd.theme.graphite', categoryKey: 'settings.theme' },
+  { id: 'theme.ulysses', titleKey: 'cmd.theme.ulysses', categoryKey: 'settings.theme' },
+  { id: 'theme.material_dark', titleKey: 'cmd.theme.material_dark', categoryKey: 'settings.theme' },
+  { id: 'theme.blue_topaz', titleKey: 'cmd.theme.blue_topaz', categoryKey: 'settings.theme' },
 
   // Language
-  { id: 'lang.en', title: 'Language: English', category: 'Language' },
-  { id: 'lang.zh', title: 'Language: 简体中文', category: 'Language' },
-  { id: 'lang.ja', title: 'Language: 日本語', category: 'Language' },
+  { id: 'lang.en', titleKey: 'cmd.lang.en', categoryKey: 'settings.language' },
+  { id: 'lang.zh', titleKey: 'cmd.lang.zh', categoryKey: 'settings.language' },
+  { id: 'lang.ja', titleKey: 'cmd.lang.ja', categoryKey: 'settings.language' },
 
   // Tools
-  { id: 'tools.spellcheck', title: 'Check Spelling', category: 'Tools' },
-  { id: 'tools.bookmarks', title: 'Show Bookmarks', category: 'Tools' },
-  { id: 'tools.settings', title: 'Settings', category: 'Tools', keywords: ['preferences'] },
-  { id: 'insert.mermaid', title: 'Insert Mermaid Diagram', category: 'Insert', keywords: ['diagram', 'chart'] },
-  { id: 'insert.frontmatter', title: 'Insert YAML Frontmatter', category: 'Insert', keywords: ['metadata', 'header'] },
-  { id: 'insert.toc', title: 'Insert Table of Contents', category: 'Insert', keywords: ['outline', 'navigation'] },
-  { id: 'insert.footnote_ref', title: 'Insert Footnote Reference', category: 'Insert', keywords: ['reference', 'note', 'cite'] },
-  { id: 'insert.fold', title: 'Fold Section', category: 'Insert' },
-  { id: 'insert.snippet', title: 'Insert Snippet…', category: 'Insert', keywords: ['template', 'shortcode', 'reuse'] },
+  { id: 'tools.spellcheck', titleKey: 'cmd.tools.spellcheck', categoryKey: 'cmd.category.tools' },
+  { id: 'tools.bookmarks', titleKey: 'cmd.tools.bookmarks', categoryKey: 'cmd.category.tools' },
+  { id: 'tools.settings', titleKey: 'menu.settings', categoryKey: 'cmd.category.tools', keywords: ['preferences'] },
+  { id: 'insert.mermaid', titleKey: 'quick_insert.mermaid_title', categoryKey: 'cmd.category.insert', keywords: ['diagram', 'chart'] },
+  { id: 'insert.frontmatter', titleKey: 'cmd.insert.frontmatter', categoryKey: 'cmd.category.insert', keywords: ['metadata', 'header'] },
+  { id: 'insert.toc', titleKey: 'quick_insert.toc_title', categoryKey: 'cmd.category.insert', keywords: ['outline', 'navigation'] },
+  { id: 'insert.footnote_ref', titleKey: 'quick_insert.footnote_ref_title', categoryKey: 'cmd.category.insert', keywords: ['reference', 'note', 'cite'] },
+  { id: 'insert.fold', titleKey: 'cmd.insert.fold', categoryKey: 'cmd.category.insert' },
+  { id: 'insert.snippet', titleKey: 'cmd.insert.snippet', categoryKey: 'cmd.category.insert', keywords: ['template', 'shortcode', 'reuse'] },
 ]

@@ -90,7 +90,7 @@
       class="tag-panel-refresh"
       onclick={() => void loadTags()}
       title={i18n.t('tag_pane.refresh')}
-      aria-label="Refresh tags"
+      aria-label={i18n.t('tag_pane.refresh')}
     >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
         <path

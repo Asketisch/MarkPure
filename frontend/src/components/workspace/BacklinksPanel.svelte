@@ -30,6 +30,7 @@
   let loading = $state(false)
   let error = $state<string | null>(null)
   let requestSeq = 0
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined
 
   async function loadBacklinks() {
     if (!workspacePath || !currentPage) {
@@ -51,13 +52,20 @@
     }
   }
 
+  function debouncedLoad() {
+    if (refreshTimer) clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => {
+      void loadBacklinks()
+    }, 300)
+  }
+
   $effect(() => {
     // Track `currentPage` so the list re-fetches on tab switch.
     // `workspacePath` is also tracked — closing the workspace
-    // clears the list.
+    // clears the list. Debounced to avoid rapid-fire queries.
     void currentPage
     void workspacePath
-    void loadBacklinks()
+    debouncedLoad()
   })
 
   onMount(() => {
@@ -65,13 +73,14 @@
       // Bump seq so any in-flight request's resolution is a
       // no-op after unmount.
       requestSeq++
+      if (refreshTimer) clearTimeout(refreshTimer)
     }
   })
 
   // P0-6: public hook for App.svelte to trigger a refresh on
   // file change events. Wired via bind:this.
   export function refresh() {
-    void loadBacklinks()
+    debouncedLoad()
   }
 </script>
 
@@ -82,7 +91,7 @@
       class="backlinks-panel-refresh"
       onclick={() => void loadBacklinks()}
       title={i18n.t('backlinks_pane.refresh')}
-      aria-label="Refresh backlinks"
+      aria-label={i18n.t('backlinks_pane.refresh')}
     >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
         <path

@@ -147,7 +147,7 @@
 
 {#if visible}
   <div class="backdrop" onclick={handleBackdropClick} onkeydown={handleKeydown} role="presentation">
-    <div class="switcher" role="dialog" aria-modal="true" aria-label="Quick file switcher" onclick={(e) => e.stopPropagation()} onkeydown={handleKeydown}>
+    <div class="switcher" role="dialog" aria-modal="true" aria-label={i18n.t('palette.switcher_aria')} onclick={(e) => e.stopPropagation()} onkeydown={handleKeydown}>
       <input
         bind:this={inputEl}
         bind:value={query}

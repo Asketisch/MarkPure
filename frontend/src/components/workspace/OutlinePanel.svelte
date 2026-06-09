@@ -2,6 +2,7 @@
   import Outline from './Outline.svelte'
   import type { OutlineItem } from '$lib/commands'
   import type { Editor } from '@tiptap/core'
+  import { useI18n } from '$lib/stores/i18n.svelte'
 
   interface Props {
     editor?: Editor | null
@@ -15,18 +16,20 @@
   }
 
   let { editor = null, onNavigate, onClose, onInsertToc }: Props = $props()
+
+  const i18n = useI18n()
 </script>
 
 <div class="outline-panel">
   <div class="outline-panel-header">
-    <span class="outline-panel-title">Outline</span>
+    <span class="outline-panel-title">{i18n.t('outline.title')}</span>
     <div class="outline-panel-actions">
       {#if onInsertToc}
         <button
           class="outline-panel-action"
           onclick={() => onInsertToc?.()}
-          title="Insert Table of Contents at cursor"
-          aria-label="Insert TOC"
+          title={i18n.t('outline.insert_toc_tooltip')}
+          aria-label={i18n.t('outline.insert_toc_aria')}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path d="M2 4 L10 4 M2 8 L13 8 M2 12 L8 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
@@ -34,7 +37,7 @@
           </svg>
         </button>
       {/if}
-      <button class="outline-panel-close" onclick={() => onClose?.()} title="Close">
+      <button class="outline-panel-close" onclick={() => onClose?.()} title={i18n.t('common.close')}>
         <svg width="14" height="14" viewBox="0 0 16 16">
           <path d="M4 4 L12 12 M12 4 L4 12" stroke="currentColor" stroke-width="1.5" fill="none"/>
         </svg>

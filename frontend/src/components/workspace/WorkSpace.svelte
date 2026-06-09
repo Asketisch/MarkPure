@@ -33,6 +33,7 @@
   } from '$lib/editor/commands'
   import type { FileEntry } from '$lib/editor/commands'
   import { basename, joinPath } from '$lib/fileTreeFilters'
+  import { useI18n } from '$lib/stores/i18n.svelte'
   import FileTree from './FileTree.svelte'
   import FileContextMenu from './FileContextMenu.svelte'
 
@@ -50,6 +51,8 @@
   }
 
   let { workspacePath = null, onOpenFile, onPinTab, onWorkspaceChange, onRegisterRefresh }: Props = $props()
+
+  const i18n = useI18n()
 
   // ----- State (shared across the sub-components) -----
 
@@ -155,7 +158,7 @@
     if (!contextMenu) return
     const parentPath = contextMenu.isDir ? contextMenu.path : workspacePath
     if (!parentPath) return
-    const name = prompt('New file name:', 'untitled.md')
+    const name = prompt(i18n.t('workspace.new_file_prompt'), i18n.t('workspace.new_file_default'))
     if (name) {
       await createFile(joinPath(parentPath, name))
       await loadTree()
@@ -167,7 +170,7 @@
     if (!contextMenu) return
     const parentPath = contextMenu.isDir ? contextMenu.path : workspacePath
     if (!parentPath) return
-    const name = prompt('New folder name:', 'new-folder')
+    const name = prompt(i18n.t('workspace.new_folder_prompt'), i18n.t('workspace.new_folder_default'))
     if (name) {
       await createDirectory(joinPath(parentPath, name))
       await loadTree()
@@ -178,7 +181,7 @@
   async function handleRename() {
     if (!contextMenu) return
     const oldName = basename(contextMenu.path)
-    const newName = prompt('Rename to:', oldName)
+    const newName = prompt(i18n.t('workspace.rename_prompt'), oldName)
     if (newName && newName !== oldName) {
       await renameFile(contextMenu.path, newName)
       await loadTree()
@@ -188,7 +191,7 @@
 
   async function handleDelete() {
     if (!contextMenu) return
-    if (confirm(`Delete "${contextMenu.path}"?`)) {
+    if (confirm(i18n.t('workspace.delete_confirm').replace('{path}', contextMenu.path))) {
       await deleteFile(contextMenu.path)
       await loadTree()
     }
@@ -265,15 +268,15 @@
     <input
       type="text"
       class="search-input"
-      placeholder="Filter files..."
+      placeholder={i18n.t('workspace.filter_placeholder')}
       bind:value={searchQuery}
     />
     <button
       class="toggle-hidden-btn"
       class:active={showHidden}
       onclick={toggleHidden}
-      title={showHidden ? 'Hide hidden files' : 'Show hidden files'}
-      aria-label="Toggle hidden files"
+      title={showHidden ? i18n.t('workspace.toggle_hidden_hide') : i18n.t('workspace.toggle_hidden_show')}
+      aria-label={i18n.t('workspace.toggle_hidden_aria')}
     >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
         {#if showHidden}
@@ -306,10 +309,10 @@
 
   {#if !workspacePath}
     <div class="workspace-empty">
-      <button class="open-workspace-btn" onclick={openWorkspace}>Open Folder</button>
+      <button class="open-workspace-btn" onclick={openWorkspace}>{i18n.t('empty.open_folder')}</button>
     </div>
   {:else}
-    <button class="change-workspace-btn" onclick={openWorkspace}>Change Folder</button>
+    <button class="change-workspace-btn" onclick={openWorkspace}>{i18n.t('workspace.change_folder')}</button>
   {/if}
 
   {#if contextMenu}

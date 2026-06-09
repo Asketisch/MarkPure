@@ -10,6 +10,8 @@
    * a sibling under a file). The host tells us which via
    * the `isDir` prop.
    */
+  import { useI18n } from '$lib/stores/i18n.svelte'
+
   let {
     x,
     y,
@@ -44,6 +46,8 @@
     onRefresh: () => void
   } = $props()
 
+  const i18n = useI18n()
+
   function pickAndClose(fn: () => void) {
     fn()
     onCloseMenu()
@@ -52,18 +56,18 @@
 
 <div class="context-menu" style="left: {x}px; top: {y}px">
   {#if isDir}
-    <button onclick={() => pickAndClose(onNewFile)}>New File</button>
-    <button onclick={() => pickAndClose(onNewFolder)}>New Folder</button>
+    <button onclick={() => pickAndClose(onNewFile)}>{i18n.t('workspace.new_file')}</button>
+    <button onclick={() => pickAndClose(onNewFolder)}>{i18n.t('workspace.new_folder')}</button>
     <div class="menu-sep"></div>
   {/if}
-  <button onclick={() => pickAndClose(onCopyRelativePath)}>Copy Relative Path</button>
-  <button onclick={() => pickAndClose(onCopyAbsolutePath)}>Copy Absolute Path</button>
-  <button onclick={() => pickAndClose(onRevealInFinder)}>Reveal in Finder</button>
+  <button onclick={() => pickAndClose(onCopyRelativePath)}>{i18n.t('workspace.copy_relative_path')}</button>
+  <button onclick={() => pickAndClose(onCopyAbsolutePath)}>{i18n.t('workspace.copy_absolute_path')}</button>
+  <button onclick={() => pickAndClose(onRevealInFinder)}>{i18n.t('workspace.reveal_in_finder')}</button>
   <div class="menu-sep"></div>
-  <button onclick={() => pickAndClose(onRename)}>Rename</button>
-  <button onclick={() => pickAndClose(onDelete)} class="danger">Delete</button>
+  <button onclick={() => pickAndClose(onRename)}>{i18n.t('action.rename')}</button>
+  <button onclick={() => pickAndClose(onDelete)} class="danger">{i18n.t('action.delete')}</button>
   <div class="menu-sep"></div>
-  <button onclick={() => pickAndClose(onRefresh)}>Refresh</button>
+  <button onclick={() => pickAndClose(onRefresh)}>{i18n.t('workspace.refresh')}</button>
 </div>
 
 <style>

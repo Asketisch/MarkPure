@@ -1,6 +1,18 @@
+use once_cell::sync::Lazy;
 use pulldown_cmark::{Options, Parser};
+use regex::Regex;
 
 pub use pulldown_cmark::{Event, Tag, TagEnd, HeadingLevel};
+
+/// Pre-compiled regex for wiki-style links: `[[Page]]` or `[[Page|Alias]]`
+static WIKILINK_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]").unwrap()
+});
+
+/// Pre-compiled regex for tags: `#tag` (not preceded by `#` or word chars)
+static TAG_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?<![#\w])#([a-zA-Z][a-zA-Z0-9_-]*)").unwrap()
+});
 
 /// Parsed markdown element (simplified AST)
 #[derive(Debug, Clone)]
@@ -97,27 +109,14 @@ pub struct WikiLink {
 
 /// Extract wiki-style links from markdown text (e.g., [[Page]] or [[Page|Alias]])
 pub fn extract_wikilinks(text: &str) -> Vec<WikiLink> {
-    use regex::Regex;
-
-    // Regex to match [[Page]] or [[Page|Alias]]
-    // The pattern matches:
-    // - Opening [[
-    // - Page name (any characters except | or ])
-    // - Optional | followed by alias
-    // - Closing ]]
-    let re = Regex::new(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]").ok();
-
-    if let Some(re) = re {
-        re.captures_iter(text)
-            .map(|cap| {
-                let page = cap.get(1).map(|m| m.as_str().trim().to_string()).unwrap_or_default();
-                let alias = cap.get(2).map(|m| Some(m.as_str().trim().to_string())).unwrap_or(None);
-                WikiLink { page, alias }
-            })
-            .collect()
-    } else {
-        Vec::new()
-    }
+    WIKILINK_RE
+        .captures_iter(text)
+        .map(|cap| {
+            let page = cap.get(1).map(|m| m.as_str().trim().to_string()).unwrap_or_default();
+            let alias = cap.get(2).map(|m| Some(m.as_str().trim().to_string())).unwrap_or(None);
+            WikiLink { page, alias }
+        })
+        .collect()
 }
 
 /// Tag representation (renamed to avoid conflict with pulldown_cmark::Tag)
@@ -134,26 +133,15 @@ pub struct MarkdownTag {
 /// Extract tags from markdown text (e.g., #tag)
 /// Note: Does not match tags within code blocks or URLs
 pub fn extract_tags(text: &str) -> Vec<MarkdownTag> {
-    use regex::Regex;
-
-    // Regex to match #tag
-    // - Must be preceded by whitespace or string start
-    // - Tag name: alphanumeric, hyphen, underscore (no spaces)
-    // - Must NOT be preceded by another # (to avoid matching ## heading syntax)
-    let re = Regex::new(r"(?<![#\w])#([a-zA-Z][a-zA-Z0-9_-]*)").ok();
-
-    if let Some(re) = re {
-        re.captures_iter(text)
-            .map(|cap| {
-                let start = cap.get(0).map(|m| m.start()).unwrap_or(0);
-                let end = cap.get(0).map(|m| m.end()).unwrap_or(0);
-                let name = cap.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
-                MarkdownTag { name, start, end }
-            })
-            .collect()
-    } else {
-        Vec::new()
-    }
+    TAG_RE
+        .captures_iter(text)
+        .map(|cap| {
+            let start = cap.get(0).map(|m| m.start()).unwrap_or(0);
+            let end = cap.get(0).map(|m| m.end()).unwrap_or(0);
+            let name = cap.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+            MarkdownTag { name, start, end }
+        })
+        .collect()
 }
 
 #[cfg(test)]

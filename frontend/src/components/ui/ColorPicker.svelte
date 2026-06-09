@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { useI18n } from '$lib/stores/i18n.svelte'
+
   let {
     value = '#000000',
     onchange,
@@ -6,6 +8,8 @@
     value: string
     onchange?: (color: string) => void
   } = $props()
+
+  const i18n = useI18n()
 
   let inputValue = $state(value)
   let isOpen = $state(false)
@@ -90,7 +94,7 @@
         </div>
       </div>
 
-      <button class="close-btn" onclick={() => isOpen = false}>Done</button>
+      <button class="close-btn" onclick={() => isOpen = false}>{i18n.t('colorpicker.done')}</button>
     </div>
   {/if}
 </div>

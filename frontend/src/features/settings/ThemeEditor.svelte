@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getThemes, saveCustomTheme, type Theme, type ThemeColors } from '$lib/editor/commands'
   import ColorPicker from '$lib/components/ui/ColorPicker.svelte'
+  import { useI18n } from '$lib/stores/i18n.svelte'
 
   let {
     currentThemeId = '',
@@ -9,6 +10,8 @@
     currentThemeId?: string
     onThemeUpdated?: (theme: Theme) => void
   } = $props()
+
+  const i18n = useI18n()
 
   let themes = $state<Theme[]>([])
   let selectedTheme = $state<Theme | null>(null)
@@ -115,9 +118,9 @@
         // No custom themes - initialize with current built-in theme
         selectedTheme = {
           id: currentThemeId,
-          name: currentThemeId === '' ? 'Light' : currentThemeId,
-          author: 'Built-in',
-          description: 'Built-in theme',
+          name: currentThemeId === '' ? i18n.t('settings.theme.light') : currentThemeId,
+          author: i18n.t('settings.theme_editor.builtin_label'),
+          description: i18n.t('settings.theme_editor.builtin_description'),
           is_dark: currentThemeId !== '',
           colors: {} as ThemeColors,
         }
@@ -145,9 +148,9 @@
     // Create a new custom theme based on the built-in
     const newTheme: Theme = {
       id: `custom_${Date.now()}`,
-      name: `Custom ${new Date().toLocaleDateString()}`,
-      author: 'User',
-      description: 'Customized theme',
+      name: i18n.t('settings.theme_editor.custom_default_name').replace('{date}', new Date().toLocaleDateString()),
+      author: i18n.t('settings.theme_editor.user_author'),
+      description: i18n.t('settings.theme_editor.customized_description'),
       is_dark: themeId !== '',
       colors: { ...builtin } as ThemeColors,
     }
@@ -182,78 +185,76 @@
     previewOpen = true
   }
 
-  // Color categories for display
+  // Color categories for display. Each category and label is
+  // resolved through i18n at render time via the *_key fields;
+  // the legacy `name` / `label` strings are kept as fallback
+  // values for any caller that hasn't migrated.
   const colorCategories = [
     {
-      name: 'UI Colors',
+      nameKey: 'settings.theme_editor.category.ui',
       colors: [
-        { key: 'bg', label: 'Background' },
-        { key: 'bg_secondary', label: 'Secondary BG' },
-        { key: 'bg_tab_active', label: 'Tab Active' },
-        { key: 'bg_tab_inactive', label: 'Tab Inactive' },
-        { key: 'text', label: 'Text' },
-        { key: 'text_secondary', label: 'Text Secondary' },
-        { key: 'accent', label: 'Accent' },
-        { key: 'accent_hover', label: 'Accent Hover' },
-        { key: 'border', label: 'Border' },
-        { key: 'status_bg', label: 'Status Bar BG' },
-        { key: 'scrollbar_thumb', label: 'Scrollbar' },
+        { key: 'bg', label: 'Background', labelKey: 'settings.theme_editor.color.bg' },
+        { key: 'bg_secondary', label: 'Secondary BG', labelKey: 'settings.theme_editor.color.bg_secondary' },
+        { key: 'bg_tab_active', label: 'Tab Active', labelKey: 'settings.theme_editor.color.bg_tab_active' },
+        { key: 'bg_tab_inactive', label: 'Tab Inactive', labelKey: 'settings.theme_editor.color.bg_tab_inactive' },
+        { key: 'text', label: 'Text', labelKey: 'settings.theme_editor.color.text' },
+        { key: 'text_secondary', label: 'Text Secondary', labelKey: 'settings.theme_editor.color.text_secondary' },
+        { key: 'accent', label: 'Accent', labelKey: 'settings.theme_editor.color.accent' },
+        { key: 'accent_hover', label: 'Accent Hover', labelKey: 'settings.theme_editor.color.accent_hover' },
+        { key: 'border', label: 'Border', labelKey: 'settings.theme_editor.color.border' },
+        { key: 'status_bg', label: 'Status Bar BG', labelKey: 'settings.theme_editor.color.status_bg' },
+        { key: 'scrollbar_thumb', label: 'Scrollbar', labelKey: 'settings.theme_editor.color.scrollbar_thumb' },
       ],
     },
     {
-      name: 'Headings',
+      nameKey: 'settings.theme_editor.category.syntax',
       colors: [
-        { key: 'heading1_color', label: 'H1 Color' },
-        { key: 'heading2_color', label: 'H2 Color' },
-        { key: 'heading3_color', label: 'H3 Color' },
-        { key: 'heading4_color', label: 'H4 Color' },
-        { key: 'heading5_color', label: 'H5 Color' },
-        { key: 'heading6_color', label: 'H6 Color' },
+        { key: 'heading1_color', label: 'H1 Color', labelKey: 'settings.theme_editor.color.heading1' },
+        { key: 'heading2_color', label: 'H2 Color', labelKey: 'settings.theme_editor.color.heading2' },
+        { key: 'heading3_color', label: 'H3 Color', labelKey: 'settings.theme_editor.color.heading3' },
+        { key: 'heading4_color', label: 'H4 Color', labelKey: 'settings.theme_editor.color.heading4' },
+        { key: 'heading5_color', label: 'H5 Color', labelKey: 'settings.theme_editor.color.heading5' },
+        { key: 'heading6_color', label: 'H6 Color', labelKey: 'settings.theme_editor.color.heading6' },
       ],
     },
     {
-      name: 'Heading Sizes',
+      nameKey: 'settings.theme_editor.category.editor',
       colors: [
-        { key: 'heading1_size', label: 'H1 Size', isSize: true },
-        { key: 'heading2_size', label: 'H2 Size', isSize: true },
-        { key: 'heading3_size', label: 'H3 Size', isSize: true },
-        { key: 'heading4_size', label: 'H4 Size', isSize: true },
-        { key: 'heading5_size', label: 'H5 Size', isSize: true },
-        { key: 'heading6_size', label: 'H6 Size', isSize: true },
+        { key: 'heading1_size', label: 'H1 Size', isSize: true, labelKey: 'settings.theme_editor.color.heading1_size' },
+        { key: 'heading2_size', label: 'H2 Size', isSize: true, labelKey: 'settings.theme_editor.color.heading2_size' },
+        { key: 'heading3_size', label: 'H3 Size', isSize: true, labelKey: 'settings.theme_editor.color.heading3_size' },
+        { key: 'heading4_size', label: 'H4 Size', isSize: true, labelKey: 'settings.theme_editor.color.heading4_size' },
+        { key: 'heading5_size', label: 'H5 Size', isSize: true, labelKey: 'settings.theme_editor.color.heading5_size' },
+        { key: 'heading6_size', label: 'H6 Size', isSize: true, labelKey: 'settings.theme_editor.color.heading6_size' },
       ],
     },
     {
-      name: 'Code',
+      nameKey: 'settings.theme_editor.category.code',
       colors: [
-        { key: 'code_bg', label: 'Inline Code BG' },
-        { key: 'code_block_bg', label: 'Code Block BG' },
+        { key: 'code_bg', label: 'Inline Code BG', labelKey: 'settings.theme_editor.color.code_bg' },
+        { key: 'code_block_bg', label: 'Code Block BG', labelKey: 'settings.theme_editor.color.code_block_bg' },
       ],
     },
     {
-      name: 'Links',
+      nameKey: 'settings.theme_editor.category.accent',
       colors: [
-        { key: 'link_color', label: 'Link Color' },
-        { key: 'link_hover_color', label: 'Link Hover' },
+        { key: 'link_color', label: 'Link Color', labelKey: 'settings.theme_editor.color.link_color' },
+        { key: 'link_hover_color', label: 'Link Hover', labelKey: 'settings.theme_editor.color.link_hover_color' },
       ],
     },
     {
-      name: 'Blockquote',
+      nameKey: 'settings.theme_editor.category.misc',
       colors: [
-        { key: 'blockquote_border', label: 'Border' },
-        { key: 'blockquote_bg', label: 'Background' },
+        { key: 'blockquote_border', label: 'Blockquote Border', labelKey: 'settings.theme_editor.color.blockquote_border' },
+        { key: 'blockquote_bg', label: 'Blockquote Background', labelKey: 'settings.theme_editor.color.blockquote_bg' },
+        { key: 'hr_color', label: 'Horizontal Rule', labelKey: 'settings.theme_editor.color.hr_color' },
+        { key: 'table_border', label: 'Table Border', labelKey: 'settings.theme_editor.color.table_border' },
+        { key: 'table_header_bg', label: 'Table Header BG', labelKey: 'settings.theme_editor.color.table_header_bg' },
+        { key: 'highlight_bg', label: 'Highlight BG', labelKey: 'settings.theme_editor.color.highlight_bg' },
+        { key: 'cell_selected_bg', label: 'Cell Selected BG', labelKey: 'settings.theme_editor.color.cell_selected_bg' },
       ],
     },
-    {
-      name: 'Other',
-      colors: [
-        { key: 'hr_color', label: 'Horizontal Rule' },
-        { key: 'table_border', label: 'Table Border' },
-        { key: 'table_header_bg', label: 'Table Header BG' },
-        { key: 'highlight_bg', label: 'Highlight BG' },
-        { key: 'cell_selected_bg', label: 'Cell Selected BG' },
-      ],
-    },
-  ] as { name: string; colors: { key: keyof ThemeColors; label: string; isSize?: boolean }[] }[]
+  ] as { name: string; nameKey: string; colors: { key: keyof ThemeColors; label: string; labelKey: string; isSize?: boolean }[] }[]
 
   $effect(() => {
     load()
@@ -262,7 +263,7 @@
 
 <div class="theme-editor">
   <div class="editor-header">
-    <h3>Theme Editor</h3>
+    <h3>{i18n.t('settings.theme_editor.title')}</h3>
     {#if themes.length > 0}
       <select onchange={(e) => {
         const theme = themes.find(t => t.id === (e.target as HTMLSelectElement).value)
@@ -277,25 +278,25 @@
 
   {#if !selectedTheme}
     <div class="no-theme">
-      <p>No custom theme selected. Import or create a theme to edit.</p>
+      <p>{i18n.t('settings.theme_editor.empty')}</p>
     </div>
   {:else}
     <div class="editor-content">
       <div class="theme-info">
         <span class="theme-name">{selectedTheme.name}</span>
         <span class="theme-badge" class:dark={selectedTheme.is_dark}>
-          {selectedTheme.is_dark ? 'Dark' : 'Light'}
+          {selectedTheme.is_dark ? i18n.t('settings.theme.badge.dark') : i18n.t('settings.theme.badge.light')}
         </span>
         {#if isBuiltInTheme(selectedTheme.id)}
-          <span class="builtin-badge">Built-in</span>
+          <span class="builtin-badge">{i18n.t('settings.theme_editor.builtin_label')}</span>
         {/if}
       </div>
 
       {#if isBuiltInTheme(selectedTheme.id)}
         <div class="builtin-notice">
-          <p>Built-in themes cannot be directly edited.</p>
+          <p>{i18n.t('settings.theme_editor.builtin_notice')}</p>
           <button onclick={() => cloneAndEdit(selectedTheme!.id)}>
-            Clone and Customize
+            {i18n.t('settings.theme_editor.clone')}
           </button>
         </div>
       {/if}
@@ -303,11 +304,11 @@
       <div class="color-sections">
         {#each colorCategories as category}
           <div class="color-section">
-            <h4>{category.name}</h4>
+            <h4>{i18n.t(category.nameKey)}</h4>
             <div class="color-grid">
               {#each category.colors as item}
                 <div class="color-item">
-                  <label>{item.label}</label>
+                  <label>{i18n.t(item.labelKey)}</label>
                   {#if item.isSize}
                     <input
                       type="text"
@@ -330,11 +331,11 @@
 
       <div class="editor-actions">
         <button class="preview-btn" onclick={openPreview}>
-          Preview
+          {i18n.t('settings.theme_editor.preview')}
         </button>
         {#if isModified && !isBuiltInTheme(selectedTheme.id)}
           <button class="save-btn" onclick={handleSave}>
-            Save Changes
+            {i18n.t('action.save')}
           </button>
         {/if}
       </div>
@@ -346,7 +347,7 @@
   <div class="preview-overlay" onclick={() => previewOpen = false}>
     <div class="preview-dialog" onclick={(e) => e.stopPropagation()}>
       <div class="preview-header">
-        <h3>Theme Preview</h3>
+        <h3>{i18n.t('settings.theme_editor.preview_title')}</h3>
         <button class="close-btn" onclick={() => previewOpen = false}>x</button>
       </div>
       <div class="preview-content" style="

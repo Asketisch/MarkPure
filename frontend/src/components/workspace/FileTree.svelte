@@ -12,6 +12,7 @@
    */
   import type { FileEntry } from '$lib/editor/commands'
   import { filterTree } from '$lib/fileTreeFilters'
+  import { useI18n } from '$lib/stores/i18n.svelte'
 
   let {
     tree,
@@ -32,11 +33,13 @@
     onPin: (entry: FileEntry) => void
     onContextMenu: (e: MouseEvent, entry: FileEntry) => void
   } = $props()
+
+  const i18n = useI18n()
 </script>
 
 <div class="workspace-tree">
   {#if loading}
-    <div class="workspace-loading">Loading...</div>
+    <div class="workspace-loading">{i18n.t('workspace.loading')}</div>
   {:else}
     {#each filterTree(tree, searchQuery) as entry (entry.path)}
       {@render treeNode(entry, 0)}

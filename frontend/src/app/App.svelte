@@ -56,15 +56,13 @@
     handleWikiLinkClick as handleWikiLinkClickLib,
     handleTagClick as handleTagClickLib,
   } from '$lib/wikiTagActions'
-  import { toggleInstantRender } from '$lib/plugins/instant-render'
   import { searchQuickInsert, type QuickInsertItem } from '$lib/extensions/quick-insert-config'
-  import { getPopupActiveIndex } from '$lib/extensions/blocks/quick-insert-extension'
   import {
     Heading1, Heading2, Heading3,
     Bold, Italic, Strikethrough, Code,
     Quote, List, ListOrdered, ListTodo,
     Table, Minus, Search, FileCode2,
-    Undo2, Redo2, Sparkles, X,
+    Undo2, Redo2, X,
     Superscript as Sup, Subscript as Sub
   } from 'lucide-svelte'
 
@@ -137,10 +135,17 @@
   let viewMode = $state<'wysiwyg' | 'source' | 'split'>('wysiwyg')
   let splitWidth = $state(50) // percent for the WYSIWYG half
   let splitResizing = $state(false)
-  let instantRenderEnabled = $state(false)
   let qiVisible = $state(false)
   let qiQuery = $state('')
   let qiPosition = $state({ top: 0, left: 0 })
+  // Active Suggestion props from the QuickInsertExtension. We
+  // track the latest one in Svelte state instead of the
+  // `window.__qi_props` global that the previous implementation
+  // used — two QuickInsertExtension instances (one for `@`, one
+  // for `/`) clobbered that global and the second instance could
+  // leave the editor in a state where subsequent keystrokes were
+  // swallowed (the "WYSIWYG can't input" bug).
+  let qiProps: any = $state(null)
   let initPending = false
   // Auto-save timers per tab (fixes race condition with single timer)
   let autoSaveTimers = $state<Map<number, ReturnType<typeof setTimeout>>>(new Map())
@@ -165,21 +170,6 @@
   // the un-themed layout. The bootstrap overlay below is only visible
   // for the duration of the two IPC roundtrips (sub-100ms in practice).
   let ready = $state(false)
-
-  // Build the live command list for the palette. We rebuild
-  // once at component mount; if a handler ever needs fresh
-  // state (e.g. theme name) it reads it lazily at run-time.
-  const paletteCommands: Command[] = commandCatalog.map(def => {
-    const cmd: Command = {
-      id: def.id,
-      title: def.title,
-      category: def.category,
-      keywords: def.keywords,
-      run: () => { /* wired below */ },
-    }
-    cmd.run = buildCommandRun(def.id)
-    return cmd
-  })
 
   function buildCommandRun(id: string): () => void {
     switch (id) {
@@ -236,6 +226,24 @@
       case 'insert.snippet': return () => { void openSnippetPicker() }
       default: return () => {}
     }
+  }
+
+  // Build the live command list for the palette. We rebuild the
+  // list whenever the active language changes so titles and
+  // category headers stay in sync. The list is recomputed at
+  // every template render that the i18n runes participate in.
+  function buildPaletteCommands(): Command[] {
+    // Touch the runes so any template that reads the result
+    // re-runs when the user switches language.
+    void i18n.locale
+    void i18n.translations
+    return commandCatalog.map(def => ({
+      id: def.id,
+      title: i18n.t(def.titleKey),
+      category: i18n.t(def.categoryKey),
+      keywords: def.keywords,
+      run: buildCommandRun(def.id),
+    }))
   }
 
   function insertMermaidBlock() {
@@ -861,20 +869,26 @@
 
   function toggleSourceMode() {
     // P0-1: legacy two-state toggle is now a 3-state cycle:
-    // wysiwyg → source → split → wysiwyg. The implementation
+    // wysiwyg → split → source → wysiwyg. The implementation
     // is delegated to `cycleViewMode` so the command palette
     // entry and the keyboard shortcut (Ctrl+/) hit the same
     // path.
     cycleViewMode()
   }
 
-  // P0-1: cycle through the three editor layouts. Persists
-  // the markdown through `sourceContent` so the SourceEditor
-  // can read the latest content on first paint.
+  // P0-1 + P1-9 follow-up: cycle through the three editor
+  // layouts. Persists the markdown through `sourceContent` so
+  // the SourceEditor can read the latest content on first
+  // paint. Reordered to `wysiwyg → split → source → wysiwyg`
+  // so the first Ctrl+/ press shows BOTH raw markdown and
+  // rendered WYSIWYG side by side — the previous order
+  // (`wysiwyg → source → split`) hid the WYSIWYG pane on the
+  // first press and left the user staring at raw text, which
+  // felt like Ctrl+/ "broke" the editor.
   function cycleViewMode() {
     const next: 'wysiwyg' | 'source' | 'split' =
-      viewMode === 'wysiwyg' ? 'source'
-      : viewMode === 'source' ? 'split'
+      viewMode === 'wysiwyg' ? 'split'
+      : viewMode === 'split' ? 'source'
       : 'wysiwyg'
     setViewMode(next)
   }
@@ -882,9 +896,18 @@
   function setViewMode(mode: 'wysiwyg' | 'source' | 'split') {
     if (viewMode === mode) return
     if (viewMode === 'wysiwyg') {
-      // Going to source/split: snapshot the current markdown
-      // so the source editor has fresh content to show.
-      if (editor) sourceContent = getMarkdown(editor)
+      // Going to source/split: snapshot the current markdown so
+      // the source editor has fresh content to show. If the Tiptap
+      // editor isn't ready yet (very first toggle before init, or a
+      // tab switch in flight), fall back to the active tab's stored
+      // content — otherwise the SourceEditor mounts with an empty
+      // string and shows a blank document.
+      if (editor) {
+        sourceContent = getMarkdown(editor)
+      } else {
+        const tab = getActiveTab()
+        if (tab && sourceContent !== tab.content) sourceContent = tab.content
+      }
     } else if (viewMode === 'source' && mode !== 'source') {
       // Leaving source-only: pull any pending edits from the
       // source editor back into the tab content so the Tiptap
@@ -897,16 +920,28 @@
           tab.dirty = true
         }
       }
-      if (mode === 'wysiwyg') {
-        // Re-attach the Tiptap editor to a fresh container.
-        requestAnimationFrame(() => {
-          const container = document.querySelector('.editor-area') as HTMLElement | null
-          if (container && editor) {
-            editorContainer = container
-            initEditor()
-          }
-        })
-      }
+    }
+
+    // If the new mode renders the Tiptap editor (wysiwyg or split),
+    // the previous view's `editor-area` div is about to be unmounted
+    // and a fresh one will be mounted. The Tiptap editor instance is
+    // still attached to the old (about-to-be-removed) node, so it
+    // would render into a detached element and the new split-pane /
+    // wysiwyg pane would be empty. Re-attach on the next frame so
+    // it mounts to the freshly-rendered container.
+    //
+    // (The previous implementation only re-initialised for
+    // `mode === 'wysiwyg'`, so entering split left the WYSIWYG
+    // pane blank — the Tiptap instance was alive but pointing at
+    // a detached DOM node.)
+    if (mode === 'wysiwyg' || mode === 'split') {
+      requestAnimationFrame(() => {
+        const container = document.querySelector('.editor-area') as HTMLElement | null
+        if (container && editor) {
+          editorContainer = container
+          initEditor()
+        }
+      })
     }
     viewMode = mode
     // Keep legacy flag in sync for any other call site.
@@ -1297,12 +1332,25 @@
     }
   })
 
+  // Platform detection (computed once at module load — the app is a
+  // desktop app, the platform doesn't change while it runs).
+  const isMac = typeof navigator !== 'undefined'
+    && /Mac|iPhone|iPad/i.test(navigator.platform)
+
   function handleKeydown(e: KeyboardEvent) {
-    // F11 toggles Zen mode (P0-2). The key is checked before the
-    // metaKey/ctrlKey guard below so a bare F11 still fires — but
-    // F11 inside a text field is suppressed by `target` check to
-    // avoid stomping on IME / accessibility shortcuts.
-    if (e.key === 'F11') {
+    // Zen-mode toggle: F11 on Windows/Linux, Cmd+Ctrl+F on macOS.
+    // On macOS, F11 is owned by WKWebView/macOS itself — it triggers
+    // a system fullscreen transition that races with any in-page
+    // handler. The macOS-conventional shortcut for "Toggle Full
+    // Screen" is Cmd+Ctrl+F, so we use that instead and leave F11
+    // alone on macOS.
+    if (isMac) {
+      if (e.metaKey && e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault()
+        toggleZenMode()
+        return
+      }
+    } else if (e.key === 'F11') {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
         return
@@ -1428,6 +1476,7 @@
     // Quick insert popup event listeners
     const handleQIStart = (e: Event) => {
       const detail = (e as CustomEvent).detail
+      qiProps = detail
       qiVisible = true
       qiQuery = detail.query ?? ''
       // Position popup using clientRect from suggestion plugin
@@ -1441,6 +1490,7 @@
     }
     const handleQIUpdate = (e: Event) => {
       const detail = (e as CustomEvent).detail
+      qiProps = detail
       qiQuery = detail.query ?? ''
       const rect = detail.clientRect?.()
       if (rect) {
@@ -1452,22 +1502,29 @@
     }
     const handleQIExit = () => {
       qiVisible = false
+      qiProps = null
     }
 
     window.addEventListener('quick-insert-start', handleQIStart)
     window.addEventListener('quick-insert-update', handleQIUpdate)
     window.addEventListener('quick-insert-exit', handleQIExit)
 
-    // Handle Enter selection from extension's onKeyDown
+    // Handle Enter selection from extension's onKeyDown. The
+    // active item index lives in the popup (it tracks it
+    // locally and emits a navigate *delta* on ArrowUp/Down);
+    // the popup exposes its current index via the
+    // `data-active-index` attribute on its root element.
     const handleQISelect = () => {
-      const props = (window as any).__qi_props
+      const popupEl = document.querySelector('.qi-popup') as HTMLElement | null
+      const idxAttr = popupEl?.getAttribute('data-active-index')
+      const activeIdx = idxAttr != null ? parseInt(idxAttr, 10) : 0
+      const props = qiProps
       if (!props) {
         logger.warn('[QI] handleQISelect: props is null')
         return
       }
       // Use props.items directly (the filtered items from Suggestion) instead of re-filtering
       const items = props.items as QuickInsertItem[]
-      const activeIdx = getPopupActiveIndex()
       if (items[activeIdx]) {
         logger.debug('[QI] running command', { title: items[activeIdx].title, itemsCount: items.length, activeIdx })
         props.command(items[activeIdx])
@@ -1625,52 +1682,51 @@
       <!-- Toolbar -->
       {#if !zenMode}
       <div class="toolbar">
-        <button class="tb-btn" onclick={() => setHeading(1)} title="Heading 1"><Heading1 size={16} /></button>
-        <button class="tb-btn" onclick={() => setHeading(2)} title="Heading 2"><Heading2 size={16} /></button>
-        <button class="tb-btn" onclick={() => setHeading(3)} title="Heading 3"><Heading3 size={16} /></button>
+        <button class="tb-btn" onclick={() => setHeading(1)} title={i18n.t('toolbar.heading1')}><Heading1 size={16} /></button>
+        <button class="tb-btn" onclick={() => setHeading(2)} title={i18n.t('toolbar.heading2')}><Heading2 size={16} /></button>
+        <button class="tb-btn" onclick={() => setHeading(3)} title={i18n.t('toolbar.heading3')}><Heading3 size={16} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={toggleBold} title="Bold (Ctrl+B)"><Bold size={15} /></button>
-        <button class="tb-btn" onclick={toggleItalic} title="Italic (Ctrl+I)"><Italic size={15} /></button>
-        <button class="tb-btn" onclick={toggleStrike} title="Strikethrough"><Strikethrough size={15} /></button>
-        <button class="tb-btn" onclick={toggleCode} title="Inline Code"><Code size={15} /></button>
-        <button class="tb-btn" onclick={() => editor?.chain().focus().toggleMark('superscript').run()} title="Superscript (P2-1)"><Sup size={15} /></button>
-        <button class="tb-btn" onclick={() => editor?.chain().focus().toggleMark('subscript').run()} title="Subscript (P2-1)"><Sub size={15} /></button>
+        <button class="tb-btn" onclick={toggleBold} title={i18n.t('toolbar.bold')}><Bold size={15} /></button>
+        <button class="tb-btn" onclick={toggleItalic} title={i18n.t('toolbar.italic')}><Italic size={15} /></button>
+        <button class="tb-btn" onclick={toggleStrike} title={i18n.t('toolbar.strikethrough')}><Strikethrough size={15} /></button>
+        <button class="tb-btn" onclick={toggleCode} title={i18n.t('toolbar.inline_code')}><Code size={15} /></button>
+        <button class="tb-btn" onclick={() => editor?.chain().focus().toggleMark('superscript').run()} title={i18n.t('toolbar.superscript')}><Sup size={15} /></button>
+        <button class="tb-btn" onclick={() => editor?.chain().focus().toggleMark('subscript').run()} title={i18n.t('toolbar.subscript')}><Sub size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={toggleCodeBlock} title="Code Block"><FileCode2 size={15} /></button>
-        <button class="tb-btn" onclick={toggleBlockquote} title="Blockquote"><Quote size={15} /></button>
+        <button class="tb-btn" onclick={toggleCodeBlock} title={i18n.t('toolbar.code_block')}><FileCode2 size={15} /></button>
+        <button class="tb-btn" onclick={toggleBlockquote} title={i18n.t('toolbar.blockquote')}><Quote size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={toggleBulletList} title="Bullet List"><List size={15} /></button>
-        <button class="tb-btn" onclick={toggleOrderedList} title="Ordered List"><ListOrdered size={15} /></button>
-        <button class="tb-btn" onclick={toggleTaskList} title="Task List"><ListTodo size={15} /></button>
+        <button class="tb-btn" onclick={toggleBulletList} title={i18n.t('toolbar.bullet_list')}><List size={15} /></button>
+        <button class="tb-btn" onclick={toggleOrderedList} title={i18n.t('toolbar.ordered_list')}><ListOrdered size={15} /></button>
+        <button class="tb-btn" onclick={toggleTaskList} title={i18n.t('toolbar.task_list')}><ListTodo size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={addTable} title="Insert Table"><Table size={15} /></button>
+        <button class="tb-btn" onclick={addTable} title={i18n.t('toolbar.insert_table')}><Table size={15} /></button>
         {#if isInTable}
-          <button class="tb-btn" onclick={addColumnBefore} title="Add Column Before">&#8592;+</button>
-          <button class="tb-btn" onclick={addColumnAfter} title="Add Column After">+&#8594;</button>
-          <button class="tb-btn" onclick={deleteColumn} title="Delete Column">&#8722;Col</button>
-          <button class="tb-btn" onclick={addRowBefore} title="Add Row Before">&#8593;+</button>
-          <button class="tb-btn" onclick={addRowAfter} title="Add Row After">+&#8595;</button>
-          <button class="tb-btn" onclick={deleteRow} title="Delete Row">&#8722;Row</button>
+          <button class="tb-btn" onclick={addColumnBefore} title={i18n.t('toolbar.add_column_before')}>&#8592;+</button>
+          <button class="tb-btn" onclick={addColumnAfter} title={i18n.t('toolbar.add_column_after')}>+&#8594;</button>
+          <button class="tb-btn" onclick={deleteColumn} title={i18n.t('toolbar.delete_column')}>&#8722;Col</button>
+          <button class="tb-btn" onclick={addRowBefore} title={i18n.t('toolbar.add_row_before')}>&#8593;+</button>
+          <button class="tb-btn" onclick={addRowAfter} title={i18n.t('toolbar.add_row_after')}>+&#8595;</button>
+          <button class="tb-btn" onclick={deleteRow} title={i18n.t('toolbar.delete_row')}>&#8722;Row</button>
         {/if}
-        <button class="tb-btn" onclick={insertHr} title="Horizontal Rule"><Minus size={15} /></button>
+        <button class="tb-btn" onclick={insertHr} title={i18n.t('toolbar.horizontal_rule')}><Minus size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" onclick={() => showSearch = !showSearch} title="Find & Replace (Ctrl+F)"><Search size={15} /></button>
+        <button class="tb-btn" onclick={() => showSearch = !showSearch} title={i18n.t('toolbar.find_replace')}><Search size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" class:active={viewMode !== 'wysiwyg'} onclick={toggleSourceMode} title="Cycle View Mode (Ctrl+/)"><FileCode2 size={15} /></button>
-        <button class="tb-btn" class:active={instantRenderEnabled} onclick={() => { if (editor) { toggleInstantRender(editor.view); instantRenderEnabled = !instantRenderEnabled } }} title="Instant Render"><Sparkles size={15} /></button>
+        <button class="tb-btn" class:active={viewMode !== 'wysiwyg'} onclick={toggleSourceMode} title={i18n.t('toolbar.cycle_view_mode')}><FileCode2 size={15} /></button>
         <span class="tb-sep"></span>
-        <button class="tb-btn" class:active={showOutline} onclick={toggleOutline} title="Outline">
+        <button class="tb-btn" class:active={showOutline} onclick={toggleOutline} title={i18n.t('toolbar.outline')}>
           <svg width="15" height="15" viewBox="0 0 16 16">
             <path d="M2 3 L2 15 M6 3 L14 3 M6 8 L14 8 M6 13 L14 13" fill="none" stroke="currentColor" stroke-width="1.2"/>
           </svg>
         </button>
-        <button class="tb-btn" class:active={showTags} onclick={() => showTags = !showTags} title="Tags">
+        <button class="tb-btn" class:active={showTags} onclick={() => showTags = !showTags} title={i18n.t('toolbar.tags')}>
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
             <path d="M2 4 L8 4 M2 8 L13 8 M2 12 L10 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
             <circle cx="14.5" cy="4" r="1.2" fill="currentColor"/>
           </svg>
         </button>
-        <button class="tb-btn" class:active={showBacklinks} onclick={() => showBacklinks = !showBacklinks} title="Backlinks">
+        <button class="tb-btn" class:active={showBacklinks} onclick={() => showBacklinks = !showBacklinks} title={i18n.t('toolbar.backlinks')}>
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
             <path d="M2.5 8 L13 8 M9 4 L13 8 L9 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M3 4 L5 4 M3 8 L5 8 M3 12 L5 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
@@ -1767,7 +1823,7 @@
               <input
                 type="text"
                 class="snippet-picker-input"
-                placeholder="Filter snippets…"
+                placeholder={i18n.t('snippet.filter_placeholder')}
                 bind:value={snippetFilter}
                 autofocus
               />
@@ -1782,7 +1838,7 @@
                 </li>
               {:else}
                 <li class="snippet-picker-empty">
-                  {snippetCache.length === 0 ? 'No snippets found. Add .md files to ~/.config/markpure/snippets/.' : 'No matching snippets.'}
+                  {snippetCache.length === 0 ? i18n.t('snippet.empty') : i18n.t('snippet.no_match')}
                 </li>
               {/each}
             </ul>
@@ -1800,7 +1856,7 @@
     query={qiQuery}
     position={qiPosition}
     onSelect={(item: QuickInsertItem) => {
-      const props = (window as any).__qi_props
+      const props = qiProps
       if (props?.command) {
         props.command(item)
       }
@@ -1808,12 +1864,12 @@
     }}
     onClose={() => {
       qiVisible = false
-      // Clear the @ trigger from editor
-      const w = window as any
-      if (w.__qi_props?.range) {
+      // Clear the trigger character range from the editor
+      const props = qiProps
+      if (props?.range) {
         editor?.chain().focus().deleteRange({
-          from: w.__qi_props.range.from,
-          to: w.__qi_props.range.to,
+          from: props.range.from,
+          to: props.range.to,
         }).run()
       }
     }}
@@ -1828,7 +1884,7 @@
 />
 
 <!-- Command Palette (Cmd+Shift+P) -->
-<CommandPalette bind:visible={showCommandPalette} commands={paletteCommands} />
+<CommandPalette bind:visible={showCommandPalette} commands={buildPaletteCommands()} />
 
 <!-- Quick File Switcher (Cmd+P) -->
 <QuickSwitcher bind:visible={showQuickSwitcher} workspacePath={workspacePath ?? ''} onOpen={handleOpenRecent} />

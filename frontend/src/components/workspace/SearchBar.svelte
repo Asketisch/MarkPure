@@ -10,8 +10,11 @@
     getSearchState,
     searchPluginKey,
   } from '$lib/plugins/search'
+  import { useI18n } from '$lib/stores/i18n.svelte'
 
   let { editor, visible = $bindable(false) }: { editor: Editor; visible: boolean } = $props()
+
+  const i18n = useI18n()
 
   let query = $state('')
   let replacement = $state('')
@@ -116,7 +119,7 @@
         <input
           type="text"
           class="search-input"
-          placeholder="Find"
+          placeholder={i18n.t('search.find_placeholder')}
           bind:value={query}
           oninput={doSearch}
         />
@@ -124,30 +127,30 @@
           {#if matchCount > 0}
             {currentMatch}/{matchCount}
           {:else}
-            No results
+            {i18n.t('search.no_results')}
           {/if}
         </span>
       </div>
-      <button class="sb-btn" onclick={handlePrev} title="Previous (Shift+Enter)" disabled={matchCount === 0}>&#9650;</button>
-      <button class="sb-btn" onclick={handleNext} title="Next (Enter)" disabled={matchCount === 0}>&#9660;</button>
+      <button class="sb-btn" onclick={handlePrev} title={i18n.t('search.previous')} disabled={matchCount === 0}>&#9650;</button>
+      <button class="sb-btn" onclick={handleNext} title={i18n.t('search.next')} disabled={matchCount === 0}>&#9660;</button>
       <div class="search-options">
-        <button class="sb-opt" class:active={caseSensitive} onclick={() => caseSensitive = !caseSensitive} title="Match Case">Aa</button>
-        <button class="sb-opt" class:active={wholeWord} onclick={() => wholeWord = !wholeWord} title="Whole Word">Ab</button>
-        <button class="sb-opt" class:active={useRegex} onclick={() => useRegex = !useRegex} title="Regex">.*</button>
+        <button class="sb-opt" class:active={caseSensitive} onclick={() => caseSensitive = !caseSensitive} title={i18n.t('search.match_case')}>Aa</button>
+        <button class="sb-opt" class:active={wholeWord} onclick={() => wholeWord = !wholeWord} title={i18n.t('search.whole_word')}>Ab</button>
+        <button class="sb-opt" class:active={useRegex} onclick={() => useRegex = !useRegex} title={i18n.t('search.regex')}>.*</button>
       </div>
-      <button class="sb-btn sb-close" onclick={handleClose} title="Close (Escape)">&#10005;</button>
+      <button class="sb-btn sb-close" onclick={handleClose} title={i18n.t('search.close_tooltip')}>&#10005;</button>
     </div>
     <div class="search-row">
       <div class="search-input-wrap">
         <input
           type="text"
           class="search-input"
-          placeholder="Replace"
+          placeholder={i18n.t('search.replace_placeholder')}
           bind:value={replacement}
         />
       </div>
-      <button class="sb-btn" onclick={handleReplace} title="Replace" disabled={matchCount === 0}>Replace</button>
-      <button class="sb-btn" onclick={handleReplaceAll} title="Replace All" disabled={matchCount === 0}>All</button>
+      <button class="sb-btn" onclick={handleReplace} title={i18n.t('search.replace')} disabled={matchCount === 0}>{i18n.t('search.replace')}</button>
+      <button class="sb-btn" onclick={handleReplaceAll} title={i18n.t('search.replace_all_tooltip')} disabled={matchCount === 0}>{i18n.t('search.replace_all')}</button>
     </div>
   </div>
 {/if}

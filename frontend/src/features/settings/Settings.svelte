@@ -97,18 +97,34 @@
   }
 
   // Convert CSS class name to human-readable label for display
+  // by looking up the i18n key — keeps labels in sync with the
+  // current locale (Settings is bilingual at runtime).
   function getThemeLabel(cssClass: string): string {
-    const classToLabel: Record<string, string> = {
-      '': 'Cadmium Light',
-      'theme-dark': 'Dark',
-      'theme-one-dark': 'One Dark',
-      'theme-graphite': 'Graphite',
-      'theme-ulysses': 'Ulysses',
-      'theme-material-dark': 'Material Dark',
-      'theme-blue-topaz': 'Blue Topaz',
+    const classToKey: Record<string, string> = {
+      '': 'settings.theme.cadmium',
+      'theme-dark': 'settings.theme.dark',
+      'theme-one-dark': 'settings.theme.one_dark',
+      'theme-graphite': 'settings.theme.graphite',
+      'theme-ulysses': 'settings.theme.ulysses',
+      'theme-material-dark': 'settings.theme.material_dark',
+      'theme-blue-topaz': 'settings.theme.blue_topaz',
     }
-    return classToLabel[cssClass] ?? cssClass
+    const key = classToKey[cssClass]
+    return key ? i18n.t(key) : cssClass
   }
+
+  // Display options for the theme selector — values are CSS classes,
+  // labels resolve via i18n at render time so the user sees the
+  // current language.
+  const themeOptions: Array<{ value: string; labelKey: string }> = [
+    { value: '', labelKey: 'settings.theme.cadmium' },
+    { value: 'theme-dark', labelKey: 'settings.theme.dark' },
+    { value: 'theme-one-dark', labelKey: 'settings.theme.one_dark' },
+    { value: 'theme-graphite', labelKey: 'settings.theme.graphite' },
+    { value: 'theme-ulysses', labelKey: 'settings.theme.ulysses' },
+    { value: 'theme-material-dark', labelKey: 'settings.theme.material_dark' },
+    { value: 'theme-blue-topaz', labelKey: 'settings.theme.blue_topaz' },
+  ]
 
   async function handleImportTheme() {
     try {
@@ -264,14 +280,10 @@
 
             <div class="setting-row">
               <label>{i18n.t('settings.builtin_theme')}</label>
-              <select value={getThemeLabel(config?.theme ?? '')} onchange={(e) => changeTheme((e.target as HTMLSelectElement).value)}>
-                <option value="Cadmium Light">Cadmium Light</option>
-                <option value="Dark">Dark</option>
-                <option value="One Dark">One Dark</option>
-                <option value="Graphite">Graphite</option>
-                <option value="Ulysses">Ulysses</option>
-                <option value="Material Dark">Material Dark</option>
-                <option value="Blue Topaz">Blue Topaz</option>
+              <select value={config?.theme ?? ''} onchange={(e) => changeTheme((e.target as HTMLSelectElement).value)}>
+                {#each themeOptions as opt (opt.value)}
+                  <option value={opt.value}>{i18n.t(opt.labelKey)}</option>
+                {/each}
               </select>
             </div>
 
@@ -281,8 +293,8 @@
                 <div class="theme-card">
                   <div class="theme-info">
                     <span class="theme-name">{theme.name}</span>
-                    <span class="theme-author">by {theme.author}</span>
-                    <span class="theme-badge" class:dark={theme.is_dark}>{theme.is_dark ? 'Dark' : 'Light'}</span>
+                    <span class="theme-author">{i18n.t('settings.theme.author_template').replace('{author}', theme.author)}</span>
+                    <span class="theme-badge" class:dark={theme.is_dark}>{theme.is_dark ? i18n.t('settings.theme.badge.dark') : i18n.t('settings.theme.badge.light')}</span>
                   </div>
                   <div class="theme-actions">
                     <button onclick={() => handleDeleteTheme(theme.id)}>{i18n.t('action.delete')}</button>

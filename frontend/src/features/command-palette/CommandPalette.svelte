@@ -147,7 +147,7 @@
 
 {#if visible}
   <div class="backdrop" onclick={handleBackdropClick} onkeydown={handleKeydown} role="presentation">
-    <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette" onclick={(e) => e.stopPropagation()} onkeydown={handleKeydown}>
+    <div class="palette" role="dialog" aria-modal="true" aria-label={i18n.t('palette.aria_label')} onclick={(e) => e.stopPropagation()} onkeydown={handleKeydown}>
       <input
         bind:this={inputEl}
         bind:value={query}

@@ -23,7 +23,6 @@ interface WidgetDecorationSpec {
 }
 
 export interface InstantRenderState {
-  enabled: boolean
   cursorPos: number
   decorations: DecorationSet
 }
@@ -141,44 +140,12 @@ export function createInstantRenderPlugin(): Plugin {
     state: {
       init(_config, state) {
         return {
-          enabled: true,
           cursorPos: -1,
           decorations: DecorationSet.empty,
         }
       },
 
       apply(tr, prev, oldState, newState): InstantRenderState {
-        const meta = tr.getMeta(instantRenderPluginKey) as
-          | { type: 'toggle' }
-          | { type: 'enable' }
-          | { type: 'disable' }
-          | undefined
-
-        if (meta) {
-          if (meta.type === 'toggle') {
-            const enabled = !prev.enabled
-            return {
-              enabled,
-              cursorPos: prev.cursorPos,
-              decorations: enabled
-                ? computeSyntaxDecorations(newState.doc, prev.cursorPos >= 0 ? prev.cursorPos : tr.selection.from)
-                : DecorationSet.empty,
-            }
-          }
-          if (meta.type === 'enable') {
-            return {
-              enabled: true,
-              cursorPos: newState.selection.from,
-              decorations: computeSyntaxDecorations(newState.doc, newState.selection.from),
-            }
-          }
-          if (meta.type === 'disable') {
-            return { enabled: false, cursorPos: prev.cursorPos, decorations: DecorationSet.empty }
-          }
-        }
-
-        if (!prev.enabled) return prev
-
         const newCursorPos = tr.selection.from
         const cursorMoved = newCursorPos !== prev.cursorPos
 
@@ -245,14 +212,8 @@ export function createInstantRenderPlugin(): Plugin {
     props: {
       decorations(state) {
         const pluginState = instantRenderPluginKey.getState(state)
-        if (!pluginState?.enabled) return DecorationSet.empty
-        return pluginState.decorations
+        return pluginState?.decorations ?? DecorationSet.empty
       },
     },
   })
-}
-
-/** Toggle instant render on/off */
-export function toggleInstantRender(view: EditorView): void {
-  view.dispatch(view.state.tr.setMeta(instantRenderPluginKey, { type: 'toggle' }))
 }
