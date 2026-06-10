@@ -15,14 +15,14 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ### 1.2 缺口统计
 
-> 最近更新：2026-06-08 — 全部 9 项 P0 + 阶段 3 的 13 项 P1/P2 已完成。剩余 6 项延期（需重依赖或 XL 改造）。
+> 最近更新：2026-06-10 — P1-11 CJK 拼写检查（macOS NSSpellChecker + 前端完整 UI）完成。剩余 5 项延期。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
 | **P0** | 0 | 全部 P0 已实现 ✅ |
-| **P1** | 2 | P1-8 PNG 导出、P1-11 CJK 拼写延期 |
+| **P1** | 1 | P1-8 PNG 导出延期 |
 | **P2** | 4 | P2-3 列选、P2-4 多根、P2-6 虚拟化、P2-7 Vim、P2-9 评论延期 |
-| **合计** | 6 | 全部为延期项目（需要重依赖或架构改造） |
+| **合计** | 5 | 全部为延期项目（需要重依赖或架构改造） |
 
 ### 1.3 优先级定义
 
@@ -673,7 +673,7 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 
 ### [P1-11] 拼写检查 CJK 支持
 
-**状态**：⏸️ 延期（需要集成 hunspell + CEDICT/Mecab/Ko-dic 字典资产；当前跳过 CJK 字符的逻辑已具备）
+**状态**：✅ 已实现（2026-06-10，macOS NSSpellChecker；Win/Linux 仅英文 fallback）
 
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：L
 
@@ -684,6 +684,27 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 - `backend/crates/spellcheck/src/dict_en.txt` 仅英文
 - `check_spelling` IPC 只对英文分词
 - 代码注释：CJK 自动跳过（`spellcheck/src/lib.rs`）
+
+**已实现（2026-06-10）**：
+- 后端 `spellcheck` crate 拆分为 `types.rs` + `english.rs` + `lib.rs` + `macos.rs` 四个模块（每个 < 300 行，满足铁律）
+- `macos.rs` 调用 `objc2-app-kit::NSSpellChecker`，零字节体积成本，CJK + 英文均高质量
+- `editor_ops::cmd_check_spelling` 通过 `tao::EventLoopProxy` + `std::sync::mpsc::sync_channel(1)` 派发到主线程，超时 5 秒
+- `state::AppEvent::SpellCheckRequest` 新变体携带 reply sender
+- 前端新建 `frontend/src/plugins/spellcheck.ts`（DecorationSet + tr.mapping fast-path + 500ms 防抖）
+- 新建 `frontend/src/extensions/editing/spellcheck-extension.ts`（Tiptap 包装 + `recheckSpelling` 命令）
+- 新建 `frontend/src/stores/spellcheck.svelte.ts`（Svelte 5 rune 单例）
+- App.svelte 添加 `contextmenu` 全局监听，命中 `.spell-error` → 弹出候选词菜单（候选词 + Ignore Once）
+- AppConfig 新增 `spellcheck_enabled`（macOS 默认 true）+ `spellcheck_language`（可覆盖 UI 语言）字段
+- Settings.svelte 新增「拼写检查」区块（开关 + 语言下拉 + 非 macOS tooltip）
+- i18n 三语新增 8 个 key（`spell.no_suggestions` / `spell.ignore_once` / `spell.add_to_dictionary` / `settings.spellcheck` / `settings.spellcheck_enabled` / `settings.spellcheck_language` / `settings.spellcheck.follow_ui` / `settings.spellcheck.macos_only`）
+- CSS 添加 `.ProseMirror .spell-error` 红色波浪下划线
+- 命令面板 `tools.spellcheck` 接入 `recheckSpelling` 命令
+- 11 个后端单测全部通过
+
+**已知限制**：
+- Windows/Linux 仍只支持英文（用户预期已透过 Settings tooltip 透明化）
+- "Add to Dictionary" 菜单项暂未持久化（仅显示，需后端 personal dict 支持）
+- 1MB 以上文档跳过检查（避免数千个 Decoration 拖慢渲染）
 
 **实现要点**：
 - 集成 `hunspell` Rust crate（成熟方案）

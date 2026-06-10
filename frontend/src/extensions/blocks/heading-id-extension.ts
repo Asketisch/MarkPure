@@ -80,7 +80,11 @@ export const HeadingIdExtension = Extension.create({
             modified = true
           })
 
-          return modified ? tr : null
+          if (modified) {
+            tr.setMeta('headingId', true)
+            return tr
+          }
+          return null
         },
       }),
     ]

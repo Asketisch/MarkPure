@@ -36,6 +36,7 @@
   import { useI18n } from '$lib/stores/i18n.svelte'
   import FileTree from './FileTree.svelte'
   import FileContextMenu from './FileContextMenu.svelte'
+  import Dialog from '$lib/components/ui/Dialog.svelte'
 
   interface Props {
     workspacePath?: string | null
@@ -63,6 +64,49 @@
   let expandedDirs = $state<Set<string>>(new Set())
   let selectedPath = $state<string | null>(null)
   let contextMenu = $state<{ x: number; y: number; path: string; isDir: boolean } | null>(null)
+
+  // ----- In-app dialog (replaces native window.confirm/prompt,
+  //       which wry's WebView silently no-ops) -----
+  type DialogState = {
+    type: 'confirm' | 'input'
+    title: string
+    message: string
+    confirmText: string
+    cancelText: string
+    inputValue: string
+    onConfirm: (value?: string) => void | Promise<void>
+  } | null
+  let dialog = $state<DialogState>(null)
+
+  // ----- Inline error banner (side-bar top) -----
+  let actionError = $state<string | null>(null)
+  let errorTimer: ReturnType<typeof setTimeout> | null = null
+
+  function openDialog(d: NonNullable<DialogState>) {
+    dialog = d
+  }
+  function closeDialog() {
+    dialog = null
+  }
+  function showError(msg: string) {
+    actionError = msg
+    if (errorTimer) clearTimeout(errorTimer)
+    errorTimer = setTimeout(() => {
+      actionError = null
+      errorTimer = null
+    }, 6000)
+  }
+  function clearError() {
+    actionError = null
+    if (errorTimer) {
+      clearTimeout(errorTimer)
+      errorTimer = null
+    }
+  }
+  // Teardown: clear the dismiss timer when the component unmounts
+  $effect(() => () => {
+    if (errorTimer) clearTimeout(errorTimer)
+  })
 
   // ----- Workspace / tree management -----
 
@@ -153,49 +197,124 @@
   }
 
   // ----- Context-menu actions (CRUD) -----
+  //
+  // Each handler snapshots the target path/values *before*
+  // `hideContextMenu()` (which clears `contextMenu`), then pops
+  // an in-app `Dialog.svelte`. We avoid `window.confirm/prompt`
+  // because wry's WebView does not implement them — they
+  // return undefined/false and the operation is silently
+  // skipped, which is the bug this rewrite fixes.
+  //
+  // IPC errors are caught and surfaced via the inline error
+  // banner at the top of the sidebar so the user gets feedback
+  // when the Rust side rejects (e.g. "no active workspace",
+  // "path outside the active workspace", filesystem errors).
 
   async function handleNewFile() {
     if (!contextMenu) return
     const parentPath = contextMenu.isDir ? contextMenu.path : workspacePath
-    if (!parentPath) return
-    const name = prompt(i18n.t('workspace.new_file_prompt'), i18n.t('workspace.new_file_default'))
-    if (name) {
-      await createFile(joinPath(parentPath, name))
-      await loadTree()
+    if (!parentPath) {
+      hideContextMenu()
+      return
     }
     hideContextMenu()
+    openDialog({
+      type: 'input',
+      title: i18n.t('workspace.new_file_prompt'),
+      message: '',
+      confirmText: i18n.t('action.confirm'),
+      cancelText: i18n.t('action.cancel'),
+      inputValue: i18n.t('workspace.new_file_default'),
+      onConfirm: async (value) => {
+        const v = (value ?? '').trim()
+        if (!v) return
+        try {
+          await createFile(joinPath(parentPath, v))
+          await loadTree()
+        } catch (e) {
+          console.error('createFile failed:', e)
+          showError(String(e))
+        }
+      },
+    })
   }
 
   async function handleNewFolder() {
     if (!contextMenu) return
     const parentPath = contextMenu.isDir ? contextMenu.path : workspacePath
-    if (!parentPath) return
-    const name = prompt(i18n.t('workspace.new_folder_prompt'), i18n.t('workspace.new_folder_default'))
-    if (name) {
-      await createDirectory(joinPath(parentPath, name))
-      await loadTree()
+    if (!parentPath) {
+      hideContextMenu()
+      return
     }
     hideContextMenu()
+    openDialog({
+      type: 'input',
+      title: i18n.t('workspace.new_folder_prompt'),
+      message: '',
+      confirmText: i18n.t('action.confirm'),
+      cancelText: i18n.t('action.cancel'),
+      inputValue: i18n.t('workspace.new_folder_default'),
+      onConfirm: async (value) => {
+        const v = (value ?? '').trim()
+        if (!v) return
+        try {
+          await createDirectory(joinPath(parentPath, v))
+          await loadTree()
+        } catch (e) {
+          console.error('createDirectory failed:', e)
+          showError(String(e))
+        }
+      },
+    })
   }
 
   async function handleRename() {
     if (!contextMenu) return
-    const oldName = basename(contextMenu.path)
-    const newName = prompt(i18n.t('workspace.rename_prompt'), oldName)
-    if (newName && newName !== oldName) {
-      await renameFile(contextMenu.path, newName)
-      await loadTree()
-    }
+    const oldPath = contextMenu.path
+    const oldName = basename(oldPath)
     hideContextMenu()
+    openDialog({
+      type: 'input',
+      title: i18n.t('workspace.rename_prompt'),
+      message: '',
+      confirmText: i18n.t('action.confirm'),
+      cancelText: i18n.t('action.cancel'),
+      inputValue: oldName,
+      onConfirm: async (value) => {
+        const newName = (value ?? '').trim()
+        if (!newName || newName === oldName) return
+        try {
+          await renameFile(oldPath, newName)
+          await loadTree()
+        } catch (e) {
+          console.error('renameFile failed:', e)
+          showError(String(e))
+        }
+      },
+    })
   }
 
   async function handleDelete() {
     if (!contextMenu) return
-    if (confirm(i18n.t('workspace.delete_confirm').replace('{path}', contextMenu.path))) {
-      await deleteFile(contextMenu.path)
-      await loadTree()
-    }
+    const targetPath = contextMenu.path
     hideContextMenu()
+    openDialog({
+      type: 'confirm',
+      title: i18n.t('action.delete'),
+      message: i18n.t('workspace.delete_confirm').replace('{path}', targetPath),
+      confirmText: i18n.t('action.delete'),
+      cancelText: i18n.t('action.cancel'),
+      inputValue: '',
+      onConfirm: async () => {
+        try {
+          await deleteFile(targetPath)
+          await loadTree()
+        } catch (e) {
+          console.error('deleteFile failed:', e)
+          showError(String(e))
+        }
+      },
+    })
   }
 
   async function handleRefresh() {
@@ -264,6 +383,12 @@
 <svelte:window onclick={hideContextMenu} />
 
 <div class="workspace">
+  {#if actionError}
+    <div class="action-error" role="alert">
+      <span class="action-error-msg">{actionError}</span>
+      <button class="action-error-close" onclick={clearError} aria-label="Close">×</button>
+    </div>
+  {/if}
   <div class="workspace-header">
     <input
       type="text"
@@ -334,6 +459,31 @@
   {/if}
 </div>
 
+<!-- In-app confirm/input dialog (replaces native window.confirm/prompt,
+     which wry's WebView silently no-ops). Rendered outside the flex
+     `.workspace` so the dialog's `position: fixed` backdrop is not
+     trapped by the sidebar's layout. -->
+{#if dialog}
+  <Dialog
+    type={dialog.type}
+    title={dialog.title}
+    message={dialog.message}
+    confirmText={dialog.confirmText}
+    cancelText={dialog.cancelText}
+    bind:inputValue={dialog.inputValue}
+    onConfirm={() => {
+      // Capture + close BEFORE invoking the callback, so a
+      // synchronous reopen from inside the callback (e.g. an
+      // error path) doesn't see stale state.
+      const cb = dialog?.onConfirm
+      const value = dialog?.inputValue
+      closeDialog()
+      void cb?.(value)
+    }}
+    onClose={closeDialog}
+  />
+{/if}
+
 <style>
   .workspace {
     display: flex;
@@ -401,4 +551,37 @@
   }
   .open-workspace-btn:hover,
   .change-workspace-btn:hover { background: var(--menu-hover-bg); }
+
+  /* Inline error banner — appears at the top of the sidebar
+     when a CRUD IPC rejects (e.g. "no active workspace",
+     "path outside active workspace", filesystem errors).
+     Auto-dismisses after 6s; user can close it with ×. */
+  .action-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    margin: 6px 6px 0 6px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--error-color);
+    border-radius: 4px;
+    color: var(--error-color);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .action-error-msg {
+    flex: 1;
+    word-break: break-all;
+  }
+  .action-error-close {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: var(--error-color);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+  .action-error-close:hover { opacity: 0.7; }
 </style>

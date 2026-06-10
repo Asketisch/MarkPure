@@ -37,6 +37,13 @@
   let loading = $state(false)
   let themeEditorVisible = $state(false)
 
+  // P1-11: platform detection drives the spellcheck tooltip.
+  // We can't import the cargo cfg from the renderer, so we
+  // rely on `navigator.platform` for the OS the WebView is
+  // running on. The Settings copy on non-macOS reads
+  // "currently only English is checked".
+  const isMacPlatform = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
+
   async function load() {
     loading = true
     try {
@@ -271,6 +278,36 @@
             <div class="setting-row">
               <label>{i18n.t('settings.auto_save_interval')}</label>
               <input type="number" min="0" max="300" value={config.editor.auto_save_interval} onchange={(e) => saveConfig({ editor: { ...config!.editor, auto_save_interval: Number((e.target as HTMLInputElement).value) } })} />
+            </div>
+
+            <!-- P1-11: Spell check (toggle + language). On
+                 non-macOS the tooltip warns the user that
+                 only English is checked. -->
+            <h3>{i18n.t('settings.spellcheck')}</h3>
+            <div class="setting-row">
+              <label title={isMacPlatform ? '' : i18n.t('settings.spellcheck.macos_only')}>
+                {i18n.t('settings.spellcheck_enabled')}
+              </label>
+              <input
+                type="checkbox"
+                checked={config.editor.spellcheck_enabled}
+                onchange={(e) => saveConfig({ editor: { ...config!.editor, spellcheck_enabled: (e.target as HTMLInputElement).checked } })}
+              />
+            </div>
+            <div class="setting-row">
+              <label>{i18n.t('settings.spellcheck_language')}</label>
+              <select
+                value={config.editor.spellcheck_language ?? ''}
+                onchange={(e) => {
+                  const v = (e.target as HTMLSelectElement).value
+                  saveConfig({ editor: { ...config!.editor, spellcheck_language: v === '' ? null : v } })
+                }}
+              >
+                <option value="">{i18n.t('settings.spellcheck.follow_ui')}</option>
+                <option value="en">English</option>
+                <option value="zh-CN">简体中文</option>
+                <option value="ja">日本語</option>
+              </select>
             </div>
           </section>
 

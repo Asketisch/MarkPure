@@ -32,6 +32,7 @@ import { TagExtension } from '../extensions/editing/tag-extension'
 import { TypewriterScrollExtension } from '../extensions/view/typewriter-scroll-extension'
 import { FocusModeExtension } from '../extensions/view/focus-mode-extension'
 import { UndoTreeExtension } from '../extensions/editing/undo-tree-extension'
+import { SpellcheckExtension } from '../extensions/editing/spellcheck-extension'
 import { MermaidExtension } from '../nodeviews/mermaid-view'
 
 // Extension to wrap multi-cursor plugin
@@ -135,6 +136,11 @@ export function createEditor(opts: EditorOptions): Editor {
       TypewriterScrollExtension.configure({ enabled: false }),
       FocusModeExtension.configure({ enabled: false }),
       UndoTreeExtension,
+      // P1-11: spell-check via Rust IPC. The plugin reads its
+      // enabled / language settings from the shared
+      // `stores/spellcheck.svelte.ts` store at IPC call time —
+      // no configuration here.
+      SpellcheckExtension,
       MermaidExtension,
     ],
     content,

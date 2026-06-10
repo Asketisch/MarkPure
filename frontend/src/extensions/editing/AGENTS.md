@@ -10,3 +10,4 @@
 | `search-extension.ts` | 搜索高亮 |
 | `select-same-word-extension.ts` | 选择同一单词 |
 | `undo-tree-extension.ts` | Undo tree 管理 |
+| `spellcheck-extension.ts` | 拼写检查 Tiptap 包装（recheckSpelling 命令） |

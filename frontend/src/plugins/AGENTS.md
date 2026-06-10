@@ -7,3 +7,4 @@
 | `instant-render.ts` | Typora 风格即时渲染 |
 | `search.ts` | 搜索高亮 + 位置映射 |
 | `multi-cursor.ts` | Alt+Click 多光标编辑 |
+| `spellcheck.ts` | 拼写检查（红波浪线 Decoration + 500ms 防抖 + IPC） |

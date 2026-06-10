@@ -54,11 +54,38 @@ pub struct IpcResponse {
 /// via `EventLoopProxy`. The UI thread reads these in
 /// `Event::UserEvent` and dispatches to the renderer via
 /// `evaluate_script`.
+///
+/// `Clone` is required by tao's `EventLoopProxy::send_event`.
+/// The `SpellCheckRequest` variant carries an
+/// `std::sync::mpsc::SyncSender` (which IS `Clone`) — but a
+/// clone of the sender just gives another handle to the same
+/// channel, so even a duplicated event still wakes the
+/// original waiter exactly once.
 #[derive(Debug, Clone)]
 pub enum AppEvent {
     /// File-watcher fired; the payload is what the FS layer
     /// produced.
     FileChanges(Vec<fs::FileChangeEvent>),
+    /// IPC asked the main thread to run NSSpellChecker. The
+    /// `reply` sender is woken with the result; the IPC
+    /// handler is blocked on `recv()` for it.
+    ///
+    /// We use this event (rather than calling NSSpellChecker
+    /// inline in the IPC handler) because:
+    ///   - `NSSpellChecker::setLanguage:` / `checkString:` are
+    ///     not documented as thread-safe; the safe path is to
+    ///     always touch the checker from the main thread.
+    ///   - The IPC handler runs on the wry event-loop thread,
+    ///     which is NOT the main thread.
+    SpellCheckRequest {
+        text: String,
+        lang: String,
+        reply: std::sync::mpsc::SyncSender<Result<Vec<spellcheck::SpellError>, String>>,
+    },
+    /// An async IPC handler has completed on a tokio worker
+    /// thread. The `js` field is the pre-serialized, escaped
+    /// response string ready for `evaluate_script`.
+    IpcResponse { js: String },
 }
 
 /// Shared state. Each field is wrapped in a `Mutex` because

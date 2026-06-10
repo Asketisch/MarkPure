@@ -376,4 +376,13 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.color.table_header_bg", "表头背景"),
     ("settings.theme_editor.color.highlight_bg", "高亮背景"),
     ("settings.theme_editor.color.cell_selected_bg", "选中单元格背景"),
+    // P1-11: 拼写检查 UI 字符串（右键菜单 + Settings）
+    ("spell.no_suggestions", "无建议"),
+    ("spell.ignore_once", "忽略一次"),
+    ("spell.add_to_dictionary", "添加到字典"),
+    ("settings.spellcheck", "拼写检查"),
+    ("settings.spellcheck_enabled", "启用拼写检查"),
+    ("settings.spellcheck_language", "拼写检查语言"),
+    ("settings.spellcheck.follow_ui", "跟随界面语言"),
+    ("settings.spellcheck.macos_only", "CJK 拼写检查仅在 macOS 上可用；Windows/Linux 仅检查英文。"),
 ];

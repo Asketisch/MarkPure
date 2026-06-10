@@ -756,6 +756,15 @@ html, body, #app {
   outline-offset: -1px;
 }
 
+/* P1-11: spell-check error highlight. Red wavy underline,
+   purely decorative — interaction goes through the
+   right-click context menu in App.svelte. */
+.ProseMirror .spell-error {
+  text-decoration: underline wavy #d32f2f;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 2px;
+}
+
 /* Drag and drop highlighting */
 .drag-highlight {
   outline: 2px dashed var(--accent);

@@ -376,4 +376,13 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.color.table_header_bg", "表ヘッダー背景"),
     ("settings.theme_editor.color.highlight_bg", "ハイライト背景"),
     ("settings.theme_editor.color.cell_selected_bg", "選択セル背景"),
+    // P1-11: スペルチェック UI 文字列（右クリックメニュー + Settings）
+    ("spell.no_suggestions", "候補なし"),
+    ("spell.ignore_once", "今回は無視"),
+    ("spell.add_to_dictionary", "辞書に追加"),
+    ("settings.spellcheck", "スペルチェック"),
+    ("settings.spellcheck_enabled", "スペルチェックを有効化"),
+    ("settings.spellcheck_language", "スペルチェック言語"),
+    ("settings.spellcheck.follow_ui", "UI 言語に従う"),
+    ("settings.spellcheck.macos_only", "CJK スペルチェックは macOS のみ対応。Windows/Linux は英語のみチェックします。"),
 ];

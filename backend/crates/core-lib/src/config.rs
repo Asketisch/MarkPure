@@ -42,6 +42,27 @@ pub struct EditorConfig {
     pub word_wrap: bool,
     /// Auto-save interval in seconds (0 = disabled)
     pub auto_save_interval: u16,
+    /// Whether to run spell-checking on the active document.
+    /// On macOS this drives NSSpellChecker (full CJK + English);
+    /// on other platforms it falls back to the bundled English
+    /// dictionary and skips CJK.
+    ///
+    /// Defaults to true on macOS (where the OS provides a free,
+    /// high-quality checker) and false elsewhere so non-macOS
+    /// users aren't surprised by red underlines on the only
+    /// language they can spell-check (English).
+    #[serde(default = "default_spellcheck_enabled")]
+    pub spellcheck_enabled: bool,
+    /// Override the spell-check language. `None` means "follow
+    /// the UI language" — the frontend passes the active
+    /// `i18n.locale` through. Set to e.g. `"en"` to keep an
+    /// English checker active while the UI is in Chinese.
+    #[serde(default)]
+    pub spellcheck_language: Option<String>,
+}
+
+fn default_spellcheck_enabled() -> bool {
+    cfg!(target_os = "macos")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,6 +90,8 @@ impl Default for AppConfig {
                 line_numbers: true,
                 word_wrap: true,
                 auto_save_interval: 0,
+                spellcheck_enabled: default_spellcheck_enabled(),
+                spellcheck_language: None,
             },
             window: WindowConfig {
                 width: 1200.0,

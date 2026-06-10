@@ -150,6 +150,9 @@ export const UndoTreeExtension = Extension.create<UndoTreeOptions>({
             if (!tr.docChanged) {
               return value
             }
+            // Skip heading-id appendTransactions — they only modify
+            // heading `id` attributes, not document content.
+            if (tr.getMeta('headingId')) return value
             const isRestore = !!tr.getMeta('undoTree:restore')
             if (isRestore) {
               // Mark the restored branch as current.
@@ -163,10 +166,35 @@ export const UndoTreeExtension = Extension.create<UndoTreeOptions>({
               }
             }
 
+            // Throttle snapshots: if the last branch was created
+            // less than 1 second ago, update it in-place instead
+            // of creating a new one. This avoids serializing the
+            // entire document to JSON on every keystroke.
+            const now = Date.now()
+            const lastBranch = value.branches[value.branches.length - 1]
+            if (lastBranch && now - lastBranch.timestamp < 1000) {
+              // Update the latest branch snapshot in-place
+              const updated = value.branches.map((b, i) =>
+                i === value.branches.length - 1
+                  ? {
+                      ...b,
+                      docJson: newState.doc.toJSON(),
+                      timestamp: now,
+                      label: nodeTextPreview(newState.doc),
+                      current: true,
+                    }
+                  : { ...b, current: false },
+              )
+              return {
+                branches: updated,
+                markers: [{ id: lastBranch.id, pos: 0 }],
+              }
+            }
+
             const newBranch: UndoTreeBranch = {
               id: `b${nextId++}`,
               docJson: newState.doc.toJSON(),
-              timestamp: Date.now(),
+              timestamp: now,
               // Best-effort label: first line of the new doc.
               label: nodeTextPreview(newState.doc),
               current: true,

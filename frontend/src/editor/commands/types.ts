@@ -70,6 +70,13 @@ export interface AppConfig {
     line_numbers: boolean
     word_wrap: boolean
     auto_save_interval: number
+    /** P1-11: enable spell-checking. macOS uses NSSpellChecker
+     *  (CJK + English); other platforms fall back to the
+     *  bundled English dictionary. */
+    spellcheck_enabled: boolean
+    /** Override the spell-check language. `null` means follow
+     *  the UI language. */
+    spellcheck_language: string | null
   }
 }
 

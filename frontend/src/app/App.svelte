@@ -35,6 +35,7 @@
   import MenuBar from '$lib/components/layout/MenuBar.svelte'
   import Tabs from '$lib/components/layout/Tabs.svelte'
   import TabContextMenu from '$lib/components/layout/TabContextMenu.svelte'
+  import ContextMenu from '$lib/components/ui/ContextMenu.svelte'
   import ResizeHandle from '$lib/components/ui/ResizeHandle.svelte'
   import SearchBar from '$lib/components/workspace/SearchBar.svelte'
   import OutlinePanel from '$lib/components/workspace/OutlinePanel.svelte'
@@ -51,6 +52,8 @@
   import QuickSwitcher from '$lib/features/quick-switcher/QuickSwitcher.svelte'
   import BookmarkSidebar from '$lib/features/bookmark/BookmarkSidebar.svelte'
   import { createI18n } from '$lib/stores/i18n.svelte'
+  import { createSpellcheck, type ErrorRange } from '$lib/stores/spellcheck.svelte'
+  import { applySpellSuggestion } from '$lib/plugins/spellcheck'
   import { logger } from '$lib/logger'
   import {
     handleWikiLinkClick as handleWikiLinkClickLib,
@@ -77,6 +80,9 @@
   }
 
   const i18n = createI18n()
+  // P1-11: spell-check store. Owns enabled/language; the
+  // ProseMirror plugin reads via `getSpellcheckStore()`.
+  const spellcheck = createSpellcheck()
 
   let tabs = $state<Tab[]>([])
   let activeTabId = $state<number | null>(null)
@@ -116,6 +122,11 @@
   // and on file-change events that touch the styles dir.
   let workspaceStyles = $state('')
   let tabContextMenu = $state<{ x: number; y: number; tabId: number } | null>(null)
+  // P1-11: spell-check right-click menu. Set when the user
+  // right-clicks a `.spell-error` decoration; cleared when
+  // any of: menu item picked, backdrop clicked, or another
+  // tab gains focus.
+  let spellMenu = $state<{ x: number; y: number; error: ErrorRange } | null>(null)
   // Note: showFileMenu / showEditMenu / showExportSubmenu
   // moved to MenuBar.svelte (local UI state).
   let showSearch = $state(false)
@@ -218,6 +229,7 @@
       case 'lang.ja': return () => i18n.changeLocale('ja')
       case 'tools.settings': return () => { showSettings = true }
       case 'tools.bookmarks': return () => { showBookmarks = true }
+      case 'tools.spellcheck': return () => { (editor as any)?.commands.recheckSpelling?.() }
       case 'insert.mermaid': return () => insertMermaidBlock()
       case 'insert.frontmatter': return () => insertFrontmatter()
       case 'insert.toc': return () => insertToc()
@@ -376,6 +388,9 @@
     return tab.content
   }
 
+  let syncTimer: ReturnType<typeof setTimeout> | null = null
+  let statsTimer: ReturnType<typeof setTimeout> | null = null
+
   function updateStats(docId: number) {
     docGetStats(docId).then(s => stats = s).catch(() => {
       // Fallback to legacy method if doc not registered
@@ -384,9 +399,30 @@
     })
   }
 
+  /** Debounced stats update (500ms). Stats don't need per-keystroke freshness. */
+  function updateStatsDebounced(docId: number) {
+    if (statsTimer) clearTimeout(statsTimer)
+    statsTimer = setTimeout(() => {
+      statsTimer = null
+      updateStats(docId)
+    }, 500)
+  }
+
   /** Sync editor content to Rust document registry */
   function syncToRust(docId: number, content: string) {
     docSetContent(docId, content).catch(() => {})
+  }
+
+  /** Debounced Rust sync (300ms). Coalesces rapid keystrokes so
+   *  the IPC pipeline isn't flooded with full-document messages.
+   *  Use `syncToRust` directly when immediate sync is required
+   *  (e.g. editor init, tab switch). */
+  function syncToRustDebounced(docId: number, content: string) {
+    if (syncTimer) clearTimeout(syncTimer)
+    syncTimer = setTimeout(() => {
+      syncTimer = null
+      syncToRust(docId, content)
+    }, 300)
   }
 
   async function handleFilesDropped(files: File[]) {
@@ -542,8 +578,8 @@
           t.content = md
           t.dirty = true
           t.preview = false  // Pin the tab when edited
-          // Sync content to Rust document
-          syncToRust(t.id, md)
+          // Sync content to Rust document (debounced to reduce IPC load)
+          syncToRustDebounced(t.id, md)
         }
         // P0-1: in split view, also keep the SourceEditor in
         // sync with the WYSIWYG half. We skip the update when
@@ -557,7 +593,7 @@
           sourceContent = md
           sourceEditorRef?.setContent(md)
         }
-        updateStats(t?.id ?? myTabId)
+        updateStatsDebounced(t?.id ?? myTabId)
         // Auto-save with configured interval (per-tab timer, 0 = disabled)
         if (autoSaveInterval > 0) {
           const tabId = t?.id ?? myTabId
@@ -600,9 +636,11 @@
 
   function switchTab(id: number, force: boolean = false) {
     if (activeTabId === id && !force) return
-    // Clear auto-save timer for the tab being switched away from
+    // Clear timers for the tab being switched away from
     const oldTimer = autoSaveTimers.get(activeTabId)
     if (oldTimer) { clearTimeout(oldTimer); autoSaveTimers.delete(activeTabId) }
+    if (syncTimer) { clearTimeout(syncTimer); syncTimer = null }
+    if (statsTimer) { clearTimeout(statsTimer); statsTimer = null }
     const current = getActiveTab()
     if (current && editor && id !== activeTabId) {
       current.content = getMarkdown(editor)
@@ -631,9 +669,11 @@
   }
 
   function closeTab(id: number) {
-    // Clear auto-save timer for the tab being closed
+    // Clear timers for the tab being closed
     const timer = autoSaveTimers.get(id)
     if (timer) { clearTimeout(timer); autoSaveTimers.delete(id) }
+    if (syncTimer) { clearTimeout(syncTimer); syncTimer = null }
+    if (statsTimer) { clearTimeout(statsTimer); statsTimer = null }
     const idx = tabs.findIndex(t => t.id === id)
     const wasActive = activeTabId === id
 
@@ -1248,9 +1288,27 @@
           ? updates.editor.auto_save_interval * 1000
           : 0
       }
+      // P1-11: propagate spell-check toggle + language to
+      // the runtime store so the plugin picks up changes on
+      // the next debounced tick.
+      if (updates.editor.spellcheck_enabled !== undefined) {
+        spellcheck.setEnabled(updates.editor.spellcheck_enabled)
+        // If the user just turned it off, clear any active
+        // decorations so the red underlines disappear
+        // immediately rather than waiting for the doc to
+        // change.
+        if (!updates.editor.spellcheck_enabled) {
+          spellcheck.setErrors([])
+        }
+      }
+      if ('spellcheck_language' in updates.editor) {
+        spellcheck.setLanguage(updates.editor.spellcheck_language ?? null)
+      }
     }
     if (updates.language) i18n.changeLocale(updates.language).catch(() => {})
   }
+
+  let fileChangeTimer: ReturnType<typeof setTimeout> | null = null
 
   function handleFileChanges(events: FileChangeEvent[]) {
     // P0-4: dirty-tab handling. When the on-disk content changes
@@ -1285,20 +1343,18 @@
     if (dirtyPromptNeeded) {
       fileReloadPrompt = dirtyPromptNeeded
     }
-    // P0-5: tell the file tree to refresh (WorkSpace wired the
-    // callback in via `refreshFileTree`). We do this *after* the
-    // per-event loop so a single batch of events triggers exactly
-    // one tree reload.
+    // Debounce expensive UI refreshes (file tree, tags, backlinks)
+    // so rapid filesystem event bursts (iCloud sync, git ops)
+    // coalesce into a single refresh. The per-tab dirty check
+    // above is NOT debounced — it's cheap and needs to be instant.
     if (events.length > 0) {
-      refreshFileTree?.()
-      // P0-7: the tag index also needs to stay in sync with
-      // disk events. `tagPanelRef.refresh()` is debounced
-      // internally (300ms) so a burst of events only triggers
-      // one rebuild.
-      tagPanelRef?.refresh?.()
-      // P0-6: backlinks can change when any file is edited
-      // (a new `[[link]]` may have been added or removed).
-      backlinksPanelRef?.refresh?.()
+      if (fileChangeTimer) clearTimeout(fileChangeTimer)
+      fileChangeTimer = setTimeout(() => {
+        fileChangeTimer = null
+        refreshFileTree?.()
+        tagPanelRef?.refresh?.()
+        backlinksPanelRef?.refresh?.()
+      }, 300)
       // P1-7: if a CSS file under .markpure/styles/ was
       // changed, re-load the styles. We debounce 300ms via
       // a small in-place timer to coalesce rapid save bursts.
@@ -1439,6 +1495,17 @@
           if (config.editor.auto_save_interval > 0) {
             autoSaveInterval = config.editor.auto_save_interval * 1000
           }
+          // P1-11: seed spellcheck enable + language. The
+          // language override is `null` → "follow UI locale";
+          // we sync that at the bottom of onMount once i18n
+          // has loaded so the very first IPC roundtrip uses
+          // the right code.
+          if (typeof config.editor.spellcheck_enabled === 'boolean') {
+            spellcheck.setEnabled(config.editor.spellcheck_enabled)
+          }
+          if ('spellcheck_language' in config.editor) {
+            spellcheck.setLanguage(config.editor.spellcheck_language ?? null)
+          }
         }
       })
       .catch((e: unknown) => {
@@ -1472,6 +1539,28 @@
     }
 
     window.addEventListener('keydown', handleKeydown)
+
+    // P1-11: spell-check right-click menu. We listen at
+    // window level (capture: true) so we beat the editor's
+    // own selection-only contextmenu. If the target sits
+    // inside a `.spell-error` decoration we look up the
+    // error in the store and pop our menu; otherwise we
+    // do nothing and let the native menu run.
+    const handleContextMenu = (e: MouseEvent) => {
+      if (!spellcheck.enabled) return
+      const target = e.target as HTMLElement | null
+      if (!target) return
+      const errEl = target.closest('.spell-error') as HTMLElement | null
+      if (!errEl || !editor) return
+      const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY })
+      if (!pos) return
+      const err = spellcheck.errorAt(pos.pos)
+      if (!err) return
+      e.preventDefault()
+      e.stopPropagation()
+      spellMenu = { x: e.clientX, y: e.clientY, error: err }
+    }
+    window.addEventListener('contextmenu', handleContextMenu, true)
 
     // Quick insert popup event listeners
     const handleQIStart = (e: Event) => {
@@ -1538,6 +1627,7 @@
       offFileChanges()
       unwatchDirectory().catch(() => {})
       window.removeEventListener('keydown', handleKeydown)
+      window.removeEventListener('contextmenu', handleContextMenu, true)
       window.removeEventListener('quick-insert-start', handleQIStart)
       window.removeEventListener('quick-insert-update', handleQIUpdate)
       window.removeEventListener('quick-insert-exit', handleQIExit)
@@ -1546,6 +1636,55 @@
       editor?.destroy()
     }
   })
+
+  // P1-11: keep the spell-check fallback language in sync
+  // with the UI locale. When the user picks "follow UI"
+  // (languageOverride = null), the plugin's
+  // `effectiveLanguage()` returns this value. Setting it
+  // here means a `Settings → language` change reaches the
+  // spellcheck IPC on the next debounced tick (~500ms).
+  $effect(() => {
+    spellcheck.setFallbackLanguage(i18n.locale)
+  })
+
+  // P1-11: build the ContextMenu items for the spell-check
+  // overlay. Pulled out to a function because Svelte 5's
+  // template parser doesn't accept the deeply-nested inline
+  // spread/conditional expression cleanly.
+  type SpellMenuItem = { label: string; action?: () => void; disabled?: boolean; separator?: boolean }
+  function buildSpellMenuItems(): SpellMenuItem[] {
+    if (!spellMenu) return []
+    const err = spellMenu.error
+    const items: SpellMenuItem[] = []
+    if (err.suggestions.length > 0) {
+      for (const s of err.suggestions) {
+        items.push({
+          label: s,
+          action: () => {
+            if (editor) {
+              applySpellSuggestion(editor.view, err.from, err.to, s)
+            }
+          },
+        })
+      }
+    } else {
+      items.push({ label: i18n.t('spell.no_suggestions'), disabled: true })
+    }
+    items.push({ label: '', separator: true })
+    items.push({
+      label: i18n.t('spell.ignore_once'),
+      action: () => {
+        // Drop just this error from the latest set; the
+        // next debounced recheck will probably re-add it,
+        // but the user gets a beat of relief to keep typing.
+        const filtered = spellcheck.latestErrors.filter(
+          e => !(e.from === err.from && e.to === err.to),
+        )
+        spellcheck.setErrors(filtered)
+      },
+    })
+    return items
+  }
 </script>
 
 <svelte:window onclick={hideTabContextMenu} oncontextmenu={hideTabContextMenu} />
@@ -1891,6 +2030,20 @@
 
 <!-- Bookmark sidebar (Cmd+B) -->
 <BookmarkSidebar bind:visible={showBookmarks} onOpen={handleOpenRecent} />
+
+<!-- P1-11: Spell-check candidate menu. Shown when the user
+     right-clicks a `.spell-error` decoration; entries are
+     the IPC-supplied suggestions plus "Ignore Once" (a
+     local-only dismiss that clears the decoration via a
+     forced PM transaction). -->
+{#if spellMenu}
+  <ContextMenu
+    x={spellMenu.x}
+    y={spellMenu.y}
+    items={buildSpellMenuItems()}
+    onClose={() => { spellMenu = null }}
+  />
+{/if}
 
 <style>
   /* App.svelte's <style> block used to hold the layout shell

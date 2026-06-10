@@ -35,7 +35,8 @@ mod state;
 mod workspace_ops;
 
 use state::{lock_or_recover, AppEvent, AppState, IpcMessage};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tao::window::WindowBuilder;
@@ -170,21 +171,27 @@ fn main() {
             }
         };
 
-        let response = dispatch::handle_command(&msg, &state_for_handler);
-        let js = match serde_json::to_string(&response) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("IPC serialize error: {e}");
-                return;
+        // Fast path: execute inline and deliver response immediately.
+        if let Some(response) = dispatch::handle_command(&msg, &state_for_handler) {
+            let js = match serde_json::to_string(&response) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("IPC serialize error: {e}");
+                    return;
+                }
+            };
+            let js_escaped = state::escape_for_js(&js);
+            if let Ok(wv) = wv_clone.lock() {
+                if let Some(ref webview) = *wv {
+                    let _ = webview.evaluate_script(&format!("window.__mt_dispatch('{js_escaped}')"));
+                }
             }
-        };
-
-        let js_escaped = state::escape_for_js(&js);
-        if let Ok(wv) = wv_clone.lock() {
-            if let Some(ref webview) = *wv {
-                let _ = webview.evaluate_script(&format!("window.__mt_dispatch('{js_escaped}')"));
-            }
+            return;
         }
+
+        // Slow path: offload to tokio thread pool. The response
+        // will be delivered via EventLoopProxy → IpcResponse event.
+        dispatch::dispatch_slow(msg, state_for_handler.clone());
     });
 
     let built = builder.build(&window).unwrap();
@@ -211,6 +218,39 @@ fn main() {
                         ));
                     }
                 }
+            }
+            // Async IPC responses arrive here from tokio worker threads.
+            Event::UserEvent(AppEvent::IpcResponse { js }) => {
+                if let Ok(wv) = webview_for_el.lock() {
+                    if let Some(ref webview) = *wv {
+                        let _ = webview.evaluate_script(&format!(
+                            "window.__mt_dispatch('{js}')"
+                        ));
+                    }
+                }
+            }
+            // Spell-check requests are dispatched here because
+            // NSSpellChecker on macOS must run on the main
+            // thread (this IS the main thread — tao
+            // `event_loop.run` requires it). On other platforms
+            // we fall through to the embedded English
+            // dictionary, which is thread-agnostic but goes
+            // through this arm anyway for path uniformity.
+            Event::UserEvent(AppEvent::SpellCheckRequest { text, lang, reply }) => {
+                #[cfg(target_os = "macos")]
+                let result: Result<Vec<spellcheck::SpellError>, String> = {
+                    let errors = spellcheck::macos::check_with_nsspellchecker(&text, &lang);
+                    Ok(errors)
+                };
+                #[cfg(not(target_os = "macos"))]
+                let result: Result<Vec<spellcheck::SpellError>, String> = {
+                    // English-only fallback. CJK languages
+                    // produce empty errors (see
+                    // `spellcheck::check_spelling`).
+                    let r = spellcheck::check_spelling(&text, &lang);
+                    Ok(r.errors)
+                };
+                let _ = reply.send(result);
             }
             _ => {}
         }

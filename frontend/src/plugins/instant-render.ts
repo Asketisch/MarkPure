@@ -149,12 +149,43 @@ export function createInstantRenderPlugin(): Plugin {
         const newCursorPos = tr.selection.from
         const cursorMoved = newCursorPos !== prev.cursorPos
 
-        // Document changed: full rebuild with mapped cursor
+        // Document changed: incremental update. Map existing
+        // decorations through the transaction, then recompute only
+        // for the changed regions. This avoids a full doc.descendants
+        // walk on every keystroke (O(changes) instead of O(doc)).
         if (tr.docChanged) {
+          let mapped = prev.decorations.map(tr.mapping, newState.doc)
+
+          // Collect changed ranges from the transaction's mapping
+          const changedRanges: { from: number; to: number }[] = []
+          for (const map of tr.mapping.maps) {
+            map.forEach((_oldFrom, _oldTo, newFrom, newTo) => {
+              changedRanges.push({ from: newFrom, to: newTo })
+            })
+          }
+
+          // Remove decorations in changed ranges and recompute
+          if (changedRanges.length > 0) {
+            for (const range of changedRanges) {
+              mapped = mapped.remove(mapped.find(range.from, range.to))
+            }
+            const newDecos: Decoration[] = []
+            for (const range of changedRanges) {
+              newState.doc.nodesBetween(
+                Math.max(0, range.from),
+                Math.min(newState.doc.content.size, range.to),
+                (node, pos) => {
+                  decorateNode(node, pos, newCursorPos, newDecos)
+                },
+              )
+            }
+            mapped = mapped.add(newState.doc, newDecos)
+          }
+
           return {
             ...prev,
             cursorPos: newCursorPos,
-            decorations: computeSyntaxDecorations(newState.doc, newCursorPos),
+            decorations: mapped,
           }
         }
 

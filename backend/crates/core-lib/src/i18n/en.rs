@@ -376,4 +376,13 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.color.table_header_bg", "Table Header BG"),
     ("settings.theme_editor.color.highlight_bg", "Highlight BG"),
     ("settings.theme_editor.color.cell_selected_bg", "Cell Selected BG"),
+    // P1-11: spell-check UI strings (right-click menu + Settings)
+    ("spell.no_suggestions", "No suggestions"),
+    ("spell.ignore_once", "Ignore Once"),
+    ("spell.add_to_dictionary", "Add to Dictionary"),
+    ("settings.spellcheck", "Spell Check"),
+    ("settings.spellcheck_enabled", "Enable spell check"),
+    ("settings.spellcheck_language", "Spell check language"),
+    ("settings.spellcheck.follow_ui", "Follow UI language"),
+    ("settings.spellcheck.macos_only", "CJK spell check is available on macOS only; Windows/Linux check English only."),
 ];

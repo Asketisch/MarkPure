@@ -91,16 +91,31 @@ pub fn cmd_save_file(
 
     // Try doc_id first (read from Rust document registry), fall back to content param
     if let Some(doc_id) = params["doc_id"].as_u64() {
-        let mut docs = lock_or_recover(&state.documents);
-        if let Some(doc) = docs.get_mut(&doc_id) {
-            doc.set_path(path.clone());
-            state
-                .rt()
-                .block_on(fs::write_file(doc, &path))
-                .map_err(|e| e.to_string())?;
-            doc.mark_saved();
-        } else {
-            return Err("Document not found".to_string());
+        // Extract content and metadata from the registry, then release
+        // the mutex BEFORE doing I/O — holding it during write_file
+        // blocks all document operations (stats, search, content sync).
+        let write_info = {
+            let mut docs = lock_or_recover(&state.documents);
+            match docs.get_mut(&doc_id) {
+                Some(doc) => {
+                    doc.set_path(path.clone());
+                    let text = doc.text();
+                    let encoding = doc.encoding();
+                    doc.mark_saved();
+                    Some((text, encoding))
+                }
+                None => None,
+            }
+        }; // mutex released here
+        match write_info {
+            Some((text, encoding)) => {
+                let tmp_doc = Document::from_content(&text, Some(path.clone()), encoding);
+                state
+                    .rt()
+                    .block_on(fs::write_file(&tmp_doc, &path))
+                    .map_err(|e| e.to_string())?;
+            }
+            None => return Err("Document not found".to_string()),
         }
     } else {
         let content = params["content"].as_str().ok_or("Missing 'content' parameter")?;
