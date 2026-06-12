@@ -8,7 +8,7 @@
 //! and stay focused on its own commands.
 
 use mt_core::document::Document;
-use mt_core::tab::{load_tabs, WindowTabs};
+use mt_core::tab::{load_tabs, rebind_tabs_to_workspace_roots, WindowTabs};
 use mt_core::AppConfig;
 use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
@@ -98,13 +98,22 @@ pub struct AppState {
     /// Tokio runtime used by all the async file/export IPCs.
     pub runtime: tokio::runtime::Runtime,
     pub config: Mutex<AppConfig>,
-    pub watcher: Mutex<Option<fs::FileWatcher>>,
+    /// File watcher. P2-4: holds all root watchers keyed by
+    /// workspace id (the `FileWatcher` is `Multi-root ready`
+    /// internally; we just don't `Option<>` it anymore so the
+    /// mut API can be used directly without an unwrap dance).
+    pub watcher: Mutex<fs::FileWatcher>,
     pub proxy: Mutex<Option<EventLoopProxy<AppEvent>>>,
     pub tabs: Mutex<Vec<WindowTabs>>,
-    /// Document registry: tab_id → Document (Rust-owned text buffer)
-    pub documents: Mutex<HashMap<u64, Document>>,
+    /// Document registry: tab_id → Document (Rust-owned text buffer).
+    /// P2-4: `String` so the registry key matches the frontend
+    /// tab id verbatim and survives restart round-trips.
+    pub documents: Mutex<HashMap<String, Document>>,
+    /// P2-4: doc_id → workspace_root_id so we can GC docs that
+    /// belong to a root the user has switched away from.
+    pub doc_workspace: Mutex<HashMap<String, String>>,
     /// LRU tracking: ordered list of doc_ids (oldest first, newest last)
-    pub doc_order: Mutex<Vec<u64>>,
+    pub doc_order: Mutex<Vec<String>>,
 }
 
 impl AppState {
@@ -117,7 +126,21 @@ impl AppState {
             .parent()
             .map(|p| p.to_path_buf())
             .unwrap_or_default();
-        let tabs = load_tabs(&config_dir).unwrap_or_default();
+        let loaded = load_tabs(&config_dir).unwrap_or_default();
+
+        // Phase 5: rebind each tab's `workspace_root_id` to
+        // the root that contains its `path`. Pre-P2-4
+        // `tabs.json` files have `None` here; the rebind
+        // fills in the right id based on the current
+        // workspace_roots. The result is in-memory only —
+        // we don't rewrite `tabs.json` until the user does
+        // a normal tab-saving action.
+        let root_paths: Vec<(String, String)> = config
+            .workspace_roots()
+            .iter()
+            .map(|r| (r.id.clone(), r.path.clone()))
+            .collect();
+        let tabs = rebind_tabs_to_workspace_roots(loaded, &root_paths);
 
         let runtime =
             tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
@@ -125,10 +148,11 @@ impl AppState {
         Self {
             runtime,
             config: Mutex::new(config),
-            watcher: Mutex::new(None),
+            watcher: Mutex::new(fs::FileWatcher::default()),
             proxy: Mutex::new(None),
             tabs: Mutex::new(tabs),
             documents: Mutex::new(HashMap::new()),
+            doc_workspace: Mutex::new(HashMap::new()),
             doc_order: Mutex::new(Vec::new()),
         }
     }
@@ -207,4 +231,23 @@ pub fn escape_for_js(s: &str) -> String {
         .replace('\0', "\\0")
         .replace("</script", "<\\/script")
         .replace("</SCRIPT", "<\\/script")
+}
+
+/// Parse a `doc_id` field from IPC params, accepting either the
+/// P2-4 string form or the legacy numeric form. Returns the
+/// canonical `String` so registry keys are consistent.
+///
+/// Used by every `doc_*` and `cmd_save_file`-with-`doc_id`
+/// handler. Centralizing the conversion keeps the migration
+/// backward-compatible (old renderer sending numbers still
+/// works) and means future call sites can't accidentally key the
+/// registry on a `u64`.
+pub fn parse_doc_id_param(params: &serde_json::Value) -> std::result::Result<String, String> {
+    if let Some(s) = params["doc_id"].as_str() {
+        return Ok(s.to_string());
+    }
+    if let Some(n) = params["doc_id"].as_u64() {
+        return Ok(n.to_string());
+    }
+    Err("Missing 'doc_id' parameter".to_string())
 }

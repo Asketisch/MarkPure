@@ -8,8 +8,10 @@ pub mod theme;
 pub mod tab;
 pub mod selection;
 pub mod workspace;
+pub mod workspace_root;
 
 pub use config::AppConfig;
+pub use workspace_root::WorkspaceRoot;
 pub use document::Document;
 pub use error::Error;
 pub use keymap::{KeyBinding, default_keybindings, load_keybindings, save_keybindings, reset_keybindings, update_keybinding};

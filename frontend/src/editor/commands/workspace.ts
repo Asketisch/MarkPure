@@ -67,6 +67,8 @@ export interface Bookmark {
   tags: string[]
   created_at: number
   updated_at: number
+  /** P2-4: which WorkspaceRoot.id this bookmark belongs to. */
+  workspace_root_id?: string | null
 }
 
 export async function getBookmarks(): Promise<Bookmark[]> {
@@ -77,8 +79,14 @@ export async function addBookmark(
   path: string,
   title: string,
   tags: string[] = [],
+  workspaceRootId?: string | null,
 ): Promise<Bookmark> {
-  return await ipc('add_bookmark', { path, title, tags })
+  return await ipc('add_bookmark', {
+    path,
+    title,
+    tags,
+    ...(workspaceRootId ? { workspace_root_id: workspaceRootId } : {}),
+  })
 }
 
 export async function updateBookmark(
@@ -231,6 +239,82 @@ export function offFileChanges(): void {
   delete window.__mt_on_file_changes
 }
 
+// ============================== Multi-root workspace (P2-4) ==============================
+
+/** A single workspace root — a folder the user has added to
+ *  the current multi-root workspace. The `id` is stable across
+ *  restarts (used by TabState.workspace_root_id, watcher
+ *  handles, LRU GC) and `added_at` is a unix-seconds
+ *  timestamp. `exists` is recomputed on every
+ *  `list_workspace_roots` IPC and is `false` for missing
+ *  paths (e.g. an external drive that's been unmounted).
+ *  We never auto-delete missing roots — the user must
+ *  invoke `remove_missing_workspace_roots` explicitly. */
+export interface WorkspaceRoot {
+  id: string
+  path: string
+  name: string
+  added_at: number
+  exists?: boolean
+}
+
+export interface WorkspaceRoots {
+  roots: WorkspaceRoot[]
+  active_id: string | null
+}
+
+/** Add a folder to the current workspace. Returns the freshly
+ *  created root (with its server-assigned id). */
+export async function addWorkspaceRoot(path: string): Promise<WorkspaceRoot> {
+  return await ipc<WorkspaceRoot>('add_workspace_root', { path })
+}
+
+/** Remove a root from the workspace (also unwatches and clears
+ *  its expanded-dirs entry). The active id is re-pointed at
+ *  the next remaining root, or `null` if the workspace is
+ *  now empty. */
+export async function removeWorkspaceRoot(rootId: string): Promise<void> {
+  await ipc('remove_workspace_root', { root_id: rootId })
+}
+
+/** Fetch the current set of roots + the active id. Called on
+ *  app boot to hydrate the workspace store. */
+export async function listWorkspaceRoots(): Promise<WorkspaceRoots> {
+  return (await ipc<WorkspaceRoots>('list_workspace_roots')) ?? {
+    roots: [],
+    active_id: null,
+  }
+}
+
+/** Switch the active root. Rust's LRU document registry
+ *  drops every doc that doesn't belong to the new active
+ *  root; the returned `evicted_doc_ids` lets the renderer
+ *  close the matching tabs in lockstep. */
+export async function setActiveWorkspaceRoot(
+  rootId: string,
+): Promise<{ evicted_doc_ids: string[] }> {
+  return (
+    (await ipc<{ evicted_doc_ids: string[] }>('set_active_workspace_root', {
+      root_id: rootId,
+    })) ?? { evicted_doc_ids: [] }
+  )
+}
+
+/** Phase 5: drop every root whose `path` no longer exists
+ *  on disk. Returns the list of removed ids so the caller
+ *  can close tabs whose `workspace_root_id` matches. The
+ *  renderer should still show a confirm dialog before
+ *  invoking this — removal is permanent. */
+export async function removeMissingWorkspaceRoots(): Promise<{
+  removed_root_ids: string[]
+}> {
+  return (
+    (await ipc<{ removed_root_ids: string[] }>(
+      'remove_missing_workspace_roots',
+    )) ?? { removed_root_ids: [] }
+  )
+}
+
 // ============================== Workspace tag index (P0-7) ==============================
 
 /** A single entry in the workspace-wide tag index. `count` is the
@@ -245,17 +329,19 @@ export interface WorkspaceTag {
 
 /** Aggregate every `#tag` across `path` into a flat
  *  `WorkspaceTag[]` (alphabetical by name). Scans `.md` /
- *  `.markdown` / `.mdx` files only. */
+ *  `.markdown` / `.mdx` files only. P2-4 multi-root: pass
+ *  `paths` (plural) to merge across multiple roots in a
+ *  single call. */
 export async function getWorkspaceTags(
-  path: string,
+  path: string | string[],
   maxDepth = 10,
   showHidden = false,
 ): Promise<WorkspaceTag[]> {
-  const result = await ipc<{ tags: WorkspaceTag[] }>('get_workspace_tags', {
-    path,
-    max_depth: maxDepth,
-    show_hidden: showHidden,
-  })
+  const params =
+    typeof path === 'string'
+      ? { path, max_depth: maxDepth, show_hidden: showHidden }
+      : { paths: path, max_depth: maxDepth, show_hidden: showHidden }
+  const result = await ipc<{ tags: WorkspaceTag[] }>('get_workspace_tags', params)
   return result?.tags ?? []
 }
 
@@ -272,19 +358,19 @@ export interface Backlink {
 
 /** Return every workspace document that links to `page` via
  *  `[[page]]` or `[[page|alias]]` (alias ignored for matching).
- *  Case-insensitive exact-name match. */
+ *  Case-insensitive exact-name match. P2-4 multi-root: pass
+ *  `paths` to scan across multiple roots. */
 export async function getBacklinks(
   page: string,
-  path: string,
+  path: string | string[],
   maxDepth = 10,
   showHidden = false,
 ): Promise<Backlink[]> {
-  const result = await ipc<{ backlinks: Backlink[] }>('get_backlinks', {
-    page,
-    path,
-    max_depth: maxDepth,
-    show_hidden: showHidden,
-  })
+  const params =
+    typeof path === 'string'
+      ? { page, path, max_depth: maxDepth, show_hidden: showHidden }
+      : { page, paths: path, max_depth: maxDepth, show_hidden: showHidden }
+  const result = await ipc<{ backlinks: Backlink[] }>('get_backlinks', params)
   return result?.backlinks ?? []
 }
 
@@ -297,9 +383,18 @@ export interface WorkspaceStyles {
 
 /** Read every `*.css` under `<workspace>/.markpure/styles/`
  *  and return the concatenated text plus the list of file
- *  names. Empty when the directory doesn't exist. */
-export async function loadWorkspaceStyles(path: string): Promise<WorkspaceStyles> {
-  const result = await ipc<WorkspaceStyles>('load_workspace_styles', { path })
+ *  names. P2-4 multi-root: pass `paths` to merge across roots
+ *  (active root's CSS is concatenated last so it wins the
+ *  cascade). */
+export async function loadWorkspaceStyles(
+  path: string | string[],
+  activeRootPath?: string,
+): Promise<WorkspaceStyles> {
+  const params =
+    typeof path === 'string'
+      ? { path }
+      : { paths: path, active_root_path: activeRootPath }
+  const result = await ipc<WorkspaceStyles>('load_workspace_styles', params)
   return result ?? { css: '', files: [] }
 }
 

@@ -199,6 +199,42 @@ pub fn search_workspace(
     })
 }
 
+/// P2-4 multi-root variant: run `search_workspace` once per
+/// root and merge the results. Match order is preserved per
+/// root (in the order `root_paths` is given); within each root
+/// the matches are in walk order. `total_files` is the
+/// deduplicated count across all roots.
+///
+/// Empty or non-existent root paths are silently skipped — the
+/// caller should already have validated, but a partial config
+/// (e.g. an external drive that got unmounted) shouldn't
+/// crash the search.
+pub fn search_workspace_multi(
+    root_paths: &[&PathBuf],
+    query: &str,
+    options: &SearchOptions,
+) -> Result<SearchResult, Error> {
+    let mut all_matches: Vec<SearchMatch> = Vec::new();
+    let mut files_with_matches: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
+
+    for root in root_paths {
+        if !root.exists() {
+            continue;
+        }
+        let result = search_workspace(root, query, options)?;
+        files_with_matches.extend(result.matches.iter().map(|m| m.file.clone()));
+        all_matches.extend(result.matches);
+    }
+
+    let total_matches = all_matches.len();
+    Ok(SearchResult {
+        matches: all_matches,
+        total_files: files_with_matches.len(),
+        total_matches,
+    })
+}
+
 /// Quick search in a single file
 pub fn search_file(
     file_path: &PathBuf,
@@ -293,5 +329,44 @@ mod tests {
         };
         let pattern = build_pattern("hello", &options).unwrap();
         assert_eq!(pattern, r"\bhello\b");
+    }
+
+    /// P2-4 multi-root: search across two tempdirs and confirm
+    /// matches from both roots are returned. The tempdir names
+    /// carry "root-a" / "root-b" so the cross-root merge is
+    /// observable from the file paths in the result.
+    #[test]
+    fn search_workspace_multi_merges_across_roots() {
+        let dir_a = std::env::temp_dir().join("markpure-search-root-a");
+        let dir_b = std::env::temp_dir().join("markpure-search-root-b");
+        let _ = std::fs::remove_dir_all(&dir_a);
+        let _ = std::fs::remove_dir_all(&dir_b);
+        std::fs::create_dir_all(&dir_a).unwrap();
+        std::fs::create_dir_all(&dir_b).unwrap();
+        std::fs::write(dir_a.join("a-note.md"), "TODO here").unwrap();
+        std::fs::write(dir_b.join("b-note.md"), "TODO here").unwrap();
+
+        let options = SearchOptions {
+            case_sensitive: false,
+            whole_word: false,
+            use_regex: false,
+            max_depth: Some(10),
+        };
+        let result =
+            search_workspace_multi(&[&dir_a, &dir_b], "TODO", &options).unwrap();
+        assert!(result.total_matches >= 2);
+        let has_a = result.matches.iter().any(|m| m.file.contains("root-a"));
+        let has_b = result.matches.iter().any(|m| m.file.contains("root-b"));
+        assert!(has_a, "missing matches from root-a: {:?}", result.matches);
+        assert!(has_b, "missing matches from root-b: {:?}", result.matches);
+
+        // Missing root is silently skipped, not an error.
+        let bogus = std::path::PathBuf::from("/nonexistent/markpure-zzz");
+        let result2 =
+            search_workspace_multi(&[&dir_a, &bogus], "TODO", &options).unwrap();
+        assert!(result2.total_matches >= 1);
+
+        let _ = std::fs::remove_dir_all(&dir_a);
+        let _ = std::fs::remove_dir_all(&dir_b);
     }
 }

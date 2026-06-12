@@ -198,6 +198,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("workspace.open_folder", "Open Folder"),
     ("workspace.loading", "Loading..."),
     ("workspace.change_folder", "Change Folder"),
+    ("workspace.no_root_hint", "No workspace folder — click + to add"),
     ("outline.title", "Outline"),
     ("outline.no_headings", "No headings"),
     ("action.undo", "Undo"),

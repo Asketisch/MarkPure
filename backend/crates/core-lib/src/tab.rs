@@ -1,6 +1,75 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Phase 5: rebind every tab's `workspace_root_id` to the
+/// root that contains its `path`. The longest matching root
+/// path wins (so `/x/notes` beats `/x` for tab
+/// `/x/notes/today.md`). Tabs whose path doesn't sit under
+/// any configured root keep their existing
+/// `workspace_root_id` (preserved as a hint for the
+/// renderer's "unknown root" badge) — the user can move the
+/// folder back under a root and the rebind will pick it up
+/// on the next launch.
+///
+/// This is a **non-destructive** migration: it mutates the
+/// in-memory `WindowTabs` list and returns it; the caller
+/// decides whether to write it back. We don't auto-persist
+/// because (a) the user may want to fix the path
+/// configuration first and (b) the next regular `save_tabs`
+/// call (when the user closes the app or adds a tab) will
+/// pick up the rebound ids naturally.
+pub fn rebind_tabs_to_workspace_roots(
+    mut windows: Vec<WindowTabs>,
+    root_paths: &[(String, String)], // (root_id, root_path)
+) -> Vec<WindowTabs> {
+    for w in windows.iter_mut() {
+        for t in w.tabs.iter_mut() {
+            // Untitled tabs have no path; leave their
+            // `workspace_root_id` alone (it should be None).
+            let Some(tab_path) = t.path.as_deref() else {
+                continue;
+            };
+            // Longest-prefix wins — iterate roots sorted by
+            // descending path length. Ties (two roots that
+            // are prefixes of each other) are broken by the
+            // sort stability: first inserted wins.
+            let mut roots: Vec<&(String, String)> = root_paths.iter().collect();
+            roots.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+            let matched = roots
+                .into_iter()
+                .find(|(_, rp)| is_under_root(tab_path, rp));
+            if let Some((id, _)) = matched {
+                t.workspace_root_id = Some(id.clone());
+            }
+            // If no root matched, we leave the existing
+            // value. Old `tabs.json` (pre-P2-4) files have
+            // `workspace_root_id = None`; the renderer shows
+            // a "unknown root" badge for those. We don't
+            // clear a non-None value just because the
+            // matching root is gone — the user might be
+            // about to re-add it.
+        }
+    }
+    windows
+}
+
+/// True if `path` is at or under `root`. Both arguments are
+/// absolute paths on disk. We use byte-prefix matching on
+/// the canonicalised path strings; this is cheap and
+/// matches the rule `cmd_get_directory_tree` uses elsewhere
+/// (path is in workspace if the canonicalised path string
+/// starts with the canonicalised root + separator).
+fn is_under_root(path: &str, root: &str) -> bool {
+    // Normalise trailing slashes so `/x/notes/` doesn't
+    // fail to match a tab with path `/x/notes/today.md`.
+    let root_trim = root.trim_end_matches('/');
+    if path == root_trim {
+        return true;
+    }
+    path.starts_with(root_trim)
+        && (root_trim.ends_with('/') || path[root_trim.len()..].starts_with('/'))
+}
+
 /// Tab state for persistence across sessions
 ///
 /// The `content` field is intentionally **excluded** from
@@ -37,6 +106,14 @@ pub struct TabState {
     /// Whether the file is read-only
     #[serde(default)]
     pub read_only: bool,
+    /// P2-4 multi-root workspace: which `WorkspaceRoot.id` this
+    /// tab belongs to. `None` for unsaved/untitled tabs (no path)
+    /// or for legacy `tabs.json` files written before multi-root
+    /// support. The renderer shows a "unknown root" badge for
+    /// `None` and a "missing root" badge for `Some(id)` that
+    /// doesn't match any current root.
+    #[serde(default)]
+    pub workspace_root_id: Option<String>,
 }
 
 impl TabState {
@@ -49,6 +126,7 @@ impl TabState {
             is_modified: false,
             scroll_ratio: 0.0,
             read_only: false,
+            workspace_root_id: None,
         }
     }
 
@@ -65,6 +143,7 @@ impl TabState {
             is_modified: false,
             scroll_ratio: 0.0,
             read_only: false,
+            workspace_root_id: None,
         }
     }
 
@@ -78,6 +157,7 @@ impl TabState {
             "is_modified": self.is_modified,
             "scroll_ratio": self.scroll_ratio,
             "read_only": self.read_only,
+            "workspace_root_id": self.workspace_root_id,
         })
     }
 }
@@ -264,5 +344,110 @@ mod tests {
         assert!(!on_disk.contains("SENSITIVE PASSWORD DATA"),
                 "content leaked to disk: {on_disk}");
         assert!(!on_disk.contains("\"content\""), "content field emitted: {on_disk}");
+    }
+
+    #[test]
+    fn load_handles_missing_workspace_root_id_field() {
+        // P2-4 backwards compat: tabs.json written by a single-root
+        // build (no workspace_root_id field) must still load — the
+        // field should be `None` on the loaded tab.
+        let dir = std::env::temp_dir().join("markpure-tab-legacy-wroot");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("tabs.json");
+        std::fs::write(
+            &path,
+            r#"[
+              {
+                "window_id": "main",
+                "active_tab_id": "t1",
+                "tabs": [
+                  {"id": "t1", "name": "old", "path": "/x/a.md",
+                   "is_modified": false, "scroll_ratio": 0.0, "read_only": false}
+                ]
+              }
+            ]"#,
+        )
+        .unwrap();
+
+        let loaded = load_tabs(&dir).unwrap();
+        assert_eq!(loaded[0].tabs[0].workspace_root_id, None,
+                   "legacy tabs.json should deserialize workspace_root_id as None");
+    }
+
+    #[test]
+    fn round_trip_preserves_workspace_root_id() {
+        let dir = std::env::temp_dir().join("markpure-tab-rt-wroot");
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut t = TabState::with_path("t1".into(), "/x/a.md".into());
+        t.workspace_root_id = Some("root-abc".into());
+
+        save_tabs(&dir, &[WindowTabs {
+            window_id: "main".into(),
+            active_tab_id: Some("t1".into()),
+            tabs: vec![t],
+        }]).unwrap();
+
+        let loaded = load_tabs(&dir).unwrap();
+        assert_eq!(loaded[0].tabs[0].workspace_root_id.as_deref(), Some("root-abc"));
+    }
+
+    /// Phase 5: pre-P2-4 tabs (no `workspace_root_id`) get
+    /// rebound to the root that contains their `path`. The
+    /// rebind is longest-prefix-wins, so the more specific
+    /// root wins when two are configured.
+    #[test]
+    fn rebind_finds_longest_matching_root() {
+        let tab = TabState::with_path("t1".into(), "/x/notes/today.md".into());
+        let windows = vec![WindowTabs {
+            window_id: "main".into(),
+            active_tab_id: Some("t1".into()),
+            tabs: vec![tab],
+        }];
+        let roots = vec![
+            ("root-loose".into(), "/x".into()),
+            ("root-tight".into(), "/x/notes".into()),
+            ("root-other".into(), "/y".into()),
+        ];
+        let rebound = rebind_tabs_to_workspace_roots(windows, &roots);
+        assert_eq!(
+            rebound[0].tabs[0].workspace_root_id.as_deref(),
+            Some("root-tight"),
+        );
+    }
+
+    /// Phase 5: a tab whose path is outside every root keeps
+    /// its existing `workspace_root_id` (or stays `None` if
+    /// the tab was loaded from a pre-P2-4 file). We never
+    /// overwrite a hint with `None` — losing the hint would
+    /// make it harder for the user to fix a misconfigured
+    /// workspace later.
+    #[test]
+    fn rebind_preserves_unmatched_tab() {
+        let tab = TabState::with_path("t1".into(), "/elsewhere/a.md".into());
+        let windows = vec![WindowTabs {
+            window_id: "main".into(),
+            active_tab_id: Some("t1".into()),
+            tabs: vec![tab],
+        }];
+        let roots = vec![("root-x".into(), "/x".into())];
+        let rebound = rebind_tabs_to_workspace_roots(windows, &roots);
+        assert_eq!(rebound[0].tabs[0].workspace_root_id, None);
+    }
+
+    /// Phase 5: an Untitled tab (no `path`) keeps whatever
+    /// `workspace_root_id` it had, since there's nothing
+    /// to match. Pre-P2-4 untitleds have `None`, which the
+    /// rebind leaves alone.
+    #[test]
+    fn rebind_skips_untitled_tabs() {
+        let tab = TabState::new("u1".into(), "Untitled".into());
+        let windows = vec![WindowTabs {
+            window_id: "main".into(),
+            active_tab_id: Some("u1".into()),
+            tabs: vec![tab],
+        }];
+        let roots = vec![("root-x".into(), "/x".into())];
+        let rebound = rebind_tabs_to_workspace_roots(windows, &roots);
+        assert_eq!(rebound[0].tabs[0].workspace_root_id, None);
     }
 }

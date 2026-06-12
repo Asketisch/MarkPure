@@ -18,6 +18,8 @@
     onOpen,
     onSave,
     onOpenWorkspace,
+    onAddWorkspaceRoot,
+    onRemoveWorkspaceRoot,
     onExportHtml,
     onExportPdf,
     onExportWord,
@@ -35,6 +37,11 @@
     onOpen: () => void
     onSave: () => void
     onOpenWorkspace: () => void
+    // P2-4 multi-root: extra File menu items. Optional so
+    // the host can wire them up gradually; if absent the
+    // menu just hides the corresponding entry.
+    onAddWorkspaceRoot?: () => void
+    onRemoveWorkspaceRoot?: () => void
     onExportHtml: () => void
     onExportPdf: () => void
     onExportWord: () => void
@@ -83,6 +90,12 @@
           <button class="dropdown-item" onclick={() => { onSave(); hideFileMenu() }}>{i18n.t('menu.save')}</button>
           <div class="dropdown-sep"></div>
           <button class="dropdown-item" onclick={() => { onOpenWorkspace(); hideFileMenu() }}>{i18n.t('menu.open_workspace')}</button>
+          {#if onAddWorkspaceRoot}
+            <button class="dropdown-item" onclick={() => { onAddWorkspaceRoot(); hideFileMenu() }}>{i18n.t('cmd.file.add_workspace_root')}</button>
+          {/if}
+          {#if onRemoveWorkspaceRoot}
+            <button class="dropdown-item" onclick={() => { onRemoveWorkspaceRoot(); hideFileMenu() }}>{i18n.t('cmd.file.remove_workspace_root')}</button>
+          {/if}
           <div class="dropdown-sep"></div>
           <div
             class="dropdown-submenu"

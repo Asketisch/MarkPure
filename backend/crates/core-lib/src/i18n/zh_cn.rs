@@ -198,6 +198,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("workspace.open_folder", "打开文件夹"),
     ("workspace.loading", "加载中..."),
     ("workspace.change_folder", "更换文件夹"),
+    ("workspace.no_root_hint", "无工作区文件夹 — 点 + 添加"),
     ("outline.title", "大纲"),
     ("outline.no_headings", "无标题"),
     ("action.undo", "撤销"),

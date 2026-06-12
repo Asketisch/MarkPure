@@ -91,13 +91,30 @@ pub fn cmd_export_word(params: &serde_json::Value) -> std::result::Result<serde_
 pub fn cmd_search_workspace(
     params: &serde_json::Value,
 ) -> std::result::Result<serde_json::Value, String> {
-    let path_str = params["path"]
-        .as_str()
-        .ok_or("Missing 'path' parameter")?;
     let query = params["query"]
         .as_str()
         .ok_or("Missing 'query' parameter")?;
-    let path = PathBuf::from(path_str);
+
+    // P2-4: accept either `paths: Vec<String>` (multi-root) or
+    // `path: String` (legacy single-root). Empty `paths` falls
+    // back to `path` for back-compat with pre-multi-root callers.
+    let mut path_strs: Vec<String> = params["paths"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+    if path_strs.is_empty() {
+        if let Some(p) = params["path"].as_str() {
+            path_strs.push(p.to_string());
+        }
+    }
+    if path_strs.is_empty() {
+        return Err("Missing 'path' or 'paths' parameter".to_string());
+    }
+    let root_paths: Vec<PathBuf> = path_strs.iter().map(PathBuf::from).collect();
 
     let options = search::SearchOptions {
         case_sensitive: params
@@ -115,8 +132,14 @@ pub fn cmd_search_workspace(
         max_depth: params.get("max_depth").and_then(|v| v.as_u64()).map(|v| v as usize),
     };
 
-    let result = search::search_workspace(&path, query, &options)
-        .map_err(|e| e.to_string())?;
+    let result = if root_paths.len() == 1 {
+        search::search_workspace(&root_paths[0], query, &options)
+            .map_err(|e| e.to_string())?
+    } else {
+        let refs: Vec<&PathBuf> = root_paths.iter().collect();
+        search::search_workspace_multi(&refs, query, &options)
+            .map_err(|e| e.to_string())?
+    };
 
     Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
 }
@@ -127,9 +150,16 @@ pub fn cmd_save_pasted_image(
     params: &serde_json::Value,
     _state: &AppState,
 ) -> std::result::Result<serde_json::Value, String> {
-    let workspace_path = params["workspace_path"]
+    // P2-4: prefer `workspace_root_path` (the active root's
+    // path) but fall back to the legacy `workspace_path` field
+    // for older callers. Both names point at the same thing
+    // for single-root callers; for multi-root callers the
+    // renderer MUST pass `workspace_root_path` so the image
+    // lands in the right root's `.assets/images/`.
+    let workspace_path = params["workspace_root_path"]
         .as_str()
-        .ok_or("Missing 'workspace_path' parameter")?;
+        .or_else(|| params["workspace_path"].as_str())
+        .ok_or("Missing 'workspace_root_path' parameter")?;
     let base64_data = params["data"]
         .as_str()
         .ok_or("Missing 'data' parameter")?;

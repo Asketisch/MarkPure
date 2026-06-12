@@ -126,6 +126,16 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
         "update_bookmark" => workspace_ops::cmd_update_bookmark(&msg.params),
         "remove_bookmark" => workspace_ops::cmd_remove_bookmark(&msg.params),
 
+        // Multi-root workspace (P2-4) — slow (canonicalize + save_config
+        // hit the filesystem; running them inline would block the wry IPC
+        // thread on slow/stalled mounts and freeze the UI).
+        "add_workspace_root" | "remove_workspace_root" | "list_workspace_roots"
+        | "set_active_workspace_root" | "remove_missing_workspace_roots" => return None,
+        // Multi-root variants of the legacy expanded-dirs IPC.
+        // The old names keep working for now; new code should use _v2.
+        "get_expanded_dirs_v2" => workspace_ops::cmd_get_expanded_dirs_v2(&msg.params, state),
+        "set_expanded_dirs_v2" => workspace_ops::cmd_set_expanded_dirs_v2(&msg.params, state),
+
         // Workspace tag index → slow (WalkDir over workspace)
         "get_workspace_tags" => return None,
 
@@ -222,7 +232,7 @@ fn run_slow_command(
 
         // File watcher
         "watch_directory" => file_ops::cmd_watch_directory(&msg.params, state),
-        "unwatch_directory" => file_ops::cmd_unwatch_directory(state),
+        "unwatch_directory" => file_ops::cmd_unwatch_directory(&msg.params, state),
 
         // File CRUD
         "create_file" => file_ops::cmd_create_file(&msg.params, state),
@@ -264,6 +274,19 @@ fn run_slow_command(
 
         // File drop
         "open_dropped_files" => file_ops::cmd_open_dropped_files(&msg.params, state),
+
+        // Multi-root workspace (P2-4) — moved off the fast path
+        // because `cmd_add_workspace_root` /
+        // `cmd_set_active_workspace_root` /
+        // `cmd_remove_missing_workspace_roots` perform
+        // `std::fs::canonicalize` and `is_dir()` checks; on a
+        // slow or stalled mount those can block for minutes
+        // and freeze the wry IPC thread.
+        "add_workspace_root" => workspace_ops::cmd_add_workspace_root(&msg.params, state),
+        "remove_workspace_root" => workspace_ops::cmd_remove_workspace_root(&msg.params, state),
+        "list_workspace_roots" => workspace_ops::cmd_list_workspace_roots(state),
+        "set_active_workspace_root" => workspace_ops::cmd_set_active_workspace_root(&msg.params, state),
+        "remove_missing_workspace_roots" => workspace_ops::cmd_remove_missing_workspace_roots(state),
 
         _ => Err(format!("Unknown slow command: {}", msg.cmd)),
     }

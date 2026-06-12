@@ -7,10 +7,21 @@
 
   let {
     workspacePath = '',
+    rootPaths,
+    initialScope = 'active',
     visible = $bindable(false),
     onNavigate,
   }: {
     workspacePath: string
+    /** P2-4: every configured root. When `scope === 'all'`,
+     *  the search runs against this list. `undefined` falls
+     *  back to a single-root search over `workspacePath`. */
+    rootPaths?: string[]
+    /** P2-4: 'active' searches just `workspacePath`; 'all'
+     *  searches `rootPaths`. The host can override the
+     *  default via this prop (e.g. the command palette's
+     *  "search.workspace_all_roots" sets it to 'all'). */
+    initialScope?: 'active' | 'all'
     visible: boolean
     onNavigate: (file: string, line: number) => void
   } = $props()
@@ -25,6 +36,10 @@
   let searching = $state(false)
   let error = $state('')
   let selectedIndex = $state(-1)
+  // P2-4 multi-root search scope. The host can pre-set
+  // this via `initialScope`; the user can flip it via a
+  // small dropdown in the toolbar.
+  let scope = $state<'active' | 'all'>(initialScope)
   let searchSeq = 0 // request sequence to discard stale results
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -43,7 +58,19 @@
   })
 
   async function doSearch() {
-    if (!workspacePath || !query.trim()) {
+    if (!query.trim()) {
+      results = []
+      return
+    }
+    // Resolve the search scope. "all" is a no-op when
+    // `rootPaths` is empty or only has the active root.
+    const searchRoots: string | string[] = (() => {
+      if (scope === 'all' && rootPaths && rootPaths.length > 1) {
+        return rootPaths
+      }
+      return workspacePath
+    })()
+    if (!searchRoots || (typeof searchRoots === 'string' && !searchRoots)) {
       results = []
       return
     }
@@ -54,7 +81,7 @@
     results = []
 
     try {
-      const result = await searchWorkspace(workspacePath, query, {
+      const result = await searchWorkspace(searchRoots, query, {
         case_sensitive: caseSensitive,
         whole_word: wholeWord,
         use_regex: useRegex,
@@ -250,6 +277,14 @@
       <button class="ws-opt" class:active={caseSensitive} onclick={() => caseSensitive = !caseSensitive} title={i18n.t('search.match_case')}>Aa</button>
       <button class="ws-opt" class:active={wholeWord} onclick={() => wholeWord = !wholeWord} title={i18n.t('search.whole_word')}>Ab</button>
       <button class="ws-opt" class:active={useRegex} onclick={() => useRegex = !useRegex} title={i18n.t('search.regex')}>.*</button>
+      {#if rootPaths && rootPaths.length > 1}
+        <button
+          class="ws-opt"
+          class:active={scope === 'all'}
+          onclick={() => { scope = scope === 'all' ? 'active' : 'all'; debouncedSearch() }}
+          title={scope === 'all' ? 'Searching all roots' : 'Searching active root only'}
+        >{scope === 'all' ? 'All' : 'Active'}</button>
+      {/if}
       <span class="ws-stats">
         {#if totalMatches > 0}
           {totalMatches} {i18n.t('search.matches')} {i18n.t('search.in_files')} {totalFiles} {i18n.t('search.files')}

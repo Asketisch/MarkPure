@@ -31,6 +31,7 @@
     getExpandedDirs,
     setExpandedDirs,
   } from '$lib/editor/commands'
+  import { useWorkspace } from '$lib/stores/workspace.svelte'
   import type { FileEntry } from '$lib/editor/commands'
   import { basename, joinPath } from '$lib/fileTreeFilters'
   import { useI18n } from '$lib/stores/i18n.svelte'
@@ -54,6 +55,11 @@
   let { workspacePath = null, onOpenFile, onPinTab, onWorkspaceChange, onRegisterRefresh }: Props = $props()
 
   const i18n = useI18n()
+  // P2-4 multi-root store. The sidebar's "Open Folder" button
+  // registers the picked folder here so it shows up in the
+  // root-pill strip alongside folders added from other entry
+  // points (MenuBar, EmptyState, WorkspaceRootTabs +).
+  const workspace = useWorkspace()
 
   // ----- State (shared across the sub-components) -----
 
@@ -110,14 +116,33 @@
 
   // ----- Workspace / tree management -----
 
+  // Re-entrancy guard. The sidebar button funnels through
+  // here; the EmptyState and MenuBar paths are separate but
+  // share the underlying `pickDirectory` IPC, so two stacked
+  // pickers used to be possible if the user clicked the
+  // sidebar button while a previous picker was still up.
+  let openWorkspaceBusy = $state(false)
   async function openWorkspace() {
-    const path = await pickDirectory()
-    if (path) {
+    if (openWorkspaceBusy) return
+    openWorkspaceBusy = true
+    try {
+      const path = await pickDirectory()
+      if (!path) return
+      // Register the picked folder in the P2-4 store so it
+      // appears in the root-pill strip and survives a config
+      // round-trip. Then switch the active root to it — the
+      // sidebar "Open / Change Folder" button has open-and-show
+      // semantics, so we explicitly switch (addRoot alone only
+      // activates the *first* root). The mirror $effect in
+      // App.svelte then updates `workspacePath`, which triggers
+      // the tree-load $effect below.
+      const root = await workspace.addRoot(path)
+      if (root && workspace.activeId !== root.id) {
+        await workspace.setActive(root.id)
+      }
       onWorkspaceChange?.(path)
-      // Local update so the tree loads immediately without
-      // waiting for the parent round-trip.
-      workspacePath = path
-      await loadTree()
+    } finally {
+      openWorkspaceBusy = false
     }
   }
 
@@ -432,12 +457,12 @@
     onContextMenu={showContextMenu}
   />
 
-  {#if !workspacePath}
+  {#if workspace.roots.length === 0}
     <div class="workspace-empty">
-      <button class="open-workspace-btn" onclick={openWorkspace}>{i18n.t('empty.open_folder')}</button>
+      <button class="open-workspace-btn" onclick={openWorkspace} disabled={openWorkspaceBusy}>{i18n.t('empty.open_folder')}</button>
     </div>
   {:else}
-    <button class="change-workspace-btn" onclick={openWorkspace}>{i18n.t('workspace.change_folder')}</button>
+    <button class="change-workspace-btn" onclick={openWorkspace} disabled={openWorkspaceBusy}>{i18n.t('workspace.change_folder')}</button>
   {/if}
 
   {#if contextMenu}

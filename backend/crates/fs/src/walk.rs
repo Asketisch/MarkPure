@@ -1,5 +1,6 @@
 use mt_core::error::{Error, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::Path;
 
 /// Git file status
@@ -40,8 +41,55 @@ pub async fn walk_directory(path: &Path, depth: u32, show_hidden: bool) -> Resul
     } else {
         None
     };
-    let entries = walk_dir_sync(&path, 0, depth, show_hidden, repo_root.as_deref(), git_statuses.as_ref())?;
+    // Guard against symlink cycles: a directory can appear via multiple
+    // paths (e.g. `dir/loop/loop/...`). Without a visited-set the
+    // recursion below would either blow the stack or — on a "soft" cycle
+    // bounded only by `max_depth` — silently truncate the tree. We track
+    // each visited directory by its `(dev, ino)` on Unix (zero syscall
+    // beyond the `metadata()` we already do per entry) and by its
+    // canonical path elsewhere.
+    let mut visited: HashSet<DirKey> = HashSet::new();
+    let entries = walk_dir_sync(
+        &path,
+        0,
+        depth,
+        show_hidden,
+        repo_root.as_deref(),
+        git_statuses.as_ref(),
+        &mut visited,
+    )?;
     Ok(entries)
+}
+
+/// Opaque directory identity used to detect symlink cycles during a walk.
+#[derive(Clone, Eq, PartialEq, Hash)]
+enum DirKey {
+    #[cfg(unix)]
+    Unix { dev: u64, ino: u64 },
+    #[cfg(not(unix))]
+    Canonical(String),
+}
+
+impl DirKey {
+    fn for_path(path: &Path, meta: &std::fs::Metadata) -> Self {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            return DirKey::Unix {
+                dev: meta.dev(),
+                ino: meta.ino(),
+            };
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = meta;
+            DirKey::Canonical(
+                std::fs::canonicalize(path)
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_else(|_| path.to_string_lossy().into_owned()),
+            )
+        }
+    }
 }
 
 /// Load all git statuses for a repo into a HashMap for fast lookup
@@ -88,7 +136,28 @@ fn load_git_status_map(repo_root: &Path) -> Option<std::collections::HashMap<Str
     Some(map)
 }
 
-fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32, show_hidden: bool, repo_root: Option<&Path>, git_statuses: Option<&std::collections::HashMap<String, GitStatus>>) -> Result<Vec<FileEntry>> {
+fn walk_dir_sync(
+    path: &std::path::Path,
+    current_depth: u32,
+    max_depth: u32,
+    show_hidden: bool,
+    repo_root: Option<&Path>,
+    git_statuses: Option<&std::collections::HashMap<String, GitStatus>>,
+    visited: &mut HashSet<DirKey>,
+) -> Result<Vec<FileEntry>> {
+    // Stat the directory itself first so we can dedupe by (dev, ino).
+    // If `metadata()` fails the path is already gone; surface the error
+    // so the user sees a meaningful "permission denied / not found"
+    // rather than an empty tree.
+    let self_meta = std::fs::metadata(path).map_err(Error::Io)?;
+    let self_key = DirKey::for_path(path, &self_meta);
+    if !visited.insert(self_key) {
+        // We've already walked this directory via another path
+        // (symlink cycle). Return an empty list — the parent still
+        // shows the entry, we just don't recurse into it again.
+        return Ok(Vec::new());
+    }
+
     let mut entries = Vec::new();
     let read_dir = std::fs::read_dir(path).map_err(Error::Io)?;
 
@@ -118,7 +187,15 @@ fn walk_dir_sync(path: &std::path::Path, current_depth: u32, max_depth: u32, sho
         }
 
         let children = if is_dir && (max_depth == 0 || current_depth < max_depth) {
-            walk_dir_sync(&item_path, current_depth + 1, max_depth, show_hidden, repo_root, git_statuses)?
+            walk_dir_sync(
+                &item_path,
+                current_depth + 1,
+                max_depth,
+                show_hidden,
+                repo_root,
+                git_statuses,
+                visited,
+            )?
         } else {
             Vec::new()
         };

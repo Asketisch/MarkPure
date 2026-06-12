@@ -44,12 +44,18 @@ export interface WorkspaceSearchOptions {
 }
 
 export async function searchWorkspace(
-  path: string,
+  path: string | string[],
   query: string,
   options: WorkspaceSearchOptions,
 ): Promise<WorkspaceSearchResult> {
+  // P2-4 multi-root: pass `paths` (plural) when the caller
+  // supplies an array; fall back to legacy `path: string` for
+  // single-root callers. Rust merges the results internally.
+  const pathOrPaths = Array.isArray(path)
+    ? { paths: path }
+    : { path }
   return await ipc<WorkspaceSearchResult>('search_workspace', {
-    path, query, ...options,
+    ...pathOrPaths, query, ...options,
   })
 }
 

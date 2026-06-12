@@ -36,12 +36,19 @@ export const commandCatalog: CommandDef[] = [
   { id: 'file.new', titleKey: 'dialog.new_file', categoryKey: 'menu.file', keywords: ['create', 'document'] },
   { id: 'file.open', titleKey: 'menu.open_file', categoryKey: 'menu.file', keywords: ['browse', 'load'] },
   { id: 'file.open_workspace', titleKey: 'menu.open_workspace', categoryKey: 'menu.file', keywords: ['folder', 'directory'] },
+  // P2-4 multi-root: add/remove/switch workspace roots.
+  { id: 'file.add_workspace_root', titleKey: 'cmd.file.add_workspace_root', categoryKey: 'menu.file', keywords: ['folder', 'multi-root', 'add'] },
+  { id: 'file.remove_workspace_root', titleKey: 'cmd.file.remove_workspace_root', categoryKey: 'menu.file', keywords: ['folder', 'multi-root', 'remove'] },
+  { id: 'file.set_active_workspace_root', titleKey: 'cmd.file.set_active_workspace_root', categoryKey: 'menu.file', keywords: ['folder', 'multi-root', 'switch'] },
   { id: 'file.save', titleKey: 'action.save', categoryKey: 'menu.file', keywords: ['write', 'persist'] },
   { id: 'file.save_as', titleKey: 'cmd.file.save_as', categoryKey: 'menu.file', keywords: ['export', 'rename'] },
   { id: 'file.close_tab', titleKey: 'cmd.file.close_tab', categoryKey: 'menu.file', keywords: ['close'] },
   { id: 'file.export_html', titleKey: 'menu.export_html', categoryKey: 'menu.file' },
   { id: 'file.export_pdf', titleKey: 'menu.export_pdf', categoryKey: 'menu.file' },
   { id: 'file.export_word', titleKey: 'menu.export_word', categoryKey: 'menu.file' },
+
+  // Search — P2-4: cross-root variant runs against every root.
+  { id: 'search.workspace_all_roots', titleKey: 'cmd.search.workspace_all_roots', categoryKey: 'menu.search', keywords: ['cross-root', 'multi-root', 'all'] },
 
   // Edit
   { id: 'edit.undo', titleKey: 'action.undo', categoryKey: 'menu.edit', keywords: ['revert'] },

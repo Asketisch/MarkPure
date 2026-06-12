@@ -198,6 +198,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("workspace.open_folder", "フォルダーを開く"),
     ("workspace.loading", "読み込み中..."),
     ("workspace.change_folder", "フォルダーを変更"),
+    ("workspace.no_root_hint", "ワークスペースフォルダなし — + で追加"),
     ("outline.title", "アウトライン"),
     ("outline.no_headings", "見出しなし"),
     ("action.undo", "元に戻す"),

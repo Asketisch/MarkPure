@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { createEditor, getMarkdown, setContent } from '$lib/editor/editor'
   import {
     openFile,
@@ -34,6 +34,7 @@
   import StatusBar from '$lib/components/layout/StatusBar.svelte'
   import MenuBar from '$lib/components/layout/MenuBar.svelte'
   import Tabs from '$lib/components/layout/Tabs.svelte'
+  import WorkspaceRootTabs from '$lib/components/workspace/WorkspaceRootTabs.svelte'
   import TabContextMenu from '$lib/components/layout/TabContextMenu.svelte'
   import ContextMenu from '$lib/components/ui/ContextMenu.svelte'
   import ResizeHandle from '$lib/components/ui/ResizeHandle.svelte'
@@ -68,21 +69,23 @@
     Undo2, Redo2, X,
     Superscript as Sup, Subscript as Sub
   } from 'lucide-svelte'
+  import type { Tab } from './handlers/types'
+  import { pageNameFromPath } from './handlers/helpers'
 
-  interface Tab {
-    id: number
-    path: string | null
-    name: string
-    dirty: boolean
-    content: string
-    preview?: boolean  // true = preview tab, closed when another file is opened
-    mtime: number | null  // file modification time when opened
-  }
+  // P2-4 multi-root workspace. The store owns the roots list
+  // and the active-id pointer; App.svelte reads them and
+  // reacts to root-switch evictions.
+  import { createWorkspace } from '$lib/stores/workspace.svelte'
 
   const i18n = createI18n()
   // P1-11: spell-check store. Owns enabled/language; the
   // ProseMirror plugin reads via `getSpellcheckStore()`.
   const spellcheck = createSpellcheck()
+  // P2-4 multi-root workspace store. Hydrated in onMount; the
+  // App mirrors `workspace.activePath` into the legacy
+  // `workspacePath` state so the rest of the code keeps
+  // working without a full refactor.
+  const workspace = createWorkspace()
 
   let tabs = $state<Tab[]>([])
   let activeTabId = $state<number | null>(null)
@@ -131,6 +134,11 @@
   // moved to MenuBar.svelte (local UI state).
   let showSearch = $state(false)
   let showWorkspaceSearch = $state(false)
+  // P2-4: when the user opens workspace search via
+  // "search.workspace_all_roots", we set this so the
+  // WorkspaceSearch component starts in "All roots" scope.
+  // Cleared when the panel closes (effect below).
+  let workspaceAllRoots = $state(false)
   let showSettings = $state(false)
   let showCommandPalette = $state(false)
   let sourceMode = $state(false)
@@ -187,6 +195,15 @@
       case 'file.new': return () => newTab()
       case 'file.open': return () => handleOpenFile()
       case 'file.open_workspace': return () => openWorkspace()
+      // P2-4 multi-root commands. They open a directory
+      // picker (or a root-picker) and call into the
+      // workspace store. The store handles the IPC and
+      // state updates; the eviction effect (see
+      // `$effect` near the end of this file) closes the
+      // tabs that Rust just dropped from the LRU.
+      case 'file.add_workspace_root': return () => void addWorkspaceRoot()
+      case 'file.remove_workspace_root': return () => void removeCurrentWorkspaceRoot()
+      case 'file.set_active_workspace_root': return () => void pickActiveWorkspaceRoot()
       case 'file.save': return () => handleSave()
       case 'file.save_as': return () => saveFileAs()
       case 'file.close_tab': return () => { if (activeTabId) closeTab(activeTabId) }
@@ -215,6 +232,11 @@
       case 'view.toggle_zen_mode': return () => toggleZenMode()
       case 'view.toggle_typewriter': return () => toggleTypewriter()
       case 'search.workspace': return () => { showWorkspaceSearch = true }
+      // P2-4 cross-root search. The WorkspaceSearch
+      // component already has a "scope" toggle, so opening
+      // the panel and switching to "All roots" is just
+      // one extra state flag — see WorkspaceSearch.svelte.
+      case 'search.workspace_all_roots': return () => openWorkspaceSearchAllRoots()
       case 'search.quick_switcher': return () => { showQuickSwitcher = true }
       case 'theme.cycle': return () => cycleTheme()
       case 'theme.light': return () => setTheme('')
@@ -364,14 +386,7 @@
   // the basename minus the `.md`/`.markdown`/`.mdx` extension
   // so it matches the wikilink `[[Page]]` syntax. For untitled
   // tabs (path === null) we fall back to the tab's display
-  // name, which is the placeholder the user sees in the
-  // tab bar.
-  function pageNameFromPath(path: string | null, fallback: string): string {
-    if (!path) return fallback
-    const sep = path.lastIndexOf('/')
-    const base = sep >= 0 ? path.slice(sep + 1) : path
-    return base.replace(/\.(md|markdown|mdx)$/i, '')
-  }
+  // P2-4 pageNameFromPath: now imported from ./handlers/helpers.
 
   let currentBacklinkPage = $derived.by(() => {
     const t = getActiveTab()
@@ -1024,12 +1039,96 @@
   function handleFind() { showSearch = true }
   function handleReplace() { showSearch = true }
 
-  async function openWorkspace() {
-    const path = await pickDirectory()
-    if (path) {
-      workspacePath = path
+  // Guard against re-entrant "Open Folder" clicks. The leaf
+  // buttons (EmptyState, sidebar, MenuBar, WorkspaceRootTabs)
+  // all funnel through here, and a second click while the
+  // first pickDirectory is still on screen used to leave the
+  // user with two stacked pickers and a flurry of duplicate
+  // IPC. `busy` is cleared in `finally` so an early-return
+  // (user cancels the picker) still re-arms the handler.
+  let openWorkspaceBusy = $state(false)
+  async function openWorkspace(path?: string) {
+    if (openWorkspaceBusy) return
+    openWorkspaceBusy = true
+    try {
+      // Accept a pre-resolved path from the caller (e.g.
+      // EmptyState, which calls pickDirectory itself) so we
+      // don't prompt the user twice. The MenuBar / command
+      // palette still call us with no argument.
+      if (!path) path = await pickDirectory()
+      if (!path) return
+      const root = await workspace.addRoot(path)
+      // "Open Folder" implies the user wants to *see* the chosen
+      // folder. `addRoot` only auto-activates the first root, so
+      // for subsequent opens we explicitly switch. The mirror
+      // $effect picks up the change and updates `workspacePath`.
+      if (root && workspace.activeId !== root.id) {
+        await workspace.setActive(root.id)
+      }
       saveCurrentConfig()
+    } finally {
+      openWorkspaceBusy = false
     }
+  }
+
+  // P2-4 multi-root: command-palette wrappers around the
+  // workspace store. These mirror the UI the user will get
+  // via the WorkspaceRootTabs component (Phase 4c) — the
+  // palette is just an alternate entry point.
+  async function addWorkspaceRoot() {
+    if (openWorkspaceBusy) return
+    openWorkspaceBusy = true
+    try {
+      const path = await pickDirectory()
+      if (!path) return
+      // Command-palette "Add" is purely additive — it does NOT
+      // switch the active root (use the WorkspaceRootTabs pill
+      // or the "Switch Active Root" command for that). The
+      // store auto-activates only if there was no prior root;
+      // the mirror $effect handles `workspacePath` on its own.
+      await workspace.addRoot(path)
+    } finally {
+      openWorkspaceBusy = false
+    }
+  }
+
+  async function removeCurrentWorkspaceRoot() {
+    const active = workspace.activeRoot
+    if (!active) return
+    if (workspace.roots.length === 1) {
+      // Removing the only root returns the user to the
+      // empty state. We don't prompt; the user can always
+      // add it back.
+    }
+    // The store updates `activeId` (falling back to the first
+    // remaining root, or null). The mirror $effect propagates
+    // the change to `workspacePath`, which retriggers the
+    // tree-load / watcher effects.
+    await workspace.removeRoot(active.id)
+  }
+
+  async function pickActiveWorkspaceRoot() {
+    if (workspace.roots.length === 0) return
+    // For now: cycle to the next root. A proper picker
+    // (the WorkspaceRootTabs component) lands in 4c; until
+    // then this gives the command-palette entry point
+    // something to do.
+    const ids = workspace.roots.map((r) => r.id)
+    const idx = workspace.activeId
+      ? ids.indexOf(workspace.activeId)
+      : 0
+    const next = ids[(idx + 1) % ids.length]
+    await workspace.setActive(next)
+  }
+
+  function openWorkspaceSearchAllRoots() {
+    showWorkspaceSearch = true
+    // The WorkspaceSearch component reads `workspaceAllRoots`
+    // as a derived flag and switches its scope dropdown to
+    // "all roots" when set. We set it here and let the
+    // effect clear it on close so a future search re-opens
+    // in the user's last-used scope.
+    workspaceAllRoots = true
   }
 
   async function handleWorkspaceSearchNavigate(file: string, line: number) {
@@ -1370,6 +1469,21 @@
     }
   }
 
+  // P2-4 mirror bridge: keep the legacy `workspacePath` $state in
+  // sync with the workspace store's active path. The downstream
+  // $effects below (file watcher + workspace CSS) and
+  // WorkSpace.svelte's tree-load $effect all key off
+  // `workspacePath`, so this effect is the single point that
+  // catches every entry that mutates the store — including paths
+  // (WorkspaceRootTabs `+` and pill switch) that don't go through
+  // the imperative mirror sites elsewhere in this file.
+  $effect(() => {
+    const next = workspace.activePath ?? null
+    if (workspacePath !== next) {
+      workspacePath = next
+    }
+  })
+
   $effect(() => {
     const path = workspacePath
     if (path) {
@@ -1478,7 +1592,49 @@
     }
   }
 
+  // P2-4 root-switch eviction: when the user changes the
+  // active root, Rust drops the LRU docs that don't belong
+  // to the new active root and returns the list. We close
+  // the matching tabs here so the UI and the registry stay
+  // aligned.
+  $effect(() => {
+    const evicted = workspace.evictedDocIds
+    if (evicted.length === 0) return
+    const idSet = new Set(evicted.map((s) => Number(s)))
+    // `untrack` keeps the effect from re-subscribing to `tabs`.
+    // Without it, every `closeTab()` call below (which mutates
+    // `tabs`) would re-fire this effect; with it, the effect
+    // only depends on `evictedDocIds` and runs once per
+    // root-switch.
+    // Avoid clobbering the user — only close tabs that
+    // aren't dirty. A dirty tab is the user's in-flight
+    // edit; they'd rather see the prompt than lose it.
+    const idsToClose = untrack(() =>
+      tabs.filter((t) => idSet.has(t.id) && !t.dirty).map((t) => t.id),
+    )
+    for (const id of idsToClose) {
+      closeTab(id)
+    }
+    workspace.clearEvictedDocs()
+  })
+
   onMount(async () => {
+    // P2-4: hydrate the workspace store in parallel with i18n
+    // and config. The roots are read after i18n so the
+    // empty-state copy can be localized.
+    const workspacePromise = workspace.init()
+      .then(() => {
+        // Phase 5: warm up the watcher for every existing
+        // root so the first 3 seconds don't drop file
+        // events (see the post-mortem in
+        // COMPETITOR_TODO P2-4 §5). Missing roots are
+        // skipped by `watchAll` itself.
+        return workspace.watchAll()
+      })
+      .catch((e: unknown) => {
+        console.error('Failed to init workspace store:', e)
+      })
+
     // 1) i18n — load in parallel with config, but block on both.
     const i18nPromise = i18n.init().catch((e: unknown) => {
       console.error('Failed to init i18n:', e)
@@ -1517,9 +1673,18 @@
     //    forever — we always proceed with whatever defaults we have.
     const timeout = new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), 5000))
     await Promise.race([
-      Promise.all([i18nPromise, configPromise]).then(() => 'done' as const),
+      Promise.all([i18nPromise, configPromise, workspacePromise]).then(
+        () => 'done' as const,
+      ),
       timeout,
     ])
+
+    // P2-4: the mirror $effect above keeps `workspacePath` in
+    // sync with `workspace.activePath`, including the initial
+    // hydrated value from `workspace.init()`. No explicit
+    // assignment is needed here — the effect runs once on mount
+    // after this block returns.
+
     ready = true
 
     // Start in EmptyState — only spin up the editor when a tab exists.
@@ -1713,6 +1878,8 @@
     onOpen={handleOpen}
     onSave={handleSave}
     onOpenWorkspace={openWorkspace}
+    onAddWorkspaceRoot={() => void addWorkspaceRoot()}
+    onRemoveWorkspaceRoot={() => void removeCurrentWorkspaceRoot()}
     onExportHtml={handleExportHtml}
     onExportPdf={handleExportPdf}
     onExportWord={handleExportWord}
@@ -1727,6 +1894,15 @@
   />
   {/if}
 
+  <!-- P2-4 multi-root tabs: a strip of pills above the editor
+       so the user can see + switch between the configured
+       workspace roots. The component itself renders an
+       empty-state hint when no roots are configured, so we
+       keep it mounted unconditionally (within Zen mode). -->
+  {#if !zenMode}
+    <WorkspaceRootTabs />
+  {/if}
+
   <div class="main-area">
     <!-- Sidebar -->
     {#if showSidebar && !zenMode}
@@ -1735,7 +1911,7 @@
           {workspacePath}
           onOpenFile={handleOpenFile}
           onPinTab={handlePinTab}
-          onWorkspaceChange={(path) => { workspacePath = path; saveCurrentConfig() }}
+          onWorkspaceChange={() => { saveCurrentConfig() }}
           isResizing={sidebarResizing}
           onRegisterRefresh={(refresh) => { refreshFileTree = refresh }}
         />
@@ -1787,7 +1963,7 @@
       {#if tabs.length === 0}
         <EmptyState
           onOpenFile={handleOpenFile}
-          onOpenWorkspace={(path) => { workspacePath = path; saveCurrentConfig() }}
+          onOpenWorkspace={openWorkspace}
           onOpenRecent={handleOpenRecent}
         />
       {:else}
@@ -2018,6 +2194,8 @@
 <!-- Workspace Search Modal -->
 <WorkspaceSearch
   workspacePath={workspacePath ?? ''}
+  rootPaths={workspace.rootPaths}
+  initialScope={workspaceAllRoots ? 'all' : 'active'}
   bind:visible={showWorkspaceSearch}
   onNavigate={handleWorkspaceSearchNavigate}
 />
