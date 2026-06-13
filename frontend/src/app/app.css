@@ -1340,3 +1340,26 @@ html, body, #app {
 .footnote-ref:hover {
   text-decoration: underline;
 }
+
+/* P2-6: Top-block virtualization.
+ * Modern browsers (Chrome 85+, Edge 85+, Firefox 125+, Safari 18+)
+ * skip layout/paint for off-screen blocks via `content-visibility:
+ * auto`, while `contain-intrinsic-size` preserves the box
+ * dimensions set by the plugin so the scrollbar stays accurate.
+ * Older browsers fall back to `display: none` (no placeholder,
+ * scrollable height = sum of visible blocks only — degraded but
+ * functional).
+ */
+.ProseMirror .pm-virtual-hidden {
+  content-visibility: auto;
+  /* `contain-intrinsic-size` is set per-block via inline style
+   * by the plugin (e.g. `auto 240px`). The empty `auto 0` here
+   * is the CSS-default for browsers that don't read the inline
+   * override, so they at least preserve 0 height. */
+  contain-intrinsic-size: auto 0;
+}
+@supports not (content-visibility: auto) {
+  .ProseMirror .pm-virtual-hidden {
+    display: none;
+  }
+}

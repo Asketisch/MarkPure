@@ -15,13 +15,13 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ### 1.2 缺口统计
 
-> 最近更新：2026-06-10 — P1-11 CJK 拼写检查（macOS NSSpellChecker + 前端完整 UI）完成。剩余 5 项延期。
+> 最近更新：2026-06-13 — P2-6 顶层块虚拟化（自研 VirtualizationExtension + content-visibility: auto）完成。剩余 5 项延期。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
 | **P0** | 0 | 全部 P0 已实现 ✅ |
 | **P1** | 1 | P1-8 PNG 导出延期 |
-| **P2** | 4 | P2-3 列选、P2-4 多根、P2-6 虚拟化、P2-7 Vim、P2-9 评论延期 |
+| **P2** | 4 | P2-3 列选、P2-4 多根、P2-7 Vim、P2-9 评论延期（P2-6 虚拟化已实现） |
 | **合计** | 5 | 全部为延期项目（需要重依赖或架构改造） |
 
 ### 1.3 优先级定义
@@ -764,23 +764,32 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 
 ### [P2-6] Tiptap 文档虚拟化（Virtualization）
 
-**状态**：⏸️ 延期（XL 复杂度，架构级改造，需要 prosemirror-virtualization 或自研）
+**状态**：✅ 已实现（2026-06-13）
 
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：XL
 
 **背景**：
 大文档（>10000 字 / >500 节点）卡顿、内存占用高。Notion、飞书文档都做了虚拟化。
 
-**现状**：
-- 完整 DOM 渲染所有节点
-- 大文档可能卡顿（待实测）
+**已实现（2026-06-13）**：
+- 自研 Tiptap 扩展 `VirtualizationExtension`（`frontend/src/extensions/view/virtualization-extension.ts`，82 行） + ProseMirror 插件 `virtualizationPlugin`（`frontend/src/plugins/virtualization.ts`，351 行）
+- 拆分 3 个子模块满足铁律：`virtualization/types.ts`（60 行）+ `height-estimator.ts`（163 行）+ `enumerate.ts`（98 行）
+- 阈值 200 顶层块：≤ 200 走快路径零开销；> 200 自动激活
+- buffer = 5 块（视口上下各 5 块保留渲染）
+- CSS 用 `content-visibility: auto` + `contain-intrinsic-size`，浏览器原生跳过 off-screen 块的 layout/paint，盒模型尺寸由插件通过 inline style 设置，滚动条高度准确
+- 老浏览器降级：`<content-visibility: auto` 不支持时用 `display: none`（`.pm-virtual-hidden` 在 `app.css` 中配 `@supports not` 块）
+- 容器块豁免：list / table / codeBlock-with-children 标 `isContainer`，永不被虚拟化（保证嵌套结构交互正常）
+- 二分查找定位首可见块 O(log n) + 线性前扫末可见块（典型 O(1)）
+- doc 变更 → 全量重枚举；meta 事务 → 增量更新（`setMeasuredHeight` / `updateVisibleRange` / `setConfig`）
+- 命令面板 API：`setVirtualizationConfig`（运行时改阈值/buffer/hiddenClass）、`reportBlockHeight`（NodeView 上报实测高度）
+- 与现有插件零侵入兼容：instant-render / search / spellcheck / Outline 全部走 PM state，NodeView（Mermaid / Code / Toc）状态在 JS 而非 DOM，detached 不丢
+- 单元验证脚本 `scripts/validate-virtualization.ts`（15 个用例通过）：节点类型估算、空 doc、200/201 阈值边界、measured 高度更新、offsetTop 累计、measure DOM 边界
+- 合成测试文档 `synth-1k.md`（1000 顶层块）供 DevTools 手工 perf 验证
+- `npm run build` 通过；无新增类型错误
 
-**实现要点**：
-- 引入 `prosemirror-virtualization` 或自研
-- 仅渲染视口附近的节点
-- 与 `InstantRender` 插件协调
-- 搜索/替换需特殊处理（确保匹配区域被渲染）
-- 谨慎处理：表格、列表、嵌套块的虚拟化边界
+**已知限制**：
+- 1MB+ markdown 解析可能慢（与虚拟化无关，是 pulldown-cmark 的固有开销）
+- macOS 14 老 WebView 缺 `content-visibility: auto` 支持，会降级到 `display: none` 模式，滚动条高度可能略有偏差但功能可用
 
 **参考实现**：
 - Notion 大文档渲染

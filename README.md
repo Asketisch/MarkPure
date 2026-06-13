@@ -27,6 +27,7 @@ WYSIWYG Markdown 桌面编辑器。
 | **书签管理** | 添加、编辑、删除书签 |
 | **拼写检查** | 英文拼写检查，提供修正建议 |
 | **Workspace 搜索** | 工作区全文搜索，支持正则和大小写敏感 |
+| **大文档虚拟化** | 顶层块视口虚拟化（>200 块自动启用），`content-visibility: auto` 跳过 off-screen 块的 layout/paint |
 
 ## 快速开始
 
@@ -123,8 +124,8 @@ MarkPure/
 │       │   ├── search/          # 工作区搜索
 │       │   ├── quick-insert/    # 快速插入
 │       │   └── outline/        # 大纲面板
-│       ├── extensions/         # Tiptap 扩展（16 个）
-│       ├── plugins/            # ProseMirror 插件（5+ 个）
+│       ├── extensions/         # Tiptap 扩展（17 个，含 P2-6 虚拟化）
+│       ├── plugins/            # ProseMirror 插件（5+ 个，含 P2-6 virtualization/）
 │       ├── nodeviews/          # ProseMirror NodeView（代码块）
 │       ├── stores/             # Svelte 5 runes 状态管理
 │       └── i18n/               # 国际化
@@ -215,6 +216,7 @@ MarkPure/
 
 ## 最近更新
 
+- **P2-6 顶层块虚拟化** — 文档 >200 顶层块时自动启用视口虚拟化，浏览器原生 `content-visibility: auto` 跳过 off-screen 块，1k 块文档预期首屏 < 200ms、滚动 FPS > 50
 - **拖拽 bugfix** — 修复文件拖拽相关问题
 - **文件重命名/渲染 bug 修复** — 修复文件操作和渲染问题
 - **Git 文件状态色值处理** — 目录树显示 Git 状态颜色

@@ -34,6 +34,7 @@ import { FocusModeExtension } from '../extensions/view/focus-mode-extension'
 import { UndoTreeExtension } from '../extensions/editing/undo-tree-extension'
 import { SpellcheckExtension } from '../extensions/editing/spellcheck-extension'
 import { MermaidExtension } from '../nodeviews/mermaid-view'
+import { VirtualizationExtension } from '../extensions/view/virtualization-extension'
 
 // Extension to wrap multi-cursor plugin
 const MultiCursorExtension = Extension.create({
@@ -142,6 +143,9 @@ export function createEditor(opts: EditorOptions): Editor {
       // no configuration here.
       SpellcheckExtension,
       MermaidExtension,
+      // P2-6: top-block virtualization. Activates automatically
+      // when the document has more than 200 top-level blocks.
+      VirtualizationExtension,
     ],
     content,
     editorProps: {
