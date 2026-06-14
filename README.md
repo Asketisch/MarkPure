@@ -25,9 +25,10 @@ WYSIWYG Markdown 桌面编辑器。
 | **最近文件** | 自动记录最近打开的文件 |
 | **标签页持久化** | 关闭后恢复上次的标签页状态 |
 | **书签管理** | 添加、编辑、删除书签 |
-| **拼写检查** | 英文拼写检查，提供修正建议 |
+| **拼写检查** | 英文 + macOS CJK（NSSpellChecker；Win/Linux 仅英文） |
 | **Workspace 搜索** | 工作区全文搜索，支持正则和大小写敏感 |
 | **大文档虚拟化** | 顶层块视口虚拟化（>200 块自动启用），`content-visibility: auto` 跳过 off-screen 块的 layout/paint |
+| **完整功能清单** | 见 [docs/FEATURES.md](./docs/FEATURES.md)，含 22+ 项详细说明 |
 
 ## 快速开始
 
@@ -217,6 +218,8 @@ MarkPure/
 
 ## 最近更新
 
+- **多根工作区 (P2-4)** — 工作区支持多根目录，根切换 pill、跨根搜索/书签、Tab 持久化含 root_id；命令 `file.set_active_workspace_root`
+- **文档化整改** — 22+ 项已实现功能从 COMPETITOR_TODO.md 下沉到 [docs/FEATURES.md](./docs/FEATURES.md)，README 与实现状态完全对齐
 - **P1-8 PNG 图片导出** — File ▸ Export ▸ PNG 一键导出当前文档为 PNG 长图，主题跟随编辑器，KaTeX/Mermaid/代码高亮/workspace 图片自动保留。零 Rust 新渲染依赖，复用 `image 0.25` 校验字节流
 - **P2-6 顶层块虚拟化** — 文档 >200 顶层块时自动启用视口虚拟化，浏览器原生 `content-visibility: auto` 跳过 off-screen 块，1k 块文档预期首屏 < 200ms、滚动 FPS > 50
 - **拖拽 bugfix** — 修复文件拖拽相关问题
