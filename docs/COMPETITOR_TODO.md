@@ -17,14 +17,14 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ### 1.2 缺口统计
 
-> 最近更新：2026-06-14 — 22+ 项已实现功能下沉到 [docs/FEATURES.md](./FEATURES.md)，本文档仅含 5 个延期项。剩余 P2-4 多根工作区已实际实现（git b05dbeb，文档滞后已修正）。
+> 最近更新：2026-06-14 — 23+ 项已实现功能下沉到 [docs/FEATURES.md](./FEATURES.md)，本文档仅含 4 个延期项。P0-3 多光标已实现（3 PR 全部落地），P2-4 多根工作区已实际实现（git b05dbeb）。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
-| **P0** | 2 | P0-3 多光标、P0-8 撤销树 延期 |
+| **P0** | 1 | P0-8 撤销树 延期 |
 | **P1** | 0 | P1 全部完成 ✅ |
 | **P2** | 3 | P2-3 列选、P2-7 Vim、P2-9 评论 延期 |
-| **合计** | 5 | 全部为延期项目 |
+| **合计** | 4 | 全部为延期项目 |
 
 ### 1.3 优先级定义
 
@@ -43,25 +43,28 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ## 2. 编辑体验差距（Editing Experience）
 
-### [P0-3] 真正的多光标编辑（Multi-Cursor）
+### [P0-3] 真正的多光标编辑（Multi-Cursor）✅
 
-**优先级**：P0 &nbsp;·&nbsp; **复杂度**：XL
+**状态**：✅ 已实现（2026-06-14，3 个 PR 全部落地）。核心 plugin 7 文件 + Alt+Click / Cmd+D / Cmd+Shift+L / Cmd+U / Esc / 输入 fan-out / Backspace-Delete fan-out / 单行粘贴 fan-out + StatusBar 指示器 + 4 处键位注册 + 4 条 i18n key（en/zh-CN/ja）+ 15/15 单元测试通过。详见 [docs/FEATURES.md#19-真正多光标编辑-multi-cursor-vscode-风格--p0-3-2026-06-14](./FEATURES.md)、`frontend/src/plugins/multi-cursor/` 和 `scripts/validate-multi-cursor.ts`。
 
-**背景**：
-VSCode 风格的 Alt+Click 多光标、Cmd+D 选下个匹配并多光标编辑是程序员核心诉求。MarkText 已实现。MarkPure 当前 Alt+Click 实际是单光标替换（源码注释承认）。
+**优先级**：P0 &nbsp;·&nbsp; **复杂度**：XL（已实现）
 
-**现状**：
-- `frontend/src/plugins/multi-cursor.ts:1` 注释明确写：
+**背景**（历史）：
+VSCode 风格的 Alt+Click 多光标、Cmd+D 选下个匹配并多光标编辑是程序员核心诉求。MarkText 已实现。MarkPure 原 Alt+Click 实际是单光标替换（源码注释承认）。
+
+**原状**（已修复）：
+- 原 `frontend/src/plugins/multi-cursor.ts:1` 注释明确写：
   > "Alt+Click places a single cursor (not true multi-cursor despite the name)"
 - `MultiCursorExtension` 包装同上
 - `SelectSameWordExtension` (Mod-d) 仅"选下个匹配"，**不是多光标编辑**
 
-**实现要点**：
-- 引入 `prosemirror-changeset` 或社区维护的 `prosemirror-multicursor`
-- 用 `Decoration` 标记次光标位置
-- 自定义 transaction 处理多选区输入
-- 配合 `SelectSameWordExtension` 形成"选下个匹配即添加光标"
-- **大量测试**（边界条件：行尾、表格内、代码块内、IME 组合中等）
+**实现路径**（已选）：
+- **自研**（不引入 `prosemirror-multicursor`：该社区包最后发布 2020 年，与 Tiptap 3.22/PM 17 不兼容）
+- 主光标在 `state.selection`，次光标列表在 Plugin state（**不**自建 `Selection` 子类）
+- 次光标走 `Decoration.widget` 绘制（1px 竖线 + 闪烁动画）
+- 输入 / Backspace / Delete / 单行粘贴走 `handleTextInput` + fan-out
+- 边界：表格 cell / CodeBlock / 只读视图 / IME / 64 上限 / dedup 全部处理
+- **测试**：`npx tsx scripts/validate-multi-cursor.ts` 15/15 通过
 
 **参考实现**：
 - `prosemirror-multicursor` (npm，社区方案)
@@ -72,7 +75,7 @@ VSCode 风格的 Alt+Click 多光标、Cmd+D 选下个匹配并多光标编辑�
 
 ### [P2-3] 列选择 / 块选择（Column Selection）
 
-**状态**：⏸️ 延期（需要 prosemirror-column-selecting 依赖或自研多光标扩展）
+**状态**：⏸️ 延期（多光标基础已就位 P0-3 ✅，列选还需要 Alt+Drag 选区建模；可基于现有 `multi-cursor/` 扩展）
 
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：L
 

@@ -66,6 +66,22 @@ QuickSwitcher `Cmd+P` 模态补全文件；Wiki 链接 `[[` 触发 suggestion，
 - **关键文件**：`frontend/src/extensions/blocks/footnote-extension.ts`、`backend/crates/markdown/src/pandoc.rs`
 - **触发方式**：命令面板 `insert.footnote_ref` / quick-insert「Footnote Reference」项
 
+### 1.9 真正多光标编辑（Multi-Cursor，VSCode 风格）— P0-3（2026-06-14）✅
+
+自研多光标 plugin（无 `prosemirror-multicursor` 社区包依赖）。主光标保留在 PM 标准 `state.selection`，次光标列表存在 Plugin state；次光标走 `Decoration.widget` 绘制（1px 竖线 + 1s 闪烁），range 选区走 `Decoration.inline`。输入字符 / Backspace / Delete / 单行粘贴全部 fan-out 到所有光标（从后往前避免位置漂移）。边界：表格 cell / CodeBlock / 只读视图 / IME 组合中 / 同一位置重复 / 64 上限 全部处理。多光标不进 undo 栈（transient 模式），`prosemirror-history` 透明处理输入产生的 doc 变化。
+
+- **关键文件**：`frontend/src/plugins/multi-cursor/`（7 文件：`types` / `state` / `find-occurrence` / `decorations` / `input-handler` / `commands` / `index`）、`frontend/src/editor/editor.ts:40-86`（Tiptap `addCommands` 包装）、`frontend/src/extensions/editing/select-same-word-extension.ts`（Mod-d / Mod-Shift-L 集成）
+- **触发方式**：
+  - `Alt + 点击` 添加次光标
+  - `Alt + Shift + 点击` 添加 range 次光标
+  - `Cmd/Ctrl + D` 选下个匹配并加入多光标
+  - `Cmd/Ctrl + Shift + L` 全选所有匹配加入多光标
+  - `Cmd/Ctrl + U` 撤销最后一次光标添加
+  - `Esc` 清空所有次光标（保留主光标）
+- **状态栏**：右下角显示「多光标 (N)」（`status.multi_cursor` i18n key，3 语言均已翻译）
+- **验证**：`npx tsx scripts/validate-multi-cursor.ts` 15/15 通过；CSS 6 主题独立色值
+- **参考**：VSCode 多光标、MarkText Alt+Click
+
 ---
 
 ## 2. 文档与工作区
@@ -260,6 +276,7 @@ JSON 格式主题存储在 `~/.config/markpure/themes/`；通过 `backend/crates
 | 2026-06-13 | P1-8 | PNG 图片导出 |
 | 2026-06-13 | P2-6 | 大文档虚拟化 |
 | 实际合并 | P2-4 | 多根工作区（git b05dbeb，文档滞后） |
+| 2026-06-14 | P0-3 | 真正多光标编辑（VSCode 风格）：7 文件 plugin + 4 处键位 + 4 条 i18n + 15/15 测试 |
 
 ---
 

@@ -1363,3 +1363,47 @@ html, body, #app {
     display: none;
   }
 }
+
+/* P0-3: Multi-cursor secondary cursors.
+ *
+ * Each secondary cursor is a 1px-wide widget rendered by the
+ * multi-cursor plugin. The class `mc-blink-on` / `mc-blink-off`
+ * is toggled by the plugin once a second to produce the
+ * blinking effect (we can't rely on a pure CSS animation
+ * because ProseMirror re-uses the widget DOM node across
+ * re-renders).
+ *
+ * Range cursors (Cmd+D or Alt+Shift+Click) get an additional
+ * `mc-range` inline class on the span to highlight the
+ * selected range, not just the caret.
+ */
+.ProseMirror .mc-cursor {
+  display: inline-block;
+  width: 1px;
+  background: var(--mc-cursor-color, #e51400);
+  pointer-events: none;
+  vertical-align: text-bottom;
+  height: 1.2em;
+  margin: 0 -1px;
+}
+.ProseMirror .mc-cursor.mc-blink-on {
+  opacity: 1;
+}
+.ProseMirror .mc-cursor.mc-blink-off {
+  opacity: 0;
+}
+.ProseMirror .mc-range {
+  background: var(--mc-range-bg, rgba(229, 20, 0, 0.15));
+}
+
+/* P0-3: Per-theme multi-cursor colors. The default
+ * (--mc-cursor-color: #e51400) lives in the .mc-cursor rule
+ * above; the overrides below tune the cursor and range
+ * background for each built-in theme.
+ */
+.theme-dark { --mc-cursor-color: #f48771; --mc-range-bg: rgba(244, 135, 113, 0.18); }
+.theme-one-dark { --mc-cursor-color: #e5c07b; --mc-range-bg: rgba(229, 192, 123, 0.18); }
+.theme-graphite { --mc-cursor-color: #ff8a65; --mc-range-bg: rgba(255, 138, 101, 0.15); }
+.theme-ulysses { --mc-cursor-color: #b8860b; --mc-range-bg: rgba(184, 134, 11, 0.15); }
+.theme-material-dark { --mc-cursor-color: #82b1ff; --mc-range-bg: rgba(130, 177, 255, 0.18); }
+.theme-blue-topaz { --mc-cursor-color: #ffca28; --mc-range-bg: rgba(255, 202, 40, 0.18); }

@@ -62,6 +62,13 @@ export const commandCatalog: CommandDef[] = [
   { id: 'edit.copy_as_markdown', titleKey: 'cmd.edit.copy_as_markdown', categoryKey: 'menu.edit', keywords: ['clipboard', 'paste'] },
   { id: 'edit.copy_as_html', titleKey: 'cmd.edit.copy_as_html', categoryKey: 'menu.edit', keywords: ['clipboard', 'paste', 'rich'] },
   { id: 'edit.copy_as_plain', titleKey: 'cmd.edit.copy_as_plain', categoryKey: 'menu.edit', keywords: ['clipboard', 'paste', 'text'] },
+  // P0-3: multi-cursor commands. Surfaced in the palette so
+  // the user can invoke them via search ("multi cursor",
+  // "all matches", etc.) even before the keymap is set up.
+  { id: 'edit.select_next_match', titleKey: 'cmd.edit.select_next_match', categoryKey: 'menu.edit', keywords: ['multicursor', 'occurrence', 'cmd-d', 'duplicate'] },
+  { id: 'edit.select_all_matches', titleKey: 'cmd.edit.select_all_matches', categoryKey: 'menu.edit', keywords: ['multicursor', 'all', 'cmd-shift-l', 'rename'] },
+  { id: 'edit.undo_last_cursor', titleKey: 'cmd.edit.undo_last_cursor', categoryKey: 'menu.edit', keywords: ['multicursor', 'undo', 'cmd-u'] },
+  { id: 'edit.clear_multi_cursor', titleKey: 'cmd.edit.clear_multi_cursor', categoryKey: 'menu.edit', keywords: ['multicursor', 'clear', 'escape', 'esc'] },
   { id: 'format.superscript', titleKey: 'toolbar.superscript', categoryKey: 'cmd.category.format', keywords: ['sup', 'exponent', 'power'] },
   { id: 'format.subscript', titleKey: 'toolbar.subscript', categoryKey: 'cmd.category.format', keywords: ['sub', 'index', 'chemical'] },
   { id: 'block.move_up', titleKey: 'cmd.block.move_up', categoryKey: 'cmd.category.block', keywords: ['reorder', 'drag', 'organize'] },

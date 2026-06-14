@@ -24,7 +24,13 @@ import { InstantRenderExtension } from '../extensions/view/instant-render-extens
 import { QuickInsertExtension } from '../extensions/blocks/quick-insert-extension'
 import { DropHandlerExtension } from '../extensions/blocks/drop-handler-extension'
 import { SelectSameWordExtension } from '../extensions/editing/select-same-word-extension'
-import { createMultiCursorPlugin } from '../plugins/multi-cursor'
+import {
+  createMultiCursorPlugin,
+  clearMultiCursors,
+  undoLastCursor,
+  selectNextMatch,
+  selectAllMatches,
+} from '../plugins/multi-cursor'
 import { PasteHandlerExtension } from '../extensions/blocks/paste-handler-extension'
 import { AutoCloseExtension } from '../extensions/editing/auto-close-extension'
 import { WikiLinkExtension } from '../extensions/editing/wikilink-extension'
@@ -36,12 +42,34 @@ import { SpellcheckExtension } from '../extensions/editing/spellcheck-extension'
 import { MermaidExtension } from '../nodeviews/mermaid-view'
 import { VirtualizationExtension } from '../extensions/view/virtualization-extension'
 
-// Extension to wrap multi-cursor plugin
+// Extension to wrap multi-cursor plugin. Exposes the
+// multi-cursor commands (selectNextMatch / selectAllMatches /
+// undoLastCursor / clearMultiCursors) to the Tiptap command
+// system so other extensions — most notably
+// `SelectSameWordExtension` — can call them via
+// `editor.commands.selectNextMatch()`.
 const MultiCursorExtension = Extension.create({
   name: 'multiCursor',
 
   addProseMirrorPlugins() {
     return [createMultiCursorPlugin()]
+  },
+
+  addCommands() {
+    // The Tiptap `addCommands` type expects
+    // `Partial<RawCommands>`, which is a closed registry of
+    // built-in commands. We bypass that with `as any` — the
+    // same pattern the codebase already uses for the
+    // block.move_up / moveBlockDown commands (see
+    // App.svelte:221-222). Callers reach the commands via
+    // `editor.commands.selectNextMatch()` (typed as the
+    // extension's own contract, not Tiptap's).
+    return {
+      selectNextMatch: () => ({ view }: { view: import('@tiptap/pm/view').EditorView }) => selectNextMatch(view),
+      selectAllMatches: () => ({ view }: { view: import('@tiptap/pm/view').EditorView }) => selectAllMatches(view),
+      undoLastCursor: () => ({ view }: { view: import('@tiptap/pm/view').EditorView }) => undoLastCursor(view),
+      clearMultiCursor: () => ({ view }: { view: import('@tiptap/pm/view').EditorView }) => clearMultiCursors(view),
+    } as unknown as Record<string, () => boolean>
   },
 })
 
@@ -152,11 +180,27 @@ export function createEditor(opts: EditorOptions): Editor {
       attributes: {
         class: 'prose-editor',
       },
-      handleKeyDown: (_view, event) => {
+      handleKeyDown: (view, event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+          // P0-3: also clear any active multi-cursor state on save.
+          clearMultiCursors(view)
           event.preventDefault()
           onSave?.()
           return true
+        }
+        // P0-3 multi-cursor: Mod-u undoes the last cursor add.
+        if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key === 'u') {
+          if (undoLastCursor(view)) {
+            event.preventDefault()
+            return true
+          }
+        }
+        // P0-3 multi-cursor: Escape clears all secondary cursors.
+        if (event.key === 'Escape') {
+          if (clearMultiCursors(view)) {
+            event.preventDefault()
+            return true
+          }
         }
         return false
       },

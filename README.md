@@ -10,6 +10,7 @@ WYSIWYG Markdown 桌面编辑器。
 |------|------|
 | **所见即所得** | WYSIWYG Markdown 编辑体验 |
 | **即时渲染** | Typora 风格，光标附近显示 Markdown 语法标记，远离时隐藏 |
+| **多光标编辑** | VSCode 风格：Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/粘贴自动 fan-out |
 | **多标签页** | 同时打开多个文档，支持脏状态追踪 |
 | **文件树管理** | 打开文件夹作为工作区，浏览、搜索、创建、重命名、删除文件 |
 | **文档大纲** | 直接从 ProseMirror 文档模型提取标题（零 IPC 开销） |
@@ -28,7 +29,7 @@ WYSIWYG Markdown 桌面编辑器。
 | **拼写检查** | 英文 + macOS CJK（NSSpellChecker；Win/Linux 仅英文） |
 | **Workspace 搜索** | 工作区全文搜索，支持正则和大小写敏感 |
 | **大文档虚拟化** | 顶层块视口虚拟化（>200 块自动启用），`content-visibility: auto` 跳过 off-screen 块的 layout/paint |
-| **完整功能清单** | 见 [docs/FEATURES.md](./docs/FEATURES.md)，含 22+ 项详细说明 |
+| **完整功能清单** | 见 [docs/FEATURES.md](./docs/FEATURES.md)，含 23+ 项详细说明 |
 
 ## 快速开始
 
@@ -126,7 +127,7 @@ MarkPure/
 │       │   ├── quick-insert/    # 快速插入
 │       │   └── outline/        # 大纲面板
 │       ├── extensions/         # Tiptap 扩展（17 个，含 P2-6 虚拟化）
-│       ├── plugins/            # ProseMirror 插件（5+ 个，含 P2-6 virtualization/）
+│       ├── plugins/            # ProseMirror 插件（5+ 个，含 P2-6 virtualization/、P0-3 multi-cursor/）
 │       ├── nodeviews/          # ProseMirror NodeView（代码块）
 │       ├── stores/             # Svelte 5 runes 状态管理
 │       └── i18n/               # 国际化
@@ -216,10 +217,24 @@ MarkPure/
 | `Backspace`（空代码块） | 删除代码块 |
 | `Alt + 点击` | 添加光标 |
 
+### 多光标编辑
+
+| 快捷键 | 操作 |
+|--------|------|
+| `Alt + 点击` | 添加次光标 |
+| `Alt + Shift + 点击` | 添加 range 次光标（按主光标位置作 anchor） |
+| `Cmd/Ctrl + D` | 选下个匹配并加入多光标 |
+| `Cmd/Ctrl + Shift + L` | 全选所有匹配加入多光标 |
+| `Cmd/Ctrl + U` | 撤销最后一次光标添加 |
+| `Esc` | 清空所有次光标（保留主光标） |
+
+> 多光标状态下输入字符、Backspace、Delete、单行粘贴会自动 fan-out 到所有光标位置。表格 cell / CodeBlock / 只读视图不响应 Alt+Click。状态栏右下角显示「多光标 (N)」指示器。
+
 ## 最近更新
 
+- **P0-3 真正多光标编辑（VSCode 风格）** — 自研多光标 plugin 7 文件落地（`frontend/src/plugins/multi-cursor/`）。Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/单行粘贴自动 fan-out；状态栏显示「多光标 (N)」；4 处键位注册 + 4 条 i18n key（en/zh-CN/ja）；15/15 单元测试通过。详见 [docs/FEATURES.md#19-真正多光标编辑-multi-cursor-vscode-风格--p0-3-2026-06-14](./docs/FEATURES.md)
 - **多根工作区 (P2-4)** — 工作区支持多根目录，根切换 pill、跨根搜索/书签、Tab 持久化含 root_id；命令 `file.set_active_workspace_root`
-- **文档化整改** — 22+ 项已实现功能从 COMPETITOR_TODO.md 下沉到 [docs/FEATURES.md](./docs/FEATURES.md)，README 与实现状态完全对齐
+- **文档化整改** — 23+ 项已实现功能从 COMPETITOR_TODO.md 下沉到 [docs/FEATURES.md](./docs/FEATURES.md)，README 与实现状态完全对齐
 - **P1-8 PNG 图片导出** — File ▸ Export ▸ PNG 一键导出当前文档为 PNG 长图，主题跟随编辑器，KaTeX/Mermaid/代码高亮/workspace 图片自动保留。零 Rust 新渲染依赖，复用 `image 0.25` 校验字节流
 - **P2-6 顶层块虚拟化** — 文档 >200 顶层块时自动启用视口虚拟化，浏览器原生 `content-visibility: auto` 跳过 off-screen 块，1k 块文档预期首屏 < 200ms、滚动 FPS > 50
 - **拖拽 bugfix** — 修复文件拖拽相关问题

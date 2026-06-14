@@ -18,9 +18,13 @@
   let {
     stats,
     saving,
+    multiCursorCount = 0,
   }: {
     stats: DocStats
     saving: boolean
+    /** Number of secondary cursors (P0-3 multi-cursor).
+     *  When > 0 the editor is in multi-cursor mode. */
+    multiCursorCount?: number
   } = $props()
 
   const i18n = useI18n()
@@ -30,6 +34,11 @@
   <span>{stats.lines} {i18n.t('status.lines')}</span>
   <span>{stats.words} {i18n.t('status.words')}</span>
   <span>{stats.characters} {i18n.t('status.chars')}</span>
+  {#if multiCursorCount > 0}
+    <span class="multi-cursor" title="Multi-cursor mode (Esc to exit)">
+      {i18n.t('status.multi_cursor')} ({multiCursorCount})
+    </span>
+  {/if}
   {#if saving}
     <span class="saving">{i18n.t('status.saving')}</span>
   {/if}
@@ -44,6 +53,10 @@
     border-top: 1px solid var(--border);
     color: var(--text-secondary);
     font-size: 11px;
+  }
+  .multi-cursor {
+    color: var(--mc-cursor-color, #e51400);
+    font-weight: 600;
   }
   .saving {
     margin-left: auto;

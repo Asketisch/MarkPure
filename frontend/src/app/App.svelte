@@ -31,6 +31,7 @@
   import type { DocStats, AppConfig, FileChangeEvent, FileInfo } from '$lib/editor/commands'
   import type { Editor } from '@tiptap/core'
   import { TextSelection } from '@tiptap/pm/state'
+  import { multiCursorPluginKey } from '$lib/plugins/multi-cursor'
   import SideBar from '$lib/components/layout/SideBar.svelte'
   import StatusBar from '$lib/components/layout/StatusBar.svelte'
   import MenuBar from '$lib/components/layout/MenuBar.svelte'
@@ -92,6 +93,10 @@
   let activeTabId = $state<number | null>(null)
   let nextId = $state(1)
   let stats = $state<DocStats>({ words: 0, characters: 0, lines: 0 })
+  // P0-3: number of secondary cursors in the active editor.
+  // 0 ⇔ single-cursor mode (default). Updated by the
+  // $effect below whenever the editor view's state changes.
+  let multiCursorCount = $state(0)
   let theme = $state<string>('')
   let editorContainer: HTMLElement
   let editor: Editor | null = null
@@ -216,6 +221,13 @@
       case 'edit.copy_as_markdown': return () => { void handleCopyAs('markdown') }
       case 'edit.copy_as_html': return () => { void handleCopyAs('html') }
       case 'edit.copy_as_plain': return () => { void handleCopyAs('plain') }
+      // P0-3: multi-cursor commands. The underlying logic
+      // lives in the multi-cursor plugin; we just route
+      // command-palette invocations to the Tiptap command.
+      case 'edit.select_next_match': return () => { (editor as any)?.chain().focus().selectNextMatch().run() }
+      case 'edit.select_all_matches': return () => { (editor as any)?.chain().focus().selectAllMatches().run() }
+      case 'edit.undo_last_cursor': return () => { (editor as any)?.chain().focus().undoLastCursor().run() }
+      case 'edit.clear_multi_cursor': return () => { (editor as any)?.chain().focus().clearMultiCursor().run() }
       case 'format.superscript': return () => { editor?.chain().focus().toggleMark('superscript').run() }
       case 'format.subscript': return () => { editor?.chain().focus().toggleMark('subscript').run() }
       case 'block.move_up': return () => { (editor as any)?.commands.moveBlockUp?.() }
@@ -649,6 +661,20 @@
     // that's live at unmount.
     editor.on('selectionUpdate', updateTableState)
     updateTableState()
+
+    // P0-3: subscribe to the multi-cursor plugin state so the
+    // status bar can show the secondary-cursor count. We attach
+    // a Tiptap 'transaction' listener (fires on every doc or
+    // selection change) and read the plugin state.
+    const onTransaction = () => {
+      const state = multiCursorPluginKey.getState(editor!.state) as
+        | { count: number }
+        | undefined
+      multiCursorCount = state?.count ?? 0
+    }
+    editor.on('transaction', onTransaction)
+    onTransaction() // seed initial value
+    ;(editor as unknown as { __onMcTransaction?: () => void }).__onMcTransaction = onTransaction
   }
 
   function switchTab(id: number, force: boolean = false) {
@@ -1885,6 +1911,10 @@
       window.removeEventListener('quick-insert-exit', handleQIExit)
       window.removeEventListener('quick-insert-select', handleQISelect)
       editor?.off('selectionUpdate', updateTableState)
+      // P0-3: detach the multi-cursor status listener we
+      // attached in initEditor.
+      const mcListener = (editor as unknown as { __onMcTransaction?: () => void } | null)?.__onMcTransaction
+      if (mcListener) editor?.off('transaction', mcListener)
       editor?.destroy()
     }
   })
@@ -2195,7 +2225,7 @@
 
       <!-- Status Bar -->
       {#if !zenMode}
-      <StatusBar {stats} {saving} />
+      <StatusBar {stats} {saving} {multiCursorCount} />
       {/if}
       {/if}
 

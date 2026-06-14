@@ -71,6 +71,30 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
             label: "Find and Replace".into(),
             accelerator: Some("CmdOrCtrl+H".into()),
         },
+        // P0-3: multi-cursor bindings. Mod-d is the
+        // VSCode-style "select next occurrence" / Cmd+L
+        // adds all matches. Cmd+U undoes the last cursor
+        // add. Escape clears all secondary cursors.
+        KeyBinding {
+            id: "edit.select_next_match".into(),
+            label: "Select Next Match".into(),
+            accelerator: Some("CmdOrCtrl+D".into()),
+        },
+        KeyBinding {
+            id: "edit.select_all_matches".into(),
+            label: "Select All Matches".into(),
+            accelerator: Some("CmdOrCtrl+Shift+L".into()),
+        },
+        KeyBinding {
+            id: "edit.undo_last_cursor".into(),
+            label: "Undo Last Cursor".into(),
+            accelerator: Some("CmdOrCtrl+U".into()),
+        },
+        KeyBinding {
+            id: "edit.clear_multi_cursor".into(),
+            label: "Clear Multi-Cursor".into(),
+            accelerator: Some("Escape".into()),
+        },
         // View operations
         KeyBinding {
             id: "view.toggle_sidebar".into(),
