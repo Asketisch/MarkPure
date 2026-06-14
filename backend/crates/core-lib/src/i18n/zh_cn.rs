@@ -18,6 +18,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("menu.export_html", "导出 HTML"),
     ("menu.export_pdf", "导出 PDF"),
     ("menu.export_word", "导出 Word"),
+    // P1-8: PNG 图片导出（社交分享/博客长图场景）。
+    ("menu.export_png", "导出 PNG"),
     ("menu.search", "搜索"),
     ("menu.settings", "设置"),
     ("action.new_tab", "新建标签"),

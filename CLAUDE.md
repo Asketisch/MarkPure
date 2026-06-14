@@ -13,6 +13,7 @@ WYSIWYG Markdown 桌面编辑器，使用 Rust (wry + tao) + Svelte 5 + Tiptap �
 | UI 事件触发 | Markdown 解析和大纲提取 |
 | 定时器（自动保存防抖） | 工作区全文搜索 |
 | 键盘快捷键分发 | HTML/PDF/Word 导出 |
+| 离屏 DOM 快照 | PNG 导出（前端 html-to-image + 后端 image 校验） |
 | — | 主题管理 |
 | — | 拼写检查 |
 | — | 书签 CRUD |
@@ -24,7 +25,7 @@ WYSIWYG Markdown 桌面编辑器，使用 Rust (wry + tao) + Svelte 5 + Tiptap �
 - ❌ 前端计算字数统计 → ✅ 调用 `doc_get_stats` IPC
 - ❌ 前端解析 Markdown 提取大纲 → ✅ 调用 `get_outline` IPC
 - ❌ 前端搜索文档内容 → ✅ 调用 `doc_search` IPC
-- ❌ 前端实现导出逻辑 → ✅ 调用 `export_html/pdf/word` IPC
+- ❌ 前端实现导出逻辑 → ✅ 调用 `export_html/pdf/word/png` IPC
 
 **例外**：大纲提取（`Outline.svelte`）可直接从 ProseMirror 节点提取，因为这是纯本地渲染逻辑，不需要后端参与。
 
@@ -109,7 +110,7 @@ markpure/
 │       ├── core/           # Document (ropey+regex)、AppConfig、TabState、ThemeId、i18n、keymap
 │       ├── fs/             # 异步文件 I/O + 编码检测 + 目录扫描 + 文件监视
 │       ├── markdown/       # Markdown 解析 + HTML 转换 + 标题提取 + Wiki 链接提取 + Tags 提取
-│       ├── export/         # HTML/PDF/Word 导出
+│       ├── export/         # HTML/PDF/Word/PNG 导出
 │       ├── search/         # 工作区全文搜索（walkdir + regex）
 │       ├── bookmark/       # 书签 CRUD（JSON 持久化）
 │       ├── assets/         # 图片粘贴处理（本地/base64/远程上传）、SSRF 防护
@@ -138,6 +139,9 @@ markpure/
 | 编码检测 | chardetng + encoding_rs | — |
 | PDF 导出 | printpdf | 0.7 |
 | Word 导出 | docx-rs + zip | 0.4 + 2.x |
+| PNG 导出（前端）| html-to-image | ^1.11 |
+| PNG 字节校验（后端）| image | 0.25 |
+| base64 传输 | base64 | 0.22 |
 | 目录遍历 | walkdir | 2.x |
 | HTTP 客户端 | ureq | 3.x |
 | 序列化 | serde + serde_json | — |
@@ -251,9 +255,10 @@ cargo test --workspace         # 运行所有 Rust 测试（9 个测试，分布
 ### 导出
 | 命令 | 参数 | 返回值 |
 |------|------|--------|
-| `export_html` | `{ content, title }` | `{ path }` |
-| `export_pdf` | `{ content, title }` | `{ path }` |
+| `export_html` | `{ content, title, theme_css? }` | `{ path }` |
+| `export_pdf` | `{ content, title, source_path? }` | `{ path }` |
 | `export_word` | `{ content, title }` | `{ path }` |
+| `export_png` | `{ bytes_b64, title }` | `{ path }` |
 
 ### 文件监视
 | 命令 | 参数 | 返回值 |
@@ -393,6 +398,7 @@ CSS 变量还包括编辑器字体：`--editor-font-family`（默认系统字体
 - `mt-core::Document` 内部存储 LF 行尾，读写时自动转换
 - 词数统计支持 CJK：每个 CJK 字符（U+2E80 以上）计为一个词
 - PDF 导出硬编码 macOS 字体路径（Helvetica），Windows 用 Arial，Linux 用 DejaVu/Liberation
+- PNG 导出走「前端 DOM 快照 → base64 → Rust 写盘」路径，依赖编辑器实例存在；KaTeX/Mermaid/CM6 高亮/worskpace 图片自动通过 DOM 继承
 - 表格使用 `resizable: true`，需要 `.tableWrapper`、`.selectedCell`、`.column-resize-handle` CSS 样式配合
 - 拼写检查目前仅支持英文（内置词典 `dict_en.txt`），中日韩文本自动跳过
 - 编码检测使用 `chardetng`，支持 UTF-8、GBK、Shift_JIS、Big5 等编码，写回时保留原始编码

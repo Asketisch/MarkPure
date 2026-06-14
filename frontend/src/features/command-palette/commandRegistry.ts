@@ -46,6 +46,9 @@ export const commandCatalog: CommandDef[] = [
   { id: 'file.export_html', titleKey: 'menu.export_html', categoryKey: 'menu.file' },
   { id: 'file.export_pdf', titleKey: 'menu.export_pdf', categoryKey: 'menu.file' },
   { id: 'file.export_word', titleKey: 'menu.export_word', categoryKey: 'menu.file' },
+  // P1-8: PNG export. Sits alongside the other file-export
+  // commands so the command palette stays grouped.
+  { id: 'file.export_png', titleKey: 'menu.export_png', categoryKey: 'menu.file', keywords: ['image', 'picture', 'snapshot', 'social'] },
 
   // Search — P2-4: cross-root variant runs against every root.
   { id: 'search.workspace_all_roots', titleKey: 'cmd.search.workspace_all_roots', categoryKey: 'menu.search', keywords: ['cross-root', 'multi-root', 'all'] },

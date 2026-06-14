@@ -15,8 +15,17 @@ import type { SearchMatch, WorkspaceSearchResult } from './types'
 export async function exportHtml(
   content: string,
   title: string,
+  themeCss?: string | null,
 ): Promise<{ path: string }> {
-  return await ipc('export_html', { content, title })
+  return await ipc('export_html', {
+    content,
+    title,
+    // P1-8: pass through the active editor theme so the
+    // standalone HTML mirrors the live palette. Older callers
+    // (or callers that don't import `pngExport`) pass nothing
+    // and the Rust side falls back to the built-in light CSS.
+    theme_css: themeCss ?? null,
+  })
 }
 
 export async function exportPdf(
@@ -32,6 +41,21 @@ export async function exportWord(
   title: string,
 ): Promise<{ path: string }> {
   return await ipc('export_word', { content, title })
+}
+
+/**
+ * P1-8: persist a PNG byte stream that the caller has already
+ * rasterised. The frontend pipeline (see `commands/pngExport.ts`)
+ * renders the document into a hidden DOM node via `html-to-image`,
+ * then sends the resulting `data:image/png;base64,…` URL through
+ * this wrapper. The Rust host validates the bytes and writes them
+ * to a user-chosen path.
+ */
+export async function exportPng(
+  dataUrl: string,
+  title: string,
+): Promise<{ path: string }> {
+  return await ipc('export_png', { bytes_b64: dataUrl, title })
 }
 
 // ============================== Workspace search ==============================

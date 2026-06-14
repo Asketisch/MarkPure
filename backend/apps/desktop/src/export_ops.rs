@@ -9,6 +9,7 @@
 
 use super::file_ops::ensure_path_in_workspace;
 use super::state::AppState;
+use base64::Engine;
 use rfd::FileDialog;
 use std::path::PathBuf;
 
@@ -22,8 +23,14 @@ pub fn cmd_export_html(params: &serde_json::Value) -> std::result::Result<serde_
         .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("Untitled");
+    // P1-8: optional inline theme CSS. When the caller supplies
+    // a `:root { … }` block of CSS variables it overrides the
+    // built-in `DEFAULT_CSS` palette so the standalone HTML
+    // matches the live editor theme. Older callers omit the
+    // field entirely and get the light-fallback styling.
+    let theme_css = params.get("theme_css").and_then(|v| v.as_str());
 
-    let html = export::export_html(content, title, None);
+    let html = export::export_html(content, title, theme_css);
 
     let path = FileDialog::new()
         .add_filter("HTML", &["html"])
@@ -84,6 +91,49 @@ pub fn cmd_export_word(params: &serde_json::Value) -> std::result::Result<serde_
     std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({ "path": path.to_string_lossy() }))
+}
+
+/// P1-8: persist a PNG byte stream produced by the frontend's
+/// `html-to-image` snapshot. The frontend owns pixel generation
+/// (so KaTeX / Mermaid / code-highlight / theme are rendered with
+/// the same fidelity as the editor); we just decode the base64
+/// transport, validate the bytes, and write to disk.
+///
+/// `params.bytes_b64` is the standard base64 of a PNG file
+/// (alpha-format `data:image/png;base64,…` is also accepted —
+/// the leading `data:` prefix is stripped before decoding so the
+/// frontend can pass back whatever `html-to-image` gives it).
+/// `params.title` is used as the default filename.
+pub fn cmd_export_png(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
+    let bytes_b64 = params["bytes_b64"]
+        .as_str()
+        .ok_or("Missing 'bytes_b64' parameter")?;
+    let title = params
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Untitled");
+
+    // Strip an optional `data:image/png;base64,` prefix so the
+    // frontend can hand us either form directly.
+    let payload = bytes_b64
+        .strip_prefix("data:image/png;base64,")
+        .unwrap_or(bytes_b64);
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(payload)
+        .map_err(|e| format!("base64 decode failed: {e}"))?;
+
+    let path = FileDialog::new()
+        .add_filter("PNG Image", &["png"])
+        .set_file_name(&format!("{}.png", title))
+        .set_title("Export PNG Image")
+        .save_file()
+        .ok_or_else(|| "Cancelled".to_string())?;
+
+    let path_str = path.to_string_lossy().into_owned();
+    export::export_png_save(&bytes, &path_str)?;
+
+    Ok(serde_json::json!({ "path": path_str }))
 }
 
 // ============================== Workspace search ==============================

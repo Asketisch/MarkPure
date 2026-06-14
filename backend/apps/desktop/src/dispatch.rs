@@ -74,7 +74,7 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
         "set_expanded_dirs" => workspace_ops::cmd_set_expanded_dirs(&msg.params, state),
 
         // Export → slow (I/O + rendering)
-        "export_html" | "export_pdf" | "export_word" => return None,
+        "export_html" | "export_pdf" | "export_word" | "export_png" => return None,
 
         // Search → slow (walkdir over workspace)
         "search_workspace" => return None,
@@ -245,6 +245,9 @@ fn run_slow_command(
         "export_html" => export_ops::cmd_export_html(&msg.params),
         "export_pdf" => export_ops::cmd_export_pdf(&msg.params),
         "export_word" => export_ops::cmd_export_word(&msg.params),
+        // P1-8: PNG export. The frontend has already rasterised
+        // the document via `html-to-image`; we just persist it.
+        "export_png" => export_ops::cmd_export_png(&msg.params),
 
         // Workspace search
         "search_workspace" => export_ops::cmd_search_workspace(&msg.params),

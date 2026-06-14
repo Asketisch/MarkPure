@@ -18,6 +18,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("menu.export_html", "Export HTML"),
     ("menu.export_pdf", "Export PDF"),
     ("menu.export_word", "Export Word"),
+    // P1-8: PNG image export (social/blog share use case).
+    ("menu.export_png", "Export PNG"),
     ("menu.search", "Search"),
     ("menu.settings", "Settings"),
     ("action.new_tab", "New Tab"),

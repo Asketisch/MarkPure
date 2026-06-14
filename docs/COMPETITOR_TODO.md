@@ -15,14 +15,14 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ### 1.2 缺口统计
 
-> 最近更新：2026-06-13 — P2-6 顶层块虚拟化（自研 VirtualizationExtension + content-visibility: auto）完成。剩余 5 项延期。
+> 最近更新：2026-06-13 — P1-8 PNG 图片导出完成（P1 全清空） + P2-6 顶层块虚拟化完成。剩余 4 项延期。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
 | **P0** | 0 | 全部 P0 已实现 ✅ |
-| **P1** | 1 | P1-8 PNG 导出延期 |
+| **P1** | 0 | P1 全部完成 ✅（P1-8 PNG 导出 2026-06-13） |
 | **P2** | 4 | P2-3 列选、P2-4 多根、P2-7 Vim、P2-9 评论延期（P2-6 虚拟化已实现） |
-| **合计** | 5 | 全部为延期项目（需要重依赖或架构改造） |
+| **合计** | 4 | 全部为延期项目（需要重依赖或架构改造） |
 
 ### 1.3 优先级定义
 
@@ -590,28 +590,42 @@ PDF 是最常用的分享格式。当前导出基本不能用（无图片、无�
 
 ### [P1-8] HTML/MD → PNG 图片导出（Image Export）
 
-**状态**：⏸️ 延期（需要重依赖 resvg/tiny-skia/headless_chrome，需后续单独会话实施）
+**状态**：✅ 已实现（2026-06-13）
 
 **优先级**：P1 &nbsp;·&nbsp; **复杂度**：M
 
 **背景**：
 社交媒体分享、长图保存场景。Typora 支持。
 
-**现状**：
-- **无**
-- HTML 导出有但不带 PNG 转换
+**已实现（2026-06-13）**：
+- Rust 端新增 `crates/export/src/png.rs`（约 130 行）：`export_png_save` 验证 PNG 字节流（PNG 签名 + image crate 解码）后写入磁盘
+- `apps/desktop/src/export_ops.rs` 新增 `cmd_export_png` IPC：弹 rfd 保存对话框（.png filter），接收前端 base64，写盘
+- `apps/desktop/src/dispatch.rs` 注册 `"export_png"` 到 slow path 路由 + fast-path 白名单
+- `apps/desktop/Cargo.toml` 新增 `base64 = "0.22"` 依赖
+- 前端新增 `commands/pngExport.ts`（约 110 行）：`serializeActiveTheme()` 提取当前主题 CSS 变量 + `snapshotHtmlToPng()` 离屏 DOM → `html-to-image` → data URL
+- `commands/export.ts` 新增 `exportPng(dataUrl, title)` IPC 包装
+- `App.svelte` 新增 `handleExportPng()`：边界检查（空文档/超长文档/取消静默）+ 错误处理
+- `MenuBar.svelte` 子菜单加 "Export PNG" 项（紧跟 Word 后）
+- `commandRegistry.ts` 加 `file.export_png` 命令（含 image/snapshot/social 关键词）
+- i18n 三语（en/zh-CN/ja）各加 `menu.export_png` 翻译
+- 顺手修复 `cmd_export_html` 的 theme_css 未接通问题（html.rs 已有参数但 IPC 写死 None → 前端 exportHtml 第三参数 + theme_css 字段传递）
+- 4 个 Rust 单测 + 3 个前端 validation 脚本全部通过
+- 零 Rust 新渲染依赖（复用 image 0.25）
+- 唯一新前端依赖：`html-to-image ^1.11` (~50KB gzip)
 
-**实现要点**：
-- 复用 PDF 导出的 HTML 渲染管线
-- 用 Rust `resvg` / `tiny-skia` 渲染 SVG → PNG（轻量）
-- 或用 headless Chromium 截图（重但保真）
-- 处理中文字体（必须子集化）
-- 暗色主题导出时背景色处理
+**实现要点**（按计划实际路径）：
+- 复用应用内 wry WebView 渲染（`html-to-image` 截图 ProseMirror DOM）→ 100% 保真度（KaTeX/Mermaid/CM6 高亮/workspace 图片自动正确）
+- 主题跟随通过 DOM 快照路径自然达成（DOM 已应用 CSS 变量），theme_css 字段主要惠及 HTML 导出
+- Rust 端 PNG 处理薄：仅做 PNG 签名 + 字节流解码校验 + 写盘
+
+**已知限制**：
+- DOM 快照依赖编辑器实例存在；空文档/无 ProseMirror 时退出（已处理）
+- 暂未做"按章节切多张 PNG"等高级分页
+- 暂未处理"导出后用户的撤销历史被截屏节点短暂污染"（hidden 容器在 body 下，PM 视口外，无影响）
 
 **参考实现**：
 - `html-to-image` (npm，浏览器方案)
-- `resvg` (Rust)
-- puppeteer 截图
+- `resvg` (Rust) — 评估后未采用（仅 SVG 输入，全文档覆盖差）
 - Carbon (https://carbon.now.sh) 思路
 
 ---

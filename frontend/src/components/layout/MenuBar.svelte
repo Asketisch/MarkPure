@@ -23,6 +23,7 @@
     onExportHtml,
     onExportPdf,
     onExportWord,
+    onExportPng,
     onUndo,
     onRedo,
     onFind,
@@ -45,6 +46,9 @@
     onExportHtml: () => void
     onExportPdf: () => void
     onExportWord: () => void
+    // P1-8: PNG export. Same shape as the other onExport*
+    // handlers so the host wiring stays uniform.
+    onExportPng: () => void
     onUndo: () => void
     onRedo: () => void
     onFind: () => void
@@ -108,6 +112,7 @@
                 <button class="dropdown-item" onclick={() => { onExportHtml(); hideFileMenu() }}>{i18n.t('menu.export_html')}</button>
                 <button class="dropdown-item" onclick={() => { onExportPdf(); hideFileMenu() }}>{i18n.t('menu.export_pdf')}</button>
                 <button class="dropdown-item" onclick={() => { onExportWord(); hideFileMenu() }}>{i18n.t('menu.export_word')}</button>
+                <button class="dropdown-item" onclick={() => { onExportPng(); hideFileMenu() }}>{i18n.t('menu.export_png')}</button>
               </div>
             {/if}
           </div>

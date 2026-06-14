@@ -23,6 +23,9 @@ assets = { path = "../../crates/assets" }
 spellcheck = { path = "../../crates/spellcheck" }
 walkdir = "2"
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+# P1-8: base64 decode the PNG byte stream that the frontend
+# produces via `html-to-image` before writing it to disk.
+base64 = "0.22"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5"

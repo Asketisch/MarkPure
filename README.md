@@ -19,7 +19,7 @@ WYSIWYG Markdown 桌面编辑器。
 | **源码模式** | 切换到 CodeMirror 原始 Markdown 编辑 |
 | **快速插入** | `@` 触发命令面板，快速插入标题、代码块、表格等 |
 | **多主题** | 浅色、VS Code Dark、Atom One Dark 等 6 种主题 |
-| **导出** | 支持导出为 HTML、PDF 和 Word |
+| **导出** | 支持导出为 HTML、PDF、Word 和 PNG（图片） |
 | **CJK 支持** | CJK 字符感知的词数统计 |
 | **自动编码检测** | 支持读取 UTF-8、GBK、Shift_JIS、Big5 等编码的文件 |
 | **最近文件** | 自动记录最近打开的文件 |
@@ -91,9 +91,9 @@ open target/MarkPure.app
 └─────────────────────────────────────────────────────┘
               │
 ┌─────────────┼─────────────┬─────────────┬──────────┐
-│  core-lib   │    fs       │  markdown   │  export  │
-│  文档/配置  │  文件 I/O    │  MD 解析    │ HTML/PDF │
-│  (ropey)    │  编码检测    │ (pulldown)  │  Word    │
+│  core-lib   │    fs       │  markdown   │  export    │
+│  文档/配置  │  文件 I/O    │  MD 解析    │ HTML/PDF   │
+│  (ropey)    │  编码检测    │ (pulldown)  │  Word/PNG  │
 └─────────────┴─────────────┴─────────────┴──────────┘
 ```
 
@@ -136,7 +136,7 @@ MarkPure/
 │       ├── core-lib/           # Document、AppConfig、TabState、Theme、i18n、keymap
 │       ├── fs/                 # 异步文件 I/O + 编码检测 + 目录扫描 + 文件监视
 │       ├── markdown/           # Markdown 解析 + HTML 转换 + 标题提取 + Wiki 链接
-│       ├── export/             # HTML/PDF/Word 导出
+│       ├── export/             # HTML/PDF/Word/PNG 导出
 │       ├── search/             # 工作区全文搜索
 │       ├── bookmark/          # 书签 CRUD
 │       ├── assets/            # 图片粘贴处理 + SSRF 防护
@@ -165,6 +165,7 @@ MarkPure/
 | 编码检测 | chardetng + encoding_rs | — |
 | PDF 导出 | printpdf | 0.7 |
 | Word 导出 | docx-rs + zip | 0.4 + 2.x |
+| PNG 导出 | html-to-image (前端) + image 0.25 (后端校验) | ^1.11 |
 | 前端嵌入 | rust-embed | 8.x |
 
 ## 键盘快捷键
@@ -216,6 +217,7 @@ MarkPure/
 
 ## 最近更新
 
+- **P1-8 PNG 图片导出** — File ▸ Export ▸ PNG 一键导出当前文档为 PNG 长图，主题跟随编辑器，KaTeX/Mermaid/代码高亮/workspace 图片自动保留。零 Rust 新渲染依赖，复用 `image 0.25` 校验字节流
 - **P2-6 顶层块虚拟化** — 文档 >200 顶层块时自动启用视口虚拟化，浏览器原生 `content-visibility: auto` 跳过 off-screen 块，1k 块文档预期首屏 < 200ms、滚动 FPS > 50
 - **拖拽 bugfix** — 修复文件拖拽相关问题
 - **文件重命名/渲染 bug 修复** — 修复文件操作和渲染问题
@@ -241,6 +243,7 @@ cargo test --workspace
 ## 已知限制
 
 - PDF 导出使用硬编码的 macOS 字体路径，跨平台需修复
+- PNG 导出依赖编辑器实例存在（离屏 DOM 快照），空文档/无 ProseMirror 时跳过
 - 部分主题仅有 CSS 实现（完整 6 主题支持进行中）
 
 ## 许可证

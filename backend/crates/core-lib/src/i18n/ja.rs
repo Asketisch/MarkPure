@@ -18,6 +18,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("menu.export_html", "HTML エクスポート"),
     ("menu.export_pdf", "PDF エクスポート"),
     ("menu.export_word", "Word エクスポート"),
+    // P1-8: PNG 画像エクスポート（SNS 共有・ブログ用長画像）。
+    ("menu.export_png", "PNG エクスポート"),
     ("menu.search", "検索"),
     ("menu.settings", "設定"),
     ("action.new_tab", "新しいタブ"),
