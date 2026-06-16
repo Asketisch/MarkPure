@@ -77,6 +77,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("status.chars", "字符"),
     ("status.saving", "保存中..."),
     ("status.multi_cursor", "多光标"),
+    ("status.column_select", "列选"),
     ("tab.untitled", "未命名"),
     ("tab.close_others", "关闭其他"),
     ("tab.close_to_right", "关闭右侧"),
@@ -267,6 +268,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.edit.select_all_matches", "选中所有匹配"),
     ("cmd.edit.undo_last_cursor", "撤销上一次光标"),
     ("cmd.edit.clear_multi_cursor", "退出多光标"),
+    // P2-3: 列选择 (Alt+Drag)
+    ("cmd.edit.add_column_selection", "添加列选择"),
     ("cmd.block.move_up", "上移块"),
     ("cmd.block.move_down", "下移块"),
     ("cmd.image.align_left", "图片左对齐"),

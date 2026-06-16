@@ -19,12 +19,17 @@
     stats,
     saving,
     multiCursorCount = 0,
+    columnMode = false,
   }: {
     stats: DocStats
     saving: boolean
     /** Number of secondary cursors (P0-3 multi-cursor).
      *  When > 0 the editor is in multi-cursor mode. */
     multiCursorCount?: number
+    /** P2-3: true while the user is actively Alt+Dragging a
+     *  column-select rectangle. Drives a small chip next to
+     *  the multi-cursor count so the user knows what's happening. */
+    columnMode?: boolean
   } = $props()
 
   const i18n = useI18n()
@@ -37,6 +42,11 @@
   {#if multiCursorCount > 0}
     <span class="multi-cursor" title="Multi-cursor mode (Esc to exit)">
       {i18n.t('status.multi_cursor')} ({multiCursorCount})
+    </span>
+  {/if}
+  {#if columnMode}
+    <span class="multi-cursor" title="Column select mode (Esc to exit)">
+      {i18n.t('status.column_select')}
     </span>
   {/if}
   {#if saving}

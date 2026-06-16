@@ -1,4 +1,5 @@
 import { Editor, Extension, mergeAttributes } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
 import { Table } from '@tiptap/extension-table'
@@ -26,10 +27,13 @@ import { DropHandlerExtension } from '../extensions/blocks/drop-handler-extensio
 import { SelectSameWordExtension } from '../extensions/editing/select-same-word-extension'
 import {
   createMultiCursorPlugin,
+  createColumnSelectPlugin,
   clearMultiCursors,
   undoLastCursor,
   selectNextMatch,
   selectAllMatches,
+  flattenRectToCursors,
+  multiCursorPluginKey,
 } from '../plugins/multi-cursor'
 import { PasteHandlerExtension } from '../extensions/blocks/paste-handler-extension'
 import { AutoCloseExtension } from '../extensions/editing/auto-close-extension'
@@ -52,7 +56,12 @@ const MultiCursorExtension = Extension.create({
   name: 'multiCursor',
 
   addProseMirrorPlugins() {
-    return [createMultiCursorPlugin()]
+    // P2-3: the column-select plugin MUST come first. Its
+    // Alt+mousedown handler consumes the event so the linear
+    // plugin's handler does not also place a single Alt+Click
+    // cursor at the drag start. Sub-threshold drags fall back
+    // to addCursor() inside the column-select mouseup path.
+    return [createColumnSelectPlugin(), createMultiCursorPlugin()]
   },
 
   addCommands() {
@@ -69,6 +78,36 @@ const MultiCursorExtension = Extension.create({
       selectAllMatches: () => ({ view }: { view: import('@tiptap/pm/view').EditorView }) => selectAllMatches(view),
       undoLastCursor: () => ({ view }: { view: import('@tiptap/pm/view').EditorView }) => undoLastCursor(view),
       clearMultiCursor: () => ({ view }: { view: import('@tiptap/pm/view').EditorView }) => clearMultiCursors(view),
+      // P2-3: keyboard / command-palette entry point for
+      // column selection. Without a drag rectangle to flatten,
+      // we expand the current selection downward by 3 lines as
+      // a discoverable demo. The mouse-driven path (Alt+Drag)
+      // is the primary usage.
+      addColumnSelection: () => ({ view }: { view: import('@tiptap/pm/view').EditorView }) => {
+        try {
+          const sel = view.state.selection
+          const head = view.coordsAtPos(sel.head)
+          const rect = {
+            left: head.left,
+            top: head.top,
+            right: head.left + Math.max(80, head.right - head.left + 1),
+            bottom: head.bottom + 3 * (head.bottom - head.top),
+          }
+          const cursors = flattenRectToCursors(view, rect)
+          if (cursors.length <= 1) return false
+          const primary = cursors[0]
+          const secondary = cursors.slice(1)
+          const tr = view.state.tr
+            .setMeta(multiCursorPluginKey, { type: 'set', cursors: secondary })
+            .setSelection(primary.anchor != null
+              ? TextSelection.create(view.state.doc, primary.anchor, primary.pos)
+              : TextSelection.create(view.state.doc, primary.pos))
+          view.dispatch(tr)
+          return true
+        } catch {
+          return false
+        }
+      },
     } as unknown as Record<string, () => boolean>
   },
 })

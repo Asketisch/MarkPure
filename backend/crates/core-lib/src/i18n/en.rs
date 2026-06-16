@@ -77,6 +77,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("status.chars", "chars"),
     ("status.saving", "Saving..."),
     ("status.multi_cursor", "Multi-cursor"),
+    ("status.column_select", "Column select"),
     ("tab.untitled", "Untitled"),
     ("tab.close_others", "Close Others"),
     ("tab.close_to_right", "Close to the Right"),
@@ -267,6 +268,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.edit.select_all_matches", "Select All Matches"),
     ("cmd.edit.undo_last_cursor", "Undo Last Cursor"),
     ("cmd.edit.clear_multi_cursor", "Clear Multi-Cursor"),
+    // P2-3: column selection (Alt+Drag).
+    ("cmd.edit.add_column_selection", "Add Column Selection"),
     ("cmd.block.move_up", "Move Block Up"),
     ("cmd.block.move_down", "Move Block Down"),
     ("cmd.image.align_left", "Align Image Left"),

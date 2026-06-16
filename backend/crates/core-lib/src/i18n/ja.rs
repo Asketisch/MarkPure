@@ -77,6 +77,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("status.chars", "文字"),
     ("status.saving", "保存中..."),
     ("status.multi_cursor", "マルチカーソル"),
+    ("status.column_select", "列選択"),
     ("tab.untitled", "無題"),
     ("tab.close_others", "他を閉じる"),
     ("tab.close_to_right", "右側を閉じる"),
@@ -267,6 +268,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.edit.select_all_matches", "すべての一致を選択"),
     ("cmd.edit.undo_last_cursor", "最後のカーソルを元に戻す"),
     ("cmd.edit.clear_multi_cursor", "マルチカーソルを解除"),
+    // P2-3: 列選択 (Alt+Drag)
+    ("cmd.edit.add_column_selection", "列選択を追加"),
     ("cmd.block.move_up", "ブロックを上に移動"),
     ("cmd.block.move_down", "ブロックを下に移動"),
     ("cmd.image.align_left", "画像を左に配置"),

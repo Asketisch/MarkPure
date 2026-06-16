@@ -69,6 +69,11 @@ export const commandCatalog: CommandDef[] = [
   { id: 'edit.select_all_matches', titleKey: 'cmd.edit.select_all_matches', categoryKey: 'menu.edit', keywords: ['multicursor', 'all', 'cmd-shift-l', 'rename'] },
   { id: 'edit.undo_last_cursor', titleKey: 'cmd.edit.undo_last_cursor', categoryKey: 'menu.edit', keywords: ['multicursor', 'undo', 'cmd-u'] },
   { id: 'edit.clear_multi_cursor', titleKey: 'cmd.edit.clear_multi_cursor', categoryKey: 'menu.edit', keywords: ['multicursor', 'clear', 'escape', 'esc'] },
+  // P2-3: column selection (Alt+Drag). Surfaced in the palette
+  // so users discover it; the command expands the current
+  // selection downward by 3 lines as a demo (mouse drag is the
+  // primary entry point).
+  { id: 'edit.add_column_selection', titleKey: 'cmd.edit.add_column_selection', categoryKey: 'menu.edit', keywords: ['multicursor', 'column', 'rectangle', 'box', 'alt', 'drag', '列选'] },
   { id: 'format.superscript', titleKey: 'toolbar.superscript', categoryKey: 'cmd.category.format', keywords: ['sup', 'exponent', 'power'] },
   { id: 'format.subscript', titleKey: 'toolbar.subscript', categoryKey: 'cmd.category.format', keywords: ['sub', 'index', 'chemical'] },
   { id: 'block.move_up', titleKey: 'cmd.block.move_up', categoryKey: 'cmd.category.block', keywords: ['reorder', 'drag', 'organize'] },

@@ -1396,6 +1396,22 @@ html, body, #app {
   background: var(--mc-range-bg, rgba(229, 20, 0, 0.15));
 }
 
+/* P2-3: Column-select overlay. Drawn by the column-select
+ * plugin as an absolutely-positioned div on the editor's
+ * parent element while the user Alt+Drags. We deliberately
+ * do NOT use a ProseMirror Decoration here — the rectangle
+ * updates at 60Hz and rebuilding a DecorationSet that often
+ * is too slow. The overlay is pointer-events: none so the
+ * underlying mousemove/mouseup events still reach the editor.
+ */
+.mc-rect-overlay {
+  position: absolute;
+  border: 1px dashed var(--mc-cursor-color, #e51400);
+  background: color-mix(in srgb, var(--mc-cursor-color, #e51400) 12%, transparent);
+  pointer-events: none;
+  z-index: 10;
+}
+
 /* P0-3: Per-theme multi-cursor colors. The default
  * (--mc-cursor-color: #e51400) lives in the .mc-cursor rule
  * above; the overrides below tune the cursor and range

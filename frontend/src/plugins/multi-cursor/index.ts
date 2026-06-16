@@ -4,6 +4,8 @@
  * Exports:
  *   - `createMultiCursorPlugin`  — the ProseMirror plugin
  *   - `multiCursorPluginKey`     — read state from outside
+ *   - `createColumnSelectPlugin` — P2-3 Alt+Drag column selection
+ *   - `columnSelectPluginKey`    — read drag state from outside
  *
  * Tiptap commands and keybindings live in
  * `extensions/editing/multi-cursor-extension.ts` (or are
@@ -29,6 +31,13 @@ export {
   currentNeedle,
 } from './commands'
 export { findNextOccurrence, findNextForCursors, findAllOccurrences } from './find-occurrence'
+// P2-3 column selection (Alt+Drag) — exported so editor.ts can
+// register the second plugin and App.svelte can subscribe to
+// the drag state for the StatusBar indicator.
+export { createColumnSelectPlugin, flattenRectToCursors, normaliseRect, estimateLineHeight, isInsideAtomicBlock } from './column-select'
+export type { FlattenOptions } from './column-select'
+export { columnSelectPluginKey } from './rect-types'
+export type { ColumnSelectState, ColumnSelectMeta, Rect, ViewportPoint } from './rect-types'
 
 /**
  * Build the multi-cursor plugin.
@@ -75,6 +84,12 @@ export function createMultiCursorPlugin(): Plugin {
       // current primary head). All edge cases (table cells, code
       // blocks, read-only, dedup, cap) are handled inside
       // `addCursor` so this stays a 3-line shim.
+      //
+      // P2-3: when the column-select plugin is registered AHEAD
+      // of this one, its mousedown consumes Alt+Click events
+      // first and handles the sub-threshold fallback to
+      // `addCursor` itself. This handler then becomes the
+      // sole-plugin path (when column-select is not installed).
       handleDOMEvents: {
         mousedown(view, event) {
           if (!event.altKey || event.button !== 0) return false

@@ -20,6 +20,8 @@
 | `input-handler.ts` | ~165 | `handleTextInput` / `handleMultiCursorKeyDown` fan-out + 1s 闪烁 timer |
 | `commands.ts` | ~180 | Tiptap command 实现：`addCursor` / `selectNextMatch` / `selectAllMatches` / `undoLastCursor` / `clearMultiCursors` / `currentNeedle` |
 | `index.ts` | ~80 | `createMultiCursorPlugin` 入口（Plugin 工厂 + handleDOMEvents.mousedown） |
+| `rect-types.ts` | ~60 | **P2-3** 列选择类型：`Rect` / `ViewportPoint` / `ColumnSelectState` / `ColumnSelectMeta` + `columnSelectPluginKey` 单例 + `DRAG_THRESHOLD_PX=3` |
+| `column-select.ts` | ~370 | **P2-3** Alt+Drag 列选择插件：`createColumnSelectPlugin`（必须先于 multi-cursor 注册）+ 拖动状态机 + `flattenRectToCursors` 纯几何算法 + `isInsideAtomicBlock` 表格/代码块拒绝 + `estimateLineHeight` + overlay 绘制 |
 | `spellcheck.ts` | 拼写检查（红波浪线 Decoration + 500ms 防抖 + IPC） |
 | `virtualization/` | 顶层块虚拟化（COMPETITOR_TODO P2-6） |
 | `virtualization/types.ts` | TopBlockMeta / VirtualizationConfig 共享类型 |

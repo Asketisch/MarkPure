@@ -31,7 +31,7 @@
   import type { DocStats, AppConfig, FileChangeEvent, FileInfo } from '$lib/editor/commands'
   import type { Editor } from '@tiptap/core'
   import { TextSelection } from '@tiptap/pm/state'
-  import { multiCursorPluginKey } from '$lib/plugins/multi-cursor'
+  import { multiCursorPluginKey, columnSelectPluginKey } from '$lib/plugins/multi-cursor'
   import SideBar from '$lib/components/layout/SideBar.svelte'
   import StatusBar from '$lib/components/layout/StatusBar.svelte'
   import MenuBar from '$lib/components/layout/MenuBar.svelte'
@@ -97,6 +97,10 @@
   // 0 ⇔ single-cursor mode (default). Updated by the
   // $effect below whenever the editor view's state changes.
   let multiCursorCount = $state(0)
+  // P2-3: column select drag state — true while the user is
+  // actively Alt+Dragging a rectangle. Read from the
+  // columnSelectPluginKey state and forwarded to StatusBar.
+  let columnMode = $state(false)
   let theme = $state<string>('')
   let editorContainer: HTMLElement
   let editor: Editor | null = null
@@ -228,6 +232,10 @@
       case 'edit.select_all_matches': return () => { (editor as any)?.chain().focus().selectAllMatches().run() }
       case 'edit.undo_last_cursor': return () => { (editor as any)?.chain().focus().undoLastCursor().run() }
       case 'edit.clear_multi_cursor': return () => { (editor as any)?.chain().focus().clearMultiCursor().run() }
+      // P2-3: column-select keyboard / palette path — expands
+      // the current selection downward by 3 lines as a demo
+      // (mouse-driven Alt+Drag is the primary entry point).
+      case 'edit.add_column_selection': return () => { (editor as any)?.chain().focus().addColumnSelection().run() }
       case 'format.superscript': return () => { editor?.chain().focus().toggleMark('superscript').run() }
       case 'format.subscript': return () => { editor?.chain().focus().toggleMark('subscript').run() }
       case 'block.move_up': return () => { (editor as any)?.commands.moveBlockUp?.() }
@@ -671,6 +679,12 @@
         | { count: number }
         | undefined
       multiCursorCount = state?.count ?? 0
+      // P2-3: column-select drag state — drives the
+      // "Column select" chip in the status bar.
+      const colState = columnSelectPluginKey.getState(editor!.state) as
+        | { dragging: boolean }
+        | undefined
+      columnMode = colState?.dragging ?? false
     }
     editor.on('transaction', onTransaction)
     onTransaction() // seed initial value
@@ -2225,7 +2239,7 @@
 
       <!-- Status Bar -->
       {#if !zenMode}
-      <StatusBar {stats} {saving} {multiCursorCount} />
+      <StatusBar {stats} {saving} {multiCursorCount} {columnMode} />
       {/if}
       {/if}
 

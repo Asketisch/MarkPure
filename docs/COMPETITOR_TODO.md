@@ -13,18 +13,18 @@
 
 ### 1.1 MarkPure 已具备的能力（一句话）
 
-Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown↔ProseMirror 转换、7 个内置主题 + 完整自定义主题编辑器、Rust 文档注册表（rope 副本）、工作区文件树 + 文件监视、多标签 + 书签 + 拼写检查（英文 + macOS CJK）、HTML/PDF/Word/PNG 四种导出、多根工作区、反链面板、标签面板、Slash Command、Zen 模式、Per-workspace CSS、Snippets、大文档虚拟化。
+Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown↔ProseMirror 转换、7 个内置主题 + 完整自定义主题编辑器、Rust 文档注册表（rope 副本）、工作区文件树 + 文件监视、多标签 + 书签 + 拼写检查（英文 + macOS CJK）、HTML/PDF/Word/PNG 四种导出、多根工作区、反链面板、标签面板、Slash Command、Zen 模式、Per-workspace CSS、Snippets、大文档虚拟化、多光标编辑（Alt+Click + Cmd+D + Cmd+Shift+L）、列选择（Alt+Drag）。
 
 ### 1.2 缺口统计
 
-> 最近更新：2026-06-14 — 23+ 项已实现功能下沉到 [docs/FEATURES.md](./FEATURES.md)，本文档仅含 4 个延期项。P0-3 多光标已实现（3 PR 全部落地），P2-4 多根工作区已实际实现（git b05dbeb）。
+> 最近更新：2026-06-15 — P2-3 列选择已实现并落地（自研 Alt+Drag 列选 + 20/20 单元测试通过）。本文档仅含 3 个延期项。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
 | **P0** | 1 | P0-8 撤销树 延期 |
 | **P1** | 0 | P1 全部完成 ✅ |
-| **P2** | 3 | P2-3 列选、P2-7 Vim、P2-9 评论 延期 |
-| **合计** | 4 | 全部为延期项目 |
+| **P2** | 2 | P2-7 Vim、P2-9 评论 延期 |
+| **合计** | 3 | 全部为延期项目 |
 
 ### 1.3 优先级定义
 
@@ -73,28 +73,31 @@ VSCode 风格的 Alt+Click 多光标、Cmd+D 选下个匹配并多光标编辑�
 
 ---
 
-### [P2-3] 列选择 / 块选择（Column Selection）
+### [P2-3] 列选择 / 块选择（Column Selection）✅
 
-**状态**：⏸️ 延期（多光标基础已就位 P0-3 ✅，列选还需要 Alt+Drag 选区建模；可基于现有 `multi-cursor/` 扩展）
+**状态**：✅ 已实现（2026-06-15，基于 P0-3 多光标基础设施）。自研 Alt+Drag 矩形选区 → 展开为 N 个 range cursors → 复用现有 fan-out / 装饰 / 撤销 / StatusBar。核心新增 2 文件（`column-select.ts` ~370 行 + `rect-types.ts` ~60 行）+ 集成 6 处（`editor.ts` 注册 + `App.svelte` 派发 + `StatusBar.svelte` 指示器 + `app.css` overlay 样式 + `commandRegistry.ts` 命令面板 + 2 个 i18n key × 3 语言）+ `scripts/validate-column-select.ts` 20/20 单元测试通过 + 多光标 15/15 回归无失败。详见 `frontend/src/plugins/multi-cursor/column-select.ts`。
 
-**优先级**：P2 &nbsp;·&nbsp; **复杂度**：L
+**优先级**：P2 &nbsp;·&nbsp; **复杂度**：L（已实现）
 
-**背景**：
+**背景**（历史）：
 VSCode Alt+Drag 选区、Sublime Text 列编辑是处理对齐文本的利器。
 
-**现状**：
+**原状**（已修复）：
 - 仅普通选择
 - 无 `prosemirror-*` 列选支持
 
-**实现要点**：
-- 引入 `prosemirror-column-selecting`（如有）或自研
-- Alt+Drag 选区 → 创建多列光标
-- 与多光标编辑协同使用
+**实现路径**（已选）：
+- **自研**（无可用社区方案；prosemirror-column-selecting 不存在）
+- 复用 P0-3 多光标的 `Cursor` 模型、`addCursorToList` 去重/上限、`handleTextInput`/`handleMultiCursorKeyDown`/`handleMultiCursorPaste` fan-out、`buildCursorDecorations`、Esc 清除、Cmd+U 撤销
+- Alt+Drag 矩形选区 → `flattenRectToCursors` 几何换算 → N 个 range cursors → dispatch 到 `multiCursorPluginKey` set meta
+- 阈值 3px：低于阈值降级为 Alt+Click 单点光标
+- Overlay 视觉反馈（`.mc-rect-overlay` absolute div，pointer-events: none，CSS `color-mix` 半透明边框背景）
+- 边界：表格 cell / CodeBlock / 虚拟化隐藏块 / Alt 提前释放 / 64 上限 / dedup / Esc 取消 / Tab 切换清理 / 反向拖动 全部处理
+- **测试**：`npx tsx scripts/validate-column-select.ts` 20/20 通过
 
 **参考实现**：
 - VSCode 列选
 - Sublime Text 列编辑
-- Emacs rectangle-mark-mode
 
 ---
 

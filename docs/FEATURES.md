@@ -82,6 +82,26 @@ QuickSwitcher `Cmd+P` 模态补全文件；Wiki 链接 `[[` 触发 suggestion，
 - **验证**：`npx tsx scripts/validate-multi-cursor.ts` 15/15 通过；CSS 6 主题独立色值
 - **参考**：VSCode 多光标、MarkText Alt+Click
 
+### 1.10 列选择（Column Selection，Alt+Drag）— P2-3（2026-06-15）✅
+
+VSCode / Sublime Text 风格的矩形选区。Alt+Drag 拖出矩形,实时绘制虚线 overlay；松开鼠标后将矩形按线高扫描展开为 N 个 range cursors,直接 dispatch 到 P0-3 多光标插件的 `set` meta —— 后续输入 / Backspace / Delete / 单行粘贴 / Esc / Cmd+U 全部复用现有 fan-out / 装饰 / 撤销链路,零新增代码。沿 y 轴每 `--editor-line-height`(默认 24px,CSS 变量可覆盖)采样,对每行调用 `posAtCoords({left, top: y})` 和 `posAtCoords({right, top: y})` 得到该行 range 的两端。边界处理:表格单元格 / 代码块跳过(复用 `commands.ts` 的 atomic 检测)、虚拟化隐藏块跳过(`elementFromPoint` + `.pm-virtual-hidden` 探测)、上限 64 行截断 + console.warn、3px 阈值低于则降级为单点 Alt+Click、Alt 提前释放取消提交、Esc 中途取消、Tab 切换 view.destroy 清理 listener。
+
+- **关键文件**:
+  - `frontend/src/plugins/multi-cursor/column-select.ts` (~370 行,Plugin + 拖动状态机 + `flattenRectToCursors` 纯函数 + overlay 绘制 + `isInsideAtomicBlock` + `estimateLineHeight`)
+  - `frontend/src/plugins/multi-cursor/rect-types.ts` (~60 行,`Rect` / `ColumnSelectState` / `ColumnSelectMeta` / `columnSelectPluginKey` / `DRAG_THRESHOLD_PX`)
+  - `frontend/src/editor/editor.ts`(MultiCursorExtension 增加 `addColumnSelection` 命令 + 列选插件先于多光标插件注册)
+  - `frontend/src/app/App.svelte`(`onTransaction` 订阅 `columnSelectPluginKey.getState().dragging` → 传 `columnMode` 给 StatusBar)
+  - `frontend/src/components/layout/StatusBar.svelte`(新增 `columnMode?: boolean` prop + 「列选」chip)
+  - `frontend/src/app/app.css`(`.mc-rect-overlay`:absolute + 虚线边框 + `color-mix(--mc-cursor-color 12%)` 半透明背景 + `pointer-events: none`)
+  - `frontend/src/features/command-palette/commandRegistry.ts`(`edit.add_column_selection` 命令)
+- **触发方式**:
+  - `Alt + 拖拽` 创建矩形列选(主入口)
+  - 命令面板「Add Column Selection」(键盘可访问入口,将当前选区向下扩展 3 行做 demo)
+  - `Esc` 中途取消拖动
+- **状态栏**:拖动中显示「列选」chip(`status.column_select` i18n key,3 语言均已翻译)
+- **验证**:`npx tsx scripts/validate-column-select.ts` 20/20 通过(normaliseRect 3 个,flattenRectToCursors 11 个,isInsideAtomicBlock 4 个,Cursor 形状 1 个,line-height 变化 2 个) + 多光标 15/15 回归无失败 + cargo workspace 110/110 通过
+- **参考**:VSCode 列选、Sublime Text 列编辑
+
 ---
 
 ## 2. 文档与工作区
@@ -277,6 +297,7 @@ JSON 格式主题存储在 `~/.config/markpure/themes/`；通过 `backend/crates
 | 2026-06-13 | P2-6 | 大文档虚拟化 |
 | 实际合并 | P2-4 | 多根工作区（git b05dbeb，文档滞后） |
 | 2026-06-14 | P0-3 | 真正多光标编辑（VSCode 风格）：7 文件 plugin + 4 处键位 + 4 条 i18n + 15/15 测试 |
+| 2026-06-15 | P2-3 | 列选择（Alt+Drag）：2 文件新增 + 6 处集成 + 20/20 测试 + 多光标 15/15 无回归 |
 
 ---
 

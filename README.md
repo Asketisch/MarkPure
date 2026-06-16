@@ -11,6 +11,7 @@ WYSIWYG Markdown 桌面编辑器。
 | **所见即所得** | WYSIWYG Markdown 编辑体验 |
 | **即时渲染** | Typora 风格，光标附近显示 Markdown 语法标记，远离时隐藏 |
 | **多光标编辑** | VSCode 风格：Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/粘贴自动 fan-out |
+| **列选择** | VSCode / Sublime 风格：Alt+Drag 拖出矩形选区，自动展开为 N 个 range cursors；表格 / 代码块 / 虚拟化块自动跳过，64 行上限 |
 | **多标签页** | 同时打开多个文档，支持脏状态追踪 |
 | **文件树管理** | 打开文件夹作为工作区，浏览、搜索、创建、重命名、删除文件 |
 | **文档大纲** | 直接从 ProseMirror 文档模型提取标题（零 IPC 开销） |
@@ -29,7 +30,7 @@ WYSIWYG Markdown 桌面编辑器。
 | **拼写检查** | 英文 + macOS CJK（NSSpellChecker；Win/Linux 仅英文） |
 | **Workspace 搜索** | 工作区全文搜索，支持正则和大小写敏感 |
 | **大文档虚拟化** | 顶层块视口虚拟化（>200 块自动启用），`content-visibility: auto` 跳过 off-screen 块的 layout/paint |
-| **完整功能清单** | 见 [docs/FEATURES.md](./docs/FEATURES.md)，含 23+ 项详细说明 |
+| **完整功能清单** | 见 [docs/FEATURES.md](./docs/FEATURES.md)，含 24+ 项详细说明 |
 
 ## 快速开始
 
@@ -230,8 +231,19 @@ MarkPure/
 
 > 多光标状态下输入字符、Backspace、Delete、单行粘贴会自动 fan-out 到所有光标位置。表格 cell / CodeBlock / 只读视图不响应 Alt+Click。状态栏右下角显示「多光标 (N)」指示器。
 
+### 列选择（Column Selection）
+
+| 快捷键 | 操作 |
+|--------|------|
+| `Alt + 拖拽` | 拖出矩形选区,松开后展开为 N 个 range cursors |
+| `Esc` | 中途取消拖动 / 清空已生成的列选 |
+| 命令面板 「Add Column Selection」 | 键盘可访问入口:把当前选区向下扩展 3 行作演示 |
+
+> 列选完成后立即与多光标共用 fan-out 链路:输入 / Backspace / Delete / 单行粘贴自动作用于每一行;Cmd+U 可撤销整个列选。表格 / 代码块 / 虚拟化隐藏块的行自动跳过,矩形高度若覆盖超过 64 行则静默截断并 console.warn。拖动中状态栏显示「列选」chip。
+
 ## 最近更新
 
+- **P2-3 列选择（Column Selection,VSCode/Sublime 风格）** — 自研 Alt+Drag 矩形选区落地。`frontend/src/plugins/multi-cursor/column-select.ts`（~370 行）+ `rect-types.ts`(~60 行)新增 2 文件,集成 6 处(editor.ts 插件注册 + App.svelte 派发 + StatusBar chip + app.css overlay + commandRegistry + 2 个 i18n key × 3 语言)。矩形按线高扫描展开为 N 个 range cursors,直接复用 P0-3 多光标的 fan-out / 装饰 / 撤销链路,零新增编辑代码。表格 / 代码块 / 虚拟化块跳过,3px 阈值下降级为单点 Alt+Click,64 行上限。`npx tsx scripts/validate-column-select.ts` 20/20 通过,多光标 15/15 无回归,cargo 110/110 通过。详见 [docs/FEATURES.md#110-列选择column-selectionaltdrag--p2-3-2026-06-15](./docs/FEATURES.md)
 - **P0-3 真正多光标编辑（VSCode 风格）** — 自研多光标 plugin 7 文件落地（`frontend/src/plugins/multi-cursor/`）。Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/单行粘贴自动 fan-out；状态栏显示「多光标 (N)」；4 处键位注册 + 4 条 i18n key（en/zh-CN/ja）；15/15 单元测试通过。详见 [docs/FEATURES.md#19-真正多光标编辑-multi-cursor-vscode-风格--p0-3-2026-06-14](./docs/FEATURES.md)
 - **多根工作区 (P2-4)** — 工作区支持多根目录，根切换 pill、跨根搜索/书签、Tab 持久化含 root_id；命令 `file.set_active_workspace_root`
 - **文档化整改** — 23+ 项已实现功能从 COMPETITOR_TODO.md 下沉到 [docs/FEATURES.md](./docs/FEATURES.md)，README 与实现状态完全对齐
