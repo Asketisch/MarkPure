@@ -17,14 +17,14 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ### 1.2 缺口统计
 
-> 最近更新：2026-06-17 — P2-7 Vim 模式已实现并落地（自研 mode FSM + 59/59 单元测试通过 + 状态栏芯片 + Cmd+. 切换）。本文档仅含 1 个延期项。
+> 最近更新：2026-06-17 — P2-7 Vim 模式已实现并落地（自研 mode FSM + 59/59 单元测试通过 + 状态栏芯片 + Cmd+. 切换）。所有 P0/P1/P2 差距项均已关闭。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
 | **P0** | 0 | P0 全部完成 ✅ |
 | **P1** | 0 | P1 全部完成 ✅ |
-| **P2** | 1 | P2-9 评论 延期 |
-| **合计** | 1 | 全部为延期项目 |
+| **P2** | 0 | P2 全部完成 ✅ |
+| **合计** | 0 | 所有差距均已关闭 ✅ |
 
 ### 1.3 优先级定义
 
@@ -168,35 +168,6 @@ VSCode / MarkText / Obsidian 都支持 Vim 模式。prosemirror-vim 社区包 20
 - MarkText vim 模式
 - Obsidian Vim 插件
 - VSCode vim 扩展
-
----
-
-### [P2-9] 文档级评论 / 批注（Comments / Annotations）
-
-**状态**：⏸️ 延期（XL 复杂度，需要 CRDT/OT 协同 + 线程面板 + 持久化 sidecar）
-
-**优先级**：P2 &nbsp;·&nbsp; **复杂度**：XL
-
-**背景**：
-团队协作文档或自我 review 时，对某段文字加评论。Google Docs / Microsoft Word 标配。
-
-**现状**：
-- **无评论节点**
-- 拼写检查的红色波浪线不算
-
-**实现要点**：
-- Comment 节点（inline anchor + margin 备注）
-- 评论线程面板（侧边或底部）
-- 持久化：sidecar JSON 文件（`doc.md.comments.json`）或 frontmatter 扩展
-- 实时同步（可选，需引入 CRDT 或 OT）
-- 解决冲突：基于时间戳的 last-write-wins
-- 标记 resolved / open 状态
-
-**参考实现**：
-- Google Docs 评论
-- Microsoft Word 修订
-- Hypothesis 标注
-- Notion 评论
 
 ---
 
