@@ -41,6 +41,14 @@ pub struct AppConfig {
     /// root.
     #[serde(default)]
     pub expanded_dirs: std::collections::HashMap<String, Vec<String>>,
+    /// P2-7: Vim mode toggle. When true, the editor accepts
+    /// NORMAL/INSERT/VISUAL key sequences; when false, the
+    /// default Tiptap keymap runs. Persists across sessions;
+    /// toggled at runtime via `Cmd+.` or the command palette.
+    /// `#[serde(default)]` so existing config files (without
+    /// the field) deserialise to `false`.
+    #[serde(default)]
+    pub vim_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +132,7 @@ impl Default for AppConfig {
             active_workspace_root_id: None,
             language: None,
             expanded_dirs: std::collections::HashMap::new(),
+            vim_mode: false,
         }
     }
 }

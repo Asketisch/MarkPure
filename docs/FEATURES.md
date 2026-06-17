@@ -102,6 +102,25 @@ VSCode / Sublime Text 风格的矩形选区。Alt+Drag 拖出矩形,实时绘制
 - **验证**:`npx tsx scripts/validate-column-select.ts` 20/20 通过(normaliseRect 3 个,flattenRectToCursors 11 个,isInsideAtomicBlock 4 个,Cursor 形状 1 个,line-height 变化 2 个) + 多光标 15/15 回归无失败 + cargo workspace 110/110 通过
 - **参考**:VSCode 列选、Sublime Text 列编辑
 
+### 1.16 Vim 模式 (Cmd+. 切换) — P2-7（2026-06-17）✅
+
+自研 mode 状态机（normal/insert/visual/visual-line/visual-block/replace 6 种），含完整 motions + operators + text objects + counts + 4 个 ex 命令，Vim's `V`/`Ctrl-V` 复用 P2-3 列选择。**关键文件**：`frontend/src/plugins/vim/`（11 文件 plugin + 100 LOC 扩展包装器），`frontend/src/extensions/editing/vim-extension.ts`（Tiptap 包装），`scripts/validate-vim.ts`（59/59 测试通过）。
+
+- **触发**:`Cmd+.`（macOS/Linux 全局）切换启用状态,持久化到 `AppConfig.vim_mode`。
+- **motions**:`h j k l` `w b e` `W B E` `0 $ ^` `gg G` `f F t T {char}` `{ } ( )` `%` `H M L`(约 18 个)。
+- **operators**:`d c y` + linewise `dd cc yy` + `x` `r{char}` `J` `>>` `<<`。
+- **text objects**:`iw aw is as ip ap` `i" a" i' a' i\` a\`` `i( a( i{ a{ i[ a[ i< a<`。
+- **ex commands**:`:w`(保存)、`:q`(关闭,脏时拒绝)、`:wq`/`:x`(保存+关闭)、`:e`(从盘重载)。
+- **visual mode 共存复用 P2-3**:`V` 进入 visual-line、`Ctrl-V` 进入 visual-block 直接复用列选择 plugin 的矩形计算与多光标 fan-out。Alt+Click 在 NORMAL 模式被吞掉,在 INSERT 模式仍可用(P0-3)。
+- **状态栏**:mode 芯片(NORMAL 灰、INSERT 绿、VISUAL 蓝、V-LINE 紫、V-BLOCK 红、REPLACE 橙)+ 暂存区显示 count/operator(`3d`、`ci`、`wq`)。
+- **持久化**:`AppConfig.vim_mode: bool`(`#[serde(default)]`),`get_config`/`set_config` IPC 复用,无新命令。
+- **边界**:IME 合成期间 pass-through;只读文档 pass-through;数字上限 999;yank 寄存器 V1 填充不读(`p`/`P` 走 PM 默认);Alt+Click 在 NORMAL 被吞。
+- **i18n key**(3 语言 × 6 词):`status.vim_normal/insert/visual/visual_line/visual_block/replace` + `status.ex_w_saved/q_refused_dirty/e_reloaded` + `cmd.view.toggle_vim_mode` + `dialog.ex_command`。
+- **V1 未实现**(V2 候选):Emacs 模式、可重映射 keymap、marks、registers、search/replace、window splits、folding、macros、plugin system、`p`/`P` 读寄存器、cheat sheet 面板。
+- **V1 决策**:不集成 `prosemirror-vim`(2018 后未维护,PM 17 / Tiptap 3 不兼容);同 P0-3 选自研原因。
+- **测试**:`npx tsx scripts/validate-vim.ts` 59/59 通过 + 多光标 15/15 + 列选 20/20 + 撤销树 36/36 全部无回归。
+- **参考**:VSCode vim 扩展、Sublime Text Vintage、Obsidian Vim 模式、MarkText vim 模式。
+
 ---
 
 ## 2. 文档与工作区
@@ -298,6 +317,8 @@ JSON 格式主题存储在 `~/.config/markpure/themes/`；通过 `backend/crates
 | 实际合并 | P2-4 | 多根工作区（git b05dbeb，文档滞后） |
 | 2026-06-14 | P0-3 | 真正多光标编辑（VSCode 风格）：7 文件 plugin + 4 处键位 + 4 条 i18n + 15/15 测试 |
 | 2026-06-15 | P2-3 | 列选择（Alt+Drag）：2 文件新增 + 6 处集成 + 20/20 测试 + 多光标 15/15 无回归 |
+| 2026-06-16 | P0-8 | 分支式撤销树：6 文件 plugin + 右侧面板 + 36/36 测试 + 多光标 15/15 + 列选 20/20 无回归 |
+| 2026-06-17 | P2-7 | Vim 模式（Cmd+. 切换）：12 文件 plugin（自研 mode FSM，无法用 prosemirror-vim）+ 8 处集成 + 状态栏 mode 芯片 + count/operator 暂存区 + 59/59 测试 + 多光标 15/15 + 列选 20/20 + 撤销树 36/36 无回归 |
 
 ---
 

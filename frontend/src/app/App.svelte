@@ -33,6 +33,17 @@
   import { TextSelection } from '@tiptap/pm/state'
   import { multiCursorPluginKey, columnSelectPluginKey } from '$lib/plugins/multi-cursor'
   import { undoTreePluginKey, type UndoTreeState } from '$lib/plugins/undo-tree'
+  // P2-7: Vim mode. We mirror `enabled` / `mode` / `pending`
+  // into Svelte runes for the StatusBar chip and Cmd+. toggle.
+  import {
+    vimPluginKey,
+    serializePending,
+    setVimEnabled,
+    isVimEnabled,
+    type VimState as VimStateShape,
+    type VimMode,
+  } from '$lib/plugins/vim'
+  import { setVimExContext } from '$lib/extensions/editing/vim-extension'
   import SideBar from '$lib/components/layout/SideBar.svelte'
   import StatusBar from '$lib/components/layout/StatusBar.svelte'
   import MenuBar from '$lib/components/layout/MenuBar.svelte'
@@ -109,6 +120,11 @@
   // Forwarded to StatusBar as small chips.
   let undoBranchCount = $state(0)
   let undoIsForked = $state(false)
+  // P2-7: Vim mode. Mirrors the plugin's state so the StatusBar
+  // chip can render and the Cmd+. handler can read.
+  let vimEnabled = $state(false)
+  let vimMode = $state<VimMode>('normal')
+  let vimPending = $state('')
   let theme = $state<string>('')
   let editorContainer: HTMLElement
   let editor: Editor | null = null
@@ -447,6 +463,54 @@
     return tab.content
   }
 
+  // P2-7: wire the Vim ex context so `:w`/`:q`/`:wq`/`:e` route
+  // through the existing save / close / reload paths.
+  setVimExContext({
+    save: async () => {
+      const tab = getActiveTab()
+      if (!tab) return { ok: false, error: 'no active tab' }
+      try {
+        const content = getActiveContent()
+        await saveFile(tab.path, content)
+        tab.dirty = false
+        return { ok: true }
+      } catch (e) {
+        return { ok: false, error: String(e) }
+      }
+    },
+    reload: async () => {
+      const tab = getActiveTab()
+      if (!tab || !tab.path) return { ok: false, error: 'no path' }
+      try {
+        const info = await openFileByPath(tab.path)
+        tab.content = info.content
+        if (editor) setContent(editor, info.content)
+        tab.dirty = false
+        return { ok: true }
+      } catch (e) {
+        return { ok: false, error: String(e) }
+      }
+    },
+    close: async (_force = false) => {
+      const tab = getActiveTab()
+      if (!tab) return { ok: false, error: 'no active tab' }
+      if (tab.dirty && !_force) {
+        return { ok: false, error: 'unsaved changes' }
+      }
+      // Mirror the regular close flow.
+      const id = tab.id
+      const newTabs = tabs.filter(t => t.id !== id)
+      const newActive = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null
+      tabs = newTabs
+      activeTabId = newActive
+      return { ok: true }
+    },
+    isDirty: () => {
+      const tab = getActiveTab()
+      return tab?.dirty ?? false
+    },
+  })
+
   let syncTimer: ReturnType<typeof setTimeout> | null = null
   let statsTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -712,6 +776,21 @@
       undoBranchCount = undoState ? Object.keys(undoState.nodes).length : 0
       // Forked ⇔ the current node has siblings (i.e., the tree has branched at some point).
       undoIsForked = !!undoState && undoState.nodes[undoState.currentId]?.childIds.length > 1
+      // P2-7: Vim mode + pending buffer. We mirror the plugin
+      // state into Svelte runes so the StatusBar chip can react.
+      const vimState = vimPluginKey.getState(editor!.state) as VimStateShape | undefined
+      vimEnabled = vimState?.enabled ?? false
+      vimMode = vimState?.mode ?? 'normal'
+      vimPending = serializePending({
+        enabled: vimState?.enabled ?? false,
+        mode: vimState?.mode ?? 'normal',
+        pending: vimState?.pending ?? { kind: 'idle' },
+        register: null,
+        visualAnchor: null,
+        isComposing: false,
+        lastEx: null,
+        decorations: (vimState?.decorations ?? (undefined as never)),
+      } as VimStateShape)
     }
     editor.on('transaction', onTransaction)
     onTransaction() // seed initial value
@@ -1817,6 +1896,10 @@
             spellcheck.setLanguage(config.editor.spellcheck_language ?? null)
           }
         }
+        // P2-7: seed the Vim-mode global toggle from persisted config.
+        if (typeof (config as Record<string, unknown>).vim_mode === 'boolean') {
+          setVimEnabled((config as { vim_mode: boolean }).vim_mode)
+        }
       })
       .catch((e: unknown) => {
         console.error('Failed to load config:', e)
@@ -2273,10 +2356,14 @@
       {/if}
 
       <!-- Status Bar -->
-      {#if !zenMode}
-      <StatusBar {stats} {saving} {multiCursorCount} {columnMode} {undoBranchCount} {undoIsForked} />
-      {/if}
-      {/if}
+      <StatusBar
+        {stats} {saving}
+        {multiCursorCount} {columnMode}
+        {undoBranchCount} {undoIsForked}
+        vimEnabled={vimEnabled}
+        vimMode={vimMode}
+        vimPending={vimPending}
+      />
 
       <!-- Settings Modal -->
       <Settings bind:visible={showSettings} onConfigChange={handleConfigChange} />
@@ -2326,6 +2413,7 @@
             </ul>
           </div>
         </div>
+      {/if}
       {/if}
     </div>
   </div>

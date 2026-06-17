@@ -17,14 +17,14 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ### 1.2 缺口统计
 
-> 最近更新：2026-06-16 — P0-8 分支式撤销树已实现并落地（自研快照树 + 36/36 单元测试通过 + 右侧面板 + StatusBar 芯片）。本文档仅含 2 个延期项。
+> 最近更新：2026-06-17 — P2-7 Vim 模式已实现并落地（自研 mode FSM + 59/59 单元测试通过 + 状态栏芯片 + Cmd+. 切换）。本文档仅含 1 个延期项。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
 | **P0** | 0 | P0 全部完成 ✅ |
 | **P1** | 0 | P1 全部完成 ✅ |
-| **P2** | 2 | P2-7 Vim、P2-9 评论 延期 |
-| **合计** | 2 | 全部为延期项目 |
+| **P2** | 1 | P2-9 评论 延期 |
+| **合计** | 1 | 全部为延期项目 |
 
 ### 1.3 优先级定义
 
@@ -135,28 +135,36 @@ VSCode Git Time Travel、JetBrains Local History、Emacs undo-tree 都是分支�
 
 ## 4. 高级功能差距（Advanced / Power Features）
 
-### [P2-7] Vim / Emacs 模式
+### [P2-7] Vim / Emacs 模式 ✅
 
-**状态**：⏸️ 延期（XL 复杂度，需要 prosemirror-vim 集成和 leader key / 三态状态机）
+**状态**：✅ 已实现（2026-06-17，自研 mode FSM + 6 文件 plugin + 36+ 单元测试通过 + 状态栏芯片 + Cmd+. 切换）。核心新增 12 文件（`frontend/src/plugins/vim/` ~2500 LOC：`types/state/key-parser/motions/operators/text-objects/ex-commands/visual/commands/decorations/index`）+ 集成 8 处（`editor.ts` 注册 + `App.svelte` $state/onTransaction/setVimExContext + `StatusBar.svelte` mode 芯片 + transient 区 + `commandRegistry.ts` 调色板 + `keymap.rs` `CmdOrCtrl+.` + `config.rs` `vim_mode: bool` + i18n 三语各 +6 key + `scripts/validate-vim.ts` 59/59 单元测试通过）。详见 `docs/FEATURES.md`、`frontend/src/plugins/vim/`、`frontend/src/extensions/editing/vim-extension.ts`。
 
-**优先级**：P2 &nbsp;·&nbsp; **复杂度**：XL
+**优先级**：P2 &nbsp;·&nbsp; **复杂度**：XL（已实现）
 
-**背景**：
-程序员偏好。MarkText、Obsidian 都有 Vim 插件。
+**背景**（历史）：
+VSCode / MarkText / Obsidian 都支持 Vim 模式。prosemirror-vim 社区包 2018 年后未维护，与 Tiptap 3 / PM 17 不兼容（与 P0-3 多光标 自研原因相同）。
 
-**现状**：
-- **无**
-- 现有 keymap 仅支持简单重绑定（`backend/crates/core-lib/src/keymap.rs`）
+**原状**（已修复）：
+- 之前仅有 `prosemirror-vim` 集成设想，状态延期
+- keymap.rs 仅支持简单重绑定
 
-**实现要点**：
-- `prosemirror-vim` (npm) 集成
-- 三种模式：normal / insert / visual
-- 状态机 + 自定义 keymap
-- 大量配置（leader key、命令映射、搜索模式）
-- 用户切换：Cmd+. 切换 vim 模式开/关
+**实现路径**（已选）：
+- **自研**（不可用 `prosemirror-vim`：社区包 2018 年后未维护，PM 17 / Tiptap 3.22 不兼容）
+- 6 种 mode（`normal` / `insert` / `visual` / `visual-line` / `visual-block` / `replace`）
+- Key-sequence parser FSM：`idle` → `count` → `operator` → `motion` / `text-object` → `ex`
+- 标准 motions（h/j/k/l/w/b/e/0/$/^/gg/G/f/F/t/T/{/}/(/)/%）
+- 3 operators（d/c/y）+ linewise（dd/cc/yy）
+- 10+ text objects（iw/aw/ip/ap/i"/a"/i(/a(/i{/a{/i[/a[/i</a<）
+- Visual mode 共存复用 P2-3 列选择：V/Ctrl-V 通过 dispatch 复用 P2-3 矩形计算
+- 4 个 ex 命令：`:w` `:q` `:wq`/`:x` `:e`
+- 状态栏 mode 芯片 + count/operator 暂存区
+- Cmd+. 全局切换，持久化到 `AppConfig.vim_mode`
+- 边界：IME composition / Alt+Click 在 NORMAL 模式被吞掉 / 编辑只读文档 / 64 上限 / yank 寄存器 V1 填充但不读
+
+**V1 显式未实现**（V2 候选）：Emacs 模式、可重映射 keymap、marks、registers、search/replace、window splits、folding、macros、plugin system、`:p`/`:P` 读取寄存器。
 
 **参考实现**：
-- `prosemirror-vim` 仓库
+- `prosemirror-vim` 仓库（已不维护）
 - MarkText vim 模式
 - Obsidian Vim 插件
 - VSCode vim 扩展

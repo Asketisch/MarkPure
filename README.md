@@ -12,6 +12,7 @@ WYSIWYG Markdown 桌面编辑器。
 | **即时渲染** | Typora 风格，光标附近显示 Markdown 语法标记，远离时隐藏 |
 | **多光标编辑** | VSCode 风格：Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/粘贴自动 fan-out |
 | **列选择** | VSCode / Sublime 风格：Alt+Drag 拖出矩形选区，自动展开为 N 个 range cursors；表格 / 代码块 / 虚拟化块自动跳过，64 行上限 |
+| **Vim 模式** | `Cmd+.` 切换 NORMAL/INSERT/VISUAL/V-LINE/V-BLOCK 六种模式；motions（hjkl/wb/e/0$/^/gg/G/f/F/t/T/{char}/{}/( )/%）、operators（d/c/y + dd/cc/yy + x/r/J/>>/<<）、text objects（iw/aw/ip/ap/i"/a"/i(/a(/i{/a{）、ex 命令（`:w` `:q` `:wq` `:e`）；V/Ctrl-V 复用列选择 plugin；状态栏 mode 芯片 + count/operator 暂存区；持久化到 `AppConfig.vim_mode` |
 | **多标签页** | 同时打开多个文档，支持脏状态追踪 |
 | **文件树管理** | 打开文件夹作为工作区，浏览、搜索、创建、重命名、删除文件 |
 | **文档大纲** | 直接从 ProseMirror 文档模型提取标题（零 IPC 开销） |
@@ -241,8 +242,28 @@ MarkPure/
 
 > 列选完成后立即与多光标共用 fan-out 链路:输入 / Backspace / Delete / 单行粘贴自动作用于每一行;Cmd+U 可撤销整个列选。表格 / 代码块 / 虚拟化隐藏块的行自动跳过,矩形高度若覆盖超过 64 行则静默截断并 console.warn。拖动中状态栏显示「列选」chip。
 
+### Vim 模式（Cmd+. 切换）
+
+| 快捷键 | 操作 |
+|--------|------|
+| `Cmd/Ctrl + .` | 全局开关 Vim 模式（持久化到 `AppConfig.vim_mode`） |
+| `i` / `a` / `o` / `I` / `A` / `O` | 进入 INSERT 模式 |
+| `v` / `V` / `Ctrl-V` | 进入可视模式（字符 / 行 / 块） |
+| `Esc` / `Ctrl-C` | 退出 INSERT/VISUAL 回到 NORMAL |
+| `h j k l` / `w b e` / `0 $ ^` / `gg G` / `f F t T {char}` / `{ } ( )` `%` `H M L` | motions |
+| `d c y` + motion / text-object | operator + motion（`dw` 删单词,`ciw` 改内词,`di(` 删括号内） |
+| `dd` / `cc` / `yy` | linewise operator（删/改/拷贝整行） |
+| `x` / `r{char}` / `J` / `>>` / `<<` | 独立操作 |
+| `:` `w` Enter | `:w` 保存 |
+| `:` `q` Enter | `:q` 关闭（脏时拒绝） |
+| `:` `w` `q` Enter | `:wq` 保存并关闭 |
+| `:` `e` Enter | `:e` 从盘重载 |
+
+> 状态栏右下角显示「NORMAL/INSERT/VISUAL/V-LINE/V-BLOCK」芯片 + count/operator 暂存区（如 `NORMAL│3d`）。V/Ctrl-V 直接复用 P2-3 列选择 plugin 的矩形计算，Vim 的 visual-block 可立即用 `A` 进入多光标追加输入。IME 合成期间所有键 pass-through；Alt+Click 在 NORMAL 模式被吞掉，在 INSERT 模式仍可用（P0-3 多光标）。
+
 ## 最近更新
 
+- **P2-7 Vim 模式（Cmd+. 切换）** — 自研 mode FSM 落地（`prosemirror-vim` 2018 后未维护且不兼容 PM 17 / Tiptap 3）。`frontend/src/plugins/vim/` 新增 11 文件 ~2500 LOC（types/state/key-parser/motions/operators/text-objects/ex-commands/visual/commands/decorations/index）+ `frontend/src/extensions/editing/vim-extension.ts`（~100 LOC Tiptap 包装）+ 集成 8 处（editor.ts 注册 + App.svelte $state/onTransaction/setVimExContext + StatusBar.svelte mode 芯片 + commandRegistry + keymap.rs `CmdOrCtrl+.` + config.rs `vim_mode: bool` + i18n 三语各 +10 key）。6 种 mode × 18 motions × 3 operators × 10+ text objects × 4 ex 命令（`:w`/`:q`/`:wq`/`:e`）；V/Ctrl-V 直接 dispatch 到 P2-3 列选择 plugin 复用矩形计算与多光标 fan-out；状态栏 mode 芯片 + count/operator 暂存区（`NORMAL│3d`）；IME 合成 pass-through；yank 寄存器 V1 填充不读（V2）。`npx tsx scripts/validate-vim.ts` 59/59 通过 + 多光标 15/15 + 列选 20/20 + 撤销树 36/36 全部无回归。详见 [docs/FEATURES.md](./docs/FEATURES.md)
 - **P2-3 列选择（Column Selection,VSCode/Sublime 风格）** — 自研 Alt+Drag 矩形选区落地。`frontend/src/plugins/multi-cursor/column-select.ts`（~370 行）+ `rect-types.ts`(~60 行)新增 2 文件,集成 6 处(editor.ts 插件注册 + App.svelte 派发 + StatusBar chip + app.css overlay + commandRegistry + 2 个 i18n key × 3 语言)。矩形按线高扫描展开为 N 个 range cursors,直接复用 P0-3 多光标的 fan-out / 装饰 / 撤销链路,零新增编辑代码。表格 / 代码块 / 虚拟化块跳过,3px 阈值下降级为单点 Alt+Click,64 行上限。`npx tsx scripts/validate-column-select.ts` 20/20 通过,多光标 15/15 无回归,cargo 110/110 通过。详见 [docs/FEATURES.md#110-列选择column-selectionaltdrag--p2-3-2026-06-15](./docs/FEATURES.md)
 - **P0-3 真正多光标编辑（VSCode 风格）** — 自研多光标 plugin 7 文件落地（`frontend/src/plugins/multi-cursor/`）。Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/单行粘贴自动 fan-out；状态栏显示「多光标 (N)」；4 处键位注册 + 4 条 i18n key（en/zh-CN/ja）；15/15 单元测试通过。详见 [docs/FEATURES.md#19-真正多光标编辑-multi-cursor-vscode-风格--p0-3-2026-06-14](./docs/FEATURES.md)
 - **多根工作区 (P2-4)** — 工作区支持多根目录，根切换 pill、跨根搜索/书签、Tab 持久化含 root_id；命令 `file.set_active_workspace_root`

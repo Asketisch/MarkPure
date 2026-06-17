@@ -43,6 +43,8 @@ import { TypewriterScrollExtension } from '../extensions/view/typewriter-scroll-
 import { FocusModeExtension } from '../extensions/view/focus-mode-extension'
 import { UndoTreeExtension } from '../extensions/editing/undo-tree-extension'
 import { SpellcheckExtension } from '../extensions/editing/spellcheck-extension'
+import { VimExtension } from '../extensions/editing/vim-extension'
+import { setVimEnabled, isVimEnabled } from '../plugins/vim'
 import { MermaidExtension } from '../nodeviews/mermaid-view'
 import { VirtualizationExtension } from '../extensions/view/virtualization-extension'
 
@@ -204,6 +206,10 @@ export function createEditor(opts: EditorOptions): Editor {
       TypewriterScrollExtension.configure({ enabled: false }),
       FocusModeExtension.configure({ enabled: false }),
       UndoTreeExtension,
+      // P2-7: Vim mode. Registered AFTER the multi-cursor and
+      // column-select plugins so its `mousedown` shim runs
+      // first and can consume Alt+Click in NORMAL mode.
+      VimExtension,
       // P1-11: spell-check via Rust IPC. The plugin reads its
       // enabled / language settings from the shared
       // `stores/spellcheck.svelte.ts` store at IPC call time —
@@ -233,6 +239,16 @@ export function createEditor(opts: EditorOptions): Editor {
             event.preventDefault()
             return true
           }
+        }
+        // P2-7: Cmd+. toggles Vim mode globally. The Vim
+        // plugin's module-level `setVimEnabled` flips the
+        // global flag AND dispatches a `setEnabled` meta on
+        // the live view (held in a module-level ref), so the
+        // plugin state stays in sync.
+        if ((event.metaKey || event.ctrlKey) && event.key === '.') {
+          event.preventDefault()
+          setVimEnabled(!isVimEnabled())
+          return true
         }
         // P0-3 multi-cursor: Escape clears all secondary cursors.
         if (event.key === 'Escape') {

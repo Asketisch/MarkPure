@@ -132,6 +132,15 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
             label: "Toggle Zen Mode".into(),
             accelerator: Some(ZEN_MODE_ACCELERATOR.into()),
         },
+        // P2-7: Vim mode toggle. CmdOrCtrl+. is the standard
+        // "period after Cmd" binding — same as the Apple Script
+        // "quit with confirmation" mnemonic, but free in the
+        // editor since we don't ship Apple Script.
+        KeyBinding {
+            id: "view.toggle_vim_mode".into(),
+            label: "Toggle Vim Mode".into(),
+            accelerator: Some("CmdOrCtrl+.".into()),
+        },
         // Workspace
         KeyBinding {
             id: "workspace.search".into(),
