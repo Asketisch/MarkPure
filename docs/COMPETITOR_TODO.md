@@ -17,14 +17,14 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ### 1.2 缺口统计
 
-> 最近更新：2026-06-15 — P2-3 列选择已实现并落地（自研 Alt+Drag 列选 + 20/20 单元测试通过）。本文档仅含 3 个延期项。
+> 最近更新：2026-06-16 — P0-8 分支式撤销树已实现并落地（自研快照树 + 36/36 单元测试通过 + 右侧面板 + StatusBar 芯片）。本文档仅含 2 个延期项。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
-| **P0** | 1 | P0-8 撤销树 延期 |
+| **P0** | 0 | P0 全部完成 ✅ |
 | **P1** | 0 | P1 全部完成 ✅ |
 | **P2** | 2 | P2-7 Vim、P2-9 评论 延期 |
-| **合计** | 3 | 全部为延期项目 |
+| **合计** | 2 | 全部为延期项目 |
 
 ### 1.3 优先级定义
 
@@ -103,11 +103,13 @@ VSCode Alt+Drag 选区、Sublime Text 列编辑是处理对齐文本的利器。
 
 ## 3. 文档与工作区差距（Documents & Workspace）
 
-### [P0-8] 真正的撤销树（Branching Undo Tree）
+### [P0-8] 真正的撤销树（Branching Undo Tree）✅
 
-**优先级**：P0 &nbsp;·&nbsp; **复杂度**：XL
+**状态**：✅ 已实现（2026-06-16，自研快照树 + 与 PM history 并行运行）。核心新增 6 文件（`undo-tree/{types,state,tree-utils,commands,decorations,index}.ts` 共 ~700 行）+ 重写 `extensions/editing/undo-tree-extension.ts`（247 行桩 → 100 行真扩展）+ 新增 `components/workspace/UndoTreePanel.svelte`（260px 右侧面板）+ 集成 7 处（`editor.ts` 注册 + `App.svelte` showUndoTree/订阅/runes + `StatusBar.svelte` 新增 undoBranchCount/undoIsForked 芯片 + `commandRegistry.ts` +3 条命令 + `keymap.rs` +3 条默认键位 + i18n 三语各 +5 key）+ `scripts/validate-undo-tree.ts` 36/36 单元测试通过。详见 `frontend/src/plugins/undo-tree/`、`docs/FEATURES.md`。
 
-**背景**：
+**优先级**：P0 &nbsp;·&nbsp; **复杂度**：XL（已实现）
+
+**背景**（历史）：
 VSCode Git Time Travel、JetBrains Local History、Emacs undo-tree 都是分支式历史。允许"撤销后切到分支修改不丢失"。
 
 **现状**：

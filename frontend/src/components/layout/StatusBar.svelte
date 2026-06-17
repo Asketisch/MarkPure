@@ -20,6 +20,8 @@
     saving,
     multiCursorCount = 0,
     columnMode = false,
+    undoBranchCount = 0,
+    undoIsForked = false,
   }: {
     stats: DocStats
     saving: boolean
@@ -30,6 +32,11 @@
      *  column-select rectangle. Drives a small chip next to
      *  the multi-cursor count so the user knows what's happening. */
     columnMode?: boolean
+    /** P0-8: number of nodes currently in the branching undo tree. */
+    undoBranchCount?: number
+    /** P0-8: true when the current path has at least one sibling
+     *  (i.e., the tree has branched at some point). */
+    undoIsForked?: boolean
   } = $props()
 
   const i18n = useI18n()
@@ -49,6 +56,11 @@
       {i18n.t('status.column_select')}
     </span>
   {/if}
+  {#if undoBranchCount > 1}
+    <span class="undo-tree" title="Branching undo tree">
+      {i18n.t('status.undo_tree')} ({undoBranchCount}{undoIsForked ? '·fork' : ''})
+    </span>
+  {/if}
   {#if saving}
     <span class="saving">{i18n.t('status.saving')}</span>
   {/if}
@@ -66,6 +78,10 @@
   }
   .multi-cursor {
     color: var(--mc-cursor-color, #e51400);
+    font-weight: 600;
+  }
+  .undo-tree {
+    color: var(--accent);
     font-weight: 600;
   }
   .saving {

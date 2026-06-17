@@ -280,6 +280,12 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.view.toggle_focus_mode", "フォーカスモード切替"),
     ("cmd.view.toggle_typewriter", "タイプライタースクロール切替"),
     ("cmd.view.toggle_undo_tree", "アンドゥツリーを表示"),
+    // P0-8: undo-tree navigation commands.
+    ("cmd.undoTree.go_to_parent", "アンドゥツリー：親へ"),
+    ("cmd.undoTree.prune_current", "アンドゥツリー：現在の枝を剪定"),
+    ("undoTree.panel.title", "アンドゥツリー"),
+    ("undoTree.empty", "履歴なし"),
+    ("status.undo_tree", "ブランチ"),
     ("cmd.theme.cycle", "テーマ切替"),
     ("cmd.theme.light", "テーマ: ライト"),
     ("cmd.theme.dark", "テーマ: ダーク"),

@@ -280,6 +280,12 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.view.toggle_focus_mode", "Toggle Focus Mode"),
     ("cmd.view.toggle_typewriter", "Toggle Typewriter Scrolling"),
     ("cmd.view.toggle_undo_tree", "Show Undo Tree"),
+    // P0-8: undo-tree navigation commands.
+    ("cmd.undoTree.go_to_parent", "Undo Tree: Go to Parent"),
+    ("cmd.undoTree.prune_current", "Undo Tree: Prune Current Branch"),
+    ("undoTree.panel.title", "Undo Tree"),
+    ("undoTree.empty", "No history yet"),
+    ("status.undo_tree", "Branches"),
     ("cmd.theme.cycle", "Cycle Theme"),
     ("cmd.theme.light", "Theme: Light"),
     ("cmd.theme.dark", "Theme: Dark"),

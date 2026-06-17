@@ -280,6 +280,12 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.view.toggle_focus_mode", "切换专注模式"),
     ("cmd.view.toggle_typewriter", "切换打字机滚动"),
     ("cmd.view.toggle_undo_tree", "显示撤销树"),
+    // P0-8: undo-tree navigation commands.
+    ("cmd.undoTree.go_to_parent", "撤销树：跳到上级"),
+    ("cmd.undoTree.prune_current", "撤销树：剪除当前分支"),
+    ("undoTree.panel.title", "撤销树"),
+    ("undoTree.empty", "尚无历史"),
+    ("status.undo_tree", "分支"),
     ("cmd.theme.cycle", "切换主题"),
     ("cmd.theme.light", "主题：浅色"),
     ("cmd.theme.dark", "主题：深色"),

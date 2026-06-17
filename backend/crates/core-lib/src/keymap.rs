@@ -101,6 +101,22 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
             label: "Toggle Sidebar".into(),
             accelerator: Some("CmdOrCtrl+B".into()),
         },
+        // P0-8: branching undo tree. Cmd+\ opens the panel.
+        KeyBinding {
+            id: "view.toggle_undo_tree".into(),
+            label: "Toggle Undo Tree Panel".into(),
+            accelerator: Some("CmdOrCtrl+\\".into()),
+        },
+        KeyBinding {
+            id: "undoTree.go_to_parent".into(),
+            label: "Undo Tree: Go to Parent Branch".into(),
+            accelerator: Some("CmdOrCtrl+Alt+Up".into()),
+        },
+        KeyBinding {
+            id: "undoTree.prune_current".into(),
+            label: "Undo Tree: Prune Current Branch".into(),
+            accelerator: Some("CmdOrCtrl+Alt+Backspace".into()),
+        },
         KeyBinding {
             id: "view.cycle_theme".into(),
             label: "Cycle Theme".into(),

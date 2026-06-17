@@ -94,6 +94,9 @@ export const commandCatalog: CommandDef[] = [
   { id: 'view.toggle_zen_mode', titleKey: 'view.toggle_zen_mode', categoryKey: 'menu.view', keywords: ['fullscreen', 'focus', 'distraction-free'] },
   { id: 'view.toggle_typewriter', titleKey: 'cmd.view.toggle_typewriter', categoryKey: 'menu.view' },
   { id: 'view.toggle_undo_tree', titleKey: 'cmd.view.toggle_undo_tree', categoryKey: 'menu.view' },
+  // P0-8: undo-tree navigation commands.
+  { id: 'undoTree.go_to_parent', titleKey: 'cmd.undoTree.go_to_parent', categoryKey: 'menu.view', keywords: ['undo', 'tree', 'parent', 'up'] },
+  { id: 'undoTree.prune_current', titleKey: 'cmd.undoTree.prune_current', categoryKey: 'menu.view', keywords: ['undo', 'tree', 'prune', 'delete', 'branch'] },
 
   // Search
   { id: 'search.workspace', titleKey: 'search.workspace_title', categoryKey: 'menu.search' },

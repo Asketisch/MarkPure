@@ -32,6 +32,7 @@
   import type { Editor } from '@tiptap/core'
   import { TextSelection } from '@tiptap/pm/state'
   import { multiCursorPluginKey, columnSelectPluginKey } from '$lib/plugins/multi-cursor'
+  import { undoTreePluginKey, type UndoTreeState } from '$lib/plugins/undo-tree'
   import SideBar from '$lib/components/layout/SideBar.svelte'
   import StatusBar from '$lib/components/layout/StatusBar.svelte'
   import MenuBar from '$lib/components/layout/MenuBar.svelte'
@@ -44,6 +45,7 @@
   import OutlinePanel from '$lib/components/workspace/OutlinePanel.svelte'
   import TagPanel from '$lib/components/workspace/TagPanel.svelte'
   import BacklinksPanel from '$lib/components/workspace/BacklinksPanel.svelte'
+  import UndoTreePanel from '$lib/components/workspace/UndoTreePanel.svelte'
   import WorkspaceSearch from '$lib/components/workspace/WorkspaceSearch.svelte'
   import EmptyState from '$lib/components/ui/EmptyState.svelte'
   import Dialog from '$lib/components/ui/Dialog.svelte'
@@ -101,6 +103,12 @@
   // actively Alt+Dragging a rectangle. Read from the
   // columnSelectPluginKey state and forwarded to StatusBar.
   let columnMode = $state(false)
+  // P0-8: undo-tree panel visibility (mirrors showOutline / showTags).
+  let showUndoTree = $state(false)
+  // P0-8: branch count and fork status from the undo-tree plugin.
+  // Forwarded to StatusBar as small chips.
+  let undoBranchCount = $state(0)
+  let undoIsForked = $state(false)
   let theme = $state<string>('')
   let editorContainer: HTMLElement
   let editor: Editor | null = null
@@ -249,6 +257,20 @@
       case 'view.toggle_outline': return () => { showOutline = !showOutline }
       case 'view.toggle_tags': return () => { showTags = !showTags }
       case 'view.toggle_backlinks': return () => { showBacklinks = !showBacklinks }
+      case 'view.toggle_undo_tree': return () => { showUndoTree = !showUndoTree }
+      case 'undoTree.go_to_parent': return () => {
+        const cmds = editor?.commands as unknown as { goToParent: () => boolean } | undefined
+        cmds?.goToParent()
+      }
+      case 'undoTree.prune_current': return () => {
+        const st = undoTreePluginKey.getState(editor!.state) as UndoTreeState | undefined
+        const cur = st?.currentId
+        const parent = cur ? st?.nodes[cur]?.parentId : null
+        if (parent && cur) {
+          const cmds = editor?.commands as unknown as { pruneBranch: (id: string) => boolean } | undefined
+          cmds?.pruneBranch(cur)
+        }
+      }
       case 'view.toggle_source_mode': return () => toggleSourceMode()
       case 'view.toggle_focus_mode': return () => toggleFocusMode()
       case 'view.toggle_zen_mode': return () => toggleZenMode()
@@ -685,6 +707,11 @@
         | { dragging: boolean }
         | undefined
       columnMode = colState?.dragging ?? false
+      // P0-8: undo-tree state — count + fork indicator.
+      const undoState = undoTreePluginKey.getState(editor!.state) as UndoTreeState | undefined
+      undoBranchCount = undoState ? Object.keys(undoState.nodes).length : 0
+      // Forked ⇔ the current node has siblings (i.e., the tree has branched at some point).
+      undoIsForked = !!undoState && undoState.nodes[undoState.currentId]?.childIds.length > 1
     }
     editor.on('transaction', onTransaction)
     onTransaction() // seed initial value
@@ -2066,6 +2093,14 @@
       />
     {/if}
 
+    <!-- Undo Tree Panel (P0-8, Right Side) -->
+    {#if showUndoTree && !zenMode && editor}
+      <UndoTreePanel
+        {editor}
+        onClose={() => showUndoTree = false}
+      />
+    {/if}
+
     <!-- Tag Panel (Right Side, P0-7). Rendered before the
          editor so it sits left of the OutlinePanel when both
          are visible. -->
@@ -2239,7 +2274,7 @@
 
       <!-- Status Bar -->
       {#if !zenMode}
-      <StatusBar {stats} {saving} {multiCursorCount} {columnMode} />
+      <StatusBar {stats} {saving} {multiCursorCount} {columnMode} {undoBranchCount} {undoIsForked} />
       {/if}
       {/if}
 
