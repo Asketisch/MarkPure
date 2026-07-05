@@ -78,6 +78,43 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("status.saving", "Saving..."),
     ("status.multi_cursor", "Multi-cursor"),
     ("status.column_select", "Column select"),
+    // P0-X: Typora-style reading time + selection count.
+    ("status.selection", "Selected"),
+    ("status.selection_tooltip", "Characters in the active selection"),
+    ("status.reading_time_tooltip", "Estimated reading time at 250 wpm"),
+    // P0-X: word-count goal chip.
+    ("status.word_goal", "{current} / {goal} ({pct}%)"),
+    ("status.word_goal_tooltip", "Word-count progress toward your goal"),
+    // P0-X: Typora-style "Saved X ago" indicator.
+    ("status.saved_just_now", "Saved"),
+    ("status.saved_seconds_ago", "Saved seconds ago"),
+    ("status.saved_minutes_ago", "Saved {n} min ago"),
+    ("status.saved_hours_ago", "Saved {n} h ago"),
+    ("status.saved_days_ago", "Saved {n} d ago"),
+    ("status.saved_at_tooltip", "Time since the last successful save to disk"),
+    // P0-X: status-bar jump buttons (↑ / ↓).
+    ("status.jump_buttons_aria", "Document navigation"),
+    ("status.jump_top_tooltip", "Jump to top"),
+    ("status.jump_bottom_tooltip", "Jump to bottom"),
+    // P0-X: lint-on-save toggle. The settings label + a
+    // tooltip that names the three rules so users know
+    // what they're signing up for.
+    ("settings.lint_on_save", "Lint on save"),
+    ("settings.lint_on_save_tooltip",
+     "Trim trailing whitespace, ensure a final newline, and collapse runs of 3+ blank lines to 2 before writing to disk."),
+    // P0-X: Typora-style word-count goal.
+    ("settings.word_count_goal", "Word count goal"),
+    ("settings.word_count_goal_tooltip",
+     "When > 0, the status bar shows progress toward this target (e.g. 1247 / 5000 = 25%). 0 disables the chip."),
+    // P0-X: Typora-style "✓ Saved" toast.
+    ("settings.saved_flash", "✓ Saved"),
+    // P0-X: backup / restore preferences.
+    ("settings.backup_restore", "Backup & Restore"),
+    ("settings.export_preferences", "Export preferences"),
+    ("settings.export_button", "Export…"),
+    ("settings.import_preferences", "Import preferences"),
+    ("settings.import_button", "Import…"),
+    ("settings.import_report", "Restored: {themes} themes ({skipped} skipped), {keybindings} keybindings"),
     // P2-7: Vim mode chip + ex command bar labels.
     ("status.vim_normal", "NORMAL"),
     ("status.vim_insert", "INSERT"),
@@ -139,6 +176,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("toolbar.ordered_list", "Ordered List"),
     ("toolbar.task_list", "Task List"),
     ("toolbar.insert_table", "Insert Table"),
+    ("toolbar.insert_image", "Insert Image"),
     ("toolbar.add_column_before", "Add Column Before"),
     ("toolbar.add_column_after", "Add Column After"),
     ("toolbar.delete_column", "Delete Column"),
@@ -224,10 +262,27 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("action.find_and_replace", "Find & Replace"),
     ("menu.toggle_sidebar", "Toggle Sidebar"),
     ("view.toggle_zen_mode", "Toggle Zen Mode"),
+    // P0-X: per-panel toggles (Tab Bar / Toolbar / Status Bar).
+    ("view.toggle_tab_bar", "Toggle Tab Bar"),
+    ("view.toggle_toolbar", "Toggle Toolbar"),
+    ("view.toggle_status_bar", "Toggle Status Bar"),
+    // P0-X: Typora-style "Collapse / Expand All Headings".
+    ("view.collapse_all_headings", "Collapse All Headings"),
+    ("view.expand_all_headings", "Expand All Headings"),
     ("dialog.file_changed_title", "File Changed on Disk"),
     ("dialog.file_changed_message", "{name} has been modified outside MarkPure. Reload and lose your changes?"),
     ("dialog.reload", "Reload"),
     ("dialog.keep_mine", "Keep Mine"),
+    // P0-X: Typora-style `[text](` link autocomplete.
+    ("link_suggest.placeholder", "Filter workspace files…"),
+    ("link_suggest.no_match", "No matching files"),
+    // Typora-style prompts for tabs that have unsaved edits.
+    ("dialog.unsaved_title", "Save changes before closing?"),
+    ("dialog.unsaved_message", "\"{name}\" has unsaved changes. Save before closing?"),
+    ("dialog.discard", "Don't Save"),
+    ("dialog.unsaved_other_tabs", "the other tabs you want to close"),
+    ("dialog.unsaved_all_tabs", "all open tabs"),
+    ("dialog.unsaved_right_tabs", "the tabs to the right"),
     ("tag_pane.title", "Tags"),
     ("tag_pane.empty", "No tags found"),
     ("tag_pane.no_match", "No matching tags"),
@@ -273,6 +328,11 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.file.close_tab", "Close Tab"),
     ("cmd.edit.select_same_word", "Select Next Same Word"),
     ("cmd.edit.copy_as_markdown", "Copy as Markdown"),
+    // P0-X: editor right-click context menu (Typora-style).
+    ("context.copy_as_markdown", "Copy as Markdown"),
+    ("context.copy_as_html", "Copy as HTML"),
+    ("context.copy_as_plain", "Copy as Plain Text"),
+    ("context.copy", "Copy"),
     ("cmd.edit.copy_as_html", "Copy as HTML"),
     ("cmd.edit.copy_as_plain", "Copy as Plain Text"),
     // P0-3: multi-cursor commands.

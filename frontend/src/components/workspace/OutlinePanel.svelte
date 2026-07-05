@@ -1,6 +1,6 @@
 <script lang="ts">
   import Outline from './Outline.svelte'
-  import type { OutlineItem } from '$lib/commands'
+  import type { OutlineItem } from '$lib/editor/commands'
   import type { Editor } from '@tiptap/core'
   import { useI18n } from '$lib/stores/i18n.svelte'
 

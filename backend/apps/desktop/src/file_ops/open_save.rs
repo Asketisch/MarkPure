@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use mt_core::document::{Document, Encoding};
+use mt_core::markdown_lint::{lint_markdown, LintRule};
 use crate::state::{lock_or_recover, parse_doc_id_param, AppEvent, AppState};
 // ============================== File operations ==============================
 
@@ -47,6 +48,17 @@ pub fn cmd_save_file(
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
     let path = PathBuf::from(path_str);
 
+    // P0-X: read the user's `lint_on_save` toggle from the
+    // config. We snapshot it inside the lock so we can
+    // drop the mutex before the actual `lint_markdown` /
+    // `write_file` work — both of those can be slow on
+    // large documents and we'd rather not block every
+    // other config-reading call site.
+    let lint_enabled = {
+        let config = lock_or_recover(&state.config);
+        config.editor.lint_on_save
+    };
+
     // Try doc_id first (read from Rust document registry), fall back to content param.
     // P2-4: doc_id is String (accepts legacy numeric ids too via `parse_doc_id_param`).
     if params["doc_id"].is_string() || params["doc_id"].is_u64() {
@@ -69,7 +81,13 @@ pub fn cmd_save_file(
         }; // mutex released here
         match write_info {
             Some((text, encoding)) => {
-                let tmp_doc = Document::from_content(&text, Some(path.clone()), encoding);
+                let cleaned = if lint_enabled {
+                    let (out, _report) = lint_markdown(&text, &lint_rules());
+                    out
+                } else {
+                    text
+                };
+                let tmp_doc = Document::from_content(&cleaned, Some(path.clone()), encoding);
                 state
                     .rt()
                     .block_on(fs::write_file(&tmp_doc, &path))
@@ -79,7 +97,13 @@ pub fn cmd_save_file(
         }
     } else {
         let content = params["content"].as_str().ok_or("Missing 'content' parameter")?;
-        let doc = Document::from_content(content, Some(path.clone()), Encoding::Utf8);
+        let cleaned = if lint_enabled {
+            let (out, _report) = lint_markdown(content, &lint_rules());
+            out
+        } else {
+            content.to_string()
+        };
+        let doc = Document::from_content(&cleaned, Some(path.clone()), Encoding::Utf8);
         state
             .rt()
             .block_on(fs::write_file(&doc, &path))
@@ -94,6 +118,19 @@ pub fn cmd_save_file(
     state.save_config();
 
     Ok(serde_json::Value::Null)
+}
+
+/// Default lint rule set. V1 enables all three rules
+/// together — splitting them per-rule would require a more
+/// elaborate config UI (each rule as its own toggle).
+/// The user can opt out of the entire feature by turning
+/// `editor.lint_on_save` off.
+fn lint_rules() -> Vec<LintRule> {
+    vec![
+        LintRule::TrimTrailingWhitespace,
+        LintRule::EnsureFinalNewline,
+        LintRule::CollapseExcessBlankLines,
+    ]
 }
 
 pub fn cmd_get_doc_stats(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {

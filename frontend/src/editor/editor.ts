@@ -38,11 +38,13 @@ import {
 import { PasteHandlerExtension } from '../extensions/blocks/paste-handler-extension'
 import { AutoCloseExtension } from '../extensions/editing/auto-close-extension'
 import { WikiLinkExtension } from '../extensions/editing/wikilink-extension'
+import { LinkSuggestionExtension, type LinkSuggestionItem } from '../extensions/editing/link-suggestion-extension'
 import { TagExtension } from '../extensions/editing/tag-extension'
 import { TypewriterScrollExtension } from '../extensions/view/typewriter-scroll-extension'
 import { FocusModeExtension } from '../extensions/view/focus-mode-extension'
 import { UndoTreeExtension } from '../extensions/editing/undo-tree-extension'
 import { SpellcheckExtension } from '../extensions/editing/spellcheck-extension'
+import { EmojiShortcodeExtension } from '../extensions/editing/emoji-extension'
 import { VimExtension } from '../extensions/editing/vim-extension'
 import { setVimEnabled, isVimEnabled } from '../plugins/vim'
 import { MermaidExtension } from '../nodeviews/mermaid-view'
@@ -132,10 +134,73 @@ export interface EditorOptions {
    * open the workspace search pre-filled with the tag name.
    */
   onTagClick?: (tag: string) => void
+  /** Fired when Vim mode is toggled via Cmd+. inside the editor. */
+  onVimModeChange?: (enabled: boolean) => void
+  /**
+   * Typora-style editor preferences read from Settings. The
+   * host passes the current values on every `createEditor`
+   * call so a tab switch doesn't reset them. `tab_size` is
+   * injected as a CSS variable so downstream code (the
+   * SourceEditor / CodeMirror mirror) can read it without a
+   * separate IPC. `word_wrap` toggles ProseMirror's
+   * wrapping behaviour via a CSS class; `line_numbers` does
+   * the same. `soft_tabs` is read by CodeMirror's keymap
+   * via `--editor-tab-size` + indentWithTab.
+   */
+  editorPrefs?: {
+    tab_size?: number
+    soft_tabs?: boolean
+    line_numbers?: boolean
+    word_wrap?: boolean
+  }
+}
+
+/** Apply editor preferences to the ProseMirror host element
+ *  via CSS classes + variables. SourceEditor (CodeMirror)
+ *  reads the same CSS variables so WYSIWYG and source
+ *  views stay in sync.
+ *
+ *  Reading directly off `document.documentElement` is
+ *  intentional: `applyEditorConfig` in App.svelte already
+ *  writes `--editor-font-family` / `--editor-font-size`
+ *  there, so we extend the same convention for tab size
+ *  and the two toggleable boolean prefs.
+ */
+function applyEditorPrefs(
+  parent: HTMLElement,
+  prefs: EditorOptions['editorPrefs'],
+): void {
+  const root = document.documentElement
+  if (prefs?.tab_size !== undefined) {
+    root.style.setProperty('--editor-tab-size', String(prefs.tab_size))
+  }
+  if (prefs?.soft_tabs !== undefined) {
+    root.style.setProperty('--editor-soft-tabs', prefs.soft_tabs ? '1' : '0')
+  }
+  // `word_wrap` toggles a CSS class on the editor host so
+  // existing global CSS can target `.prose-editor.no-wrap`
+  // with `white-space: pre`. Line numbers toggle a separate
+  // class — the gutter itself is rendered by the existing
+  // starter-kit setup only when the class is present.
+  const host = parent
+  if (prefs?.word_wrap === false) {
+    host.classList.add('no-wrap')
+  } else {
+    host.classList.remove('no-wrap')
+  }
+  if (prefs?.line_numbers === false) {
+    host.classList.add('no-line-numbers')
+  } else {
+    host.classList.remove('no-line-numbers')
+  }
 }
 
 export function createEditor(opts: EditorOptions): Editor {
-  const { parent, content = '', onChange, onSave, onFilesDropped, onImagesDropped, onWikiLinkClick, onTagClick } = opts
+  const { parent, content = '', onChange, onSave, onFilesDropped, onImagesDropped, onWikiLinkClick, onTagClick, onVimModeChange, editorPrefs } = opts
+
+  // Apply user prefs BEFORE the editor mounts so the first
+  // transaction sees the correct wrap / line-number state.
+  applyEditorPrefs(parent, editorPrefs)
 
   const editor = new Editor({
     element: parent,
@@ -153,7 +218,7 @@ export function createEditor(opts: EditorOptions): Editor {
         // picks up its `markdownTokenizer` / `parseMarkdown` / `renderMarkdown`
         // hooks. It owns its own `mermaid` token type to avoid racing with
         // StarterKit's CodeBlock.
-        extensions: [Table, MermaidExtension],
+        ...( { extensions: [Table, MermaidExtension] } as Parameters<typeof Markdown.configure>[0] ),
       }),
       Table.configure({ resizable: true }),
       TableRow,
@@ -201,7 +266,25 @@ export function createEditor(opts: EditorOptions): Editor {
       PasteHandlerExtension,
       AutoCloseExtension,
       MultiCursorExtension,
+      // P0-X: Typora-style emoji shortcode expansion
+      // (`:smile:` → `😄`). Uses an `InputRule` so the
+      // expansion fires on Space / Enter / Tab and doesn't
+      // require the user to remember which emoji glyph
+      // matches which shortcode.
+      EmojiShortcodeExtension,
       WikiLinkExtension.configure({ onClickLink: onWikiLinkClick }),
+      // P0-X: Typora-style `[text](` link autocomplete.
+      // `getItems` is wired by App.svelte via a window
+      // event (`mt:link-suggest-query`) so the candidate
+      // list comes from the workspace tree without the
+      // plugin needing to know the file-system path.
+      LinkSuggestionExtension.configure({
+        onCommit: (item: LinkSuggestionItem) => {
+          window.dispatchEvent(new CustomEvent('mt:link-suggest-commit', {
+            detail: { item },
+          }))
+        },
+      }),
       TagExtension.configure({ onClickTag: onTagClick }),
       TypewriterScrollExtension.configure({ enabled: false }),
       FocusModeExtension.configure({ enabled: false }),
@@ -226,6 +309,16 @@ export function createEditor(opts: EditorOptions): Editor {
         class: 'prose-editor',
       },
       handleKeyDown: (view, event) => {
+        // P0-X: Typora-style IME guard. While an IME
+        // composition is open we let every keystroke
+        // reach the IME — Cmd+S saving, Cmd+. toggling
+        // Vim mode, Esc clearing cursors, Cmd+U undoing
+        // cursors, all of it. Without this guard the
+        // user typing CJK with the OS IME would have
+        // their composition window collapse the instant
+        // they pressed one of those shortcuts.
+        if (view.composing || event.isComposing) return false
+
         if ((event.metaKey || event.ctrlKey) && event.key === 's') {
           // P0-3: also clear any active multi-cursor state on save.
           clearMultiCursors(view)
@@ -247,7 +340,9 @@ export function createEditor(opts: EditorOptions): Editor {
         // plugin state stays in sync.
         if ((event.metaKey || event.ctrlKey) && event.key === '.') {
           event.preventDefault()
-          setVimEnabled(!isVimEnabled())
+          const next = !isVimEnabled()
+          setVimEnabled(next)
+          onVimModeChange?.(next)
           return true
         }
         // P0-3 multi-cursor: Escape clears all secondary cursors.
@@ -283,7 +378,7 @@ export function setContent(editor: Editor, markdown: string): void {
   // not what we want for markdown, but at least non-empty.
   try {
     const parser = (editor.markdown as { parse?: (md: string) => unknown })?.parse
-      ?? (editor.storage as Record<string, unknown>)?.markdown
+      ?? (editor.storage as unknown as Record<string, unknown>)?.markdown
         ? (editor.storage as { markdown?: { parser?: { parse?: (md: string) => unknown } } })
             .markdown?.parser?.parse
         : undefined

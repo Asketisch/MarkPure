@@ -1,6 +1,10 @@
 <script lang="ts">
   /**
-   * Bookmarks panel — slides in from the right, ⌘B toggles.
+   * Bookmarks panel — slides in from the right. Opened
+   * via the command palette (`tools.bookmarks`) or the
+   * Settings menu (no dedicated shortcut — `⌘B` is the
+   * sidebar toggle to match the EmptyState hint).
+   *
    * Reads/writes through the existing `getBookmarks` /
    * `addBookmark` / `updateBookmark` / `removeBookmark` IPC.
    * The host wires `onOpen` to navigate the editor to the

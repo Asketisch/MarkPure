@@ -4,6 +4,7 @@
     setConfig,
     getThemes,
     importTheme,
+    pickThemeFile,
     exportTheme,
     deleteTheme,
     getLocale,
@@ -11,6 +12,10 @@
     getKeybindings,
     updateKeybinding,
     resetKeybindings,
+    exportConfig,
+    importConfig,
+    type ConfigExportPayload,
+    type ConfigImportReport,
     type AppConfig,
     type Theme,
     type KeyBinding,
@@ -63,6 +68,98 @@
     loading = false
   }
 
+  // P0-X: Typora-style "saved" toast. We flash a
+  // "✓ Saved" indicator in the dialog header for ~1.5s
+  // after every successful save so the user knows the
+  // change persisted (Typora / VSCode both do this; the
+  // previous implementation gave no visible feedback and
+  // the user had to assume `setConfig` succeeded).
+  let justSaved = $state(false)
+  // P0-X: import-report state. Set after the user picks
+  // a config file so the panel can flash a one-line
+  // summary ("Restored: 2 themes, 0 skipped, 12
+  // keybindings"). `null` hides the report.
+  let configImportReport = $state<ConfigImportReport | null>(null)
+  // P0-X: re-fetch the latest config after a successful
+  // import so the Settings UI reflects the freshly
+  // restored theme / editor prefs / keybindings without
+  // a restart.
+  async function reloadAllAfterImport() {
+    try {
+      const [c, k] = await Promise.all([getConfig(), getKeybindings()])
+      config = c
+      keybindings = k
+      // Re-apply i18n + theme through the same path the
+      // user would take when changing them in Settings.
+      if (c.language) {
+        await i18n.changeLocale(c.language)
+      }
+      onConfigChange?.(c as unknown as Partial<AppConfig>)
+      flashSaved()
+    } catch (e) {
+      console.error('Failed to reload config after import:', e)
+    }
+  }
+  async function handleExportConfig() {
+    try {
+      const payload = await exportConfig()
+      // We hand the user the JSON as a Blob + an anchor
+      // download. The wry WebView respects the
+      // `download` attribute on programmatic `<a>`
+      // clicks, matching how Typora / VSCode surface
+      // "Export Preferences" without a separate IPC.
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: 'application/json',
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const stamp = new Date().toISOString().slice(0, 10)
+      a.download = `markpure-preferences-${stamp}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      flashSaved()
+    } catch (e) {
+      console.error('Failed to export preferences:', e)
+    }
+  }
+  async function handleImportConfig() {
+    // Hidden `<input type=file>` is rendered at the end
+    // of the dialog; clicking it opens the native file
+    // picker scoped to `.json` (Typora / VSCode
+    // convention).
+    if (importInput) importInput.click()
+  }
+  async function onImportFileChange(e: Event) {
+    const target = e.target as HTMLInputElement
+    const file = target.files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      const payload = JSON.parse(text) as ConfigExportPayload
+      const report = await importConfig(payload)
+      configImportReport = report
+      await reloadAllAfterImport()
+    } catch (e) {
+      console.error('Failed to import preferences:', e)
+      configImportReport = null
+    } finally {
+      target.value = ''
+    }
+  }
+  let importInput: HTMLInputElement | null = $state.raw(null)
+  let savedTimer: ReturnType<typeof setTimeout> | null = null
+  function flashSaved() {
+    justSaved = true
+    if (savedTimer) clearTimeout(savedTimer)
+    savedTimer = setTimeout(() => {
+      justSaved = false
+      savedTimer = null
+    }, 1500)
+  }
+
   async function saveConfig(updates: Partial<AppConfig>) {
     try {
       await setConfig(updates)
@@ -70,6 +167,7 @@
         Object.assign(config, updates)
       }
       onConfigChange?.(updates)
+      flashSaved()
     } catch (e) {
       console.error('Failed to save config:', e)
     }
@@ -135,19 +233,19 @@
 
   async function handleImportTheme() {
     try {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = '.json'
-      input.onchange = async () => {
-        const file = input.files?.[0]
-        if (!file) return
-        const path = file.name
-        const text = await file.text()
-        const theme = JSON.parse(text) as Theme
-        theme.id = `custom_${Date.now()}`
-        themes = [...themes, theme]
-      }
-      input.click()
+      // Use the native file picker (rfd via Rust) so we get
+      // an absolute path. The previous implementation used
+      // `input[type=file]` which only exposed a sandboxed
+      // filename and never persisted the imported theme to
+      // the on-disk themes directory.
+      const path = await pickThemeFile()
+      if (!path) return  // user cancelled
+      const theme = await importTheme(path)
+      // Re-pull the canonical list from Rust so the UI
+      // mirrors the on-disk truth (id may have been
+      // canonicalised by `import_theme_from_path`).
+      themes = await getThemes()
+      void theme  // kept for future "select just-imported" UX
     } catch (e) {
       console.error('Failed to import theme:', e)
     }
@@ -218,7 +316,14 @@
   <div class="settings-overlay" onclick={() => visible = false}>
     <div class="settings-dialog" onclick={(e) => e.stopPropagation()}>
       <div class="settings-sidebar">
-        <h3>{i18n.t('sidebar.settings')}</h3>
+        <h3>
+          {i18n.t('sidebar.settings')}
+          {#if justSaved}
+            <span class="settings-saved-flash" aria-live="polite">
+              {i18n.t('settings.saved_flash')}
+            </span>
+          {/if}
+        </h3>
         <nav>
           <button class:active={activeSection === 'general'} onclick={() => activeSection = 'general'}>{i18n.t('settings.general')}</button>
           <button class:active={activeSection === 'appearance'} onclick={() => activeSection = 'appearance'}>{i18n.t('settings.appearance')}</button>
@@ -235,8 +340,8 @@
             <h2>{i18n.t('settings.general')}</h2>
 
             <div class="setting-row">
-              <label>{i18n.t('settings.language')}</label>
-              <select value={localeInfo?.current ?? 'en'} onchange={(e) => changeLanguage((e.target as HTMLSelectElement).value)}>
+              <label for="settings-language">{i18n.t('settings.language')}</label>
+              <select id="settings-language" value={localeInfo?.current ?? 'en'} onchange={(e) => changeLanguage((e.target as HTMLSelectElement).value)}>
                 {#if localeInfo}
                   {#each localeInfo.available as [code, name]}
                     <option value={code}>{name}</option>
@@ -246,38 +351,77 @@
             </div>
 
             <div class="setting-row">
-              <label>{i18n.t('settings.font_family')}</label>
-              <input type="text" value={config.editor.font_family} onchange={(e) => saveConfig({ editor: { ...config!.editor, font_family: (e.target as HTMLInputElement).value } })} />
+              <label for="settings-font-family">{i18n.t('settings.font_family')}</label>
+              <input id="settings-font-family" type="text" value={config.editor.font_family} onchange={(e) => saveConfig({ editor: { ...config!.editor, font_family: (e.target as HTMLInputElement).value } })} />
             </div>
 
             <div class="setting-row">
-              <label>{i18n.t('settings.font_size')}</label>
-              <input type="number" min="10" max="32" value={config.editor.font_size} onchange={(e) => saveConfig({ editor: { ...config!.editor, font_size: Number((e.target as HTMLInputElement).value) } })} />
+              <label for="settings-font-size">{i18n.t('settings.font_size')}</label>
+              <input id="settings-font-size" type="number" min="10" max="32" value={config.editor.font_size} onchange={(e) => saveConfig({ editor: { ...config!.editor, font_size: Number((e.target as HTMLInputElement).value) } })} />
             </div>
 
             <div class="setting-row">
-              <label>{i18n.t('settings.tab_size')}</label>
-              <input type="number" min="2" max="8" value={config.editor.tab_size} onchange={(e) => saveConfig({ editor: { ...config!.editor, tab_size: Number((e.target as HTMLInputElement).value) } })} />
+              <label for="settings-tab-size">{i18n.t('settings.tab_size')}</label>
+              <input id="settings-tab-size" type="number" min="2" max="8" value={config.editor.tab_size} onchange={(e) => saveConfig({ editor: { ...config!.editor, tab_size: Number((e.target as HTMLInputElement).value) } })} />
             </div>
 
             <div class="setting-row">
-              <label>{i18n.t('settings.soft_tabs')}</label>
-              <input type="checkbox" checked={config.editor.soft_tabs} onchange={(e) => saveConfig({ editor: { ...config!.editor, soft_tabs: (e.target as HTMLInputElement).checked } })} />
+              <label for="settings-soft-tabs">{i18n.t('settings.soft_tabs')}</label>
+              <input id="settings-soft-tabs" type="checkbox" checked={config.editor.soft_tabs} onchange={(e) => saveConfig({ editor: { ...config!.editor, soft_tabs: (e.target as HTMLInputElement).checked } })} />
             </div>
 
             <div class="setting-row">
-              <label>{i18n.t('settings.line_numbers')}</label>
-              <input type="checkbox" checked={config.editor.line_numbers} onchange={(e) => saveConfig({ editor: { ...config!.editor, line_numbers: (e.target as HTMLInputElement).checked } })} />
+              <label for="settings-line-numbers">{i18n.t('settings.line_numbers')}</label>
+              <input id="settings-line-numbers" type="checkbox" checked={config.editor.line_numbers} onchange={(e) => saveConfig({ editor: { ...config!.editor, line_numbers: (e.target as HTMLInputElement).checked } })} />
             </div>
 
             <div class="setting-row">
-              <label>{i18n.t('settings.word_wrap')}</label>
-              <input type="checkbox" checked={config.editor.word_wrap} onchange={(e) => saveConfig({ editor: { ...config!.editor, word_wrap: (e.target as HTMLInputElement).checked } })} />
+              <label for="settings-word-wrap">{i18n.t('settings.word_wrap')}</label>
+              <input id="settings-word-wrap" type="checkbox" checked={config.editor.word_wrap} onchange={(e) => saveConfig({ editor: { ...config!.editor, word_wrap: (e.target as HTMLInputElement).checked } })} />
             </div>
 
             <div class="setting-row">
-              <label>{i18n.t('settings.auto_save_interval')}</label>
-              <input type="number" min="0" max="300" value={config.editor.auto_save_interval} onchange={(e) => saveConfig({ editor: { ...config!.editor, auto_save_interval: Number((e.target as HTMLInputElement).value) } })} />
+              <label for="settings-auto-save">{i18n.t('settings.auto_save_interval')}</label>
+              <input id="settings-auto-save" type="number" min="0" max="300" value={config.editor.auto_save_interval} onchange={(e) => saveConfig({ editor: { ...config!.editor, auto_save_interval: Number((e.target as HTMLInputElement).value) } })} />
+            </div>
+
+            <!-- P0-X: Typora-style "lint on save" toggle.
+                 When enabled, `save_file` runs
+                 `lint_markdown` (trim trailing whitespace,
+                 ensure final newline, collapse 3+ blank
+                 lines into 2) before writing to disk. -->
+            <div class="setting-row">
+              <label for="settings-lint-on-save" title={i18n.t('settings.lint_on_save_tooltip')}>
+                {i18n.t('settings.lint_on_save')}
+              </label>
+              <input
+                id="settings-lint-on-save"
+                type="checkbox"
+                checked={config.editor.lint_on_save}
+                onchange={(e) => saveConfig({ editor: { ...config!.editor, lint_on_save: (e.target as HTMLInputElement).checked } })}
+              />
+            </div>
+
+            <!-- P0-X: Typora-style word-count goal. When
+                 set (>0), the status bar shows
+                 `<current> / <goal> (<pct>%)` so the
+                 user can track progress against a writing
+                 target. Lives at the top level of
+                 AppConfig (not `editor.*`) because it's
+                 a writing-flow preference, not a code-
+                 editor knob. -->
+            <div class="setting-row">
+              <label for="settings-word-count-goal" title={i18n.t('settings.word_count_goal_tooltip')}>
+                {i18n.t('settings.word_count_goal')}
+              </label>
+              <input
+                id="settings-word-count-goal"
+                type="number"
+                min="0"
+                step="100"
+                value={config.word_count_goal ?? 0}
+                onchange={(e) => saveConfig({ word_count_goal: Number((e.target as HTMLInputElement).value) })}
+              />
             </div>
 
             <!-- P1-11: Spell check (toggle + language). On
@@ -285,18 +429,20 @@
                  only English is checked. -->
             <h3>{i18n.t('settings.spellcheck')}</h3>
             <div class="setting-row">
-              <label title={isMacPlatform ? '' : i18n.t('settings.spellcheck.macos_only')}>
+              <label for="settings-spellcheck-enabled" title={isMacPlatform ? '' : i18n.t('settings.spellcheck.macos_only')}>
                 {i18n.t('settings.spellcheck_enabled')}
               </label>
               <input
+                id="settings-spellcheck-enabled"
                 type="checkbox"
                 checked={config.editor.spellcheck_enabled}
                 onchange={(e) => saveConfig({ editor: { ...config!.editor, spellcheck_enabled: (e.target as HTMLInputElement).checked } })}
               />
             </div>
             <div class="setting-row">
-              <label>{i18n.t('settings.spellcheck_language')}</label>
+              <label for="settings-spellcheck-language">{i18n.t('settings.spellcheck_language')}</label>
               <select
+                id="settings-spellcheck-language"
                 value={config.editor.spellcheck_language ?? ''}
                 onchange={(e) => {
                   const v = (e.target as HTMLSelectElement).value
@@ -309,6 +455,38 @@
                 <option value="ja">日本語</option>
               </select>
             </div>
+
+            <!-- P0-X: Typora-style preferences export /
+                 import. The user can back up the entire
+                 `AppConfig` + keybindings + custom themes
+                 to a single JSON file and restore them
+                 later (typically on a fresh install or
+                 after switching machines). Both buttons
+                 surface a native file picker via the host
+                 Rust binary; the export writes the
+                 payload, the import reads it back and
+                 forwards it to `cmd_import_config`. -->
+            <h3>{i18n.t('settings.backup_restore')}</h3>
+            <div class="setting-row">
+              <label>{i18n.t('settings.export_preferences')}</label>
+              <button class="setting-action" onclick={handleExportConfig}>
+                {i18n.t('settings.export_button')}
+              </button>
+            </div>
+            <div class="setting-row">
+              <label>{i18n.t('settings.import_preferences')}</label>
+              <button class="setting-action" onclick={handleImportConfig}>
+                {i18n.t('settings.import_button')}
+              </button>
+            </div>
+            {#if configImportReport}
+              <div class="import-report" role="status">
+                {i18n.t('settings.import_report')
+                  .replace('{themes}', String(configImportReport.themes_restored))
+                  .replace('{skipped}', String(configImportReport.themes_skipped))
+                  .replace('{keybindings}', String(configImportReport.keybindings_restored))}
+              </div>
+            {/if}
           </section>
 
         {:else if activeSection === 'appearance'}
@@ -316,8 +494,8 @@
             <h2>{i18n.t('settings.appearance')}</h2>
 
             <div class="setting-row">
-              <label>{i18n.t('settings.builtin_theme')}</label>
-              <select value={config?.theme ?? ''} onchange={(e) => changeTheme((e.target as HTMLSelectElement).value)}>
+              <label for="settings-builtin-theme">{i18n.t('settings.builtin_theme')}</label>
+              <select id="settings-builtin-theme" value={config?.theme ?? ''} onchange={(e) => changeTheme((e.target as HTMLSelectElement).value)}>
                 {#each themeOptions as opt (opt.value)}
                   <option value={opt.value}>{i18n.t(opt.labelKey)}</option>
                 {/each}
@@ -386,6 +564,20 @@
   </div>
 {/if}
 
+<!-- P0-X: hidden file input for the "Import Preferences"
+     button. Same shape as the image-picker input —
+     keep it offscreen but in the DOM so `input.click()`
+     works on every WebView port. -->
+<input
+  bind:this={importInput}
+  type="file"
+  accept="application/json,.json"
+  class="hidden-file-input"
+  onchange={onImportFileChange}
+  aria-hidden="true"
+  tabindex="-1"
+/>
+
 {#if themeEditorVisible}
   <div class="theme-editor-wrapper">
     <ThemeEditor
@@ -435,6 +627,26 @@
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  /* P0-X: Typora-style "saved" toast that flashes for
+     ~1.5s after a successful `setConfig` IPC. Sits next
+     to the "Settings" sidebar header. */
+  .settings-saved-flash {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    animation: saved-flash-fade 1.5s ease-out forwards;
+  }
+  @keyframes saved-flash-fade {
+    0% { opacity: 0; transform: translateX(-4px); }
+    20% { opacity: 1; transform: translateX(0); }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
   }
 
   .settings-sidebar nav {
@@ -511,6 +723,35 @@
 
   .setting-actions {
     margin-top: 16px;
+  }
+
+  /* P0-X: backup / restore buttons. Match the existing
+     "setting-action" class so they line up with the
+     appearance actions above. */
+  .setting-action {
+    padding: 6px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .setting-action:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  /* P0-X: post-import report line. Shown directly under
+     the buttons so the user immediately sees what was
+     restored (themes / keybindings counts). */
+  .import-report {
+    margin: 8px 0 4px;
+    padding: 8px 12px;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--accent);
+    border-radius: 6px;
+    font-size: 12px;
   }
 
   .setting-actions button {

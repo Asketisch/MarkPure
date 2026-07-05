@@ -62,6 +62,11 @@ export interface AppConfig {
   theme: string
   language: string | null
   last_workspace: string | null
+  // P0-X: Typora-style word-count goal. Top-level
+  // AppConfig field so the Settings panel reads /
+  // writes it through the same `editor` namespace as
+  // the rest of the live config.
+  word_count_goal?: number
   editor: {
     font_family: string
     font_size: number
@@ -77,7 +82,14 @@ export interface AppConfig {
     /** Override the spell-check language. `null` means follow
      *  the UI language. */
     spellcheck_language: string | null
+    /** P0-X: Typora-style "lint on save". When true, the
+     *  Rust host runs `lint_markdown` over the buffer
+     *  before writing it to disk. Default false so
+     *  existing users' workflows don't change. */
+    lint_on_save?: boolean
   }
+  /** P2-7: global Vim mode toggle (persisted). */
+  vim_mode?: boolean
 }
 
 // Search results (workspace + per-document)
@@ -95,4 +107,59 @@ export interface WorkspaceSearchResult {
   matches: SearchMatch[]
   total_files: number
   total_matches: number
+}
+
+// Themes — 1:1 aligned with backend/crates/core-lib/src/theme.rs ThemeColors
+export interface ThemeColors {
+  bg: string
+  bg_secondary: string
+  bg_tab_active: string
+  bg_tab_inactive: string
+  text: string
+  text_secondary: string
+  accent: string
+  accent_hover: string
+  border: string
+  menu_hover_bg: string
+  menu_hover_text: string
+  status_bg: string
+  scrollbar_thumb: string
+  highlight_bg: string
+  cell_selected_bg: string
+  heading1_color: string
+  heading2_color: string
+  heading3_color: string
+  heading4_color: string
+  heading5_color: string
+  heading6_color: string
+  heading1_size: string
+  heading2_size: string
+  heading3_size: string
+  heading4_size: string
+  heading5_size: string
+  heading6_size: string
+  code_bg: string
+  code_block_bg: string
+  link_color: string
+  link_hover_color: string
+  blockquote_border: string
+  blockquote_bg: string
+  hr_color: string
+  table_border: string
+  table_header_bg: string
+}
+
+export interface Theme {
+  id: string
+  name: string
+  author: string
+  description: string
+  is_dark: boolean
+  colors: ThemeColors
+}
+
+// File watcher events
+export interface FileChangeEvent {
+  path: string
+  kind: 'modified' | 'created' | 'deleted'
 }

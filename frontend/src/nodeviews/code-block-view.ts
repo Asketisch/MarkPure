@@ -41,6 +41,16 @@ const languageExtensions: Record<string, () => any> = {
   sql: sqlLang,
   xml,
   yaml: yamlLang, yml: yamlLang,
+  // P0-X: extra languages the picker offers. Without a
+  // matching CM extension we still want the language
+  // label to appear (so a fenced ```shell block
+  // round-trips as ```shell) but the syntax highlighting
+  // degrades to plain monospace. `getLanguageExtension`
+  // returns `[]` for unknown languages so this is a
+  // no-op at the highlighting layer.
+  shell: () => [],
+  ruby: () => [],
+  lua: () => [],
 }
 
 const languageAliases: Record<string, string> = {
@@ -92,16 +102,76 @@ export class CodeBlockView implements NodeView {
 
     const langSelect = document.createElement('select')
     langSelect.className = 'mw-code-block-lang'
-    const languages = [
-      '', 'javascript', 'typescript', 'python', 'html', 'css', 'json',
-      'markdown', 'go', 'java', 'cpp', 'rust', 'sql', 'xml', 'yaml',
+    // P0-X: Typora-style language picker. Each entry
+    // has a human-readable display label (e.g.
+    // "TypeScript" instead of "typescript") and a
+    // `<optgroup>` structure that mirrors the
+    // Markdown-spec loose categories (Web / Systems /
+    // Data / Scripting / Markup). Typora's picker is
+    // plain (`javascript`, `typescript`, …) but uses the
+    // readable labels; we go one step further with
+    // optgroups so the picker stays short even as we
+    // add more languages.
+    const langGroups: Array<{ label: string; entries: Array<[string, string]> }> = [
+      {
+        label: 'Web',
+        entries: [
+          ['html', 'HTML'],
+          ['css', 'CSS'],
+          ['javascript', 'JavaScript'],
+          ['typescript', 'TypeScript'],
+          ['jsx', 'JSX'],
+          ['tsx', 'TSX'],
+          ['json', 'JSON'],
+        ],
+      },
+      {
+        label: 'Systems',
+        entries: [
+          ['c', 'C'],
+          ['cpp', 'C++'],
+          ['rust', 'Rust'],
+          ['go', 'Go'],
+          ['java', 'Java'],
+        ],
+      },
+      {
+        label: 'Scripting',
+        entries: [
+          ['python', 'Python'],
+          ['ruby', 'Ruby'],
+          ['shell', 'Shell'],
+          ['lua', 'Lua'],
+        ],
+      },
+      {
+        label: 'Data',
+        entries: [
+          ['sql', 'SQL'],
+          ['yaml', 'YAML'],
+          ['xml', 'XML'],
+          ['markdown', 'Markdown'],
+        ],
+      },
     ]
-    for (const l of languages) {
-      const opt = document.createElement('option')
-      opt.value = l
-      opt.textContent = l || 'plain text'
-      if (l === lang) opt.selected = true
-      langSelect.appendChild(opt)
+    // Default "plain text" sits at the top, outside any
+    // group, so the user can clear the language.
+    const plainOpt = document.createElement('option')
+    plainOpt.value = ''
+    plainOpt.textContent = 'plain text'
+    if (lang === '') plainOpt.selected = true
+    langSelect.appendChild(plainOpt)
+    for (const group of langGroups) {
+      const og = document.createElement('optgroup')
+      og.label = group.label
+      for (const [value, label] of group.entries) {
+        const opt = document.createElement('option')
+        opt.value = value
+        opt.textContent = label
+        if (value === lang) opt.selected = true
+        og.appendChild(opt)
+      }
+      langSelect.appendChild(og)
     }
     langSelect.addEventListener('change', () => {
       const pos = this.getPos()

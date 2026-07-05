@@ -7,10 +7,12 @@
  * directly (the result is a side-effect on the host).
  *
  * V1 command set:
- *   - `:w`         → save the current tab
- *   - `:q`         → close the current tab (refused if dirty)
- *   - `:wq` / `:x` → save then close
- *   - `:e`         → reload the current tab from disk
+ *   - `:w`           → save the current tab
+ *   - `:q`           → close the current tab (refused if dirty)
+ *   - `:wq` / `:x`   → save then close
+ *   - `:e`           → reload the current tab from disk
+ *   - `:e <path>`    → open a workspace file by relative path
+ *   - `:b<N>`        → switch to tab N (1-indexed)
  *
  * The host injects `ExecContext` with a minimal surface so
  * this module stays easy to unit-test (no DOM, no editor
@@ -19,6 +21,8 @@
  *   - `save(): Promise<{ ok: boolean, error?: string }>`
  *   - `reload(): Promise<{ ok: boolean, error?: string }>`
  *   - `close(force = false): Promise<{ ok: boolean, error?: string }>`
+ *   - `openFile(path: string): Promise<{ ok: boolean, error?: string }>`
+ *   - `switchTab(index: number): Promise<{ ok: boolean, error?: string }>`
  *
  * Returns a `ExResult` that the plugin turns into a status-
  * bar transient message.
@@ -30,6 +34,21 @@ export interface ExecContext {
   save: () => Promise<{ ok: boolean; error?: string }>
   reload: () => Promise<{ ok: boolean; error?: string }>
   close: (force?: boolean) => Promise<{ ok: boolean; error?: string }>
+  /**
+   * P0-X: open a file by absolute or workspace-relative
+   * path. The host wires this to the existing
+   * `handleOpenFile` flow which already handles
+   * path-resolution + doc registry updates. V2 can add
+   * fuzzy matching by name; V1 just delegates.
+   */
+  openFile: (path: string) => Promise<{ ok: boolean; error?: string }>
+  /**
+   * P0-X: switch to tab N (1-indexed). The host wires
+   * this to `switchTab(tabs[N-1].id)`. Returns
+   * `{ ok: false, error }` when N is out of range so we
+   * can surface a transient status message.
+   */
+  switchTab: (index: number) => Promise<{ ok: boolean; error?: string }>
   isDirty: () => boolean
 }
 
@@ -70,6 +89,18 @@ export async function executeEx(cmd: ExCmd, ctx: ExecContext): Promise<ExResult>
       return r.ok
         ? { ok: true, message: 'reloaded' }
         : { ok: false, message: r.error ?? 'reload failed' }
+    }
+    case 'edit': {
+      const r = await ctx.openFile(cmd.path)
+      return r.ok
+        ? { ok: true, message: `opened ${cmd.path}` }
+        : { ok: false, message: r.error ?? `no such file: ${cmd.path}` }
+    }
+    case 'buffer': {
+      const r = await ctx.switchTab(cmd.index)
+      return r.ok
+        ? { ok: true, message: `switched to buffer ${cmd.index}` }
+        : { ok: false, message: r.error ?? `no buffer ${cmd.index}` }
     }
   }
 }

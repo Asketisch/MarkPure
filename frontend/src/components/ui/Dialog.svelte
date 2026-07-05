@@ -5,21 +5,31 @@
     message = '',
     confirmText = 'OK',
     cancelText = 'Cancel',
+    secondaryText = '',
     inputPlaceholder = '',
     inputValue = $bindable(''),
     onConfirm,
     onCancel,
+    onSecondary,
     onClose,
   }: {
-    type?: 'confirm' | 'info' | 'input'
+    type?: 'confirm' | 'info' | 'input' | 'unsaved'
     title?: string
     message?: string
     confirmText?: string
     cancelText?: string
+    /**
+     * Optional middle action for `type === 'unsaved'`
+     * (e.g. "Don't Save"). Wired to `onSecondary` so the
+     * caller can decide what "discard" means in its
+     * context.
+     */
+    secondaryText?: string
     inputPlaceholder?: string
     inputValue?: string
     onConfirm?: (inputValue?: string) => void
     onCancel?: () => void
+    onSecondary?: () => void
     onClose: () => void
   } = $props()
 
@@ -34,6 +44,11 @@
 
   function handleCancel() {
     onCancel?.()
+    onClose()
+  }
+
+  function handleSecondary() {
+    onSecondary?.()
     onClose()
   }
 
@@ -73,14 +88,30 @@
     </div>
 
     <div class="dialog-actions">
-      {#if type === 'confirm' || type === 'input'}
+      {#if type === 'unsaved'}
         <button class="btn btn-cancel" onclick={handleCancel}>
           {cancelText}
         </button>
+        {#if secondaryText}
+          <button class="btn btn-secondary" onclick={handleSecondary}>
+            {secondaryText}
+          </button>
+        {/if}
+        <button class="btn btn-confirm" onclick={handleConfirm}>
+          {confirmText}
+        </button>
+      {:else if type === 'confirm' || type === 'input'}
+        <button class="btn btn-cancel" onclick={handleCancel}>
+          {cancelText}
+        </button>
+        <button class="btn btn-confirm" onclick={handleConfirm}>
+          {confirmText}
+        </button>
+      {:else}
+        <button class="btn btn-confirm" onclick={handleConfirm}>
+          {confirmText}
+        </button>
       {/if}
-      <button class="btn btn-confirm" onclick={handleConfirm}>
-        {confirmText}
-      </button>
     </div>
   </div>
 </div>
@@ -167,6 +198,17 @@
   }
 
   .btn-cancel:hover {
+    background: var(--menu-hover-bg);
+  }
+
+  .btn-secondary {
+    background: var(--bg);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover {
+    color: var(--text);
     background: var(--menu-hover-bg);
   }
 

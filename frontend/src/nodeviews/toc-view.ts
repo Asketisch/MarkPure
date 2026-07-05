@@ -85,23 +85,76 @@ export class TocNodeView {
 interface TreeItem {
   item: OutlineItem
   children: TreeItem[]
+  /** P0-X: outline number string ("1.", "1.1.", …) assigned
+   *  by `assignNumbers` before render. Undefined before
+   *  assignment. */
+  label?: string
+}
+
+/** P0-X: Typora-style TOC auto-numbering. We walk the
+ *  tree top-down, incrementing a per-level counter as we
+ *  encounter headings. The resulting numbering is
+ *  classic Outline (`1.` / `1.1.` / `1.1.1.`) and lives
+ *  in a `<span class="toc-num">` sibling of the link so
+ *  the user can still copy the heading text alone (the
+ *  number is rendered as a separate CSS-pseudo-style
+ *  element would be a stretch for accessibility).
+ *
+ *  The function takes an array of counters (one per
+ *  level) and mutates it in place so the recursion
+ *  matches the depth hierarchy.
+ */
+function assignNumbers(items: TreeItem[], counters: number[]): string[] {
+  const labels: string[] = []
+  for (const ti of items) {
+    const level = ti.item.level
+    counters[level - 1] = (counters[level - 1] ?? 0) + 1
+    // Reset deeper levels — Typora resets all sub-numbers
+    // when a parent increments, so "1.1.3" doesn't become
+    // "1.2.3" by accident when the user adds a sibling
+    // heading at level 2.
+    for (let d = level; d < counters.length; d++) counters[d] = 0
+    const trimmed = counters.slice(0, level).join('.')
+    ti.label = `${trimmed}.`
+    labels.push(ti.label)
+    if (ti.children.length > 0) {
+      assignNumbers(ti.children, counters)
+    }
+  }
+  return labels
 }
 
 function renderTree(items: TreeItem[]): HTMLElement {
   const ul = document.createElement('ul')
   ul.className = 'toc-list'
+  // P0-X: assign outline numbers to every node in the
+  // tree before rendering. The counters array is
+  // scratch space — we reset it to all zeros at the
+  // top of each top-level render so a new render
+  // doesn't leak state from the previous one.
+  assignNumbers(items, [])
   for (const ti of items) {
     const li = document.createElement('li')
     li.className = 'toc-item'
     const a = document.createElement('a')
     a.className = 'toc-link'
-    a.textContent = ti.item.text
     a.href = `#${ti.item.slug}`
     a.dataset.pos = String(ti.item.pos)
     a.addEventListener('click', (e) => {
       e.preventDefault()
       handleJump(a)
     })
+    // Wrap the number + heading text in their own spans
+    // so CSS can style them differently (e.g. right-
+    // align the number, dim the colour).
+    const numSpan = document.createElement('span')
+    numSpan.className = 'toc-num'
+    numSpan.textContent = ti.label ?? ''
+    const textSpan = document.createElement('span')
+    textSpan.className = 'toc-text'
+    textSpan.textContent = ti.item.text
+    a.appendChild(numSpan)
+    a.appendChild(textSpan)
     li.appendChild(a)
     if (ti.children.length > 0) {
       li.appendChild(renderTree(ti.children))

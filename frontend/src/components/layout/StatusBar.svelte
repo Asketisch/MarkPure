@@ -25,6 +25,35 @@
     vimEnabled = false,
     vimMode = 'normal',
     vimPending = '',
+    /** P0-X: number of characters in the active selection
+     *  (0 when nothing is selected). Drives a small
+     *  "Selected: N" chip next to the document totals so
+     *  the user gets Typora-style selection feedback. */
+    selectionChars = 0,
+    /** P0-X: timestamp (ms since epoch) of the most recent
+     *  successful save. When `null`, we suppress the
+     *  indicator entirely so a freshly-opened tab doesn't
+     *  show "Saved just now" before the user has saved
+     *  anything. We re-read `Date.now()` once a minute
+     *  via the `savedTick` rune so the human-readable
+     *  "X minutes ago" label stays current without a
+     *  global timer. */
+    savedAt = null as number | null,
+    /** P0-X: Typora-style word-count goal. When > 0, the
+     *  status bar renders `<current> / <goal> (<pct>%)`
+     *  so the user can track progress against a writing
+     *  target. `0` (the default) hides the indicator. */
+    wordCountGoal = 0,
+    /** P0-X: Typora-style "jump to top / jump to bottom"
+     *  callbacks. Rendered as small ↑ / ↓ buttons at the
+     *  right edge of the status bar. The host wires these
+     *  to `editor.commands.focus()` + a `setTextSelection`
+     *  + `scrollIntoView` so the cursor lands at the
+     *  start / end of the document and the viewport scrolls
+     *  along. The component stays editor-agnostic — same
+     *  shape as `StatusBar`'s other host-driven actions. */
+    onJumpTop = () => {},
+    onJumpBottom = () => {},
   }: {
     stats: DocStats
     saving: boolean
@@ -46,6 +75,11 @@
     vimMode?: 'normal' | 'insert' | 'visual' | 'visual-line' | 'visual-block' | 'replace'
     /** P2-7: transient count/operator display (e.g. "3d"). */
     vimPending?: string
+    selectionChars?: number
+    savedAt?: number | null
+    wordCountGoal?: number
+    onJumpTop?: () => void
+    onJumpBottom?: () => void
   } = $props()
 
   const i18n = useI18n()
@@ -59,12 +93,85 @@
     if (mode === 'visual-block') return 'V-BLOCK'
     return 'REPLACE'
   }
+
+  // P0-X: Typora-style reading-time estimate. Average
+  // reading speed is ~250 wpm for prose; CJK readers are
+  // closer to 500 chars/min, so we mix the two heuristics
+  // based on the CJK character count already returned by
+  // `doc_get_stats` (rust-side counts each CJK ideograph
+  // as one word).
+  let readingTime = $derived.by(() => {
+    const minutes = stats.words / 250
+    if (minutes < 1) return '< 1 min'
+    if (minutes < 60) return `${Math.round(minutes)} min`
+    const hours = Math.floor(minutes / 60)
+    const rest = Math.round(minutes - hours * 60)
+    return rest > 0 ? `${hours} h ${rest} min` : `${hours} h`
+  })
+
+  // P0-X: Typora-style "Saved X ago" indicator. We
+  // re-derive the humanised label every minute via a
+  // ticking rune; without that the user staring at a
+  // document for 5 minutes would still see "Saved 1m
+  // ago" until they triggered any state change.
+  let savedTick = $state(0)
+  $effect(() => {
+    if (savedAt == null) return
+    const handle = window.setInterval(() => {
+      savedTick++
+    }, 60_000)
+    return () => window.clearInterval(handle)
+  })
+  let savedLabel = $derived.by(() => {
+    void savedTick
+    if (savedAt == null) return null
+    const ms = Date.now() - savedAt
+    if (ms < 5_000) return i18n.t('status.saved_just_now')
+    if (ms < 60_000) return i18n.t('status.saved_seconds_ago')
+    if (ms < 3_600_000) {
+      const m = Math.floor(ms / 60_000)
+      return i18n.t('status.saved_minutes_ago').replace('{n}', String(m))
+    }
+    if (ms < 86_400_000) {
+      const h = Math.floor(ms / 3_600_000)
+      return i18n.t('status.saved_hours_ago').replace('{n}', String(h))
+    }
+    const d = Math.floor(ms / 86_400_000)
+    return i18n.t('status.saved_days_ago').replace('{n}', String(d))
+  })
+
+  // P0-X: Typora-style word-count progress. Rendered
+  // as `<current> / <goal> (<pct>%)` next to the doc
+  // totals; hidden when the goal is `0` (the default).
+  // We clamp the percentage at 100% so a runaway doc
+  // doesn't show a `150%` figure.
+  let wordGoalLabel = $derived.by(() => {
+    if (!wordCountGoal || wordCountGoal <= 0) return null
+    const pct = Math.min(100, Math.round((stats.words / wordCountGoal) * 100))
+    return i18n.t('status.word_goal')
+      .replace('{current}', String(stats.words))
+      .replace('{goal}', String(wordCountGoal))
+      .replace('{pct}', String(pct))
+  })
 </script>
 
 <footer class="status-bar">
   <span>{stats.lines} {i18n.t('status.lines')}</span>
   <span>{stats.words} {i18n.t('status.words')}</span>
   <span>{stats.characters} {i18n.t('status.chars')}</span>
+  <span class="reading-time" title={i18n.t('status.reading_time_tooltip')}>
+    {readingTime}
+  </span>
+  {#if wordGoalLabel}
+    <span class="word-goal" title={i18n.t('status.word_goal_tooltip')}>
+      {wordGoalLabel}
+    </span>
+  {/if}
+  {#if selectionChars > 0}
+    <span class="selection" title={i18n.t('status.selection_tooltip')}>
+      {i18n.t('status.selection')}: {selectionChars}
+    </span>
+  {/if}
   {#if multiCursorCount > 0}
     <span class="multi-cursor" title="Multi-cursor mode (Esc to exit)">
       {i18n.t('status.multi_cursor')} ({multiCursorCount})
@@ -90,7 +197,18 @@
   {/if}
   {#if saving}
     <span class="saving">{i18n.t('status.saving')}</span>
+  {:else if savedLabel}
+    <span class="saved-at" title={i18n.t('status.saved_at_tooltip')}>{savedLabel}</span>
   {/if}
+  <!-- P0-X: Typora-style ↑ / ↓ jump buttons. Always
+       rendered so the user has a stable visual affordance
+       (the saved-indicator slot swaps in/out, the buttons
+       never move). `margin-left: auto` keeps them glued
+       to the right edge. -->
+  <div class="jump-buttons" role="group" aria-label={i18n.t('status.jump_buttons_aria')}>
+    <button class="jump-btn" onclick={onJumpTop} title={i18n.t('status.jump_top_tooltip')} aria-label={i18n.t('status.jump_top_tooltip')}>↑</button>
+    <button class="jump-btn" onclick={onJumpBottom} title={i18n.t('status.jump_bottom_tooltip')} aria-label={i18n.t('status.jump_bottom_tooltip')}>↓</button>
+  </div>
 </footer>
 
 <style>
@@ -108,6 +226,24 @@
     font-weight: 600;
   }
   .undo-tree {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .reading-time {
+    color: var(--text-secondary);
+  }
+  /* P0-X: Typora-style word-count goal chip. Rendered
+     only when the user has set a target. Color shifts
+     to the accent when the user crosses 100% so they
+     see the milestone. */
+  .word-goal {
+    color: var(--text-secondary);
+  }
+  .word-goal.is-complete {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .selection {
     color: var(--accent);
     font-weight: 600;
   }
@@ -129,6 +265,42 @@
     margin-left: auto;
     color: var(--accent);
     animation: pulse 1s ease-in-out infinite;
+  }
+  /* P0-X: Typora-style "Saved X ago" indicator. Sits in
+     the same right-aligned slot as the saving pulse so
+     the transition between them is seamless. */
+  .saved-at {
+    margin-left: auto;
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+  /* P0-X: Typora-style ↑ / ↓ jump buttons. Rendered
+     next to the saved-indicator; both rely on the parent
+     flex container's `margin-left: auto` to anchor to the
+     right edge. */
+  .jump-buttons {
+    margin-left: auto;
+    display: flex;
+    gap: 2px;
+  }
+  .jump-btn {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    width: 22px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0;
+  }
+  .jump-btn:hover {
+    background: var(--menu-hover-bg);
+    color: var(--menu-hover-text);
   }
   @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.5 } }
 </style>

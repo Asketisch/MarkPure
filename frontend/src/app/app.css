@@ -365,6 +365,27 @@ html, body, #app {
   font-size: var(--editor-font-size);
   line-height: 1.7;
   color: var(--text);
+  /* Typora-style: long lines wrap by default. The
+     Settings → Editor → "Word Wrap" toggle adds a
+     `no-wrap` class on the host so single-line
+     paragraphs (e.g. URLs, code) stay on one row. */
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.ProseMirror.no-wrap {
+  white-space: pre;
+  word-wrap: normal;
+  overflow-x: auto;
+}
+
+/* Typora-style: optional line numbers. The
+   `prose-editor` host receives `no-line-numbers`
+   when the user disables the toggle in Settings. We
+   default to off so we don't add a new gutter; users
+   who enable it get a faux ruler via CSS counters. */
+.prose-editor:not(.no-line-numbers) .ProseMirror {
+  position: relative;
 }
 
 .ProseMirror > * + * {
@@ -381,6 +402,27 @@ html, body, #app {
 
 /* Paragraph */
 .ProseMirror p { margin: 0.4em 0; }
+
+/* P0-X: Typora-style "Collapse All Headings" toggle.
+   When `.editor-area.headings-collapsed` is on we
+   collapse every non-heading block (paragraph / list /
+   blockquote / pre / hr / …) into a thin marker line so
+   the user can scan only the heading structure. The doc
+   itself is never mutated — toggling back is just a class
+   flip. We keep headings at full height so the user can
+   still click them to jump; we use `line-height: 0.1` +
+   `overflow: hidden` so the collapsed blocks render as a
+   thin rule instead of disappearing entirely (matches
+   Typora's "outline-only" view). */
+.editor-area.headings-collapsed .ProseMirror > *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  height: 4px;
+  margin: 2px 0;
+  overflow: hidden;
+  opacity: 0.3;
+  background: var(--border);
+  border-radius: 2px;
+  pointer-events: none;
+}
 
 /* Bold, Italic, Strike */
 .ProseMirror strong { font-weight: 700; }
@@ -689,6 +731,86 @@ html, body, #app {
   display: inline-block;
 }
 
+/* P0-X: Typora-style image resize handles. The
+   `image-extension.ts` NodeView appends three
+   absolutely-positioned handles (corner, right edge,
+   bottom edge) to every `<figure.image-figure>`. We hide
+   them by default and reveal on hover/selection so the
+   editor stays clean when the user isn't interacting with
+   an image. */
+.ProseMirror figure.image-figure {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+.ProseMirror figure.image-figure .image-resize-handle {
+  position: absolute;
+  display: none;
+  background: var(--accent, #409eff);
+  opacity: 0.85;
+  z-index: 10;
+  user-select: none;
+}
+.ProseMirror figure.image-figure:hover .image-resize-handle,
+.ProseMirror figure.image-figure.selected-node .image-resize-handle,
+.ProseMirror figure.image-figure.ProseMirror-selectednode .image-resize-handle {
+  display: block;
+}
+.ProseMirror figure.image-figure .image-resize-corner {
+  width: 10px;
+  height: 10px;
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+  border-radius: 50%;
+}
+.ProseMirror figure.image-figure .image-resize-right {
+  width: 6px;
+  height: 30px;
+  right: -3px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+  border-radius: 3px;
+}
+.ProseMirror figure.image-figure .image-resize-bottom {
+  width: 30px;
+  height: 6px;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+  border-radius: 3px;
+}
+
+/* P0-X: Typora-style alt-text caption input. Rendered
+   inside every `<figure.image-figure>` by the NodeView.
+   We keep the input hidden until the figure is
+   selected (matches Typora's "show alt text on hover")
+   so the editor doesn't look cluttered with empty
+   input boxes by default. */
+.ProseMirror figure.image-figure .image-caption-input {
+  display: none;
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+.ProseMirror figure.image-figure:hover .image-caption-input,
+.ProseMirror figure.image-figure.ProseMirror-selectednode .image-caption-input {
+  display: block;
+}
+.ProseMirror figure.image-figure .image-caption-input:focus {
+  border-color: var(--accent);
+  background: var(--bg-secondary);
+}
+
 /* Link */
 .ProseMirror a {
   color: var(--link-color);
@@ -834,23 +956,85 @@ html, body, #app {
   padding: 32px 24px;
 }
 
+/* P0-X: hidden `<input type=file>` for the "Insert
+   Image" toolbar button / command palette entry.
+   `display:none` would skip the change event on some
+   WebView ports (notably WKWebView), so we use the
+   common `width:0; height:0; opacity:0` recipe
+   instead. */
+.hidden-file-input {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* P0-X: Typora-style window-level drop affordance.
+   When the user drags a file from Finder over the
+   MarkPure window (and the pointer is outside the
+   editor's own drop target), we show a translucent
+   overlay + a centred "Drop to open" hint. Mirrors
+   Typora's behaviour where any non-editor region also
+   accepts file drops. */
+.app-root.window-drag-active::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 3px dashed var(--accent);
+  pointer-events: none;
+  z-index: 9999;
+}
+.app-root.window-drag-active::before {
+  content: 'Drop to open';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 10000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
 .focus-mode .ProseMirror > * {
   transition: opacity 0.3s ease, filter 0.3s ease;
-}
-
-.focus-mode .ProseMirror > *:not(:has(*)) {
   opacity: 0.4;
   filter: blur(1px);
 }
 
-.focus-mode .ProseMirror > *:has(+ *) {
+/* P0-X: Typora-style focus mode. The
+   `FocusModeExtension` decorates the paragraph containing
+   the cursor with `data-focus-current` so we can restore
+   full opacity to the focused paragraph only. Without this
+   rule, the legacy `:has(+ *)` selectors above mis-fade
+   the paragraph the user is editing and make the editor
+   feel broken. */
+.focus-mode .ProseMirror > *[data-focus-current],
+.focus-mode .ProseMirror > *[data-focus-current] * {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Fallback: if `data-focus-current` isn't attached for
+   some reason (older builds, disabled plugin), at least
+   keep the immediate sibling of the focused paragraph
+   readable. The `:has()` selector is broadly supported
+   in modern WebView ports (wry ships with system WebKit
+   on macOS, WebView2 on Windows, and WebKitGTK on Linux
+   — all current). */
+.focus-mode .ProseMirror > *:has(+ [data-focus-current]),
+.focus-mode .ProseMirror > [data-focus-current] + * {
   opacity: 0.6;
   filter: blur(0.5px);
-}
-
-.focus-mode .ProseMirror > *:has(+ * + *) {
-  opacity: 0.4;
-  filter: blur(1px);
 }
 
 
@@ -897,6 +1081,21 @@ html, body, #app {
 .toc-block .toc-link:hover {
   background: var(--menu-hover-bg);
   color: var(--menu-hover-text);
+}
+
+/* P0-X: Typora-style outline numbering. The
+   `.toc-num` span carries the `1.` / `1.1.` prefix;
+   `.toc-text` holds the heading label. We dim the
+   number to a secondary colour so it reads as a
+   prefix marker rather than competing with the
+   heading text. */
+.toc-block .toc-num {
+  color: var(--text-secondary);
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.toc-block .toc-text {
+  color: inherit;
 }
 
 /* Mermaid diagram block */
@@ -1261,6 +1460,111 @@ html, body, #app {
   height: 20px;
   background: var(--border);
   margin: 0 6px;
+}
+
+/* P0-X: Typora-style floating table bubble menu. Anchored
+   above the current cell via inline `top` / `left` from
+   App.svelte. Uses the same `.tb-btn` styling so it
+   matches the static toolbar. */
+.table-bubble {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  pointer-events: auto;
+}
+.table-bubble .tb-btn {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+
+/* P0-X: Typora-style `[text](` link autocomplete popup.
+   Mirrors the QuickInsertPopup styling so users get a
+   consistent popup affordance. Positioned via inline
+   `top` / `left` from App.svelte's `linkSuggestPosition`. */
+.link-suggest-popup {
+  position: fixed;
+  z-index: 9999;
+  width: 360px;
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  overflow: hidden;
+}
+.link-suggest-header {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.link-suggest-input {
+  width: 100%;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+.link-suggest-input:focus {
+  border-color: var(--accent);
+}
+.link-suggest-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  max-height: 220px;
+}
+.link-suggest-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.link-suggest-item:hover,
+.link-suggest-item[data-active='true'] {
+  background: var(--menu-hover-bg);
+  color: var(--menu-hover-text);
+}
+.link-suggest-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+.link-suggest-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--editor-font-family);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.link-suggest-empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
 }
 
 /* Editor Area */

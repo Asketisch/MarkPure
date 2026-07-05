@@ -49,6 +49,14 @@ pub struct AppConfig {
     /// the field) deserialise to `false`.
     #[serde(default)]
     pub vim_mode: bool,
+    /// P0-X: Typora-style "Word Count Goal". When set
+    /// (>0), the status bar shows `<current> / <goal>
+    /// (<pct>%)` so the user can track progress against a
+    /// writing target (e.g. a 5000-word essay). Defaults
+    /// to `0` (disabled) so existing users' status bars
+    /// don't change.
+    #[serde(default)]
+    pub word_count_goal: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,6 +92,13 @@ pub struct EditorConfig {
     /// English checker active while the UI is in Chinese.
     #[serde(default)]
     pub spellcheck_language: Option<String>,
+    /// P0-X: lint markdown on save. When true, `save_file`
+    /// runs `lint_markdown` over the buffer before writing
+    /// to disk — trailing whitespace trimmed, final newline
+    /// ensured, 3+ blank lines collapsed. Defaults to
+    /// `false` so existing users' workflows don't change.
+    #[serde(default)]
+    pub lint_on_save: bool,
 }
 
 fn default_spellcheck_enabled() -> bool {
@@ -117,6 +132,11 @@ impl Default for AppConfig {
                 auto_save_interval: 0,
                 spellcheck_enabled: default_spellcheck_enabled(),
                 spellcheck_language: None,
+                // P0-X: lint-on-save defaults to off so the
+                // change is opt-in. Users who want Typora-
+                // style automatic cleanup flip the toggle in
+                // Settings → Editor → "Lint on save".
+                lint_on_save: false,
             },
             window: WindowConfig {
                 width: 1200.0,
@@ -133,6 +153,7 @@ impl Default for AppConfig {
             language: None,
             expanded_dirs: std::collections::HashMap::new(),
             vim_mode: false,
+            word_count_goal: 0,
         }
     }
 }

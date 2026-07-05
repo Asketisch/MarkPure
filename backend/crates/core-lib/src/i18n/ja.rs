@@ -78,6 +78,39 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("status.saving", "保存中..."),
     ("status.multi_cursor", "マルチカーソル"),
     ("status.column_select", "列選択"),
+    // P0-X: Typora-style reading time + selection count.
+    ("status.selection", "選択中"),
+    ("status.selection_tooltip", "現在の選択範囲の文字数"),
+    ("status.reading_time_tooltip", "250 語/分で推定した読了時間"),
+    // P0-X: word-count goal chip.
+    ("status.word_goal", "{current} / {goal}（{pct}%）"),
+    ("status.word_goal_tooltip", "文字数目標の進捗"),
+    // P0-X: Typora-style "Saved X ago" indicator.
+    ("status.saved_just_now", "保存済み"),
+    ("status.saved_seconds_ago", "数秒前に保存"),
+    ("status.saved_minutes_ago", "{n} 分前に保存"),
+    ("status.saved_hours_ago", "{n} 時間前に保存"),
+    ("status.saved_days_ago", "{n} 日前に保存"),
+    ("status.saved_at_tooltip", "ディスクへの最終保存からの経過時間"),
+    // P0-X: status-bar jump buttons.
+    ("status.jump_buttons_aria", "文書ナビゲーション"),
+    ("status.jump_top_tooltip", "先頭に移動"),
+    ("status.jump_bottom_tooltip", "末尾に移動"),
+    // P0-X: lint-on-save toggle.
+    ("settings.lint_on_save", "保存時に整形"),
+    ("settings.lint_on_save_tooltip", "保存前に行末の空白を削除し、ファイル末尾に改行を追加し、3 行以上の連続する空行を 2 行に折りたたみます。"),
+    // P0-X: Typora-style word-count goal.
+    ("settings.word_count_goal", "文字数目標"),
+    ("settings.word_count_goal_tooltip", "0 より大きい値を設定すると、ステータスバーに進捗（例：1247 / 5000 = 25%）が表示されます。0 で非表示。"),
+    // P0-X: Typora-style "✓ Saved" toast.
+    ("settings.saved_flash", "✓ 保存しました"),
+    // P0-X: backup / restore preferences.
+    ("settings.backup_restore", "バックアップと復元"),
+    ("settings.export_preferences", "設定をエクスポート"),
+    ("settings.export_button", "エクスポート…"),
+    ("settings.import_preferences", "設定をインポート"),
+    ("settings.import_button", "インポート…"),
+    ("settings.import_report", "{themes} 個のテーマ（{skipped} 個スキップ）、{keybindings} 個のキーバインドを復元しました"),
     // P2-7: Vim モードチップ + ex コマンドバーのラベル。
     ("status.vim_normal", "ノーマル"),
     ("status.vim_insert", "インサート"),
@@ -139,6 +172,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("toolbar.ordered_list", "番号付きリスト"),
     ("toolbar.task_list", "タスクリスト"),
     ("toolbar.insert_table", "表を挿入"),
+    ("toolbar.insert_image", "画像を挿入"),
     ("toolbar.add_column_before", "左に列を追加"),
     ("toolbar.add_column_after", "右に列を追加"),
     ("toolbar.delete_column", "列を削除"),
@@ -224,10 +258,27 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("action.find_and_replace", "検索と置換"),
     ("menu.toggle_sidebar", "サイドバー切替"),
     ("view.toggle_zen_mode", "Zen モード切替"),
+    // P0-X: per-panel toggles.
+    ("view.toggle_tab_bar", "タブバーの表示切替"),
+    ("view.toggle_toolbar", "ツールバーの表示切替"),
+    ("view.toggle_status_bar", "ステータスバーの表示切替"),
+    // P0-X: Typora-style "Collapse / Expand All Headings".
+    ("view.collapse_all_headings", "すべての見出しを折りたたむ"),
+    ("view.expand_all_headings", "すべての見出しを展開する"),
     ("dialog.file_changed_title", "ファイルが外部で変更されました"),
     ("dialog.file_changed_message", "{name} が MarkPure の外部で変更されました。読み込んで変更を破棄しますか？"),
     ("dialog.reload", "再読み込み"),
     ("dialog.keep_mine", "変更を保持"),
+    // P0-X: Typora-style `[text](` link autocomplete.
+    ("link_suggest.placeholder", "ワークスペースのファイルを絞り込む…"),
+    ("link_suggest.no_match", "一致するファイルがありません"),
+    // Typora-style prompts for tabs that have unsaved edits.
+    ("dialog.unsaved_title", "閉じる前に変更を保存しますか？"),
+    ("dialog.unsaved_message", "「{name}」には未保存の変更があります。閉じる前に保存しますか？"),
+    ("dialog.discard", "保存しない"),
+    ("dialog.unsaved_other_tabs", "閉じようとしている他のタブ"),
+    ("dialog.unsaved_all_tabs", "開いているすべてのタブ"),
+    ("dialog.unsaved_right_tabs", "右側のタブ"),
     ("tag_pane.title", "タグ"),
     ("tag_pane.empty", "タグが見つかりません"),
     ("tag_pane.no_match", "一致するタグがありません"),
@@ -273,6 +324,11 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.file.close_tab", "タブを閉じる"),
     ("cmd.edit.select_same_word", "同じ単語を次に選択"),
     ("cmd.edit.copy_as_markdown", "Markdown としてコピー"),
+    // P0-X: editor right-click context menu (Typora-style).
+    ("context.copy_as_markdown", "Markdown としてコピー"),
+    ("context.copy_as_html", "HTML としてコピー"),
+    ("context.copy_as_plain", "プレーンテキストとしてコピー"),
+    ("context.copy", "コピー"),
     ("cmd.edit.copy_as_html", "HTML としてコピー"),
     ("cmd.edit.copy_as_plain", "プレーンテキストとしてコピー"),
     // P0-3: マルチカーソルコマンド

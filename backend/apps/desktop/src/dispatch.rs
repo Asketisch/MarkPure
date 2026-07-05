@@ -39,7 +39,7 @@ use std::sync::Arc;
 pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse> {
     let result: std::result::Result<serde_json::Value, String> = match msg.cmd.as_str() {
         // File dialogs → slow (rfd blocks)
-        "pick_open_file" | "pick_save_file" | "pick_directory" => return None,
+        "pick_open_file" | "pick_save_file" | "pick_directory" | "pick_theme_file" => return None,
 
         // File operations → slow (I/O)
         "open_file" | "save_file" | "get_doc_stats" => return None,
@@ -68,6 +68,16 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
         // Config — fast (in-memory)
         "get_config" => workspace_ops::cmd_get_config(state),
         "set_config" => workspace_ops::cmd_set_config(&msg.params, state),
+        // P0-X: Typora-style preferences export /
+        // import. Fast path — both are pure in-memory
+        // JSON transforms against `AppConfig` plus reads
+        // / writes of the keybindings + custom-themes
+        // files. `cmd_import_config` does the heavy
+        // lifting; the host hands it the JSON payload
+        // it previously picked from disk via the file
+        // picker.
+        "export_config" => workspace_ops::cmd_export_config(state),
+        "import_config" => workspace_ops::cmd_import_config(&msg.params, state),
         "get_recent_files" => workspace_ops::cmd_get_recent_files(state),
         "clear_recent_files" => workspace_ops::cmd_clear_recent_files(state),
         "get_expanded_dirs" => workspace_ops::cmd_get_expanded_dirs(state),
@@ -108,6 +118,9 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
         // Frontmatter — fast (pure computation)
         "parse_frontmatter" => editor_ops::cmd_parse_frontmatter(&msg.params),
         "update_frontmatter_field" => editor_ops::cmd_update_frontmatter_field(&msg.params),
+        // P0-X: markdown lint — fast (pure computation, runs
+        // before the user saves).
+        "lint_markdown" => editor_ops::cmd_lint_markdown(&msg.params),
 
         // Table — fast (pure computation)
         "transform_table" => editor_ops::cmd_transform_table(&msg.params),
@@ -221,6 +234,11 @@ fn run_slow_command(
         "pick_open_file" => file_ops::cmd_pick_open_file(),
         "pick_save_file" => file_ops::cmd_pick_save_file(),
         "pick_directory" => file_ops::cmd_pick_directory(),
+        // Typora-style native theme picker. Used by
+        // Settings → "Import Theme" because the WebView's
+        // `input[type=file]` cannot surface an absolute path
+        // for `cmd_import_theme`.
+        "pick_theme_file" => file_ops::cmd_pick_theme_file(),
 
         // File I/O
         "open_file" => file_ops::cmd_open_file(&msg.params, state),

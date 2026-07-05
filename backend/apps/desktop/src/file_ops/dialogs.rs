@@ -27,3 +27,16 @@ pub fn cmd_pick_directory() -> std::result::Result<serde_json::Value, String> {
         .ok_or_else(|| "Cancelled".to_string())?;
     Ok(serde_json::Value::String(path.to_string_lossy().to_string()))
 }
+
+/// Native file picker restricted to `.json` files. Used by
+/// the Settings panel's "Import Theme" action — the WebView's
+/// `input[type=file]` API only exposes a sandboxed name, not
+/// the absolute path the Rust `import_theme` command needs.
+pub fn cmd_pick_theme_file() -> std::result::Result<serde_json::Value, String> {
+    let path = FileDialog::new()
+        .add_filter("Theme", &["json"])
+        .set_title("Import Theme")
+        .pick_file()
+        .ok_or_else(|| "Cancelled".to_string())?;
+    Ok(serde_json::Value::String(path.to_string_lossy().to_string()))
+}

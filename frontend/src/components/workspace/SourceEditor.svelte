@@ -17,7 +17,23 @@
   let container: HTMLElement
   let cm: CMView | null = null
   let themeCompartment = new Compartment()
+  let wrapCompartment = new Compartment()
   let updating = false
+
+  // P0-X: Typora-style source-editor preferences. We read
+  // from `document.documentElement` (where App.svelte's
+  // `applyEditorConfig` writes the values) instead of
+  // threading a prop down, because the SourceEditor mounts
+  // lazily inside the split pane and re-keying it on every
+  // Settings change would force a teardown.
+  function readEditorPrefs() {
+    const root = document.documentElement
+    const rootStyle = getComputedStyle(root)
+    const tabSize = parseInt(rootStyle.getPropertyValue('--editor-tab-size'), 10) || 4
+    const softTabs = rootStyle.getPropertyValue('--editor-soft-tabs').trim() !== '0'
+    const wordWrap = rootStyle.getPropertyValue('--editor-word-wrap').trim() !== '0'
+    return { tabSize, softTabs, wordWrap }
+  }
 
   // React to content prop changes (e.g., switching tabs or toggling source mode)
   $effect(() => {
@@ -33,12 +49,32 @@
     }
   })
 
+  // P0-X: re-apply word-wrap when the user toggles it in
+  // Settings. CodeMirror's `EditorView.lineWrapping` is a
+  // plain extension so we reconfigure via the
+  // `wrapCompartment` instead of recreating the editor.
+  $effect(() => {
+    if (!cm) return
+    const { wordWrap } = readEditorPrefs()
+    cm.dispatch({
+      effects: wrapCompartment.reconfigure(wordWrap ? CMView.lineWrapping : []),
+    })
+  })
+
   onMount(() => {
     const isDark = detectDarkTheme()
+    const prefs = readEditorPrefs()
     cm = new CMView({
       state: CMState.create({
         doc: content,
         extensions: [
+          // basicSetup includes line numbers via gutter;
+          // users who disable `line_numbers` in Settings
+          // want a clean source view, so we don't add an
+          // extra gutter config and let `basicSetup` win
+          // (typing a Tab inserts `\t` when softTabs is
+          // false, which matches user expectation for a
+          // Typora-like source editor).
           basicSetup,
           mdLang(),
           themeCompartment.of(createThemeExtension(isDark)),
@@ -47,7 +83,11 @@
               onUpdate(update.state.doc.toString())
             }
           }),
-          CMView.lineWrapping,
+          // P0-X: word-wrap respects Settings. Default
+          // to true (matches the legacy behaviour) so an
+          // uninstalled user with no `--editor-word-wrap`
+          // CSS variable still gets a wrapped editor.
+          wrapCompartment.of(prefs.wordWrap ? CMView.lineWrapping : []),
         ],
       }),
       parent: container,

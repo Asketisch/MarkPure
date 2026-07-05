@@ -30,7 +30,12 @@
     onReplace,
     onGlobalSearch,
     onToggleSidebar,
+    onToggleTabBar,
+    onToggleToolbar,
+    onToggleStatusBar,
     onToggleZenMode,
+    onCollapseAllHeadings,
+    onExpandAllHeadings,
     onOpenSettings,
   }: {
     appName: string
@@ -55,7 +60,19 @@
     onReplace: () => void
     onGlobalSearch: () => void
     onToggleSidebar: () => void
+    // P0-X: Typora-style per-panel toggles. The menu
+    // lists Sidebar / Tab Bar / Toolbar / Status Bar /
+    // Zen Mode so the user can claim vertical space
+    // without entering full-screen zen mode.
+    onToggleTabBar: () => void
+    onToggleToolbar: () => void
+    onToggleStatusBar: () => void
     onToggleZenMode: () => void
+    // P0-X: Typora-style "Collapse / Expand All
+    // Headings" pair. Wire to the App-level state
+    // toggle.
+    onCollapseAllHeadings: () => void
+    onExpandAllHeadings: () => void
     onOpenSettings: () => void
   } = $props()
 
@@ -146,6 +163,12 @@
       {#if showViewMenu}
         <div class="dropdown-menu" onmouseleave={hideViewMenu}>
           <button class="dropdown-item" onclick={() => { onToggleSidebar(); hideViewMenu() }}>{i18n.t('menu.toggle_sidebar')}</button>
+          <button class="dropdown-item" onclick={() => { onToggleTabBar(); hideViewMenu() }}>{i18n.t('view.toggle_tab_bar')}</button>
+          <button class="dropdown-item" onclick={() => { onToggleToolbar(); hideViewMenu() }}>{i18n.t('view.toggle_toolbar')}</button>
+          <button class="dropdown-item" onclick={() => { onToggleStatusBar(); hideViewMenu() }}>{i18n.t('view.toggle_status_bar')}</button>
+          <div class="dropdown-sep"></div>
+          <button class="dropdown-item" onclick={() => { onCollapseAllHeadings(); hideViewMenu() }}>{i18n.t('view.collapse_all_headings')}</button>
+          <button class="dropdown-item" onclick={() => { onExpandAllHeadings(); hideViewMenu() }}>{i18n.t('view.expand_all_headings')}</button>
           <div class="dropdown-sep"></div>
           <button class="dropdown-item" onclick={() => { onToggleZenMode(); hideViewMenu() }}>{i18n.t('view.toggle_zen_mode')}</button>
         </div>

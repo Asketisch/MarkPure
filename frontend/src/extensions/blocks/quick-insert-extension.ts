@@ -36,6 +36,26 @@ export const QuickInsertExtension = Extension.create<{ triggerChar: string }>({
         char: trigger,
         pluginKey: getPluginKey(trigger),
         allowSpaces: false,
+        // P0-X: Typora-style IME guard. Suppress the popup
+        // while a CJK IME composition is open — otherwise
+        // typing `@` inside Pinyin candidate "你好"
+        // would pop the QuickInsert popup and the user's
+        // composition window would silently collapse on
+        // commit. The composition lifecycle is owned by
+        // ProseMirror's view (`view.composing`) and the
+        // browser DOM event (`event.isComposing`); we
+        // gate on both because the suggestion plugin
+        // reads from `state` directly, not from the DOM
+        // event.
+        allow: ({ state, isActive }) => {
+          void state
+          void isActive
+          const view = this.editor?.view as
+            | { composing?: boolean }
+            | undefined
+          if (view?.composing) return false
+          return true
+        },
         items: ({ query }: { query: string }) => searchQuickInsert(query),
         command: ({ editor, range, props }: { editor: any; range: any; props: QuickInsertItem }) => {
           editor.chain().focus().deleteRange(range).run()

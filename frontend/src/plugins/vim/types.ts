@@ -88,12 +88,22 @@ export type TextObject =
 /** 'i' = inner (no surrounding), 'a' = outer (include delimiters). */
 export type ObjectModifier = 'i' | 'a'
 
-/** Ex command identity. The 5 V1 commands. */
+/** Ex command identity. The V1 commands. */
 export type ExCmd =
   | { type: 'write' }
   | { type: 'quit' }
   | { type: 'writeQuit' }
   | { type: 'reload' }
+  // P0-X: `:e <path>` opens a file by relative path
+  // (matched against the active workspace root). This
+  // matches Typora/Vim `:e` semantics — the user types
+  // `:e foo` and the editor opens `./foo.md` (with or
+  // without the `.md` extension).
+  | { type: 'edit'; path: string }
+  // P0-X: `:b<N>` switches to tab N (1-indexed). Mirrors
+  // Vim's built-in `:b[uffer]` command. `<N>0` is also
+  // accepted as a shortcut for tab 10+ (`:b10` = tab 10).
+  | { type: 'buffer'; index: number }
 
 /** Parsed Vim command. Discriminated union. */
 export type VimCommand =

@@ -72,12 +72,45 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.reset_to_default", "恢复默认"),
     ("settings.press_keys", "按下快捷键..."),
     ("settings.loading", "加载中..."),
-    ("status.lines", "行"),
+("status.lines", "行"),
     ("status.words", "词"),
     ("status.chars", "字符"),
-    ("status.saving", "保存中..."),
+    ("status.saving", "正在保存..."),
     ("status.multi_cursor", "多光标"),
     ("status.column_select", "列选"),
+    // P0-X: Typora-style reading time + selection count.
+    ("status.selection", "已选"),
+    ("status.selection_tooltip", "当前选区字符数"),
+    ("status.reading_time_tooltip", "按 250 词/分钟估算的阅读时间"),
+    // P0-X: word-count goal chip.
+    ("status.word_goal", "{current} / {goal}（{pct}%）"),
+    ("status.word_goal_tooltip", "字数目标进度"),
+    // P0-X: Typora-style "Saved X ago" indicator.
+    ("status.saved_just_now", "已保存"),
+    ("status.saved_seconds_ago", "刚刚保存"),
+    ("status.saved_minutes_ago", "{n} 分钟前保存"),
+    ("status.saved_hours_ago", "{n} 小时前保存"),
+    ("status.saved_days_ago", "{n} 天前保存"),
+    ("status.saved_at_tooltip", "距离上次成功保存到磁盘的时间"),
+    // P0-X: status-bar jump buttons.
+    ("status.jump_buttons_aria", "文档导航"),
+    ("status.jump_top_tooltip", "跳到顶部"),
+    ("status.jump_bottom_tooltip", "跳到底部"),
+    // P0-X: lint-on-save toggle.
+    ("settings.lint_on_save", "保存时自动整理"),
+    ("settings.lint_on_save_tooltip", "写入磁盘前自动删除行尾空白、确保文件以单个换行符结尾、把 3 行以上的连续空行压缩为 2 行。"),
+    // P0-X: Typora-style word-count goal.
+    ("settings.word_count_goal", "字数目标"),
+    ("settings.word_count_goal_tooltip", "大于 0 时，状态栏会显示当前字数与目标的进度（如 1247 / 5000 = 25%）。0 关闭显示。"),
+    // P0-X: Typora-style "✓ Saved" toast.
+    ("settings.saved_flash", "✓ 已保存"),
+    // P0-X: backup / restore preferences.
+    ("settings.backup_restore", "备份与恢复"),
+    ("settings.export_preferences", "导出偏好设置"),
+    ("settings.export_button", "导出…"),
+    ("settings.import_preferences", "导入偏好设置"),
+    ("settings.import_button", "导入…"),
+    ("settings.import_report", "已恢复：{themes} 个主题（{skipped} 个跳过），{keybindings} 个快捷键"),
     // P2-7: Vim 模式芯片 + ex 命令条标签。
     ("status.vim_normal", "普通"),
     ("status.vim_insert", "插入"),
@@ -139,6 +172,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("toolbar.ordered_list", "有序列表"),
     ("toolbar.task_list", "任务列表"),
     ("toolbar.insert_table", "插入表格"),
+    ("toolbar.insert_image", "插入图片"),
     ("toolbar.add_column_before", "左侧插入列"),
     ("toolbar.add_column_after", "右侧插入列"),
     ("toolbar.delete_column", "删除列"),
@@ -224,10 +258,27 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("action.find_and_replace", "查找替换"),
     ("menu.toggle_sidebar", "切换侧边栏"),
     ("view.toggle_zen_mode", "切换专注模式"),
+    // P0-X: per-panel toggles.
+    ("view.toggle_tab_bar", "切换标签栏"),
+    ("view.toggle_toolbar", "切换工具栏"),
+    ("view.toggle_status_bar", "切换状态栏"),
+    // P0-X: Typora-style "Collapse / Expand All Headings".
+    ("view.collapse_all_headings", "折叠所有标题"),
+    ("view.expand_all_headings", "展开所有标题"),
     ("dialog.file_changed_title", "文件已外部修改"),
     ("dialog.file_changed_message", "{name} 已在 MarkPure 外部被修改。是否重新加载并放弃你的修改？"),
     ("dialog.reload", "重新加载"),
     ("dialog.keep_mine", "保留我的修改"),
+    // P0-X: Typora-style `[text](` link autocomplete.
+    ("link_suggest.placeholder", "筛选工作区文件…"),
+    ("link_suggest.no_match", "未找到匹配文件"),
+    // Typora-style prompts for tabs that have unsaved edits.
+    ("dialog.unsaved_title", "关闭前保存更改？"),
+    ("dialog.unsaved_message", "「{name}」有未保存的修改。是否在关闭前保存？"),
+    ("dialog.discard", "不保存"),
+    ("dialog.unsaved_other_tabs", "要关闭的其他标签页"),
+    ("dialog.unsaved_all_tabs", "所有打开的标签页"),
+    ("dialog.unsaved_right_tabs", "右侧的标签页"),
     ("tag_pane.title", "标签"),
     ("tag_pane.empty", "未发现标签"),
     ("tag_pane.no_match", "无匹配标签"),
@@ -273,6 +324,11 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.file.close_tab", "关闭标签"),
     ("cmd.edit.select_same_word", "选择下一个相同词"),
     ("cmd.edit.copy_as_markdown", "复制为 Markdown"),
+    // P0-X: editor right-click context menu (Typora-style).
+    ("context.copy_as_markdown", "复制为 Markdown"),
+    ("context.copy_as_html", "复制为 HTML"),
+    ("context.copy_as_plain", "复制为纯文本"),
+    ("context.copy", "复制"),
     ("cmd.edit.copy_as_html", "复制为 HTML"),
     ("cmd.edit.copy_as_plain", "复制为纯文本"),
     // P0-3: 多光标命令

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { searchWorkspace, type WorkspaceSearchMatch } from '$lib/editor/commands'
+  import { searchWorkspace, type SearchMatch } from '$lib/editor/commands'
   import { useI18n } from '$lib/stores/i18n.svelte'
   import { onMount } from 'svelte'
 
@@ -30,7 +30,7 @@
   let caseSensitive = $state(false)
   let wholeWord = $state(false)
   let useRegex = $state(true)
-  let results = $state<WorkspaceSearchMatch[]>([])
+  let results = $state<SearchMatch[]>([])
   let totalFiles = $state(0)
   let totalMatches = $state(0)
   let searching = $state(false)
@@ -130,7 +130,7 @@
     }
   }
 
-  function navigateToResult(match: WorkspaceSearchMatch) {
+  function navigateToResult(match: SearchMatch) {
     onNavigate(match.file, match.line_number)
     handleClose()
   }
@@ -143,7 +143,7 @@
     selectedIndex = -1
   }
 
-  function handleFileClick(match: WorkspaceSearchMatch) {
+  function handleFileClick(match: SearchMatch) {
     navigateToResult(match)
   }
 

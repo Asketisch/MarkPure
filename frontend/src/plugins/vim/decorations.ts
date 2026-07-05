@@ -19,8 +19,8 @@
  */
 
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import type { Node as PMNode } from '@tiptap/pm/model'
 import {
-  vimPluginKey,
   VIM_CARET_BLOCK_CLASS,
   VIM_CARET_BAR_CLASS,
   VIM_VISUAL_LINE_CLASS,
@@ -28,28 +28,38 @@ import {
   type VimState,
 } from './types'
 
-/** Build the full DecorationSet for the current Vim state.
- *  Idempotent and side-effect free; called from `state.apply`
- *  after every transition. */
-export function buildVimDecorations(state: { doc: unknown }): DecorationSet {
-  const s = vimPluginKey.getState(state as never) as VimState | undefined
-  if (!s) return DecorationSet.empty
+/** Rebuild decorations from Vim mode + PM selection (called each apply). */
+export function rebuildVimDecorations(
+  s: VimState,
+  selection: { from: number; to: number; head: number },
+  doc: PMNode,
+): DecorationSet {
   if (!s.enabled) return DecorationSet.empty
-  // INSERT mode uses the default caret — no widget needed.
-  if (s.mode === 'insert') return DecorationSet.empty
-  // REPLACE mode is the same as INSERT in V1.
-  if (s.mode === 'replace') return DecorationSet.empty
+  if (s.mode === 'insert' || s.mode === 'replace') return DecorationSet.empty
 
-  // For visual modes we just rely on the PM selection's native
-  // rendering. Block caret for NORMAL is the only widget we add.
   if (s.mode === 'normal') {
-    // The plugin reads the cursor position from the view state
-    // at apply-time and re-emits the decoration set. We don't
-    // have the position here (it lives in `view.state.selection`)
-    // so we let the host build the caret widget separately.
-    return DecorationSet.empty
+    return DecorationSet.create(doc, [makeBlockCaret(selection.head)])
   }
 
+  const from = Math.min(selection.from, selection.to)
+  const to = Math.max(selection.from, selection.to)
+  if (from === to) {
+    return DecorationSet.create(doc, [makeBlockCaret(selection.head)])
+  }
+
+  if (s.mode === 'visual-line') {
+    return DecorationSet.create(doc, [makeLineHighlight(from, to)])
+  }
+  if (s.mode === 'visual' || s.mode === 'visual-block') {
+    return DecorationSet.create(doc, [makeBlockHighlight(from, to)])
+  }
+
+  return DecorationSet.empty
+}
+
+/** @deprecated Use rebuildVimDecorations from plugin apply instead. */
+export function buildVimDecorations(state: { doc: unknown }): DecorationSet {
+  void state
   return DecorationSet.empty
 }
 
@@ -77,7 +87,7 @@ export function makeBarCaret(pos: number): Decoration {
 
 /** Build a per-line highlight decoration for V-LINE mode. */
 export function makeLineHighlight(from: number, to: number): Decoration {
-  return Decoration.line(from, to, { class: VIM_VISUAL_LINE_CLASS })
+  return Decoration.node(from, to, { class: VIM_VISUAL_LINE_CLASS })
 }
 
 /** Build an inline highlight decoration for V-BLOCK mode. */

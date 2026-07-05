@@ -308,9 +308,10 @@
             <div class="color-grid">
               {#each category.colors as item}
                 <div class="color-item">
-                  <label>{i18n.t(item.labelKey)}</label>
+                  <label for="theme-color-{item.key}">{i18n.t(item.labelKey)}</label>
                   {#if item.isSize}
                     <input
+                      id="theme-color-{item.key}"
                       type="text"
                       value={editedColors?.[item.key] ?? ''}
                       onchange={(e) => handleColorChange(item.key, (e.target as HTMLInputElement).value)}

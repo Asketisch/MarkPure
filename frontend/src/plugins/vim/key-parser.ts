@@ -617,6 +617,26 @@ export function parseExText(text: string): ExParseResult {
   if (t === 'q') return { kind: 'ok', cmd: { type: 'quit' } }
   if (t === 'wq' || t === 'x') return { kind: 'ok', cmd: { type: 'writeQuit' } }
   if (t === 'e') return { kind: 'ok', cmd: { type: 'reload' } }
-  if (t.startsWith('e ')) return { kind: 'error', message: '`:e <path>` not supported in V1' }
+  // P0-X: `:e <path>` — open a file by relative path. The
+  // host (`executeEx`) resolves the path against the
+  // workspace root and dispatches the standard
+  // `handleOpenFile` flow. Empty path is rejected so we
+  // don't accidentally open the literal `:e ` arg.
+  if (t.startsWith('e ')) {
+    const path = t.slice(2).trim()
+    if (!path) return { kind: 'error', message: '`:e` requires a path' }
+    return { kind: 'ok', cmd: { type: 'edit', path } }
+  }
+  // P0-X: `:b<N>` — switch to tab N (1-indexed). Mirrors
+  // Vim's built-in `:b[uffer]` command. Trailing path
+  // arguments aren't supported (Vim's `:b foo` would match
+  // by name, but that requires fuzzy-matching open tabs
+  // which V2 can add).
+  const bufMatch = t.match(/^b(\d+)$/)
+  if (bufMatch) {
+    const idx = parseInt(bufMatch[1], 10)
+    if (idx < 1) return { kind: 'error', message: 'buffer index must be >= 1' }
+    return { kind: 'ok', cmd: { type: 'buffer', index: idx } }
+  }
   return { kind: 'error', message: `unknown command: :${t}` }
 }

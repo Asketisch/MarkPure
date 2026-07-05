@@ -13,6 +13,8 @@
  * `__mt_*` global is added.
  */
 
+import type { FileChangeEvent } from './editor/commands/types'
+
 export {}
 
 declare global {
@@ -29,7 +31,7 @@ declare global {
     /** Set when the renderer wants Rust to start pushing
      *  file-watcher events. Rust invokes this with the
      *  change event payload. */
-    __mt_on_file_changes: ((events: unknown) => void) | null
+    __mt_on_file_changes: ((events: FileChangeEvent[]) => void) | null
     /** Quick-insert popup runtime (Tiptap suggestion). Not
      *  strictly part of the IPC bridge but injected by
      *  the editor's QuickInsert extension. */

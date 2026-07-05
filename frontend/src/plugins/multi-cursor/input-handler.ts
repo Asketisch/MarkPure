@@ -115,6 +115,15 @@ export function handleMultiCursorKeyDown(
   const state = multiCursorPluginKey.getState(view.state) as MultiCursorState | undefined
   if (!state || state.cursors.length === 0) return false
 
+  // P0-X: Typora-style IME guard. When the user is
+  // composing a CJK / Japanese / Korean input via an
+  // IME, Backspace / Delete / Escape must reach the IME
+  // (to delete a candidate character, exit the
+  // composition, etc.). Without this guard the fan-out
+  // runs while the IME is still open and the user's
+  // composition window collapses mid-stroke.
+  if (view.composing || event.isComposing) return false
+
   const key = event.key
   if (key !== 'Backspace' && key !== 'Delete') return false
 
@@ -173,6 +182,11 @@ export function handleMultiCursorPaste(
 ): boolean {
   const state = multiCursorPluginKey.getState(view.state) as MultiCursorState | undefined
   if (!state || state.cursors.length === 0) return false
+
+  // P0-X: don't fan-out paste while an IME composition is
+  // open — the user's still editing the candidate and the
+  // paste would clobber the composition buffer.
+  if (view.composing) return false
 
   const text = event.clipboardData?.getData('text/plain')
   if (text === undefined) return false

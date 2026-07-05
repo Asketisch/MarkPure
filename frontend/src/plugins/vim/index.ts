@@ -32,6 +32,7 @@
 import { Plugin } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { applyVimMeta, initState } from './state'
+import { rebuildVimDecorations } from './decorations'
 import { tryParseCommand, parseKey } from './key-parser'
 import { dispatchVimCommand, enterVisualMode } from './commands'
 import { vimPluginKey, type VimState } from './types'
@@ -73,7 +74,7 @@ export {
   exitVisualMode,
   enterColumnMode,
 } from './visual'
-export { buildVimDecorations, makeBlockCaret, makeBarCaret, makeLineHighlight, makeBlockHighlight } from './decorations'
+export { buildVimDecorations, rebuildVimDecorations, makeBlockCaret, makeBarCaret, makeLineHighlight, makeBlockHighlight } from './decorations'
 
 /* ------------------------------------------------------------------ *
  *  Module-level toggle                                                 *
@@ -108,8 +109,11 @@ export function createVimPlugin(): Plugin {
     state: {
       init: () => initState(_enabled),
       apply(tr, prev, _old, newState) {
-        return applyVimMeta(prev, tr)
-        void newState
+        const next = applyVimMeta(prev, tr)
+        return {
+          ...next,
+          decorations: rebuildVimDecorations(next, newState.selection, newState.doc),
+        }
       },
     },
 

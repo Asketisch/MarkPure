@@ -1,7 +1,10 @@
 <script lang="ts">
   interface MenuItem {
-    label: string
+    /** Display label. Not required for separator items. */
+    label?: string
     action?: () => void
+    /** When true, this item renders as a thin divider
+     *  instead of a clickable button. */
     separator?: boolean
     disabled?: boolean
   }
@@ -20,6 +23,7 @@
 
   function handleItemClick(item: MenuItem) {
     if (item.disabled) return
+    if (item.separator) return
     item.action?.()
     onClose()
   }

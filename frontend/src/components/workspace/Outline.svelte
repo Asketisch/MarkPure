@@ -80,6 +80,36 @@
     return best?.slug ?? null
   })
 
+  // P0-X: Typora-style "scroll the outline to keep the
+  // current heading visible" behaviour. We query the DOM
+  // for the button matching the current slug and call
+  // `scrollIntoView` whenever the slug changes. Doing it
+  // via DOM lookup (instead of binding refs on every
+  // list item) keeps the snippet simple and avoids
+  // storing a closure per outline entry.
+  let lastScrolledSlug: string | null = null
+  $effect(() => {
+    if (!currentSlug || currentSlug === lastScrolledSlug) return
+    // `requestAnimationFrame` so the snippet has time to
+    // commit the `current` class change to the DOM before
+    // we look it up. Without this, on a fast selection
+    // change the button may still have `current: false`
+    // when `scrollIntoView` fires.
+    requestAnimationFrame(() => {
+      const el = document.querySelector(
+        `.outline-item.current`,
+      ) as HTMLElement | null
+      if (el) {
+        // `block: 'nearest'` so the panel nudges only when
+        // the active heading goes off-screen — Typora does
+        // the same. `inline: 'nearest'` keeps the heading
+        // horizontally anchored.
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        lastScrolledSlug = currentSlug
+      }
+    })
+  })
+
   function handleClick(item: OutlineItem) {
     onNavigate?.(item)
   }

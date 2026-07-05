@@ -21,8 +21,8 @@
 
 import type { Editor } from '@tiptap/core'
 import type { EditorView } from '@tiptap/pm/view'
-import { TextSelection } from '@tiptap/pm/state'
-import { vimPluginKey, type VimMode, type VimCommand } from './types'
+import { TextSelection, type Transaction } from '@tiptap/pm/state'
+import { vimPluginKey, type VimMode, type VimCommand, type Motion } from './types'
 import { motionRange } from './motions'
 import { textObjectRange } from './text-objects'
 import {
@@ -194,7 +194,7 @@ export function redoCmd(editor: Editor): boolean {
  *  Range-based operators (operator + motion / text object)             *
  * ------------------------------------------------------------------ */
 
-export function deleteMotion(view: EditorView, motion: ReturnType<typeof motionRange> extends infer R ? (R extends { motion: infer M } ? M : never) : never, count: number, char?: string): boolean {
+export function deleteMotion(view: EditorView, motion: Motion, count: number, char?: string): boolean {
   const r = motionRange(view.state, motion, count, char)
   const res = applyDelete(view, r)
   dispatchResult(view, res)
@@ -202,7 +202,7 @@ export function deleteMotion(view: EditorView, motion: ReturnType<typeof motionR
   void char
 }
 
-export function changeMotion(view: EditorView, motion: Parameters<typeof deleteMotion>[1], count: number, char?: string): boolean {
+export function changeMotion(view: EditorView, motion: Motion, count: number, char?: string): boolean {
   const r = motionRange(view.state, motion, count, char)
   const res = applyChange(view, r)
   dispatchResult(view, res)
@@ -210,7 +210,7 @@ export function changeMotion(view: EditorView, motion: Parameters<typeof deleteM
   void char
 }
 
-export function yankMotion(view: EditorView, motion: Parameters<typeof deleteMotion>[1], count: number, char?: string): boolean {
+export function yankMotion(view: EditorView, motion: Motion, count: number, char?: string): boolean {
   const r = motionRange(view.state, motion, count, char)
   const res = applyYank(view, r)
   dispatchResult(view, res)
@@ -269,7 +269,7 @@ export function yankLineCmd(view: EditorView, count: number): boolean {
  *  Motion-only (cursor move, no operator)                             *
  * ------------------------------------------------------------------ */
 
-export function moveByMotion(view: EditorView, motion: Parameters<typeof deleteMotion>[1], count: number, char?: string): boolean {
+export function moveByMotion(view: EditorView, motion: Motion, count: number, char?: string): boolean {
   const r = motionRange(view.state, motion, count, char)
   const to = clampToDoc(view, r.to)
   const tr = view.state.tr
@@ -289,7 +289,7 @@ export function exitVisualCmd(view: EditorView): boolean {
  *  Helpers                                                             *
  * ------------------------------------------------------------------ */
 
-function dispatchResult(view: EditorView, res: { tr: ReturnType<typeof view.state.tr.create>; cursorPos?: number; registerUpdate?: string; nextMode?: VimMode }): void {
+function dispatchResult(view: EditorView, res: { tr: Transaction; cursorPos?: number; registerUpdate?: string; nextMode?: VimMode }): void {
   res.tr.setMeta(vimPluginKey, { type: 'setPending', pending: { kind: 'idle' } })
   if (res.nextMode) {
     res.tr.setMeta(vimPluginKey, { type: 'enterMode', mode: res.nextMode })

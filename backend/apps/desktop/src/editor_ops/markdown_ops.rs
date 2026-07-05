@@ -29,6 +29,31 @@ pub fn cmd_update_frontmatter_field(
     }
 }
 
+// ============================== Markdown lint ==============================
+
+/// P0-X: standalone `lint_markdown` IPC. The Settings
+/// panel's "preview the cleanup" button calls this with
+/// the current editor contents so the user can see the
+/// diff before turning the toggle on. `cmd_save_file`
+/// applies the same rules in-place when
+/// `config.editor.lint_on_save` is true (see
+/// `file_ops/open_save.rs`).
+pub fn cmd_lint_markdown(
+    params: &serde_json::Value,
+) -> std::result::Result<serde_json::Value, String> {
+    let content = params["content"].as_str().ok_or("Missing 'content'")?;
+    let rules = vec![
+        mt_core::LintRule::TrimTrailingWhitespace,
+        mt_core::LintRule::EnsureFinalNewline,
+        mt_core::LintRule::CollapseExcessBlankLines,
+    ];
+    let (cleaned, report) = mt_core::lint_markdown(content, &rules);
+    Ok(serde_json::json!({
+        "content": cleaned,
+        "report": report,
+    }))
+}
+
 // ============================== Table ==============================
 
 pub fn cmd_transform_table(

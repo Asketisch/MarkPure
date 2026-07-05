@@ -7,7 +7,16 @@
  * look like" rather than "what does this document contain".
  */
 import { ipc } from './ipc'
-import type { AppConfig, TabState, WindowTabs } from './types'
+import type {
+  AppConfig,
+  FileChangeEvent,
+  TabState,
+  Theme,
+  ThemeColors,
+  WindowTabs,
+} from './types'
+
+export type { Theme, ThemeColors }
 
 // ============================== Tabs ==============================
 
@@ -102,51 +111,27 @@ export async function removeBookmark(id: string): Promise<void> {
 
 // ============================== Themes ==============================
 
-export interface ThemeColors {
-  bg: string
-  bg_secondary: string
-  bg_tab_active: string
-  bg_tab_inactive: string
-  text: string
-  text_secondary: string
-  accent: string
-  accent_hover: string
-  border: string
-  menu_hover_bg: string
-  menu_hover_text: string
-  status_bg: string
-  scrollbar_thumb: string
-  highlight_bg: string
-  cell_selected_bg: string
-  // Code highlighting
-  code_block_bg: string
-  code_block_fg: string
-  // Status bar
-  status_bg?: string
-  // Mermaid (in case the theme wants to override)
-  mermaid_bg?: string
-  // Tag colors
-  tag_bg: string
-  tag_fg: string
-  // Wiki link colors
-  wiki_link_color: string
-  // Block styles
-  blockquote_border: string
-  blockquote_fg: string
-  table_header_bg: string
-}
-
-export interface Theme {
-  id: string
-  name: string
-  author: string
-  description: string
-  is_dark: boolean
-  colors: ThemeColors
-}
-
 export async function getThemes(): Promise<Theme[]> {
   return await ipc('get_themes')
+}
+
+/**
+ * Typora-style native theme picker. The WebView's
+ * `input[type=file]` cannot expose an absolute path, so we
+ * route through the Rust host which uses `rfd` to surface
+ * one. Returns the selected path or `null` if the user
+ * cancelled.
+ */
+export async function pickThemeFile(): Promise<string | null> {
+  try {
+    return (await ipc('pick_theme_file')) as string
+  } catch (e) {
+    // "Cancelled" is a normal flow from the Rust dialog and
+    // shouldn't be surfaced as an error to the user.
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.toLowerCase().includes('cancel')) return null
+    throw e
+  }
 }
 
 export async function importTheme(path: string): Promise<Theme> {
@@ -192,6 +177,49 @@ export async function updateKeybinding(
   return await ipc('update_keybinding', { id, accelerator })
 }
 
+// ============================== Config export / import ==============================
+//
+// P0-X: Typora-style "Export Preferences" / "Import
+// Preferences". The Rust host snapshots the entire
+// AppConfig + keybindings + custom themes into a
+// versioned JSON payload (see `cmd_export_config`); we
+// hand that to the host's file picker for backup. The
+// inverse path takes the file the user picked and
+// forwards the payload to `cmd_import_config` which
+// restores each piece with a best-effort report.
+
+export interface ConfigExportPayload {
+  version: number
+  app: string
+  exported_at: number
+  config: {
+    theme?: string
+    language?: string | null
+    last_workspace?: string | null
+    editor?: Record<string, unknown>
+    vim_mode?: boolean
+    [key: string]: unknown
+  }
+  keybindings: unknown[]
+  themes: unknown[]
+}
+
+export async function exportConfig(): Promise<ConfigExportPayload> {
+  return await ipc('export_config')
+}
+
+export interface ConfigImportReport {
+  ok: boolean
+  restored: string[]
+  themes_restored: number
+  themes_skipped: number
+  keybindings_restored: number
+}
+
+export async function importConfig(payload: ConfigExportPayload): Promise<ConfigImportReport> {
+  return await ipc('import_config', { payload })
+}
+
 // ============================== i18n ==============================
 
 export interface LocaleInfo {
@@ -226,17 +254,14 @@ export async function getAppInfo(): Promise<AppInfo> {
 
 // ============================== File watcher events ==============================
 
-export interface FileChangeEvent {
-  path: string
-  kind: 'modified' | 'created' | 'deleted'
-}
+export type { FileChangeEvent }
 
 export function onFileChanges(handler: (events: FileChangeEvent[]) => void): void {
   window.__mt_on_file_changes = handler
 }
 
 export function offFileChanges(): void {
-  delete window.__mt_on_file_changes
+  window.__mt_on_file_changes = null
 }
 
 // ============================== Multi-root workspace (P2-4) ==============================
