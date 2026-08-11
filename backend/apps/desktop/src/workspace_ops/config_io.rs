@@ -1,5 +1,4 @@
 use crate::state::{lock_or_recover, AppState};
-use std::collections::HashMap;
 use mt_core::AppConfig;
 // ============================== Config ==============================
 
@@ -101,6 +100,10 @@ pub fn cmd_set_config(
     }
 
     if let Some(workspace) = params.get("last_workspace") {
+        // Backward-compat IPC: pre-P2-4 clients still send
+        // `last_workspace`. The deprecated setter feeds into the
+        // same migration path that runs on next load.
+        #[allow(deprecated)]
         config.set_last_workspace(workspace.as_str().map(|s| s.to_string()));
     }
 
@@ -162,6 +165,10 @@ pub fn cmd_set_expanded_dirs(
             .iter()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
+        // Backward-compat IPC: pre-P2-4 clients send a flat
+        // `expanded_dirs` list. The deprecated setter routes those
+        // entries under the active root.
+        #[allow(deprecated)]
         config.set_expanded_dirs(expanded);
     }
     drop(config);

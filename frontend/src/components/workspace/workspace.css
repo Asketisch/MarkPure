@@ -1,0 +1,99 @@
+<style>
+.workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+.workspace-header {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: 12px;
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.toggle-hidden-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.toggle-hidden-btn:hover { background: var(--menu-hover-bg); }
+.toggle-hidden-btn.active { color: var(--accent); border-color: var(--accent); }
+.workspace-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.open-workspace-btn,
+.change-workspace-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+.change-workspace-btn {
+  margin: 8px;
+  width: calc(100% - 16px);
+}
+.open-workspace-btn:hover,
+.change-workspace-btn:hover { background: var(--menu-hover-bg); }
+
+/* Inline error banner — appears at the top of the sidebar
+   when a CRUD IPC rejects (e.g. "no active workspace",
+   "path outside active workspace", filesystem errors).
+   Auto-dismisses after 6s; user can close it with ×. */
+.action-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin: 6px 6px 0 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--error-color);
+  border-radius: 4px;
+  color: var(--error-color);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.action-error-msg {
+  flex: 1;
+  word-break: break-all;
+}
+.action-error-close {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--error-color);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}

@@ -46,6 +46,7 @@ pub fn ensure_path_in_workspace(
 /// Thin single-root wrapper used by pre-P2-4 call sites that hand us
 /// one root path. New callers should prefer
 /// [`ensure_path_in_workspace`] with a slice.
+#[allow(dead_code)]
 pub fn ensure_path_in_workspace_single(
     path: &std::path::Path,
     workspace_root: &std::path::Path,
@@ -103,6 +104,7 @@ pub fn active_workspace_roots(state: &AppState) -> Vec<PathBuf> {
 /// Legacy single-root accessor used by older call sites that still
 /// expect one path back. Returns the active root's path, or an error
 /// if no root is active.
+#[allow(dead_code)]
 pub fn active_workspace_root(state: &AppState) -> std::result::Result<PathBuf, String> {
     let cfg = lock_or_recover(&state.config);
     cfg.get_active_workspace_root()

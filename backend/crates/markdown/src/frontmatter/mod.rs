@@ -42,18 +42,11 @@ pub use types::{
     FrontmatterValue, FrontmatterCompletion,
 };
 
-use std::collections::HashMap;
-
 pub use bounds::find_frontmatter;
 pub use completions::get_frontmatter_completions;
 pub use parse::parse_frontmatter;
 pub use update::update_frontmatter_field;
 pub use validate::validate_frontmatter;
-
-// Internal render functions are only used by the update
-// path; keep them at their original path so tests can poke
-// at them via the fully-qualified name.
-pub(crate) use render::render_yaml_frontmatter;
 
 #[cfg(test)]
 mod tests;

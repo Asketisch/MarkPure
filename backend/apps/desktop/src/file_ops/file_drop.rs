@@ -1,4 +1,4 @@
-use crate::state::{lock_or_recover, AppState};
+use crate::state::AppState;
 use std::path::PathBuf;
 // ============================== File drop ==============================
 

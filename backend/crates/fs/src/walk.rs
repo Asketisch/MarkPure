@@ -71,6 +71,11 @@ enum DirKey {
 }
 
 impl DirKey {
+    // `path` is only consumed by the non-unix branch — `MetadataExt`
+    // gives us dev/ino for free on unix. Suppress the warning on
+    // unix so we don't have to rename one side and break the
+    // signature symmetry.
+    #[cfg_attr(unix, allow(unused_variables))]
     fn for_path(path: &Path, meta: &std::fs::Metadata) -> Self {
         #[cfg(unix)]
         {

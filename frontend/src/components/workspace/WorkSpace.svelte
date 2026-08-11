@@ -1,4 +1,5 @@
 <script lang="ts">
+  import './workspace.css'
   /**
    * Workspace sidebar — assemble layer.
    *
@@ -12,32 +13,29 @@
    *   - `<FileContextMenu>` — right-click actions
    *   - `$lib/fileTreeFilters` — pure path / filter helpers
    *
-   * The CRUD handlers (new file/folder, rename, delete, …)
-   * stay here because they touch the `tree` / `expandedDirs`
-   * state that lives in this component. Moving them to a
-   * separate file would force prop-drilling a half-dozen
-   * "on*" callbacks through the FileTree; not worth it for
-   * ~60 lines of glue.
+   * P13a: file/folder CRUD is now in `workspaceActions.ts`
+   * so this file stays focused on rendering + state
+   * orchestration. The actions take a context-menu
+   * snapshot and return a structured `ActionOutcome` so
+   * we never have to inline 100+ lines of prompt /
+   * create / reload-tree glue here.
    */
   import { untrack } from 'svelte'
   import {
     pickDirectory,
     getDirectoryTree,
-    createFile,
-    createDirectory,
-    deleteFile,
-    renameFile,
-    revealInFinder,
     getExpandedDirs,
     setExpandedDirs,
   } from '$lib/editor/commands'
   import { useWorkspace } from '$lib/stores/workspace.svelte'
   import type { FileEntry } from '$lib/editor/commands'
-  import { basename, joinPath } from '$lib/fileTreeFilters'
   import { useI18n } from '$lib/stores/i18n.svelte'
+  import { joinPath } from '$lib/fileTreeFilters'
   import FileTree from './FileTree.svelte'
   import FileContextMenu from './FileContextMenu.svelte'
   import Dialog from '$lib/components/ui/Dialog.svelte'
+  import { flashError, type DialogState } from './workspaceState'
+  import { createSidebarHandlers } from './workspaceHandlers'
 
   interface Props {
     workspacePath?: string | null
@@ -73,34 +71,25 @@
 
   // ----- In-app dialog (replaces native window.confirm/prompt,
   //       which wry's WebView silently no-ops) -----
-  type DialogState = {
-    type: 'confirm' | 'input'
-    title: string
-    message: string
-    confirmText: string
-    cancelText: string
-    inputValue: string
-    onConfirm: (value?: string) => void | Promise<void>
-  } | null
-  let dialog = $state<DialogState>(null)
+  let dialog = $state<DialogState | null>(null)
 
   // ----- Inline error banner (side-bar top) -----
   let actionError = $state<string | null>(null)
   let errorTimer: ReturnType<typeof setTimeout> | null = null
 
-  function openDialog(d: NonNullable<DialogState>) {
+  function openDialog(d: DialogState) {
     dialog = d
   }
   function closeDialog() {
     dialog = null
   }
   function showError(msg: string) {
-    actionError = msg
-    if (errorTimer) clearTimeout(errorTimer)
-    errorTimer = setTimeout(() => {
-      actionError = null
-      errorTimer = null
-    }, 6000)
+    flashError(
+      (m) => { actionError = m },
+      () => { if (errorTimer) { clearTimeout(errorTimer); errorTimer = null } },
+      (id) => { errorTimer = id },
+      msg,
+    )
   }
   function clearError() {
     actionError = null
@@ -230,153 +219,30 @@
   // return undefined/false and the operation is silently
   // skipped, which is the bug this rewrite fixes.
   //
-  // IPC errors are caught and surfaced via the inline error
-  // banner at the top of the sidebar so the user gets feedback
-  // when the Rust side rejects (e.g. "no active workspace",
-  // "path outside the active workspace", filesystem errors).
+  // The handlers themselves are defined in `workspaceHandlers.ts`
+  // (a `createSidebarHandlers` factory that takes the dialog
+  // state + side-effect callbacks, so the component file stays
+  // a thin shell). IPC errors are surfaced via the inline error
+  // banner at the top of the sidebar.
 
-  async function handleNewFile() {
-    if (!contextMenu) return
-    const parentPath = contextMenu.isDir ? contextMenu.path : workspacePath
-    if (!parentPath) {
-      hideContextMenu()
-      return
-    }
-    hideContextMenu()
-    openDialog({
-      type: 'input',
-      title: i18n.t('workspace.new_file_prompt'),
-      message: '',
-      confirmText: i18n.t('action.confirm'),
-      cancelText: i18n.t('action.cancel'),
-      inputValue: i18n.t('workspace.new_file_default'),
-      onConfirm: async (value) => {
-        const v = (value ?? '').trim()
-        if (!v) return
-        try {
-          await createFile(joinPath(parentPath, v))
-          await loadTree()
-        } catch (e) {
-          console.error('createFile failed:', e)
-          showError(String(e))
-        }
-      },
-    })
-  }
-
-  async function handleNewFolder() {
-    if (!contextMenu) return
-    const parentPath = contextMenu.isDir ? contextMenu.path : workspacePath
-    if (!parentPath) {
-      hideContextMenu()
-      return
-    }
-    hideContextMenu()
-    openDialog({
-      type: 'input',
-      title: i18n.t('workspace.new_folder_prompt'),
-      message: '',
-      confirmText: i18n.t('action.confirm'),
-      cancelText: i18n.t('action.cancel'),
-      inputValue: i18n.t('workspace.new_folder_default'),
-      onConfirm: async (value) => {
-        const v = (value ?? '').trim()
-        if (!v) return
-        try {
-          await createDirectory(joinPath(parentPath, v))
-          await loadTree()
-        } catch (e) {
-          console.error('createDirectory failed:', e)
-          showError(String(e))
-        }
-      },
-    })
-  }
-
-  async function handleRename() {
-    if (!contextMenu) return
-    const oldPath = contextMenu.path
-    const oldName = basename(oldPath)
-    hideContextMenu()
-    openDialog({
-      type: 'input',
-      title: i18n.t('workspace.rename_prompt'),
-      message: '',
-      confirmText: i18n.t('action.confirm'),
-      cancelText: i18n.t('action.cancel'),
-      inputValue: oldName,
-      onConfirm: async (value) => {
-        const newName = (value ?? '').trim()
-        if (!newName || newName === oldName) return
-        try {
-          await renameFile(oldPath, newName)
-          await loadTree()
-        } catch (e) {
-          console.error('renameFile failed:', e)
-          showError(String(e))
-        }
-      },
-    })
-  }
-
-  async function handleDelete() {
-    if (!contextMenu) return
-    const targetPath = contextMenu.path
-    hideContextMenu()
-    openDialog({
-      type: 'confirm',
-      title: i18n.t('action.delete'),
-      message: i18n.t('workspace.delete_confirm').replace('{path}', targetPath),
-      confirmText: i18n.t('action.delete'),
-      cancelText: i18n.t('action.cancel'),
-      inputValue: '',
-      onConfirm: async () => {
-        try {
-          await deleteFile(targetPath)
-          await loadTree()
-        } catch (e) {
-          console.error('deleteFile failed:', e)
-          showError(String(e))
-        }
-      },
-    })
-  }
-
-  async function handleRefresh() {
-    await loadTree()
-    hideContextMenu()
-  }
-
-  function handleCopyRelativePath() {
-    if (!contextMenu || !workspacePath) return
-    const relPath = contextMenu.path.replace(workspacePath, '')
-    navigator.clipboard.writeText(
-      relPath.startsWith('/') || relPath.startsWith('\\') ? relPath.slice(1) : relPath,
-    )
-    hideContextMenu()
-  }
-
-  function handleCopyAbsolutePath() {
-    if (!contextMenu) return
-    navigator.clipboard.writeText(contextMenu.path)
-    hideContextMenu()
-  }
-
-  function handleRevealInFinder() {
-    if (!contextMenu) return
-    const dir = contextMenu.isDir
-      ? contextMenu.path
-      : contextMenu.path.substring(0, contextMenu.path.lastIndexOf('/'))
-    revealInFinder(dir)
-    hideContextMenu()
-  }
-
-  function toggleHidden() {
-    // Flipping the flag is enough — the $effect below re-runs on
-    // every change to `showHidden` and triggers exactly one
-    // `loadTree()` (wrapped in `untrack` to avoid double-fire).
-    showHidden = !showHidden
-  }
+  // Instantiate the eight context-menu handlers. `contextMenu`,
+  // `workspacePath` and `showHidden` are all `$state` cells, so
+  // we build the handlers in a `$derived` — the factory re-runs
+  // whenever any of them change, giving every handler a fresh
+  // closure over the *current* target instead of a stale snapshot
+  // from the last render.
+  const sidebarHandlers = $derived(createSidebarHandlers(
+    {
+      contextMenu,
+      workspacePath,
+      t: i18n.t,
+      loadTree,
+      showError,
+      hideContextMenu,
+      openDialog,
+    },
+    { toggleHidden: () => { showHidden = !showHidden } },
+  ))
 
   $effect(() => {
     // Track both dependencies explicitly so the effect re-runs
@@ -403,6 +269,7 @@
       })
     }
   })
+
 </script>
 
 <svelte:window onclick={hideContextMenu} />
@@ -424,7 +291,7 @@
     <button
       class="toggle-hidden-btn"
       class:active={showHidden}
-      onclick={toggleHidden}
+      onclick={sidebarHandlers.toggleHidden}
       title={showHidden ? i18n.t('workspace.toggle_hidden_hide') : i18n.t('workspace.toggle_hidden_show')}
       aria-label={i18n.t('workspace.toggle_hidden_aria')}
     >
@@ -472,14 +339,14 @@
       path={contextMenu.path}
       isDir={contextMenu.isDir}
       onCloseMenu={hideContextMenu}
-      onNewFile={handleNewFile}
-      onNewFolder={handleNewFolder}
-      onCopyRelativePath={handleCopyRelativePath}
-      onCopyAbsolutePath={handleCopyAbsolutePath}
-      onRevealInFinder={handleRevealInFinder}
-      onRename={handleRename}
-      onDelete={handleDelete}
-      onRefresh={handleRefresh}
+      onNewFile={sidebarHandlers.handleNewFile}
+      onNewFolder={sidebarHandlers.handleNewFolder}
+      onCopyRelativePath={sidebarHandlers.handleCopyRelativePath}
+      onCopyAbsolutePath={sidebarHandlers.handleCopyAbsolutePath}
+      onRevealInFinder={sidebarHandlers.handleRevealInFinder}
+      onRename={sidebarHandlers.handleRename}
+      onDelete={sidebarHandlers.handleDelete}
+      onRefresh={sidebarHandlers.handleRefresh}
     />
   {/if}
 </div>
@@ -508,105 +375,3 @@
     onClose={closeDialog}
   />
 {/if}
-
-<style>
-  .workspace {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: var(--bg);
-  }
-  .workspace-header {
-    display: flex;
-    gap: 4px;
-    padding: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-  .search-input {
-    flex: 1;
-    min-width: 0;
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text);
-    font-size: 12px;
-  }
-  .search-input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-  .toggle-hidden-btn {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
-    cursor: pointer;
-  }
-  .toggle-hidden-btn:hover { background: var(--menu-hover-bg); }
-  .toggle-hidden-btn.active { color: var(--accent); border-color: var(--accent); }
-  .workspace-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: var(--text-secondary);
-    font-size: 13px;
-  }
-  .open-workspace-btn,
-  .change-workspace-btn {
-    padding: 6px 12px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text);
-    cursor: pointer;
-    font-size: 12px;
-  }
-  .change-workspace-btn {
-    margin: 8px;
-    width: calc(100% - 16px);
-  }
-  .open-workspace-btn:hover,
-  .change-workspace-btn:hover { background: var(--menu-hover-bg); }
-
-  /* Inline error banner — appears at the top of the sidebar
-     when a CRUD IPC rejects (e.g. "no active workspace",
-     "path outside active workspace", filesystem errors).
-     Auto-dismisses after 6s; user can close it with ×. */
-  .action-error {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    margin: 6px 6px 0 6px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--error-color);
-    border-radius: 4px;
-    color: var(--error-color);
-    font-size: 12px;
-    line-height: 1.4;
-  }
-  .action-error-msg {
-    flex: 1;
-    word-break: break-all;
-  }
-  .action-error-close {
-    flex-shrink: 0;
-    border: none;
-    background: transparent;
-    color: var(--error-color);
-    font-size: 16px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0 4px;
-  }
-  .action-error-close:hover { opacity: 0.7; }
-</style>

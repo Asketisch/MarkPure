@@ -339,7 +339,7 @@ mod tests {
         let items = parse_definition_list(content);
         // Note: This might be empty depending on parsing rules
         // Just verify it doesn't panic
-        assert!(items.len() >= 0);
+        let _ = items.len();
     }
 
     #[test]

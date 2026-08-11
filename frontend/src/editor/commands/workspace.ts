@@ -17,6 +17,40 @@ import type {
 } from './types'
 
 export type { Theme, ThemeColors }
+// Data contracts for the app-wide wrappers live in
+// `workspaceTypes.ts` so this IPC-file stays under the 400-line
+// window and the types can be audited next to their consumers.
+// We import them here (for use in function signatures) and
+// re-export (so existing `import { Bookmark } from './commands'`
+// call sites keep working).
+import type {
+  Bookmark,
+  KeyBinding,
+  ConfigExportPayload,
+  ConfigImportReport,
+  LocaleInfo,
+  AppInfo,
+  WorkspaceRoot,
+  WorkspaceRoots,
+  WorkspaceTag,
+  Backlink,
+  WorkspaceStyles,
+  Snippet,
+} from './workspaceTypes'
+export type {
+  Bookmark,
+  KeyBinding,
+  ConfigExportPayload,
+  ConfigImportReport,
+  LocaleInfo,
+  AppInfo,
+  WorkspaceRoot,
+  WorkspaceRoots,
+  WorkspaceTag,
+  Backlink,
+  WorkspaceStyles,
+  Snippet,
+} from './workspaceTypes'
 
 // ============================== Tabs ==============================
 
@@ -67,18 +101,6 @@ export async function clearRecentFiles(): Promise<void> {
 }
 
 // ============================== Bookmarks ==============================
-
-export interface Bookmark {
-  id: string
-  path: string
-  title: string
-  description: string
-  tags: string[]
-  created_at: number
-  updated_at: number
-  /** P2-4: which WorkspaceRoot.id this bookmark belongs to. */
-  workspace_root_id?: string | null
-}
 
 export async function getBookmarks(): Promise<Bookmark[]> {
   return (await ipc('get_bookmarks')) ?? []
@@ -152,12 +174,6 @@ export async function saveCustomTheme(theme: Theme): Promise<Theme> {
 
 // ============================== Keybindings ==============================
 
-export interface KeyBinding {
-  id: string
-  label: string
-  accelerator: string | null
-}
-
 export async function getKeybindings(): Promise<KeyBinding[]> {
   return await ipc('get_keybindings')
 }
@@ -188,32 +204,8 @@ export async function updateKeybinding(
 // forwards the payload to `cmd_import_config` which
 // restores each piece with a best-effort report.
 
-export interface ConfigExportPayload {
-  version: number
-  app: string
-  exported_at: number
-  config: {
-    theme?: string
-    language?: string | null
-    last_workspace?: string | null
-    editor?: Record<string, unknown>
-    vim_mode?: boolean
-    [key: string]: unknown
-  }
-  keybindings: unknown[]
-  themes: unknown[]
-}
-
 export async function exportConfig(): Promise<ConfigExportPayload> {
   return await ipc('export_config')
-}
-
-export interface ConfigImportReport {
-  ok: boolean
-  restored: string[]
-  themes_restored: number
-  themes_skipped: number
-  keybindings_restored: number
 }
 
 export async function importConfig(payload: ConfigExportPayload): Promise<ConfigImportReport> {
@@ -221,12 +213,6 @@ export async function importConfig(payload: ConfigExportPayload): Promise<Config
 }
 
 // ============================== i18n ==============================
-
-export interface LocaleInfo {
-  current: string
-  available: [string, string][]
-  translations: Record<string, string>
-}
 
 export async function getLocale(): Promise<LocaleInfo> {
   return await ipc('get_locale')
@@ -241,12 +227,6 @@ export async function getTranslations(lang: string): Promise<Record<string, stri
 }
 
 // ============================== App info ==============================
-
-export interface AppInfo {
-  name: string
-  version: string
-  description: string
-}
 
 export async function getAppInfo(): Promise<AppInfo> {
   return await ipc('get_app_info')
@@ -265,28 +245,6 @@ export function offFileChanges(): void {
 }
 
 // ============================== Multi-root workspace (P2-4) ==============================
-
-/** A single workspace root — a folder the user has added to
- *  the current multi-root workspace. The `id` is stable across
- *  restarts (used by TabState.workspace_root_id, watcher
- *  handles, LRU GC) and `added_at` is a unix-seconds
- *  timestamp. `exists` is recomputed on every
- *  `list_workspace_roots` IPC and is `false` for missing
- *  paths (e.g. an external drive that's been unmounted).
- *  We never auto-delete missing roots — the user must
- *  invoke `remove_missing_workspace_roots` explicitly. */
-export interface WorkspaceRoot {
-  id: string
-  path: string
-  name: string
-  added_at: number
-  exists?: boolean
-}
-
-export interface WorkspaceRoots {
-  roots: WorkspaceRoot[]
-  active_id: string | null
-}
 
 /** Add a folder to the current workspace. Returns the freshly
  *  created root (with its server-assigned id). */
@@ -342,16 +300,6 @@ export async function removeMissingWorkspaceRoots(): Promise<{
 
 // ============================== Workspace tag index (P0-7) ==============================
 
-/** A single entry in the workspace-wide tag index. `count` is the
- *  total number of occurrences across the workspace, `files` is the
- *  deduplicated set of file paths that contain the tag at least
- *  once. */
-export interface WorkspaceTag {
-  name: string
-  count: number
-  files: string[]
-}
-
 /** Aggregate every `#tag` across `path` into a flat
  *  `WorkspaceTag[]` (alphabetical by name). Scans `.md` /
  *  `.markdown` / `.mdx` files only. P2-4 multi-root: pass
@@ -371,15 +319,6 @@ export async function getWorkspaceTags(
 }
 
 // ============================== Backlinks (P0-6) ==============================
-
-/** A single backlink hit: `source_path` is the file that
- *  contains a `[[page]]`, `line` is the 1-based line number,
- *  `context` is a trimmed excerpt of the line. */
-export interface Backlink {
-  source_path: string
-  line: number
-  context: string
-}
 
 /** Return every workspace document that links to `page` via
  *  `[[page]]` or `[[page|alias]]` (alias ignored for matching).
@@ -401,11 +340,6 @@ export async function getBacklinks(
 
 // ============================== Per-workspace CSS (P1-7) ==============================
 
-export interface WorkspaceStyles {
-  css: string
-  files: string[]
-}
-
 /** Read every `*.css` under `<workspace>/.markpure/styles/`
  *  and return the concatenated text plus the list of file
  *  names. P2-4 multi-root: pass `paths` to merge across roots
@@ -424,11 +358,6 @@ export async function loadWorkspaceStyles(
 }
 
 // ============================== Snippets (P2-5) ==============================
-
-export interface Snippet {
-  name: string
-  content: string
-}
 
 /** List all user-defined snippets stored under
  *  `~/.config/markpure/snippets/`. Each `.md` file becomes

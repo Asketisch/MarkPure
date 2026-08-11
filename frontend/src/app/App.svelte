@@ -22,8 +22,6 @@
     docClose,
     docSetContent,
     docGetStats,
-    openDroppedFiles,
-    savePastedImage,
     getDirectoryTree,
     loadWorkspaceStyles,
     listSnippets,
@@ -86,6 +84,8 @@
   } from 'lucide-svelte'
   import type { Tab } from './handlers/types'
   import { pageNameFromPath } from './handlers/helpers'
+  import { handleFilesDropped, handleImagesDropped } from './fileDrop'
+  import { createExportActions } from './exportActions.svelte'
 
   // P2-4 multi-root workspace. The store owns the roots list
   // and the active-id pointer; App.svelte reads them and
@@ -359,18 +359,18 @@
       case 'file.save': return () => { void handleSave() }
       case 'file.save_as': return () => { void handleSaveAs() }
       case 'file.close_tab': return () => { if (activeTabId) closeTab(activeTabId) }
-      case 'file.export_html': return () => handleExportHtml()
-      case 'file.export_pdf': return () => handleExportPdf()
-      case 'file.export_word': return () => handleExportWord()
-      case 'file.export_png': return () => handleExportPng()
+      case 'file.export_html': return () => exportActions.handleExportHtml()
+      case 'file.export_pdf': return () => exportActions.handleExportPdf()
+      case 'file.export_word': return () => exportActions.handleExportWord()
+      case 'file.export_png': return () => exportActions.handleExportPng()
       case 'edit.find': return () => { showSearch = true }
       case 'edit.undo': return () => { handleUndo() }
       case 'edit.redo': return () => { handleRedo() }
       case 'edit.replace': return () => { handleReplace() }
       case 'edit.select_same_word': return () => { (editor as any)?.chain().focus().selectNextMatch().run() }
-      case 'edit.copy_as_markdown': return () => { void handleCopyAs('markdown') }
-      case 'edit.copy_as_html': return () => { void handleCopyAs('html') }
-      case 'edit.copy_as_plain': return () => { void handleCopyAs('plain') }
+      case 'edit.copy_as_markdown': return () => { void exportActions.handleCopyAs('markdown') }
+      case 'edit.copy_as_html': return () => { void exportActions.handleCopyAs('html') }
+      case 'edit.copy_as_plain': return () => { void exportActions.handleCopyAs('plain') }
       // P0-3: multi-cursor commands. The underlying logic
       // lives in the multi-cursor plugin; we just route
       // command-palette invocations to the Tiptap command.
@@ -611,6 +611,16 @@
     return tabs.find(t => t.id === activeTabId)
   }
 
+  // P1-6 / P1-8: export + copy-as handlers live in
+  // `exportActions.svelte.ts` (a deps-bag factory) so the
+  // ~140-line export block doesn't live in this file. The
+  // factory reads the live editor / active tab through the
+  // accessors below.
+  const exportActions = createExportActions({
+    getEditor: () => editor,
+    getActiveTab,
+  })
+
   // P0-6: derived "page name" for the backlinks pane. We use
   // the basename minus the `.md`/`.markdown`/`.mdx` extension
   // so it matches the wikilink `[[Page]]` syntax. For untitled
@@ -770,44 +780,6 @@
     }, 300)
   }
 
-  async function handleFilesDropped(files: File[]) {
-    const paths = files.map(f => (f as any).path).filter(Boolean)
-    if (paths.length === 0) return
-
-    try {
-      const results = await openDroppedFiles(paths)
-      for (const file of results) {
-        openFileInNewTab(file.path, file.content)
-      }
-    } catch (e) {
-      console.error('[App] Failed to open dropped files:', e)
-    }
-  }
-
-  async function handleImagesDropped(images: { file: File; base64: string }[]) {
-    if (!workspacePath) {
-      console.warn('[App] Cannot save image: no workspace opened')
-      return
-    }
-
-    for (const { file, base64 } of images) {
-      try {
-        const saved = await savePastedImage(workspacePath, base64, file.name)
-        // Insert image into editor at current cursor position
-        if (editor) {
-          const { state, dispatch } = editor.view
-          const imageNode = state.schema.nodes.image.create({
-            src: saved.relative_path,
-            alt: file.name,
-          })
-          dispatch(state.tr.insert(state.selection.from, imageNode))
-        }
-      } catch (e) {
-        console.error('[App] Failed to save dropped image:', e)
-      }
-    }
-  }
-
   /// Walk the workspace file tree and find the first markdown
   /// file whose basename (without extension) matches `page`.
   /// Returns the absolute path or `null` if nothing matched.
@@ -925,6 +897,16 @@
       },
       onWikiLinkClick: handleWikiLinkClick,
       onTagClick: handleTagClick,
+      onFilesDropped: (files) => handleFilesDropped(files, {
+        getWorkspacePath: () => workspacePath,
+        getEditor: () => editor,
+        openFileInNewTab,
+      }),
+      onImagesDropped: (images) => handleImagesDropped(images, {
+        getWorkspacePath: () => workspacePath,
+        getEditor: () => editor,
+        openFileInNewTab,
+      }),
       onChange: (md: string) => {
         // Drop stale callbacks from a swapped-out editor.
         if (myGeneration !== editorGeneration) return
@@ -969,8 +951,6 @@
         }
       },
       onSave: handleSave,
-      onFilesDropped: handleFilesDropped,
-      onImagesDropped: handleImagesDropped,
       onVimModeChange: persistVimMode,
     })
     // Initial sync
@@ -1331,21 +1311,13 @@
       windowDragActive = false
       return
     }
-    const paths = files.map(f => (f as unknown as { path?: string }).path).filter(Boolean) as string[]
-    if (paths.length === 0) {
-      windowDragActive = false
-      return
-    }
     e.preventDefault()
     windowDragActive = false
-    try {
-      const results = await openDroppedFiles(paths)
-      for (const file of results) {
-        openFileInNewTab(file.path, file.content)
-      }
-    } catch (err) {
-      console.error('[App] window-level drop failed:', err)
-    }
+    await handleFilesDropped(files, {
+      getWorkspacePath: () => workspacePath,
+      getEditor: () => editor,
+      openFileInNewTab,
+    })
   }
 
   async function handleOpenFile(path: string) {
@@ -1654,7 +1626,11 @@
         }),
       })),
     )
-    await handleImagesDropped(images)
+    await handleImagesDropped(images, {
+      getWorkspacePath: () => workspacePath,
+      getEditor: () => editor,
+      openFileInNewTab,
+    })
     target.value = ''
   }
   function addColumnBefore() { editor?.chain().focus().addColumnBefore().run() }
@@ -1958,154 +1934,6 @@
       align,
     })
     editor.view.dispatch(tr)
-  }
-
-  // P1-6: copy the current selection (or full doc) in a
-  // specific format to the system clipboard. Three modes:
-  //   - 'markdown' → the raw `getMarkdown()` output
-  //   - 'html'     → the editor's rendered HTML
-  //   - 'plain'    → the editor's plain text
-  // The browser's Clipboard API is fine for all three; we
-  // don't need a Rust IPC for a pure copy.
-  async function handleCopyAs(format: 'markdown' | 'html' | 'plain') {
-    if (!editor) return
-    let text = ''
-    if (format === 'markdown') {
-      text = getMarkdown(editor)
-    } else if (format === 'html') {
-      text = editor.getHTML()
-    } else {
-      text = editor.getText()
-    }
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch (e) {
-      console.error('Failed to copy:', e)
-    }
-  }
-
-  async function handleExportHtml() {
-    const tab = getActiveTab()
-    if (!tab) return
-    const content = editor ? getMarkdown(editor) : tab.content
-    const title = tab.name.replace(/\.md$/, '')
-    try {
-      // P1-8: serialise the active theme so the standalone HTML
-      // matches the live editor palette. The dynamic import
-      // keeps `pngExport.ts` out of the eager bundle.
-      const { serializeActiveTheme } = await import(
-        '$lib/editor/commands/pngExport'
-      )
-      await exportHtml(content, title, serializeActiveTheme())
-    } catch (e) {
-      console.error('Failed to export HTML:', e)
-    }
-  }
-
-  async function handleExportPdf() {
-    const tab = getActiveTab()
-    if (!tab) return
-    const content = editor ? getMarkdown(editor) : tab.content
-    const title = tab.name.replace(/\.md$/, '')
-    try {
-      // P0-9: pass the source file path so the PDF export
-      // can resolve relative image references (e.g.
-      // ![](./images/foo.png)).
-      await exportPdf(content, title, tab.path)
-    } catch (e) {
-      console.error('Failed to export PDF:', e)
-    }
-  }
-
-  async function handleExportWord() {
-    const tab = getActiveTab()
-    if (!tab) return
-    const content = editor ? getMarkdown(editor) : tab.content
-    const title = tab.name.replace(/\.md$/, '')
-    try {
-      await exportWord(content, title)
-    } catch (e) {
-      console.error('Failed to export Word:', e)
-    }
-  }
-
-  // P1-8: PNG export. The Rust host is a byte-stream sink; the
-  // rendered HTML lives on the active editor tab, so we walk
-  // the editor → markdown → backend HTML → snapshot → IPC chain
-  // here. Async + theme-aware; see `commands/pngExport.ts` for
-  // the snapshot and theme serialisation details.
-  //
-  // Phase 6 (error handling): empty documents short-circuit with
-  // a console.warn so users don't get a 1×1 transparent PNG;
-  // very long documents (>100 KB of markdown) get a one-shot
-  // console.info so the dev console surfaces the wait time. We
-  // deliberately do NOT block on a confirmation dialog — the
-  // existing HTML/PDF/Word handlers don't either, and adding
-  // one here would feel inconsistent.
-  let exportingPng = $state(false)
-  /// Heuristic threshold for the "long document" warning. A
-  /// typical 1000-paragraph `synth-1k.md` weighs in around
-  /// 30-50 KB so 100 KB gives a comfortable cushion before we
-  /// start asking the user to wait.
-  const LONG_DOC_BYTES = 100 * 1024
-  async function handleExportPng() {
-    if (exportingPng) return
-    const tab = getActiveTab()
-    if (!tab) return
-    const content = editor ? getMarkdown(editor) : tab.content
-    const title = tab.name.replace(/\.md$/, '')
-
-    // Empty document: skip the IPC round-trip and the
-    // (essentially-blank) save dialog. The user will see a
-    // console message instead of an empty PNG file.
-    if (!content || !content.trim()) {
-      console.warn('PNG export: document is empty')
-      return
-    }
-    if (content.length > LONG_DOC_BYTES) {
-      console.info(
-        `PNG export: large document (${content.length} bytes), this may take a moment`,
-      )
-    }
-
-    exportingPng = true
-    try {
-      const { snapshotHtmlToPng } = await import(
-        '$lib/editor/commands/pngExport'
-      )
-      // Snapshot the live editor DOM. This piggy-backs on the
-      // existing Tiptap render — KaTeX, Mermaid, CodeMirror
-      // highlighting and workspace images are all already in
-      // the DOM, so the resulting PNG is pixel-identical to
-      // what the user sees on screen.
-      const host = document.querySelector('.ProseMirror') as HTMLElement | null
-      if (!host) {
-        console.warn('PNG export: editor DOM not found')
-        return
-      }
-      // Pass the live editor's width so the export mirrors
-      // the column the user is looking at (the sidebar /
-      // outline panel change the available width; a fixed
-      // 800px would clip).
-      const dataUrl = await snapshotHtmlToPng(host.outerHTML, host.offsetWidth)
-      // Strip the `data:image/png;base64,` prefix — the Rust
-      // side decodes pure base64.
-      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
-      try {
-        await exportPng(base64, title)
-      } catch (e) {
-        // The Rust side returns `Cancelled` when the user
-        // dismisses the save dialog; that's a normal flow and
-        // shouldn't spam the console with an error stack.
-        const msg = e instanceof Error ? e.message : String(e)
-        if (msg.toLowerCase().includes('cancel')) return
-        console.error('Failed to export PNG:', e)
-      }
-    } catch (e) {
-      console.error('Failed to export PNG:', e)
-    } finally {
-      exportingPng = false
-    }
   }
 
   function saveCurrentConfig() {
@@ -2789,7 +2617,11 @@ window.addEventListener('mt:image-resize', handleImageResize)
           base64: await fileToBase64(file),
         })),
       )
-      await handleImagesDropped(images)
+      await handleImagesDropped(images, {
+        getWorkspacePath: () => workspacePath,
+        getEditor: () => editor,
+        openFileInNewTab,
+      })
     }
     window.addEventListener('mt:paste-images', handlePasteImages)
 
@@ -3041,10 +2873,10 @@ window.addEventListener('mt:image-resize', handleImageResize)
     onOpenWorkspace={openWorkspace}
     onAddWorkspaceRoot={() => void addWorkspaceRoot()}
     onRemoveWorkspaceRoot={() => void removeCurrentWorkspaceRoot()}
-    onExportHtml={handleExportHtml}
-    onExportPdf={handleExportPdf}
-    onExportWord={handleExportWord}
-    onExportPng={handleExportPng}
+    onExportHtml={exportActions.handleExportHtml}
+    onExportPdf={exportActions.handleExportPdf}
+    onExportWord={exportActions.handleExportWord}
+    onExportPng={exportActions.handleExportPng}
     onUndo={handleUndo}
     onRedo={handleRedo}
     onFind={handleFind}
@@ -3538,9 +3370,9 @@ window.addEventListener('mt:image-resize', handleImageResize)
     x={editorContextMenu.x}
     y={editorContextMenu.y}
     items={[
-      { label: i18n.t('context.copy_as_markdown'), action: () => { void handleCopyAs('markdown') } },
-      { label: i18n.t('context.copy_as_html'), action: () => { void handleCopyAs('html') } },
-      { label: i18n.t('context.copy_as_plain'), action: () => { void handleCopyAs('plain') } },
+      { label: i18n.t('context.copy_as_markdown'), action: () => { void exportActions.handleCopyAs('markdown') } },
+      { label: i18n.t('context.copy_as_html'), action: () => { void exportActions.handleCopyAs('html') } },
+      { label: i18n.t('context.copy_as_plain'), action: () => { void exportActions.handleCopyAs('plain') } },
       { separator: true },
       { label: i18n.t('context.copy'), action: () => { void navigator.clipboard.writeText(window.getSelection()?.toString() ?? '') } },
     ]}

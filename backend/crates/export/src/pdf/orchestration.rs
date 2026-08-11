@@ -11,6 +11,13 @@ use std::path::PathBuf;
 // `load_from_memory` function we need for PNG decoding.
 use printpdf::image_crate::load_from_memory;
 
+// Re-exports from the per-feature submodules. The orchestrator
+// (this file) still owns the line-by-line dispatcher; the
+// table/image helpers live in `super::{images,table}` and are
+// pulled in here so call sites don't have to change.
+use super::{extract_inline_images, is_table_row, is_table_separator, load_image_bytes,
+            parse_table_row, render_table_row, strip_markdown, substitute_footnote_refs};
+
 /// Export markdown text to a PDF file with basic text layout.
 ///
 /// Markdown is rendered as a stream of paragraphs, headings, code
@@ -326,7 +333,7 @@ fn create_document(title: &str) -> (PdfDocumentReference, PdfPageIndex, PdfLayer
     PdfDocument::new(title, Mm(210.0), Mm(297.0), "Layer 1")
 }
 
-fn add_page(doc: &mut PdfDocumentReference) -> (PdfPageIndex, PdfLayerIndex) {
+pub(crate) fn add_page(doc: &mut PdfDocumentReference) -> (PdfPageIndex, PdfLayerIndex) {
     doc.add_page(Mm(210.0), Mm(297.0), "Layer 1")
 }
 
@@ -486,140 +493,6 @@ fn get_font_paths() -> Result<(PathBuf, PathBuf), String> {
     }
 }
 
-fn strip_markdown(text: &str) -> String {
-    let mut result = String::with_capacity(text.len());
-    let chars: Vec<char> = text.chars().collect();
-    let mut i = 0;
-
-    while i < chars.len() {
-        // Bold: **text** or __text__
-        if i + 1 < chars.len()
-            && (chars[i] == '*' && chars[i + 1] == '*'
-                || chars[i] == '_' && chars[i + 1] == '_')
-        {
-            i += 2;
-            continue;
-        }
-        // Italic: *text* or _text_
-        if chars[i] == '*' || chars[i] == '_' {
-            i += 1;
-            continue;
-        }
-        // Strikethrough: ~~text~~
-        if i + 1 < chars.len() && chars[i] == '~' && chars[i + 1] == '~' {
-            i += 2;
-            continue;
-        }
-        // Code: `text`
-        if chars[i] == '`' {
-            i += 1;
-            continue;
-        }
-        // Footnote reference: [^id] — emit as `[N]` later in a
-        // second pass, but at this stage strip the `^` so the
-        // body text becomes "[id]". The actual numbering happens
-        // in `substitute_footnote_refs` after the document scan.
-        if chars[i] == '['
-            && i + 1 < chars.len()
-            && chars[i + 1] == '^'
-            && i + 2 < chars.len()
-            && chars[i + 2] != ']'
-        {
-            // Skip the `^`, then the label until the closing `]`.
-            // We emit `[label]` (the surrounding brackets are kept
-            // so the marker is visually distinct).
-            result.push('[');
-            i += 2; // skip [ and ^
-            while i < chars.len() && chars[i] != ']' {
-                result.push(chars[i]);
-                i += 1;
-            }
-            if i < chars.len() {
-                result.push(']');
-                i += 1; // skip ]
-            }
-            continue;
-        }
-        // Links: [text](url)
-        if chars[i] == '[' {
-            // Skip until ]
-            while i < chars.len() && chars[i] != ']' {
-                result.push(chars[i]);
-                i += 1;
-            }
-            // Skip ](url)
-            if i < chars.len() {
-                i += 1; // skip ]
-            }
-            if i < chars.len() && chars[i] == '(' {
-                while i < chars.len() && chars[i] != ')' {
-                    i += 1;
-                }
-                if i < chars.len() {
-                    i += 1; // skip )
-                }
-            }
-            continue;
-        }
-        // Images: ![alt](url) — skip the ! but keep alt text
-        if chars[i] == '!' && i + 1 < chars.len() && chars[i + 1] == '[' {
-            i += 1; // skip !
-            continue;
-        }
-        result.push(chars[i]);
-        i += 1;
-    }
-
-    result
-}
-
-/// Post-process the stripped text to substitute `[label]` footnote
-/// references with the document-order number `[N]`. Defined
-/// references are remapped; any `[^label]` that doesn't have a
-/// matching definition is left as-is so the user can spot broken
-/// references in the exported PDF.
-fn substitute_footnote_refs(text: &str, footnotes: &[markdown::FootnoteDef]) -> String {
-    if footnotes.is_empty() {
-        return text.to_string();
-    }
-    // Build a label→number map from the pre-collected footnotes.
-    let mut out = String::with_capacity(text.len());
-    let chars: Vec<char> = text.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        if chars[i] == '['
-            && i + 1 < chars.len()
-            && chars[i + 1] == '^'
-            && i + 2 < chars.len()
-            && chars[i + 2] != ']'
-        {
-            // Already converted by `strip_markdown` to `[label]`,
-            // which is now what we see. We rewrite to `[N]`.
-            let label_start = i + 2;
-            let mut label_end = label_start;
-            while label_end < chars.len() && chars[label_end] != ']' {
-                label_end += 1;
-            }
-            let label: String = chars[label_start..label_end].iter().collect();
-            let num = footnotes.iter().find(|n| n.label == label).map(|n| n.number);
-            out.push('[');
-            match num {
-                Some(n) => out.push_str(&n.to_string()),
-                None => {
-                    out.push('^');
-                    out.push_str(&label);
-                }
-            }
-            out.push(']');
-            i = if label_end < chars.len() { label_end + 1 } else { label_end };
-            continue;
-        }
-        out.push(chars[i]);
-        i += 1;
-    }
-    out
-}
-
 #[test]
 fn test_font_paths_exist() {
     let (regular, bold) = get_font_paths().expect("should resolve");
@@ -631,145 +504,4 @@ fn test_font_paths_exist() {
 fn test_strip_markdown() {
     assert_eq!(strip_markdown("**bold**"), "bold");
     assert_eq!(strip_markdown("plain text"), "plain text");
-}
-
-// ============================== P0-9 helpers ==============================
-
-/// Pull every inline image `![alt](path)` out of a single
-/// markdown line. Returns `(path, alt)` pairs in source order.
-/// Hand-rolled character loop — keeps the export crate free
-/// of a `regex` dependency (which lives in `markdown` only).
-/// No escaping support, matching the CommonMark subset we
-/// support elsewhere.
-fn extract_inline_images(line: &str) -> Vec<(String, String)> {
-    let bytes = line.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i + 4 < bytes.len() {
-        if bytes[i] == b'!' && bytes[i + 1] == b'[' {
-            // Scan alt until `]`
-            let alt_start = i + 2;
-            let mut j = alt_start;
-            while j < bytes.len() && bytes[j] != b']' {
-                j += 1;
-            }
-            if j < bytes.len() && j + 1 < bytes.len() && bytes[j + 1] == b'(' {
-                let alt = line[alt_start..j].to_string();
-                // Scan path until `)`
-                let path_start = j + 2;
-                let mut k = path_start;
-                while k < bytes.len() && bytes[k] != b')' {
-                    k += 1;
-                }
-                if k < bytes.len() {
-                    let path = line[path_start..k].trim().to_string();
-                    out.push((path, alt));
-                    i = k + 1;
-                    continue;
-                }
-            }
-        }
-        i += 1;
-    }
-    out
-}
-
-/// Read an image from `path` if it's a local file we can open.
-/// Remote URLs (http/https/data:) are rejected. Relative paths
-/// are resolved against the source markdown's directory so
-/// `![](./img.png)` works when the document is exported.
-fn load_image_bytes(path: &str, source_path: Option<&str>) -> Option<Vec<u8>> {
-    // Reject remote / inline-embedded sources outright.
-    if path.starts_with("http://")
-        || path.starts_with("https://")
-        || path.starts_with("data:")
-    {
-        return None;
-    }
-    let resolved = if let Some(src) = source_path {
-        let src_path = std::path::Path::new(src);
-        let base = src_path.parent().unwrap_or(std::path::Path::new("."));
-        if std::path::Path::new(path).is_absolute() {
-            std::path::PathBuf::from(path)
-        } else {
-            base.join(path)
-        }
-    } else {
-        std::path::PathBuf::from(path)
-    };
-    std::fs::read(&resolved).ok()
-}
-
-/// True if `line` is a markdown table row: starts and ends
-/// with `|` and has at least one more `|` inside. Empty
-/// cells are fine.
-fn is_table_row(line: &str) -> bool {
-    let t = line.trim();
-    t.starts_with('|') && t.ends_with('|') && t.matches('|').count() >= 2
-}
-
-/// True if `line` is a markdown table separator row
-/// (`| --- | --- |`). Used to skip the divider line that
-/// appears after the header.
-fn is_table_separator(line: &str) -> bool {
-    if !is_table_row(line) {
-        return false;
-    }
-    line.split('|')
-        .filter(|s| !s.trim().is_empty())
-        .all(|s| {
-            let t = s.trim();
-            t.chars().all(|c| c == '-' || c == ':') && t.len() >= 1
-        })
-}
-
-/// Split a `| col | col |` line into trimmed cell strings.
-fn parse_table_row(line: &str) -> Vec<String> {
-    line.trim()
-        .trim_start_matches('|')
-        .trim_end_matches('|')
-        .split('|')
-        .map(|s| s.trim().to_string())
-        .collect()
-}
-
-/// Render a single table row. Columns are spaced 6mm apart
-/// and truncated to fit the page width. `font` is the regular
-/// or bold font (use bold for the header).
-fn render_table_row(
-    doc: &mut PdfDocumentReference,
-    current_page_idx: &mut PdfPageIndex,
-    current_layer_idx: &mut PdfLayerIndex,
-    y: &mut f32,
-    margin: f32,
-    content_width: f32,
-    font: &IndirectFontRef,
-    cols: &[String],
-) {
-    if cols.is_empty() {
-        return;
-    }
-    let col_width_mm = (content_width / cols.len() as f32).min(80.0);
-    let char_limit = ((col_width_mm / 3.5) as usize).max(4);
-
-    if *y < margin + 5.0 {
-        let (np, nl) = add_page(doc);
-        *current_page_idx = np;
-        *current_layer_idx = nl;
-        *y = Mm(277.0).0;
-    }
-
-    let layer = doc.get_page(*current_page_idx).get_layer(*current_layer_idx);
-    for (i, cell) in cols.iter().enumerate() {
-        let x = margin + (i as f32) * col_width_mm;
-        let text = if cell.chars().count() > char_limit {
-            let mut s: String = cell.chars().take(char_limit).collect();
-            s.push('…');
-            s
-        } else {
-            cell.clone()
-        };
-        layer.use_text(&text, 8.5, Mm(x), Mm(*y), font);
-    }
-    *y -= 5.5; // slightly larger than line_height for table breathing
 }

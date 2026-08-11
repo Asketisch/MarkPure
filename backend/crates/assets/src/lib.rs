@@ -12,6 +12,13 @@ pub enum Error {
     InvalidImage,
     #[error("Unsupported image format")]
     UnsupportedFormat,
+    /// `SystemTime::duration_since(UNIX_EPOCH)` returned an error,
+    /// which means the host clock is set to a date before
+    /// 1970-01-01. Practically never happens on a properly
+    /// configured machine, but `.unwrap()` would panic the
+    /// entire IPC pipeline when it does.
+    #[error("System clock is set before the Unix epoch")]
+    ClockBeforeEpoch,
 }
 
 /// Result of saving a pasted image
@@ -266,17 +273,32 @@ lazy_static::lazy_static! {
     static ref TRACKED_FILES: Mutex<HashMap<String, u64>> = Mutex::new(HashMap::new());
 }
 
+/// Acquire the `TRACKED_FILES` mutex without poisoning the IPC
+/// pipeline if a previous caller panicked. Mirrors the
+/// `lock_or_recover` helper in `apps/desktop/src/state.rs` so the
+/// two crates share the same recovery semantics.
+fn tracked_lock() -> std::sync::MutexGuard<'static, HashMap<String, u64>> {
+    match TRACKED_FILES.lock() {
+        Ok(g) => g,
+        Err(poisoned) => {
+            eprintln!("[assets] TRACKED_FILES poisoned, recovering");
+            poisoned.into_inner()
+        }
+    }
+}
+
 /// Track a file for modification detection
 pub fn track_file(path: &str) -> Result<u64, Error> {
     let path_str = path.to_string();
     let metadata = fs::metadata(&path_str)?;
-    let mtime = metadata.modified()
+    let mtime = metadata
+        .modified()
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "Failed to get mtime"))?
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .map_err(|_| Error::ClockBeforeEpoch)?
         .as_secs();
 
-    TRACKED_FILES.lock().unwrap().insert(path_str, mtime);
+    tracked_lock().insert(path_str, mtime);
     Ok(mtime)
 }
 
@@ -285,16 +307,17 @@ pub fn is_file_modified(path: &str) -> Result<bool, Error> {
     let path_str = path.to_string();
 
     let tracked_mtime = {
-        let files = TRACKED_FILES.lock().unwrap();
+        let files = tracked_lock();
         files.get(&path_str).copied()
     };
 
     if let Some(tracked) = tracked_mtime {
         let metadata = fs::metadata(&path_str)?;
-        let current_mtime = metadata.modified()
+        let current_mtime = metadata
+            .modified()
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "Failed to get mtime"))?
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|_| Error::ClockBeforeEpoch)?
             .as_secs();
 
         Ok(current_mtime > tracked)
@@ -306,8 +329,7 @@ pub fn is_file_modified(path: &str) -> Result<bool, Error> {
 
 /// Untrack a file
 pub fn untrack_file(path: &str) {
-    let mut files = TRACKED_FILES.lock().unwrap();
-    files.remove(path);
+    tracked_lock().remove(path);
 }
 
 /// Remote upload result

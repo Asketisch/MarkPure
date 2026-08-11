@@ -1,4 +1,3 @@
-use mt_core::keymap::KeyBinding;
 // ============================== Keybindings ==============================
 
 pub fn cmd_get_keybindings() -> std::result::Result<serde_json::Value, String> {

@@ -34,8 +34,11 @@ export { findNextOccurrence, findNextForCursors, findAllOccurrences } from './fi
 // P2-3 column selection (Alt+Drag) — exported so editor.ts can
 // register the second plugin and App.svelte can subscribe to
 // the drag state for the StatusBar indicator.
-export { createColumnSelectPlugin, flattenRectToCursors, normaliseRect, estimateLineHeight, isInsideAtomicBlock } from './column-select'
-export type { FlattenOptions } from './column-select'
+export { createColumnSelectPlugin } from './column-select'
+// Pure helpers live alongside the plugin so unit tests can
+// exercise `flattenRectToCursors` without spinning up a DOM.
+export { flattenRectToCursors, normaliseRect, estimateLineHeight, isInsideAtomicBlock } from './column-select-helpers'
+export type { FlattenOptions } from './column-select-helpers'
 export { columnSelectPluginKey } from './rect-types'
 export type { ColumnSelectState, ColumnSelectMeta, Rect, ViewportPoint } from './rect-types'
 

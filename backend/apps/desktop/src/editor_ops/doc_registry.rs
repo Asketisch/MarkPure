@@ -13,6 +13,7 @@
 
 use crate::state::{lock_or_recover, parse_doc_id_param, AppState, MAX_DOCUMENTS};
 use mt_core::document::{Document, Encoding};
+#[cfg(test)]
 use std::collections::HashMap;
 
 /// Touch the LRU order for `doc_id`, returning the IDs of documents

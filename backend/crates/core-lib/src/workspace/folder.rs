@@ -1,7 +1,9 @@
-use super::pane::{Orientation, Pane};
-use super::workspace_state::WorkspaceState;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+#[cfg(test)]
+use super::pane::{Orientation, Pane};
+#[cfg(test)]
+use super::workspace_state::WorkspaceState;
 
 /// Information about a folder in the workspace
 #[derive(Debug, Clone, Serialize, Deserialize)]

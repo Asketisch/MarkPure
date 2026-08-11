@@ -56,6 +56,13 @@ import {
   type ViewportPoint,
   DRAG_THRESHOLD_PX,
 } from './rect-types'
+import {
+  normaliseRect,
+  isInsideAtomicBlock,
+  estimateLineHeight,
+  flattenRectToCursors,
+  type FlattenOptions,
+} from './column-select-helpers'
 
 /** Empty/initial drag state. */
 function emptyColumnState(): ColumnSelectState {
@@ -298,183 +305,11 @@ function detachOverlay(view: EditorView): void {
   if (el) el.remove()
 }
 
-// ============================================================
-//  Geometry helpers (pure, no DOM)
-// ============================================================
-
-/** Normalise two arbitrary points to a non-empty bounding box. */
-export function normaliseRect(a: ViewportPoint, b: ViewportPoint): Rect {
-  return {
-    left: Math.min(a.x, b.x),
-    top: Math.min(a.y, b.y),
-    right: Math.max(a.x, b.x),
-    bottom: Math.max(a.y, b.y),
-  }
-}
-
-// ============================================================
-//  Atomic-block detection
-//
-//  Mirrors the rejection logic in commands.ts:42-51 — code
-//  blocks and table cells own their own internal cursor and
-//  must not receive column-select cursors.
-// ============================================================
-
-/** Return true if the PM `pos` is inside a code block or table cell. */
-export function isInsideAtomicBlock(doc: import('@tiptap/pm/model').Node, pos: number): boolean {
-  try {
-    const $pos = doc.resolve(pos)
-    if ($pos.parent.type.spec.code) return true
-    for (let d = $pos.depth; d > 0; d--) {
-      if ($pos.node(d).type.spec.tableRole) return true
-    }
-  } catch {
-    // resolve() throws for out-of-bounds positions; treat as
-    // atomic (i.e. skip) so we don't crash the fan-out.
-    return true
-  }
-  return false
-}
-
-// ============================================================
-//  Line-height estimation
-//
-//  We need to step through the drag rectangle by approximate
-//  line height. The CSS variable `--editor-line-height` (declared
-//  in app.css) is the authoritative source. If unset, fall back
-//  to a measurement of the first line via coordsAtPos(1).
-// ============================================================
-
-/** Return an estimated line height in CSS pixels. */
-export function estimateLineHeight(view: EditorView): number {
-  // First try the CSS variable, which themes can override.
-  try {
-    const cssVar = window.getComputedStyle(view.dom).getPropertyValue('--editor-line-height').trim()
-    if (cssVar) {
-      const parsed = parseFloat(cssVar)
-      if (Number.isFinite(parsed) && parsed > 0) return parsed
-    }
-  } catch {
-    // getComputedStyle may throw if the dom isn't attached.
-  }
-  // Fall back to measuring an actual line. coordsAtPos(1) is
-  // the first character of the first block. If the doc is
-  // empty (size === 0 + 1 wrapper), we use a sane default.
-  try {
-    if (view.state.doc.content.size === 0) return 24
-    const c = view.coordsAtPos(1)
-    const h = c.bottom - c.top
-    if (Number.isFinite(h) && h > 4) return h
-  } catch {
-    // Same fallback.
-  }
-  return 24
-}
-
-// ============================================================
-//  Rectangle → Cursor[] flatten (the core algorithm)
-// ============================================================
-
-export interface FlattenOptions {
-  /** Override line height (used by unit tests). */
-  lineHeight?: number
-  /**
-   * Override the posAtCoords resolver. Tests inject a fake
-   * implementation; production passes `view.posAtCoords.bind(view)`.
-   */
-  posAtCoords?: (coord: { left: number; top: number }) => { pos: number; inside: number } | null
-  /** Override the atomic-block predicate (used by tests). */
-  isAtomic?: (pos: number) => boolean
-  /** Override the cap (used by tests). */
-  maxCursors?: number
-  /** Detect virtualization (.pm-virtual-hidden) at a point. */
-  isVirtualizedAtPoint?: (point: ViewportPoint) => boolean
-}
-
 /**
- * Convert a viewport-relative rectangle to N range cursors,
- * one per line that intersects the box.
- *
- * Returns an empty array when no usable lines were found —
- * the caller is expected to bail in that case rather than
- * dispatching an empty cursor set.
- *
- * Algorithm:
- *   1. Sample y-coordinates inside the rectangle at line-height
- *      intervals (starting at top + lineH/2 so we hit line
- *      centres, not the gap between lines).
- *   2. For each y, ask posAtCoords for the PM position at
- *      (left, y) and (right, y) — the two ends of the line slice.
- *   3. Reject if either end is null or inside an atomic block.
- *   4. Build a range cursor { pos: rightPos, anchor: leftPos }.
- *   5. Dedup identical (pos, anchor) pairs (empty trailing lines
- *      collapse to the same positions).
- *   6. Cap at MAX_CURSORS with a console.warn when truncated.
- *
- * The `view` parameter is only used for its `posAtCoords` /
- * `coordsAtPos` / `state.doc` accessors, all of which can be
- * overridden via `opts` for unit testing.
- */
-export function flattenRectToCursors(
-  view: EditorView,
-  rect: Rect,
-  opts: FlattenOptions = {},
-): Cursor[] {
-  const cap = opts.maxCursors ?? MAX_CURSORS
-  if (cap <= 0) return []
-  const lineH = opts.lineHeight ?? estimateLineHeight(view)
-  if (!Number.isFinite(lineH) || lineH <= 0) return []
-  if (rect.bottom <= rect.top) return []
-
-  const posAtCoords = opts.posAtCoords ?? view.posAtCoords.bind(view)
-  const isAtomic = opts.isAtomic ?? ((pos: number) => isInsideAtomicBlock(view.state.doc, pos))
-  const isVirt = opts.isVirtualizedAtPoint
-
-  const out: Cursor[] = []
-  const seen = new Set<string>()
-  let truncated = false
-
-  // Start at half a line down so we sample line centres.
-  const startY = rect.top + lineH / 2
-  // Use a strict-less-than comparison + an explicit max-iteration
-  // guard so a tiny lineH from a misconfigured CSS var can't
-  // produce an infinite loop.
-  const maxIter = Math.ceil((rect.bottom - rect.top) / Math.max(lineH, 1)) + 2
-  let iter = 0
-  for (let y = startY; y < rect.bottom && iter < maxIter; y += lineH, iter++) {
-    // Skip lines whose centre falls into a virtualized
-    // (content-visibility: hidden) block — posAtCoords would
-    // return a stale or wrong position.
-    if (isVirt && isVirt({ x: rect.left, y })) continue
-    const leftHit = posAtCoords({ left: rect.left, top: y })
-    const rightHit = posAtCoords({ left: rect.right, top: y })
-    if (!leftHit || !rightHit) continue
-
-    const anchor = Math.min(leftHit.pos, rightHit.pos)
-    const head = Math.max(leftHit.pos, rightHit.pos)
-    if (isAtomic(anchor) || isAtomic(head)) continue
-
-    const key = `${head}:${anchor}`
-    if (seen.has(key)) continue
-    seen.add(key)
-
-    if (out.length >= cap) {
-      truncated = true
-      break
-    }
-    out.push(anchor === head ? { pos: head } : { pos: head, anchor })
-  }
-
-  if (truncated) {
-    // eslint-disable-next-line no-console
-    console.warn(`[column-select] truncated cursor set at MAX_CURSORS=${cap}`)
-  }
-  return out
-}
-
-/**
- * The mouseup handler's commit path. Pure side-effect-only:
- *   1. Resolve the cursor set from the drag rectangle.
+ * Final step of the column-select drag: flatten the rectangle
+ * to a list of cursors and dispatch them through the linear
+ * multi-cursor plugin.
+ *   1. If the rectangle is empty / zero cursors, no-op.
  *   2. If non-empty, dispatch into the linear multi-cursor plugin.
  *   3. If empty, no-op (the user dragged over an entirely
  *      atomic or off-screen region — leave them where they were).
@@ -487,11 +322,11 @@ function commitColumnSelection(
   if (!view.editable) return
   const rect = normaliseRect(startPoint, endPoint)
   const cursors = flattenRectToCursors(view, rect, {
-    isVirtualizedAtPoint: defaultVirtualizationProbe,
+    isHidden: defaultVirtualizationProbe,
   })
   if (cursors.length === 0) return
-  // Move the primary selection to the first cursor's head so
-  // the user has a recognisable focus point; the remaining
+  // Move the primary selection to the first cursor's position
+  // so the user has a recognisable focus point; the remaining
   // entries become secondary cursors. The multi-cursor reducer
   // dedupes against the primary selection automatically via
   // input-handler.ts's range builder.

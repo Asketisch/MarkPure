@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use mt_core::document::{Document, Encoding};
 use mt_core::markdown_lint::{lint_markdown, LintRule};
-use crate::state::{lock_or_recover, parse_doc_id_param, AppEvent, AppState};
+use crate::state::{lock_or_recover, parse_doc_id_param, AppState};
 // ============================== File operations ==============================
 
 pub fn cmd_open_file(

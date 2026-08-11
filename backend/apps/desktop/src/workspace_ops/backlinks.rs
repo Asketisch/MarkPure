@@ -1,7 +1,6 @@
 // ============================== Backlinks (P0-6) ==============================
 
 use super::workspace_scans::{extract_root_paths, is_hidden};
-use std::collections::BTreeMap;
 use std::path::Path;
 use walkdir::WalkDir;
 

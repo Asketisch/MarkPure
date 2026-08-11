@@ -1,11 +1,31 @@
+<!--
+  Settings dialog — orchestrator only.
+
+  The four sections (general / appearance / shortcuts / about)
+  each live in their own .svelte file. This component owns:
+    - The sidebar tab nav (justSaved flash, active button state)
+    - The data-loading effect (load on open)
+    - The IPC wiring (saveConfig, changeLanguage, etc.)
+    - The hidden file input for "Import Preferences"
+    - The ThemeEditor overlay mount point
+
+  See `./GeneralSection.svelte`, `./AppearanceSection.svelte`,
+  `./ShortcutsSection.svelte`, `./AboutSection.svelte` for
+  the per-section markup. Pure helpers (theme lookup tables,
+  accelerator formatter, config export/import I/O) live in
+  `./themes.ts`, `./keybindings.ts`, `./configIO.ts`.
+
+  Styles live in `./settings.css` so the orchestrator file
+  stays focused on template + script logic.
+-->
 <script lang="ts">
+  import './settings.css'
+  import { onMount, untrack } from 'svelte'
   import {
     getConfig,
     setConfig,
     getThemes,
     importTheme,
-    pickThemeFile,
-    exportTheme,
     deleteTheme,
     getLocale,
     setLocale,
@@ -14,7 +34,6 @@
     resetKeybindings,
     exportConfig,
     importConfig,
-    type ConfigExportPayload,
     type ConfigImportReport,
     type AppConfig,
     type Theme,
@@ -23,6 +42,12 @@
   } from '$lib/editor/commands'
   import { useI18n } from '$lib/stores/i18n.svelte'
   import ThemeEditor from './ThemeEditor.svelte'
+  import { acceleratorFromEvent } from './keybindings'
+  import { downloadConfigAsJson, readJsonFromFileInput } from './configIO'
+  import GeneralSection from './GeneralSection.svelte'
+  import AppearanceSection from './AppearanceSection.svelte'
+  import ShortcutsSection from './ShortcutsSection.svelte'
+  import AboutSection from './AboutSection.svelte'
 
   const i18n = useI18n()
 
@@ -103,23 +128,7 @@
   async function handleExportConfig() {
     try {
       const payload = await exportConfig()
-      // We hand the user the JSON as a Blob + an anchor
-      // download. The wry WebView respects the
-      // `download` attribute on programmatic `<a>`
-      // clicks, matching how Typora / VSCode surface
-      // "Export Preferences" without a separate IPC.
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: 'application/json',
-      })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const stamp = new Date().toISOString().slice(0, 10)
-      a.download = `markpure-preferences-${stamp}.json`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      await downloadConfigAsJson(payload)
       flashSaved()
     } catch (e) {
       console.error('Failed to export preferences:', e)
@@ -133,12 +142,9 @@
     if (importInput) importInput.click()
   }
   async function onImportFileChange(e: Event) {
-    const target = e.target as HTMLInputElement
-    const file = target.files?.[0]
-    if (!file) return
     try {
-      const text = await file.text()
-      const payload = JSON.parse(text) as ConfigExportPayload
+      const payload = await readJsonFromFileInput(e)
+      if (!payload) return
       const report = await importConfig(payload)
       configImportReport = report
       await reloadAllAfterImport()
@@ -146,6 +152,7 @@
       console.error('Failed to import preferences:', e)
       configImportReport = null
     } finally {
+      const target = e.target as HTMLInputElement
       target.value = ''
     }
   }
@@ -186,50 +193,12 @@
   }
 
   async function changeTheme(themeName: string) {
-    // Convert human-readable labels to CSS class names
-    const labelToClass: Record<string, string> = {
-      'Cadmium Light': '',
-      'Light': '',
-      'Dark': 'theme-dark',
-      'One Dark': 'theme-one-dark',
-      'Graphite': 'theme-graphite',
-      'Ulysses': 'theme-ulysses',
-      'Material Dark': 'theme-material-dark',
-      'Blue Topaz': 'theme-blue-topaz',
-    }
-    const cssClass = labelToClass[themeName] ?? themeName
-    await saveConfig({ theme: cssClass })
+    // The `<select>` value is the human-readable label; the
+    // label and the CSS class map 1:1 in this build (the
+    // legacy label→class translator lives in `./themes.ts`
+    // if the menu ever re-introduces a friendly name).
+    await saveConfig({ theme: themeName })
   }
-
-  // Convert CSS class name to human-readable label for display
-  // by looking up the i18n key — keeps labels in sync with the
-  // current locale (Settings is bilingual at runtime).
-  function getThemeLabel(cssClass: string): string {
-    const classToKey: Record<string, string> = {
-      '': 'settings.theme.cadmium',
-      'theme-dark': 'settings.theme.dark',
-      'theme-one-dark': 'settings.theme.one_dark',
-      'theme-graphite': 'settings.theme.graphite',
-      'theme-ulysses': 'settings.theme.ulysses',
-      'theme-material-dark': 'settings.theme.material_dark',
-      'theme-blue-topaz': 'settings.theme.blue_topaz',
-    }
-    const key = classToKey[cssClass]
-    return key ? i18n.t(key) : cssClass
-  }
-
-  // Display options for the theme selector — values are CSS classes,
-  // labels resolve via i18n at render time so the user sees the
-  // current language.
-  const themeOptions: Array<{ value: string; labelKey: string }> = [
-    { value: '', labelKey: 'settings.theme.cadmium' },
-    { value: 'theme-dark', labelKey: 'settings.theme.dark' },
-    { value: 'theme-one-dark', labelKey: 'settings.theme.one_dark' },
-    { value: 'theme-graphite', labelKey: 'settings.theme.graphite' },
-    { value: 'theme-ulysses', labelKey: 'settings.theme.ulysses' },
-    { value: 'theme-material-dark', labelKey: 'settings.theme.material_dark' },
-    { value: 'theme-blue-topaz', labelKey: 'settings.theme.blue_topaz' },
-  ]
 
   async function handleImportTheme() {
     try {
@@ -238,6 +207,7 @@
       // `input[type=file]` which only exposed a sandboxed
       // filename and never persisted the imported theme to
       // the on-disk themes directory.
+      const { pickThemeFile } = await import('$lib/editor/commands')
       const path = await pickThemeFile()
       if (!path) return  // user cancelled
       const theme = await importTheme(path)
@@ -277,32 +247,16 @@
     e.preventDefault()
     e.stopPropagation()
 
-    const parts: string[] = []
-    if (e.metaKey || e.ctrlKey) parts.push('CmdOrCtrl')
-    if (e.shiftKey) parts.push('Shift')
-    if (e.altKey) parts.push('Alt')
+    const accelerator = acceleratorFromEvent(e)
+    if (!accelerator) return
 
-    const key = e.key
-    if (!['Meta', 'Control', 'Shift', 'Alt'].includes(key)) {
-      parts.push(key.length === 1 ? key.toUpperCase() : key)
-      const accelerator = parts.join('+')
-
-      updateKeybinding(binding.id, accelerator).then((kb: KeyBinding[]) => {
-        keybindings = kb
-        recordingId = null
-      }).catch((e: Error) => {
-        console.error('Failed to update keybinding:', e)
-        recordingId = null
-      })
-    }
-  }
-
-  function formatAccelerator(acc: string | null): string {
-    if (!acc) return '—'
-    return acc
-      .replace('CmdOrCtrl', navigator.platform.includes('Mac') ? '\u2318' : 'Ctrl')
-      .replace('Shift', '\u21E7')
-      .replace('Alt', '\u2325')
+    updateKeybinding(binding.id, accelerator).then((kb: KeyBinding[]) => {
+      keybindings = kb
+      recordingId = null
+    }).catch((e: Error) => {
+      console.error('Failed to update keybinding:', e)
+      recordingId = null
+    })
   }
 
   $effect(() => {
@@ -336,226 +290,36 @@
         {#if loading}
           <div class="loading">{i18n.t('settings.loading')}</div>
         {:else if activeSection === 'general' && config}
-          <section>
-            <h2>{i18n.t('settings.general')}</h2>
-
-            <div class="setting-row">
-              <label for="settings-language">{i18n.t('settings.language')}</label>
-              <select id="settings-language" value={localeInfo?.current ?? 'en'} onchange={(e) => changeLanguage((e.target as HTMLSelectElement).value)}>
-                {#if localeInfo}
-                  {#each localeInfo.available as [code, name]}
-                    <option value={code}>{name}</option>
-                  {/each}
-                {/if}
-              </select>
-            </div>
-
-            <div class="setting-row">
-              <label for="settings-font-family">{i18n.t('settings.font_family')}</label>
-              <input id="settings-font-family" type="text" value={config.editor.font_family} onchange={(e) => saveConfig({ editor: { ...config!.editor, font_family: (e.target as HTMLInputElement).value } })} />
-            </div>
-
-            <div class="setting-row">
-              <label for="settings-font-size">{i18n.t('settings.font_size')}</label>
-              <input id="settings-font-size" type="number" min="10" max="32" value={config.editor.font_size} onchange={(e) => saveConfig({ editor: { ...config!.editor, font_size: Number((e.target as HTMLInputElement).value) } })} />
-            </div>
-
-            <div class="setting-row">
-              <label for="settings-tab-size">{i18n.t('settings.tab_size')}</label>
-              <input id="settings-tab-size" type="number" min="2" max="8" value={config.editor.tab_size} onchange={(e) => saveConfig({ editor: { ...config!.editor, tab_size: Number((e.target as HTMLInputElement).value) } })} />
-            </div>
-
-            <div class="setting-row">
-              <label for="settings-soft-tabs">{i18n.t('settings.soft_tabs')}</label>
-              <input id="settings-soft-tabs" type="checkbox" checked={config.editor.soft_tabs} onchange={(e) => saveConfig({ editor: { ...config!.editor, soft_tabs: (e.target as HTMLInputElement).checked } })} />
-            </div>
-
-            <div class="setting-row">
-              <label for="settings-line-numbers">{i18n.t('settings.line_numbers')}</label>
-              <input id="settings-line-numbers" type="checkbox" checked={config.editor.line_numbers} onchange={(e) => saveConfig({ editor: { ...config!.editor, line_numbers: (e.target as HTMLInputElement).checked } })} />
-            </div>
-
-            <div class="setting-row">
-              <label for="settings-word-wrap">{i18n.t('settings.word_wrap')}</label>
-              <input id="settings-word-wrap" type="checkbox" checked={config.editor.word_wrap} onchange={(e) => saveConfig({ editor: { ...config!.editor, word_wrap: (e.target as HTMLInputElement).checked } })} />
-            </div>
-
-            <div class="setting-row">
-              <label for="settings-auto-save">{i18n.t('settings.auto_save_interval')}</label>
-              <input id="settings-auto-save" type="number" min="0" max="300" value={config.editor.auto_save_interval} onchange={(e) => saveConfig({ editor: { ...config!.editor, auto_save_interval: Number((e.target as HTMLInputElement).value) } })} />
-            </div>
-
-            <!-- P0-X: Typora-style "lint on save" toggle.
-                 When enabled, `save_file` runs
-                 `lint_markdown` (trim trailing whitespace,
-                 ensure final newline, collapse 3+ blank
-                 lines into 2) before writing to disk. -->
-            <div class="setting-row">
-              <label for="settings-lint-on-save" title={i18n.t('settings.lint_on_save_tooltip')}>
-                {i18n.t('settings.lint_on_save')}
-              </label>
-              <input
-                id="settings-lint-on-save"
-                type="checkbox"
-                checked={config.editor.lint_on_save}
-                onchange={(e) => saveConfig({ editor: { ...config!.editor, lint_on_save: (e.target as HTMLInputElement).checked } })}
-              />
-            </div>
-
-            <!-- P0-X: Typora-style word-count goal. When
-                 set (>0), the status bar shows
-                 `<current> / <goal> (<pct>%)` so the
-                 user can track progress against a writing
-                 target. Lives at the top level of
-                 AppConfig (not `editor.*`) because it's
-                 a writing-flow preference, not a code-
-                 editor knob. -->
-            <div class="setting-row">
-              <label for="settings-word-count-goal" title={i18n.t('settings.word_count_goal_tooltip')}>
-                {i18n.t('settings.word_count_goal')}
-              </label>
-              <input
-                id="settings-word-count-goal"
-                type="number"
-                min="0"
-                step="100"
-                value={config.word_count_goal ?? 0}
-                onchange={(e) => saveConfig({ word_count_goal: Number((e.target as HTMLInputElement).value) })}
-              />
-            </div>
-
-            <!-- P1-11: Spell check (toggle + language). On
-                 non-macOS the tooltip warns the user that
-                 only English is checked. -->
-            <h3>{i18n.t('settings.spellcheck')}</h3>
-            <div class="setting-row">
-              <label for="settings-spellcheck-enabled" title={isMacPlatform ? '' : i18n.t('settings.spellcheck.macos_only')}>
-                {i18n.t('settings.spellcheck_enabled')}
-              </label>
-              <input
-                id="settings-spellcheck-enabled"
-                type="checkbox"
-                checked={config.editor.spellcheck_enabled}
-                onchange={(e) => saveConfig({ editor: { ...config!.editor, spellcheck_enabled: (e.target as HTMLInputElement).checked } })}
-              />
-            </div>
-            <div class="setting-row">
-              <label for="settings-spellcheck-language">{i18n.t('settings.spellcheck_language')}</label>
-              <select
-                id="settings-spellcheck-language"
-                value={config.editor.spellcheck_language ?? ''}
-                onchange={(e) => {
-                  const v = (e.target as HTMLSelectElement).value
-                  saveConfig({ editor: { ...config!.editor, spellcheck_language: v === '' ? null : v } })
-                }}
-              >
-                <option value="">{i18n.t('settings.spellcheck.follow_ui')}</option>
-                <option value="en">English</option>
-                <option value="zh-CN">简体中文</option>
-                <option value="ja">日本語</option>
-              </select>
-            </div>
-
-            <!-- P0-X: Typora-style preferences export /
-                 import. The user can back up the entire
-                 `AppConfig` + keybindings + custom themes
-                 to a single JSON file and restore them
-                 later (typically on a fresh install or
-                 after switching machines). Both buttons
-                 surface a native file picker via the host
-                 Rust binary; the export writes the
-                 payload, the import reads it back and
-                 forwards it to `cmd_import_config`. -->
-            <h3>{i18n.t('settings.backup_restore')}</h3>
-            <div class="setting-row">
-              <label>{i18n.t('settings.export_preferences')}</label>
-              <button class="setting-action" onclick={handleExportConfig}>
-                {i18n.t('settings.export_button')}
-              </button>
-            </div>
-            <div class="setting-row">
-              <label>{i18n.t('settings.import_preferences')}</label>
-              <button class="setting-action" onclick={handleImportConfig}>
-                {i18n.t('settings.import_button')}
-              </button>
-            </div>
-            {#if configImportReport}
-              <div class="import-report" role="status">
-                {i18n.t('settings.import_report')
-                  .replace('{themes}', String(configImportReport.themes_restored))
-                  .replace('{skipped}', String(configImportReport.themes_skipped))
-                  .replace('{keybindings}', String(configImportReport.keybindings_restored))}
-              </div>
-            {/if}
-          </section>
-
-        {:else if activeSection === 'appearance'}
-          <section>
-            <h2>{i18n.t('settings.appearance')}</h2>
-
-            <div class="setting-row">
-              <label for="settings-builtin-theme">{i18n.t('settings.builtin_theme')}</label>
-              <select id="settings-builtin-theme" value={config?.theme ?? ''} onchange={(e) => changeTheme((e.target as HTMLSelectElement).value)}>
-                {#each themeOptions as opt (opt.value)}
-                  <option value={opt.value}>{i18n.t(opt.labelKey)}</option>
-                {/each}
-              </select>
-            </div>
-
-            {#if themes.length > 0}
-              <h3>{i18n.t('settings.custom_themes')}</h3>
-              {#each themes as theme (theme.id)}
-                <div class="theme-card">
-                  <div class="theme-info">
-                    <span class="theme-name">{theme.name}</span>
-                    <span class="theme-author">{i18n.t('settings.theme.author_template').replace('{author}', theme.author)}</span>
-                    <span class="theme-badge" class:dark={theme.is_dark}>{theme.is_dark ? i18n.t('settings.theme.badge.dark') : i18n.t('settings.theme.badge.light')}</span>
-                  </div>
-                  <div class="theme-actions">
-                    <button onclick={() => handleDeleteTheme(theme.id)}>{i18n.t('action.delete')}</button>
-                  </div>
-                </div>
-              {/each}
-            {/if}
-
-            <div class="setting-actions">
-              <button onclick={handleImportTheme}>{i18n.t('settings.import_theme')}</button>
-              <button onclick={() => themeEditorVisible = true}>{i18n.t('settings.edit_theme')}</button>
-            </div>
-          </section>
-
+          <GeneralSection
+            {config}
+            {localeInfo}
+            {isMacPlatform}
+            {configImportReport}
+            onSaveConfig={saveConfig}
+            onChangeLanguage={changeLanguage}
+            onExportConfig={handleExportConfig}
+            onImportConfig={handleImportConfig}
+          />
+        {:else if activeSection === 'appearance' && config}
+          <AppearanceSection
+            {themes}
+            currentTheme={config.theme}
+            onChangeTheme={changeTheme}
+            onDeleteTheme={handleDeleteTheme}
+            onImportTheme={handleImportTheme}
+            onOpenThemeEditor={() => themeEditorVisible = true}
+          />
         {:else if activeSection === 'shortcuts'}
-          <section>
-            <div class="section-header">
-              <h2>{i18n.t('settings.shortcuts')}</h2>
-              <button class="reset-btn" onclick={handleResetKeybindings}>{i18n.t('settings.reset_to_default')}</button>
-            </div>
-
-            <div class="keybindings-list">
-              {#each keybindings as binding (binding.id)}
-                <div class="kb-row">
-                  <span class="kb-label">{binding.label}</span>
-                  {#if recordingId === binding.id}
-                    <button class="kb-key recording" onkeydown={(e) => handleKeyCapture(e, binding)}>{i18n.t('settings.press_keys')}</button>
-                  {:else}
-                    <button class="kb-key" onclick={() => startRecording(binding.id)}>
-                      {formatAccelerator(binding.accelerator)}
-                    </button>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          </section>
-
+          <ShortcutsSection
+            {keybindings}
+            {recordingId}
+            platform={navigator.platform}
+            onStartRecording={startRecording}
+            onKeyCapture={handleKeyCapture}
+            onReset={handleResetKeybindings}
+          />
         {:else if activeSection === 'about'}
-          <section>
-            <h2>{i18n.t('settings.about')} {i18n.t('app.name')}</h2>
-            <div class="about-info">
-              <h1>{i18n.t('app.name')}</h1>
-              <p>{i18n.t('app.description')}</p>
-              <p class="version">v0.1.0</p>
-            </div>
-          </section>
+          <AboutSection />
         {/if}
       </div>
 
@@ -589,358 +353,3 @@
     <button class="close-btn" onclick={() => themeEditorVisible = false}>x</button>
   </div>
 {/if}
-
-<style>
-  .settings-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 2000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .settings-dialog {
-    display: flex;
-    width: 720px;
-    max-height: 80vh;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
-    position: relative;
-  }
-
-  .settings-sidebar {
-    width: 180px;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border);
-    padding: 16px 0;
-    flex-shrink: 0;
-  }
-
-  .settings-sidebar h3 {
-    padding: 0 16px 12px;
-    font-size: 14px;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  /* P0-X: Typora-style "saved" toast that flashes for
-     ~1.5s after a successful `setConfig` IPC. Sits next
-     to the "Settings" sidebar header. */
-  .settings-saved-flash {
-    font-size: 11px;
-    color: var(--accent);
-    font-weight: 600;
-    text-transform: none;
-    letter-spacing: 0;
-    animation: saved-flash-fade 1.5s ease-out forwards;
-  }
-  @keyframes saved-flash-fade {
-    0% { opacity: 0; transform: translateX(-4px); }
-    20% { opacity: 1; transform: translateX(0); }
-    80% { opacity: 1; }
-    100% { opacity: 0; }
-  }
-
-  .settings-sidebar nav {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .settings-sidebar button {
-    text-align: left;
-    padding: 8px 16px;
-    border: none;
-    background: none;
-    color: var(--text);
-    cursor: pointer;
-    font-size: 13px;
-    transition: background 0.15s;
-  }
-
-  .settings-sidebar button:hover {
-    background: var(--menu-hover-bg);
-  }
-
-  .settings-sidebar button.active {
-    background: var(--accent);
-    color: white;
-  }
-
-  .settings-content {
-    flex: 1;
-    padding: 24px;
-    overflow-y: auto;
-  }
-
-  .settings-content h2 {
-    font-size: 18px;
-    margin-bottom: 20px;
-  }
-
-  .settings-content h3 {
-    font-size: 14px;
-    color: var(--text-secondary);
-    margin: 20px 0 10px;
-  }
-
-  .setting-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .setting-row label {
-    font-size: 13px;
-  }
-
-  .setting-row input[type="text"],
-  .setting-row input[type="number"],
-  .setting-row select {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 13px;
-    min-width: 160px;
-  }
-
-  .setting-row input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--accent);
-  }
-
-  .setting-actions {
-    margin-top: 16px;
-  }
-
-  /* P0-X: backup / restore buttons. Match the existing
-     "setting-action" class so they line up with the
-     appearance actions above. */
-  .setting-action {
-    padding: 6px 14px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-  }
-  .setting-action:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  /* P0-X: post-import report line. Shown directly under
-     the buttons so the user immediately sees what was
-     restored (themes / keybindings counts). */
-  .import-report {
-    margin: 8px 0 4px;
-    padding: 8px 12px;
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    color: var(--accent);
-    border-radius: 6px;
-    font-size: 12px;
-  }
-
-  .setting-actions button {
-    padding: 8px 16px;
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-  }
-
-  .setting-actions button:hover {
-    opacity: 0.9;
-  }
-
-  .theme-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px;
-    margin-bottom: 8px;
-    background: var(--bg-secondary);
-    border-radius: 8px;
-    border: 1px solid var(--border);
-  }
-
-  .theme-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .theme-name { font-weight: 600; font-size: 13px; }
-  .theme-author { color: var(--text-secondary); font-size: 12px; }
-  .theme-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: var(--border);
-  }
-  .theme-badge.dark {
-    background: var(--bg-secondary);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
-
-  .theme-actions button {
-    padding: 4px 10px;
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-  }
-
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
-
-  .reset-btn {
-    padding: 6px 12px;
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-  }
-
-  .keybindings-list {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .kb-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .kb-label { font-size: 13px; }
-
-  .kb-key {
-    padding: 4px 10px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 4px;
-    font-size: 12px;
-    font-family: monospace;
-    cursor: pointer;
-    min-width: 120px;
-    text-align: center;
-  }
-
-  .kb-key.recording {
-    background: var(--accent);
-    color: white;
-    animation: pulse 1s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-  }
-
-  .about-info {
-    text-align: center;
-    padding: 40px 0;
-  }
-
-  .about-info h1 {
-    font-size: 28px;
-    margin-bottom: 8px;
-  }
-
-  .about-info p {
-    color: var(--text-secondary);
-    margin-bottom: 4px;
-  }
-
-  .version {
-    font-size: 14px;
-  }
-
-  .close-btn {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 18px;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-  }
-
-  .close-btn:hover {
-    background: var(--menu-hover-bg);
-    color: var(--text);
-  }
-
-  .loading {
-    text-align: center;
-    padding: 40px;
-    color: var(--text-secondary);
-  }
-
-  .theme-editor-wrapper {
-    position: fixed;
-    inset: 0;
-    background: var(--bg);
-    z-index: 2001;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .theme-editor-wrapper .close-btn {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 18px;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    z-index: 2002;
-  }
-
-  .theme-editor-wrapper .close-btn:hover {
-    background: var(--menu-hover-bg);
-    color: var(--text);
-  }
-</style>

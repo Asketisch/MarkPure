@@ -1,5 +1,5 @@
 use super::{active_workspace_roots, ensure_path_in_workspace};
-use crate::state::{lock_or_recover, AppState};
+use crate::state::AppState;
 use std::path::PathBuf;
 pub fn cmd_create_file(
     params: &serde_json::Value,

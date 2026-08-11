@@ -1,6 +1,8 @@
 import { Editor, Extension, mergeAttributes } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
+import { applyEditorPrefs, type EditorOptions } from './config'
+export { getMarkdown, setContent } from './content'
 import { Markdown } from '@tiptap/markdown'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
@@ -116,85 +118,10 @@ const MultiCursorExtension = Extension.create({
   },
 })
 
-export interface EditorOptions {
-  parent: HTMLElement
-  content?: string
-  onChange?: (markdown: string) => void
-  onSave?: () => void
-  onFilesDropped?: (files: File[]) => void
-  onImagesDropped?: (images: { file: File; base64: string }[]) => void
-  /**
-   * Fired when the user clicks a `[[Page]]` wikilink mark. The
-   * host is expected to resolve the page to a file path and
-   * open it (or create-and-open it if it doesn't exist).
-   */
-  onWikiLinkClick?: (page: string) => void
-  /**
-   * Fired when the user clicks a `#tag` mark. Typical hosts
-   * open the workspace search pre-filled with the tag name.
-   */
-  onTagClick?: (tag: string) => void
-  /** Fired when Vim mode is toggled via Cmd+. inside the editor. */
-  onVimModeChange?: (enabled: boolean) => void
-  /**
-   * Typora-style editor preferences read from Settings. The
-   * host passes the current values on every `createEditor`
-   * call so a tab switch doesn't reset them. `tab_size` is
-   * injected as a CSS variable so downstream code (the
-   * SourceEditor / CodeMirror mirror) can read it without a
-   * separate IPC. `word_wrap` toggles ProseMirror's
-   * wrapping behaviour via a CSS class; `line_numbers` does
-   * the same. `soft_tabs` is read by CodeMirror's keymap
-   * via `--editor-tab-size` + indentWithTab.
-   */
-  editorPrefs?: {
-    tab_size?: number
-    soft_tabs?: boolean
-    line_numbers?: boolean
-    word_wrap?: boolean
-  }
-}
-
-/** Apply editor preferences to the ProseMirror host element
- *  via CSS classes + variables. SourceEditor (CodeMirror)
- *  reads the same CSS variables so WYSIWYG and source
- *  views stay in sync.
- *
- *  Reading directly off `document.documentElement` is
- *  intentional: `applyEditorConfig` in App.svelte already
- *  writes `--editor-font-family` / `--editor-font-size`
- *  there, so we extend the same convention for tab size
- *  and the two toggleable boolean prefs.
- */
-function applyEditorPrefs(
-  parent: HTMLElement,
-  prefs: EditorOptions['editorPrefs'],
-): void {
-  const root = document.documentElement
-  if (prefs?.tab_size !== undefined) {
-    root.style.setProperty('--editor-tab-size', String(prefs.tab_size))
-  }
-  if (prefs?.soft_tabs !== undefined) {
-    root.style.setProperty('--editor-soft-tabs', prefs.soft_tabs ? '1' : '0')
-  }
-  // `word_wrap` toggles a CSS class on the editor host so
-  // existing global CSS can target `.prose-editor.no-wrap`
-  // with `white-space: pre`. Line numbers toggle a separate
-  // class — the gutter itself is rendered by the existing
-  // starter-kit setup only when the class is present.
-  const host = parent
-  if (prefs?.word_wrap === false) {
-    host.classList.add('no-wrap')
-  } else {
-    host.classList.remove('no-wrap')
-  }
-  if (prefs?.line_numbers === false) {
-    host.classList.add('no-line-numbers')
-  } else {
-    host.classList.remove('no-line-numbers')
-  }
-}
-
+// `EditorOptions` and `applyEditorPrefs` live in `./config.ts`;
+// `getMarkdown` / `setContent` live in `./content.ts`. This file
+// is kept to the assembly (createEditor) + the command-registry
+// extension.
 export function createEditor(opts: EditorOptions): Editor {
   const { parent, content = '', onChange, onSave, onFilesDropped, onImagesDropped, onWikiLinkClick, onTagClick, onVimModeChange, editorPrefs } = opts
 
@@ -365,40 +292,8 @@ export function createEditor(opts: EditorOptions): Editor {
   return editor
 }
 
-export function getMarkdown(editor: Editor): string {
-  return editor.getMarkdown()
-}
-
-export function setContent(editor: Editor, markdown: string): void {
-  // The `@tiptap/markdown` v3 API has bounced between
-  // `editor.markdown.parse(md)` and
-  // `editor.storage.markdown.parser.parse(md)`. Try the documented
-  // shape first, fall back to the storage path, and finally to
-  // `commands.setContent` which the editor will treat as HTML —
-  // not what we want for markdown, but at least non-empty.
-  try {
-    const parser = (editor.markdown as { parse?: (md: string) => unknown })?.parse
-      ?? (editor.storage as unknown as Record<string, unknown>)?.markdown
-        ? (editor.storage as { markdown?: { parser?: { parse?: (md: string) => unknown } } })
-            .markdown?.parser?.parse
-        : undefined
-    if (typeof parser === 'function') {
-      const parsed = parser.call(
-        (editor.storage as { markdown?: { parser?: unknown } })?.markdown?.parser
-          ?? editor.markdown,
-        markdown,
-      )
-      editor.commands.setContent(parsed as object)
-      return
-    }
-  } catch (err) {
-    // Fall through to last-resort path below. We log so a missing
-    // or moved parser doesn't silently degrade to HTML rendering.
-    console.error('[editor] markdown parse failed, falling back:', err)
-  }
-  // Last resort: hand the markdown string to `setContent`. Tiptap
-  // will parse it as HTML — wrong, but the editor stays open and
-  // the user can correct manually. Better than a blank screen.
-  console.warn('[editor] no markdown parser found; treating content as HTML')
-  editor.commands.setContent(markdown)
-}
+// `getMarkdown` / `setContent` live in `./content.ts` (split
+// out when `editor.ts` hit the 400-line threshold). They are
+// exported there and re-exported through this file so existing
+// `import { setContent } from '$lib/editor/editor'` call sites
+// keep working.

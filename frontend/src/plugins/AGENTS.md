@@ -21,8 +21,22 @@
 | `commands.ts` | ~180 | Tiptap command 实现：`addCursor` / `selectNextMatch` / `selectAllMatches` / `undoLastCursor` / `clearMultiCursors` / `currentNeedle` |
 | `index.ts` | ~80 | `createMultiCursorPlugin` 入口（Plugin 工厂 + handleDOMEvents.mousedown） |
 | `rect-types.ts` | ~60 | **P2-3** 列选择类型：`Rect` / `ViewportPoint` / `ColumnSelectState` / `ColumnSelectMeta` + `columnSelectPluginKey` 单例 + `DRAG_THRESHOLD_PX=3` |
-| `column-select.ts` | ~370 | **P2-3** Alt+Drag 列选择插件：`createColumnSelectPlugin`（必须先于 multi-cursor 注册）+ 拖动状态机 + `flattenRectToCursors` 纯几何算法 + `isInsideAtomicBlock` 表格/代码块拒绝 + `estimateLineHeight` + overlay 绘制 |
+| `column-select.ts` | ~370 | **P2-3** Alt+Drag 列选择插件：`createColumnSelectPlugin`（必须先于 multi-cursor 注册）+ 拖动状态机 + overlay 绘制 |
+| `column-select-helpers.ts` | ~165 | **P2-3** 列选择纯算法：`flattenRectToCursors` / `normaliseRect` / `isInsideAtomicBlock` / `estimateLineHeight` / `FlattenOptions`（与 DOM 事件解耦，便于单测） |
 | `spellcheck.ts` | 拼写检查（红波浪线 Decoration + 500ms 防抖 + IPC） |
+| `vim/` | **P2-7** Vim 模式（FSM 风格的键盘事件 → 命令映射） |
+| `vim/key-parser.ts` | FSM 调度（idle/count/operator/motion/text-object/ex 五种 active 状态） |
+| `vim/tables.ts` | 静态查找表：`MOTION_TABLE` / `OPERATOR_TABLE` / `TEXT_OBJECT_TABLE` / `VISUAL_TRIGGER` / `INSERT_TRIGGER` / `SPECIAL_KEYS` |
+| `vim/ex-parser.ts` | `:` ex 命令解析（`:w` / `:q` / `:e <path>` / `:b<N>`） |
+| `vim/types.ts` | `VimKey` / `VimCommand` / `VimState` / `Motion` / `Operator` / `TextObject` / `ExCmd` |
+| `vim/state.ts` | 状态机 reducer（insert/appendPending/reset/transition 等） |
+| `vim/commands.ts` | Tiptap 命令（moveTo/selectMotion/yank/changeLine/execEx 等） |
+| `vim/motions.ts` | 单光标 motion 的 PM dispatch 实现 |
+| `vim/operators.ts` | operator 公共逻辑（deleteMotion/changeMotion/yankMotion） |
+| `vim/visual.ts` | VISUAL 模式状态切换 |
+| `vim/decorations.ts` | 当前 mode + pending 输入的 status bar 装饰 |
+| `vim/text-objects.ts` | `iw` / `i"` / `ap` 等文本对象 |
+| `vim/key-parser.ts` 已拆分出 `tables.ts`（静态查找表）和 `ex-parser.ts`（ex 命令解析）以便 FSM 调度保持聚焦 |
 | `undo-tree/` | **P0-8** 分支式撤销树（COMPETITOR_TODO P0-8）：与 PM history 并行运行，docJson 快照 + 父子指针 + `currentId` 指针 + 50 节点 LRU 上限 |
 | `virtualization/` | 顶层块虚拟化（COMPETITOR_TODO P2-6） |
 | `virtualization/types.ts` | TopBlockMeta / VirtualizationConfig 共享类型 |

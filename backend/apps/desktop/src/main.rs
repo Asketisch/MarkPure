@@ -87,9 +87,6 @@ fn main() {
 
     // Check if this is a child window
     let is_child = std::env::args().any(|a| a.starts_with("--child-window="));
-    let _child_tab_data: Option<String> = std::env::args()
-        .find(|a| a.starts_with("--child-window="))
-        .map(|a| a.trim_start_matches("--child-window=").to_string());
 
     // Load window icon (PNG at 256x256)
     // Try multiple locations: dev mode (project root) and bundle mode (Resources/)
