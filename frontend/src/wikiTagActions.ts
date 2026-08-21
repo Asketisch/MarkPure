@@ -1,20 +1,16 @@
 /**
- * WikiLink and Tag click handlers.
+ * Wikilink 与标签点击处理器。
  *
- * Split out of `App.svelte` during the P12 file-size audit
- * so the two ~25-line handler functions stop cluttering the
- * 1600-line entry component. Each function takes a `ctx`
- * object that bundles the App-state dependencies it needs;
- * the host passes a single object so callers don't have to
- * update long parameter lists every time the dependency
- * surface grows.
+ * 在文件体积审计时从 `App.svelte` 中拆出，让这两个约 25 行的
+ * 处理函数不再挤占那个 1600 行的入口组件。每个函数接收一个
+ * `ctx` 对象，把所需依赖打包在一起；宿主只传一个对象，调用方
+ * 就无需在依赖面变化时逐一更新长长的参数列表。
  *
- * Why dependency-injection and not a Svelte store? The
- * handlers aren't reactive — they're event-driven one-shots
- * that produce a single side-effect (open a tab, fire a
- * search query). A store would be overkill and would force
- * App.svelte's `tabs[]` / `activeTabId` state to be moved
- * out, which is a much larger refactor.
+ * 为什么用依赖注入而不是 Svelte store？因为处理器不是响应式的
+ * ——它们是事件驱动的一次性动作，只产生单一副作用（打开标签页、
+ * 触发一次搜索）。用 store 有些杀鸡用牛刀，还会迫使
+ * App.svelte 的 `tabs[]` / `activeTabId` 状态搬出去，那是一次
+ * 大得多的重构。
  */
 import {
   getDirectoryTree,
@@ -22,41 +18,37 @@ import {
   createFile,
 } from '$lib/editor/commands'
 
-/// What the wikilink/tag handlers need from the host
-/// (App.svelte). We expose the *operations* the host owns
-/// (`openFileInNewTab`, `openUntitledTab`, etc.) rather
-/// than the underlying state, so the handlers can't
-/// accidentally clobber tabs the host cares about.
+/// wikilink / 标签处理器需要宿主（App.svelte）提供的东西。
+/// 我们暴露宿主拥有的*操作*（`openFileInNewTab`、
+/// `openUntitledTab` 等）而不是底层状态，这样处理器不会
+/// 意外破坏宿主关心的标签页。
 export interface WikiTagContext {
-  /** Currently-open workspace, or `null`. */
+  /** 当前打开的工作区，或 `null`。 */
   workspacePath: string | null
 
   /**
-   * Open `path` as a new tab. This is the host's existing
-   * `openFileInNewTab` — it handles preview-tab replacement,
-   * name computation from the path, and id allocation.
-   * Returns the new tab's id on success.
+   * 把 `path` 作为新标签页打开。这是宿主既有的
+   * `openFileInNewTab`——它处理预览标签页替换、从路径计算
+   * 名字以及 id 分配。成功时返回新标签页的 id。
    */
   openFileInNewTab: (path: string, content: string, mtime: number | null) => void | number
 
   /**
-   * Open a brand-new untitled tab whose display name is
-   * `name` and whose body is empty. Used for `[[Page]]`
-   * clicks that resolve to "the user has no workspace".
+   * 打开一个全新的无标题标签页，显示名为 `name`、正文为空。
+   * 用于解析为「用户没有工作区」的 `[[Page]]` 点击。
    */
   openUntitledTab: (name: string) => void
 
-  /** Show / open the workspace-search modal. */
+  /** 显示 / 打开工作区搜索弹窗。 */
   setShowWorkspaceSearch: (v: boolean) => void
 }
 
 /**
- * Walk the workspace file tree (case-insensitive basename
- * match) and return the absolute path of the first
- * `page.md` we find, or `null` if no match.
+ * 遍历工作区文件树（大小写不敏感的主文件名匹配），返回找到的
+ * 第一个 `page.md` 的绝对路径；没有匹配则返回 `null`。
  *
- * Limited to a 5-deep scan because wikilinks are usually
- * flat — a deeply nested file tree is its own UX problem.
+ * 扫描深度限制为 5 层，因为 wikilink 通常很平铺——过深的
+ * 目录嵌套本身就是一种体验问题。
  */
 export async function resolveWikiLinkInWorkspace(
   page: string,
@@ -84,12 +76,11 @@ export async function resolveWikiLinkInWorkspace(
 }
 
 /**
- * Resolve a `[[Page]]` wikilink click to a file path. We try
- * the workspace's file tree first (case-insensitive basename
- * match for `.md`/`.markdown`). If the file exists we open
- * it; if not we create an empty one in the workspace root
- * (or a scratch untitled tab if no workspace is open) so
- * the link is never a dead-end.
+ * 把 `[[Page]]` wikilink 点击解析为文件路径。先尝试工作区的
+ * 文件树（对 `.md`/`.markdown` 做大小写不敏感的主文件名匹配）。
+ * 文件存在就打开；不存在就在工作区根目录新建一个空文件
+ * （没有工作区时则打开一个无标题零时标签页），这样链接就
+ * 永远不会变成死路。
  */
 export async function handleWikiLinkClick(
   page: string,
@@ -107,7 +98,7 @@ export async function handleWikiLinkClick(
         return
       }
     }
-    // Not found — create a new file in the workspace root.
+    // 未找到——在工作区根目录新建文件。
     const newPath = `${ctx.workspacePath}/${target}.md`
     await createFile(newPath).catch(() => {})
     const info = await openFileByPath(newPath).catch(() => null)
@@ -117,23 +108,20 @@ export async function handleWikiLinkClick(
     return
   }
 
-  // No workspace — open a scratch untitled tab titled with
-  // the page name. The user can save it later.
+  // 没有工作区——打开一个以页面名作为标题的零时无标题标签页。
+  // 用户之后可以保存它。
   ctx.openUntitledTab(target)
 }
 
 /**
- * Resolve a `#tag` click. We open the workspace search
- * panel and pre-fill the query with `#tag` (the search
- * crate supports literal string matching, so a tag name
- * works as the query).
+ * 处理 `#tag` 点击。打开工作区搜索面板并用 `#tag` 预填查询
+ * （搜索库支持字面字符串匹配，因此标签名可以作为查询条件）。
  */
 export function handleTagClick(tag: string, ctx: WikiTagContext): void {
   ctx.setShowWorkspaceSearch(true)
-  // Stash the tag so WorkspaceSearch can pick it up. We
-  // use a module-scoped event to avoid prop-drilling; the
-  // search component listens once and clears the initial
-  // query when it sees a tag click.
+  // 把标签暂存起来供 WorkspaceSearch 拾取。我们用模块级事件
+  // 来避免属性层层透传；搜索组件监听一次，收到标签点击后
+  // 清空初始查询。
   window.dispatchEvent(
     new CustomEvent('workspace-search:initial', { detail: { query: `#${tag}` } }),
   )

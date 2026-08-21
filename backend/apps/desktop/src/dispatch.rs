@@ -1,26 +1,22 @@
-//! Central IPC dispatch.
+//! 中央 IPC 分发模块。
 //!
-//! The single source of truth for the command name → handler
-//! mapping. Each handler is defined in a topic-specific module
-//! (`file_ops`, `editor_ops`, …) and re-exported here so the
-//! routing table stays a one-screen function.
+//! 保存着「命令名 → 处理器」映射的唯一事实来源。每个处理器在
+//! 各自的主题模块（`file_ops`、`editor_ops`……）中定义，并在此
+//! 重新导出，让路由表保持为一屏之内的函数。
 //!
-//! Commands are split into two categories:
+//! 命令分为两类：
 //!
-//!  - **Fast** (inline on the wry IPC thread): config reads/writes,
-//!    document registry mutations, outline parsing, etc. These
-//!    complete in microseconds and never block.
+//!  - **快速**（在 wry IPC 线程内联执行）：配置读写、文档注册表变更、
+//!    大纲解析等。它们在微秒级完成，从不阻塞。
 //!
-//!  - **Slow** (offloaded to the tokio thread pool): file I/O,
-//!    spell checking, directory walks, exports, workspace scans.
-//!    These can take milliseconds to seconds; running them inline
-//!    would block the single wry IPC thread and freeze the UI.
+//!  - **慢速**（卸载到 tokio 线程池）：文件 I/O、拼写检查、目录遍历、
+//!    导出、工作区扫描。这些可能耗时毫秒到秒；若内联执行会阻塞
+//!    唯一的 wry IPC 线程并使界面冻结。
 //!
-//! Adding a new command:
-//!  1. Implement `cmd_foo(params, state)` in the relevant module.
-//!  2. Add the dispatch arm in `handle_command` (fast) or
-//!     `dispatch_slow` (slow) below.
-//!  3. Add a typed wrapper in `frontend/src/editor/commands.ts`.
+//! 新增一条命令：
+//!  1. 在相应模块中实现 `cmd_foo(params, state)`。
+//!  2. 在下方 `handle_command`（快速）或 `dispatch_slow`（慢速）中添加分发分支。
+//!  3. 在 `frontend/src/editor/commands.ts` 中添加带类型的封装。
 
 use super::editor_ops;
 use super::export_ops;
@@ -30,52 +26,48 @@ use super::workspace_ops;
 
 use std::sync::Arc;
 
-// ============================== Fast commands ==============================
+// ============================== 快速命令 ==============================
 
-/// Single entry-point used by the WebView's `ipc.postMessage`
-/// handler for *fast* commands. Returns `Some(IpcResponse)` if
-/// the command was handled inline, or `None` if it should be
-/// dispatched asynchronously via `dispatch_slow`.
+/// WebView 的 `ipc.postMessage` 处理程序对*快速*命令使用的唯一入口。
+/// 若命令被内联处理则返回 `Some(IpcResponse)`；若应通过
+/// `dispatch_slow` 异步分发则返回 `None`。
 pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse> {
     let result: std::result::Result<serde_json::Value, String> = match msg.cmd.as_str() {
-        // File dialogs → slow (rfd blocks)
+        // 文件对话框 → 慢速（rfd 阻塞）
         "pick_open_file" | "pick_save_file" | "pick_directory" | "pick_theme_file" => return None,
 
-        // File operations → slow (I/O)
+        // 文件操作 → 慢速（I/O）
         "open_file" | "save_file" | "get_doc_stats" => return None,
 
-        // Directory tree → slow (walkdir)
+        // 目录树 → 慢速（walkdir）
         "get_directory_tree" => return None,
 
-        // File watcher → slow (thread spawn)
+        // 文件监听 → 慢速（创建线程）
         "watch_directory" | "unwatch_directory" => return None,
 
-        // File CRUD → slow (I/O)
+        // 文件增删改 → 慢速（I/O）
         "create_file" | "create_directory" | "delete_file" | "rename_file" => return None,
 
         "reveal_in_finder" => return None,
 
-        // Outline — fast (pure computation)
+        // 大纲 — 快速（纯计算）
         "get_outline" => editor_ops::cmd_get_outline(&msg.params),
         "get_wikilinks" => editor_ops::cmd_get_wikilinks(&msg.params),
         "get_tags" => editor_ops::cmd_get_tags(&msg.params),
 
-        // Tabs — fast (in-memory)
+        // 标签页 — 快速（内存操作）
         "get_tabs" => workspace_ops::cmd_get_tabs(state),
         "save_tabs" => workspace_ops::cmd_save_tabs(&msg.params, state),
         "tearoff_tab" => workspace_ops::cmd_tearoff_tab(&msg.params, state),
 
-        // Config — fast (in-memory)
+        // 配置 — 快速（内存操作）
         "get_config" => workspace_ops::cmd_get_config(state),
         "set_config" => workspace_ops::cmd_set_config(&msg.params, state),
-        // P0-X: Typora-style preferences export /
-        // import. Fast path — both are pure in-memory
-        // JSON transforms against `AppConfig` plus reads
-        // / writes of the keybindings + custom-themes
-        // files. `cmd_import_config` does the heavy
-        // lifting; the host hands it the JSON payload
-        // it previously picked from disk via the file
-        // picker.
+        // 偏好设置的导出/导入。走快速路径——二者都是对
+        // `AppConfig` 的纯内存 JSON 变换，外加对快捷键与
+        // 自定义主题文件的读写。`cmd_import_config` 负责
+        // 繁重工作；宿主端把先前通过文件选择器从磁盘选出的
+        // JSON 载荷交给它。
         "export_config" => workspace_ops::cmd_export_config(state),
         "import_config" => workspace_ops::cmd_import_config(&msg.params, state),
         "get_recent_files" => workspace_ops::cmd_get_recent_files(state),
@@ -83,92 +75,90 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
         "get_expanded_dirs" => workspace_ops::cmd_get_expanded_dirs(state),
         "set_expanded_dirs" => workspace_ops::cmd_set_expanded_dirs(&msg.params, state),
 
-        // Export → slow (I/O + rendering)
+        // 导出 → 慢速（I/O + 渲染）
         "export_html" | "export_pdf" | "export_word" | "export_png" => return None,
 
-        // Search → slow (walkdir over workspace)
+        // 搜索 → 慢速（遍历工作区）
         "search_workspace" => return None,
 
-        // i18n — fast (in-memory)
+        // 国际化 — 快速（内存操作）
         "get_locale" => workspace_ops::cmd_get_locale(state),
         "set_locale" => workspace_ops::cmd_set_locale(&msg.params, state),
         "get_translations" => workspace_ops::cmd_get_translations(&msg.params),
 
-        // Keybindings — fast (in-memory)
+        // 快捷键 — 快速（内存操作）
         "get_keybindings" => workspace_ops::cmd_get_keybindings(),
         "set_keybindings" => workspace_ops::cmd_set_keybindings(&msg.params),
         "reset_keybindings" => workspace_ops::cmd_reset_keybindings(),
         "update_keybinding" => workspace_ops::cmd_update_keybinding(&msg.params),
 
-        // Assets → slow (I/O, network)
+        // 资源 → 慢速（I/O、网络）
         "save_pasted_image" | "upload_image_remote" | "image_to_base64" | "get_file_info"
         | "track_file" | "is_file_modified" => return None,
 
-        // Theme — fast (in-memory, except import/export which are I/O)
+        // 主题 — 快速（内存操作，导入/导出除外，后者涉及 I/O）
         "get_themes" => workspace_ops::cmd_get_themes(),
         "save_theme" => workspace_ops::cmd_save_theme(&msg.params),
         "import_theme" | "export_theme" | "delete_theme" => return None,
 
-        // App info — fast
+        // 应用信息 — 快速
         "get_app_info" => workspace_ops::cmd_get_app_info(),
 
-        // Spell check → slow (NSSpellChecker on main thread)
+        // 拼写检查 → 慢速（拼写检查器运行在主线程）
         "check_spelling" => return None,
 
-        // Frontmatter — fast (pure computation)
+        // 前置元数据 — 快速（纯计算）
         "parse_frontmatter" => editor_ops::cmd_parse_frontmatter(&msg.params),
         "update_frontmatter_field" => editor_ops::cmd_update_frontmatter_field(&msg.params),
-        // P0-X: markdown lint — fast (pure computation, runs
-        // before the user saves).
+        // 标色检查 — 快速（纯计算，在用户保存前执行）。
         "lint_markdown" => editor_ops::cmd_lint_markdown(&msg.params),
 
-        // Table — fast (pure computation)
+        // 表格 — 快速（纯计算）
         "transform_table" => editor_ops::cmd_transform_table(&msg.params),
         "align_table_column" => editor_ops::cmd_align_table_column(&msg.params),
         "table_to_csv" => editor_ops::cmd_to_csv(&msg.params),
 
-        // Folding — fast (pure computation)
+        // 折叠 — 快速（纯计算）
         "compute_folds" => editor_ops::cmd_compute_folds(&msg.params),
 
-        // Pandoc extensions — fast (pure computation)
+        // Pandoc 扩展 — 快速（纯计算）
         "parse_task_items" => editor_ops::cmd_parse_task_items(&msg.params),
 
-        // Bookmarks — fast (in-memory + JSON)
+        // 书签 — 快速（内存 + JSON）
         "get_bookmarks" => workspace_ops::cmd_get_bookmarks(),
         "add_bookmark" => workspace_ops::cmd_add_bookmark(&msg.params),
         "update_bookmark" => workspace_ops::cmd_update_bookmark(&msg.params),
         "remove_bookmark" => workspace_ops::cmd_remove_bookmark(&msg.params),
 
-        // Multi-root workspace (P2-4) — slow (canonicalize + save_config
-        // hit the filesystem; running them inline would block the wry IPC
-        // thread on slow/stalled mounts and freeze the UI).
+        // 多根目录工作区 — 慢速（规范化路径与保存配置会触碰文件系统；
+        // 内联执行会在线程缓慢或挂起的挂载点上阻塞 wry IPC 线程并冻结界面）。
         "add_workspace_root" | "remove_workspace_root" | "list_workspace_roots"
         | "set_active_workspace_root" | "remove_missing_workspace_roots" => return None,
-        // Multi-root variants of the legacy expanded-dirs IPC.
-        // The old names keep working for now; new code should use _v2.
+        // 多根目录版本的旧式展开目录 IPC。旧名字暂时保持可用；
+        // 新代码应使用 _v2 版本。
         "get_expanded_dirs_v2" => workspace_ops::cmd_get_expanded_dirs_v2(&msg.params, state),
         "set_expanded_dirs_v2" => workspace_ops::cmd_set_expanded_dirs_v2(&msg.params, state),
 
-        // Workspace tag index → slow (WalkDir over workspace)
+        // 工作区标签索引 → 慢速（遍历工作区）
         "get_workspace_tags" => return None,
 
-        // Backlinks → slow (WalkDir over workspace)
+        // 反向链接 → 慢速（遍历工作区）
         "get_backlinks" => return None,
 
-        // Per-workspace CSS → slow (I/O)
+        // 工作区级 CSS → 慢速（I/O）
         "load_workspace_styles" => return None,
 
-        // Snippets — fast (in-memory)
+        // 代码片段 — 快速（内存操作）
         "list_snippets" => workspace_ops::cmd_list_snippets(),
 
-        // Document registry — fast (in-memory rope ops)
+        // 文档注册表 — 快速（内存绳索操作）
         "doc_open" => editor_ops::cmd_doc_open(&msg.params, state),
         "doc_close" => editor_ops::cmd_doc_close(&msg.params, state),
         "doc_set_content" => editor_ops::cmd_doc_set_content(&msg.params, state),
         "doc_get_stats" => editor_ops::cmd_doc_get_stats(&msg.params, state),
         "doc_search" => editor_ops::cmd_doc_search(&msg.params, state),
 
-        // File drop handling → slow (I/O)
+        // 文件拖放处理 → 慢速（I/O）
         "open_dropped_files" => return None,
 
         _ => Err(format!("Unknown command: {}", msg.cmd)),
@@ -180,16 +170,15 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
     })
 }
 
-// ============================== Slow commands ==============================
+// ============================== 慢速命令 ==============================
 
-/// Dispatch a slow command on a dedicated OS thread. The result
-/// is serialized and sent back via `EventLoopProxy` as an
-/// `AppEvent::IpcResponse`, which the tao event loop then
-/// delivers to the WebView via `evaluate_script`.
+/// 在专用操作系统线程上分发慢速命令。结果被序列化并通过
+/// `EventLoopProxy` 作为 `AppEvent::IpcResponse` 回传，随后由
+/// tao 事件循环通过 `evaluate_script` 投递给 WebView。
 ///
-/// We use `std::thread::spawn` (not `tokio::spawn`) because
-/// many handlers internally call `state.rt().block_on(...)`,
-/// which panics if called from within a tokio async context.
+/// 我们使用 `std::thread::spawn`（而非 `tokio::spawn`），因为许多
+/// 处理器内部调用 `state.rt().block_on(...)`，在 tokio 异步上下文中
+/// 调用它会导致 panic。
 pub fn dispatch_slow(msg: IpcMessage, state: Arc<AppState>) {
     let proxy = {
         let guard = super::state::lock_or_recover(&state.proxy);
@@ -222,55 +211,51 @@ pub fn dispatch_slow(msg: IpcMessage, state: Arc<AppState>) {
     });
 }
 
-/// Execute a slow command synchronously. Runs on a dedicated OS
-/// thread (NOT in a tokio context), so `state.rt().block_on()`
-/// is safe.
+/// 同步执行慢速命令。运行在专用操作系统线程上（不在 tokio 上下文中），
+/// 因此 `state.rt().block_on()` 是安全的。
 fn run_slow_command(
     msg: &IpcMessage,
     state: &AppState,
 ) -> std::result::Result<serde_json::Value, String> {
     match msg.cmd.as_str() {
-        // File dialogs (rfd blocks the calling thread — safe on tokio)
+        // 文件对话框（rfd 会阻塞调用线程——在 tokio 上是安全的）
         "pick_open_file" => file_ops::cmd_pick_open_file(),
         "pick_save_file" => file_ops::cmd_pick_save_file(),
         "pick_directory" => file_ops::cmd_pick_directory(),
-        // Typora-style native theme picker. Used by
-        // Settings → "Import Theme" because the WebView's
-        // `input[type=file]` cannot surface an absolute path
-        // for `cmd_import_theme`.
+        // 原生主题选择器。供「设置 → 导入主题」使用，因为 WebView
+        // 的 `input[type=file]` 无法为 `cmd_import_theme` 提供绝对路径。
         "pick_theme_file" => file_ops::cmd_pick_theme_file(),
 
-        // File I/O
+        // 文件 I/O
         "open_file" => file_ops::cmd_open_file(&msg.params, state),
         "save_file" => file_ops::cmd_save_file(&msg.params, state),
         "get_doc_stats" => file_ops::cmd_get_doc_stats(&msg.params),
 
-        // Directory tree
+        // 目录树
         "get_directory_tree" => file_ops::cmd_get_directory_tree(&msg.params, state),
 
-        // File watcher
+        // 文件监听
         "watch_directory" => file_ops::cmd_watch_directory(&msg.params, state),
         "unwatch_directory" => file_ops::cmd_unwatch_directory(&msg.params, state),
 
-        // File CRUD
+        // 文件增删改
         "create_file" => file_ops::cmd_create_file(&msg.params, state),
         "create_directory" => file_ops::cmd_create_directory(&msg.params, state),
         "delete_file" => file_ops::cmd_delete_file(&msg.params, state),
         "rename_file" => file_ops::cmd_rename_file(&msg.params, state),
         "reveal_in_finder" => file_ops::cmd_reveal_in_finder(&msg.params),
 
-        // Export
+        // 导出
         "export_html" => export_ops::cmd_export_html(&msg.params),
         "export_pdf" => export_ops::cmd_export_pdf(&msg.params),
         "export_word" => export_ops::cmd_export_word(&msg.params),
-        // P1-8: PNG export. The frontend has already rasterised
-        // the document via `html-to-image`; we just persist it.
+        // PNG 导出。前端已通过 `html-to-image` 完成光栅化；此处仅负责持久化。
         "export_png" => export_ops::cmd_export_png(&msg.params),
 
-        // Workspace search
+        // 工作区搜索
         "search_workspace" => export_ops::cmd_search_workspace(&msg.params),
 
-        // Assets
+        // 资源
         "save_pasted_image" => export_ops::cmd_save_pasted_image(&msg.params, state),
         "upload_image_remote" => export_ops::cmd_upload_image_remote(&msg.params),
         "image_to_base64" => export_ops::cmd_image_to_base64(&msg.params),
@@ -278,31 +263,29 @@ fn run_slow_command(
         "track_file" => export_ops::cmd_track_file(&msg.params),
         "is_file_modified" => export_ops::cmd_is_file_modified(&msg.params),
 
-        // Theme I/O
+        // 主题 I/O
         "import_theme" => workspace_ops::cmd_import_theme(&msg.params),
         "export_theme" => workspace_ops::cmd_export_theme(&msg.params),
         "delete_theme" => workspace_ops::cmd_delete_theme(&msg.params),
 
-        // Spell check (still routes through main thread via SyncSender)
+        // 拼写检查（仍通过 SyncSender 走主线程路由）
         "check_spelling" => editor_ops::cmd_check_spelling(&msg.params, state),
 
-        // Workspace scans
+        // 工作区扫描
         "get_workspace_tags" => workspace_ops::cmd_get_workspace_tags(&msg.params),
         "get_backlinks" => workspace_ops::cmd_get_backlinks(&msg.params),
 
-        // Per-workspace CSS
+        // 工作区级 CSS
         "load_workspace_styles" => workspace_ops::cmd_load_workspace_styles(&msg.params),
 
-        // File drop
+        // 文件拖放
         "open_dropped_files" => file_ops::cmd_open_dropped_files(&msg.params, state),
 
-        // Multi-root workspace (P2-4) — moved off the fast path
-        // because `cmd_add_workspace_root` /
-        // `cmd_set_active_workspace_root` /
-        // `cmd_remove_missing_workspace_roots` perform
-        // `std::fs::canonicalize` and `is_dir()` checks; on a
-        // slow or stalled mount those can block for minutes
-        // and freeze the wry IPC thread.
+        // 多根目录工作区——从快速路径移出，因为
+        // `cmd_add_workspace_root` / `cmd_set_active_workspace_root` /
+        // `cmd_remove_missing_workspace_roots` 执行 `std::fs::canonicalize`
+        // 与 `is_dir()` 检查；在缓慢或挂起的挂载点上它们可能阻塞数分钟
+        // 并冻结 wry IPC 线程。
         "add_workspace_root" => workspace_ops::cmd_add_workspace_root(&msg.params, state),
         "remove_workspace_root" => workspace_ops::cmd_remove_workspace_root(&msg.params, state),
         "list_workspace_roots" => workspace_ops::cmd_list_workspace_roots(state),

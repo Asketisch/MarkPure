@@ -1,16 +1,13 @@
 /**
- * Config export/import helpers for the Settings dialog's
- * "Backup & Restore" panel.
+ * 设置对话框中“备份与恢复”面板的配置导出 / 导入助手。
  *
- * Extracted from `Settings.svelte` so the small but fiddly
- * download-anchor dance (create Blob → object URL → synthetic
- * `<a>` click → revoke URL) and the matching file-pick →
- * JSON.parse → IPC pipeline live in a unit-testable module
- * rather than at the bottom of a 950-line component.
+ * 从 `Settings.svelte` 中拆出，让细小繁琐的下载锚点流程（创建
+ * Blob → 对象 URL → 合成 `<a>` 点击 → 撤销 URL）以及配套的选文件
+ * → JSON.parse → IPC 管线住进一个可单元测试的模块，而不是堆在
+ * 950 行组件文件的底部。
  *
- * The host IPC layer (`importConfig` / `exportConfig`) does
- * the actual work; this file only handles the browser-side
- * I/O around it.
+ * 真正的活由宿主 IPC 层（`importConfig` / `exportConfig`）干；
+ * 本文件只处理它周边的浏览器侧 I/O。
  */
 
 import type {
@@ -18,10 +15,9 @@ import type {
   ConfigImportReport,
 } from '$lib/editor/commands'
 
-/** Format a payload as a JSON string and trigger a download via
- *  a transient `<a>` element. Returns the suggested filename
- *  (YYYY-MM-DD-stamped) so the caller can log success or
- *  surface it in the UI. */
+/** 把负载格式化为 JSON 字符串，并通过一个临时 `<a>` 元素触发下载。
+ *  返回建议的文件名（带 YYYY-MM-DD 时间戳），方便调用方记录成功
+ *  或在 UI 中呈现。 */
 export async function downloadConfigAsJson(
   payload: ConfigExportPayload,
 ): Promise<string> {
@@ -40,10 +36,9 @@ export async function downloadConfigAsJson(
   return a.download
 }
 
-/** Read the first file selected by an `<input type=file>` event
- *  and parse it as JSON. Returns `null` if the user cancelled
- *  or the file is empty — both are valid user actions and
- *  shouldn't be treated as errors by the caller. */
+/** 读取 `<input type=file>` 事件选中的第一个文件并解析为 JSON。
+ *  若用户取消选择或文件为空则返回 `null`——两者都是合理的用户行为，
+ *  不应被调用方当作错误。 */
 export async function readJsonFromFileInput(
   e: Event,
 ): Promise<ConfigExportPayload | null> {
@@ -54,6 +49,5 @@ export async function readJsonFromFileInput(
   return JSON.parse(text) as ConfigExportPayload
 }
 
-/** Re-export the IPC report type so callers don't need a
- *  second import for the report UI. */
+/** 重新导出 IPC 报告类型，让调用方无需为报告 UI 再导入一次。 */
 export type { ConfigExportPayload, ConfigImportReport }

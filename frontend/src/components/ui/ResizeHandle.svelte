@@ -21,14 +21,17 @@
 
   let isDragging = $state(false)
   let isHovered = $state(false)
+  /** 进行中拖拽的 document 监听器清理函数。组件在拖拽途中卸载时
+   *  （例如布局切换），靠它把闭包从 document 上摘掉，避免回调
+   *  继续打到已卸载的组件。 */
+  let dragCleanup: (() => void) | null = null
 
   function handleMouseDown(e: MouseEvent) {
     e.preventDefault()
     isDragging = true
     onResizeStart?.()
 
-    const startX = e.clientX
-    let lastX = startX
+    let lastX = e.clientX
     let liveWidth = currentWidth
 
     function onMouseMove(e: MouseEvent) {
@@ -41,23 +44,29 @@
     function onMouseUp() {
       isDragging = false
       onResizeEnd?.()
+      dragCleanup = null
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup', onMouseUp)
     }
 
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
+    dragCleanup = () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
   }
 
   onMount(() => {
-    function onMouseUp() {
-      if (isDragging) {
-        isDragging = false
+    return () => {
+      if (dragCleanup) {
+        // 拖拽未完成就卸载：补一次 onResizeEnd，让宿主
+        // （isResizing 标记、宽度持久化）能正常收尾。
         onResizeEnd?.()
+        dragCleanup()
+        dragCleanup = null
       }
     }
-    document.addEventListener('mouseup', onMouseUp)
-    return () => document.removeEventListener('mouseup', onMouseUp)
   })
 </script>
 

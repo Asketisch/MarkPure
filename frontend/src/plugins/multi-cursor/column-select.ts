@@ -1,47 +1,41 @@
 /**
- * Column-select (Alt+Drag rectangular selection) plugin — P2-3.
+ * 列选择（Alt+拖拽矩形选区）插件。
  *
- * Builds on the linear multi-cursor plugin: when the user
- * Alt+Drags a box, we collect ProseMirror text positions for
- * every line the box intersects, then dispatch the resulting
- * `Cursor[]` through `multiCursorPluginKey`'s `set` meta. The
- * existing input fan-out (handleTextInput, handleMultiCursorKeyDown,
- * handleMultiCursorPaste) and decoration rendering then take
- * over — typing, Backspace, Delete, single-line paste all
- * naturally apply to every column.
+ * 它建立在线性多光标插件之上：当用户按住 Alt 拖出一个矩形时，
+ * 我们收集矩形相交的每一行的 ProseMirror 文本位置，
+ * 再把得到的 `Cursor[]` 通过 `multiCursorPluginKey` 的 `set` meta 派发出去。
+ * 既有的输入分派逻辑（handleTextInput、handleMultiCursorKeyDown、
+ * handleMultiCursorPaste）与装饰渲染随即接管——
+ * 输入、退格、删除、单行粘贴都会自然地作用于每一个列。
  *
- * Architecture (must be registered BEFORE the linear plugin):
+ * 架构（必须注册在线性插件*之前*）：
  *
- *   mousedown (Alt held)
- *     ├─> preventDefault + return true (consume the event so
- *     │   the linear plugin's mousedown does NOT fire its
- *     │   Alt+Click cursor-add)
- *     └─> registerDocumentListeners()  // global mousemove/mouseup
+ *   mousedown（按住 Alt）
+ *     ├─> preventDefault + return true（消费该事件，
+ *     │   使线性插件的 mousedown 不再触发其 Alt+单击加光标逻辑）
+ *     └─> registerDocumentListeners()  // 全局 mousemove/mouseup
  *
- *   mousemove (rAF-throttled)
- *     └─> threshold check → set state.dragging = true, draw overlay
+ *   mousemove（按帧率节流）
+ *     └─> 阈值检查 → 置 state.dragging = true，绘制选区遮罩
  *
  *   mouseup
- *     ├─ sub-threshold ─> call addCursor(view, startPos)
- *     │                   (mimics legacy Alt+Click behaviour)
- *     └─ active drag ───> flattenRectToCursors() → dispatch
- *                          multiCursorPluginKey 'set' meta
+ *     ├─ 未达阈值 ─> 调用 addCursor(view, startPos)
+ *     │              （模拟旧的 Alt+单击行为）
+ *     └─ 活动拖拽 ─> flattenRectToCursors() → 派发
+ *                     multiCursorPluginKey 的 `set` meta
  *
- * Edge cases handled:
- *   - Sub-threshold drag → falls back to single Alt+Click cursor
- *     (Alt+Shift → range cursor against current head, matching
- *     the legacy behaviour).
- *   - Alt released before mouseup → cancel commit (matches
- *     macOS Option-key word nav convention).
- *   - Code blocks / table cells → skipped per line via
- *     `isInsideAtomicBlock` (mirrors commands.ts:42-51).
- *   - Virtualization (.pm-virtual-hidden) → skipped when
- *     elementFromPoint hits a hidden block.
- *   - >64 lines → silently truncated at MAX_CURSORS with a
- *     console.warn (matches VSCode's cap-and-warn behaviour).
- *   - Reverse drag (bottom-to-top, right-to-left) → bounding
- *     box is normalised so direction doesn't matter.
- *   - Editor torn down mid-drag → view.destroy cancels.
+ * 已处理的边界情况：
+ *   - 未达阈值的拖拽 → 回退为单个 Alt+单击光标
+ *     （Alt+Shift 则相对当前光标生成范围选区，与旧行为一致）。
+ *   - 在 mouseup 前松开 Alt → 取消提交（与 macOS
+ *     按住 Option 键的文字导航习惯一致）。
+ *   - 代码块 / 表格单元格 → 通过 `isInsideAtomicBlock` 逐行跳过
+ *     （与 commands.ts:42-51 的做法一致）。
+ *   - 虚拟化（.pm-virtual-hidden）→ elementFromPoint 命中隐藏块时跳过。
+ *   - 超过 64 行 → 静默截断到 MAX_CURSORS 并 console.warn 提示
+ *     （与其他编辑器上限加提示的策略一致）。
+ *   - 反向拖拽（自下而上、从右到左）→ 边界框会被规范化，方向不影响结果。
+ *   - 拖拽中途编辑器被销毁 → view.destroy 会取消拖拽。
  */
 
 import { Plugin, TextSelection } from '@tiptap/pm/state'
@@ -64,12 +58,12 @@ import {
   type FlattenOptions,
 } from './column-select-helpers'
 
-/** Empty/initial drag state. */
+/** 空 / 初始的拖拽状态。 */
 function emptyColumnState(): ColumnSelectState {
   return { dragging: false, rect: null }
 }
 
-/** Reducer: route a meta payload through the state. */
+/** 归约器：把一份 meta 载荷应用到状态上。 */
 function reduceColumnMeta(
   prev: ColumnSelectState,
   meta: ColumnSelectMeta | undefined,
@@ -86,9 +80,8 @@ function reduceColumnMeta(
 }
 
 /**
- * Build the plugin. Must be registered BEFORE
- * `createMultiCursorPlugin()` so that its `mousedown` runs
- * first and can consume Alt+Click events.
+ * 构建插件。必须注册在 `createMultiCursorPlugin()` 之*前*，
+ * 这样它的 `mousedown` 先运行，可以消费 Alt+单击事件。
  */
 export function createColumnSelectPlugin(): Plugin {
   return new Plugin<ColumnSelectState>({
@@ -106,9 +99,8 @@ export function createColumnSelectPlugin(): Plugin {
       handleDOMEvents: {
         mousedown(view, event) {
           if (!event.altKey || event.button !== 0) return false
-          // Consume the event so the linear plugin's Alt+Click
-          // mousedown does NOT also fire — we'll dispatch the
-          // single-cursor add ourselves on sub-threshold mouseup.
+          // 消费该事件，使线性插件的 Alt+单击 mousedown 不再触发——
+          // 我们会在未达阈值的 mouseup 中自行派发单光标添加。
           event.preventDefault()
           startColumnDrag(view, event as MouseEvent)
           return true
@@ -119,9 +111,8 @@ export function createColumnSelectPlugin(): Plugin {
     view(view) {
       return {
         destroy() {
-          // Defensive: if the editor is torn down mid-drag (tab
-          // switch, file close), make sure we don't leak global
-          // listeners or an orphan overlay.
+          // 防御性清理：若编辑器在拖拽中途被销毁（切换标签页、
+          // 关闭文件），确保不会泄漏全局监听器或残留独立遮罩。
           cancelActiveDrag(view)
         },
       }
@@ -130,16 +121,14 @@ export function createColumnSelectPlugin(): Plugin {
 }
 
 // ============================================================
-//  Module-level drag state machine
+//  模块级拖拽状态机
 //
-//  We store the in-flight drag in module-level vars rather than
-//  plugin state because:
-//    - Document-level mousemove/mouseup fire OUTSIDE the
-//      EditorView dispatch loop; plugging them into plugin
-//      state would require constant view.dispatch() bursts.
-//    - The state machine is per-EditorView in practice, but
-//      Tiptap recreates the view on every tab switch and our
-//      `view.destroy` clears the state — so global state is safe.
+//  我们把进行中的拖拽保存在模块级变量中，而不是插件状态里，因为：
+//    - 文档级的 mousemove/mouseup 在 EditorView 派发循环之外触发；
+//      若把它们接入插件状态，就需要持续不断地调用 view.dispatch()。
+//    - 该状态机实际是每 EditorView 一份，但 Tiptap 每次切换标签页
+//      都会重建视图，且我们的 `view.destroy` 会清空状态——因此
+//      使用全局状态是安全的。
 // ============================================================
 
 interface ActiveDrag {
@@ -147,9 +136,9 @@ interface ActiveDrag {
   startPoint: ViewportPoint
   startShift: boolean
   lastPoint: ViewportPoint
-  /** Set once mousemove crosses DRAG_THRESHOLD_PX. */
+  /** 一旦鼠标移动超过 DRAG_THRESHOLD_PX 即置为真。 */
   active: boolean
-  /** rAF token so we coalesce 60Hz events. */
+  /** rAF 令牌，用于把 60Hz 的事件合并处理。 */
   rafToken: number | null
   onMove: (e: MouseEvent) => void
   onUp: (e: MouseEvent) => void
@@ -159,8 +148,8 @@ interface ActiveDrag {
 let activeDrag: ActiveDrag | null = null
 
 function startColumnDrag(view: EditorView, event: MouseEvent): void {
-  // Defensive: if a previous drag wasn't cleaned up (e.g. the
-  // user Cmd+Tabbed away mid-drag), tear it down first.
+  // 防御性清理：若上一次拖拽未被清理干净（例如用户在拖拽中途
+  // Cmd+Tab 切走），先将其拆除。
   if (activeDrag) cancelActiveDrag(activeDrag.view)
 
   const startPoint: ViewportPoint = { x: event.clientX, y: event.clientY }
@@ -183,14 +172,14 @@ function startColumnDrag(view: EditorView, event: MouseEvent): void {
       const dx = Math.abs(drag.lastPoint.x - drag.startPoint.x)
       const dy = Math.abs(drag.lastPoint.y - drag.startPoint.y)
       if (dx + dy < DRAG_THRESHOLD_PX) return
-      // Promote to active drag.
+      // 提升为活动拖拽。
       drag.active = true
       view.dispatch(view.state.tr.setMeta(columnSelectPluginKey, {
         type: 'start',
         rect: normaliseRect(drag.startPoint, drag.lastPoint),
       } satisfies ColumnSelectMeta))
     }
-    // rAF-throttle the visual update.
+    // 可视化更新按帧率节流。
     if (drag.rafToken !== null) return
     drag.rafToken = window.requestAnimationFrame(() => {
       drag.rafToken = null
@@ -201,7 +190,7 @@ function startColumnDrag(view: EditorView, event: MouseEvent): void {
           type: 'update', rect,
         } satisfies ColumnSelectMeta))
       } catch {
-        // View destroyed mid-drag.
+        // 拖拽中途视图被销毁。
       }
       updateOverlay(view, rect)
     })
@@ -213,16 +202,15 @@ function startColumnDrag(view: EditorView, event: MouseEvent): void {
     activeDrag = null
 
     if (!drag.active) {
-      // Sub-threshold: behave like a plain Alt+Click. Resolve
-      // the start position to a PM position and let the linear
-      // plugin's addCursor logic handle dedup / atomic rejection.
+      // 未达阈值：表现如同普通的 Alt+单击。把起始位置解析为
+      // PM 位置，让线性插件的 addCursor 逻辑处理去重与原子节点拒绝。
       const hit = view.posAtCoords({ left: drag.startPoint.x, top: drag.startPoint.y })
       if (hit) addCursor(view, hit.pos, { asRange: drag.startShift })
       return
     }
-    // Active drag: commit unless the user released Alt early
-    // (macOS Option-key word-nav users may release Alt to switch
-    // modifier focus mid-drag; we treat that as cancellation).
+    // 活动拖拽：提交选区，除非用户提前松开了 Alt
+    // （macOS 上使用 Option 键做文字导航的用户可能在拖拽中途松开
+    // Alt 以切换修饰键焦点；我们将其视为取消）。
     try {
       view.dispatch(view.state.tr.setMeta(columnSelectPluginKey, { type: 'end' } satisfies ColumnSelectMeta))
     } catch {
@@ -264,13 +252,13 @@ function cancelActiveDrag(view: EditorView): void {
   try {
     view.dispatch(view.state.tr.setMeta(columnSelectPluginKey, { type: 'end' } satisfies ColumnSelectMeta))
   } catch {
-    // view may already be destroyed.
+    // 视图可能已被销毁。
   }
   activeDrag = null
 }
 
 // ============================================================
-//  Overlay (visual feedback during drag)
+//  选区遮罩（拖拽过程中的可视化反馈）
 // ============================================================
 
 const OVERLAY_CLASS = 'mc-rect-overlay'
@@ -278,8 +266,8 @@ const OVERLAY_CLASS = 'mc-rect-overlay'
 function updateOverlay(view: EditorView, rect: Rect): void {
   const host = view.dom.parentElement
   if (!host) return
-  // Ensure the host is positioned so absolute children anchor to it.
-  // Most editor wrappers already have position; this is a no-op safety net.
+  // 确保宿主元素已定位，使绝对定位的子元素以它为锚点。
+  // 大多数编辑器包裹层已有定位属性，这一步只是空操作的兜底。
   const cs = window.getComputedStyle(host)
   if (cs.position === 'static') host.style.position = 'relative'
 
@@ -290,7 +278,7 @@ function updateOverlay(view: EditorView, rect: Rect): void {
     el.setAttribute('aria-hidden', 'true')
     host.appendChild(el)
   }
-  // Convert viewport coords to host-relative.
+  // 把视口坐标转换为相对于宿主元素的坐标。
   const hostRect = host.getBoundingClientRect()
   el.style.left = `${rect.left - hostRect.left + host.scrollLeft}px`
   el.style.top = `${rect.top - hostRect.top + host.scrollTop}px`
@@ -306,13 +294,12 @@ function detachOverlay(view: EditorView): void {
 }
 
 /**
- * Final step of the column-select drag: flatten the rectangle
- * to a list of cursors and dispatch them through the linear
- * multi-cursor plugin.
- *   1. If the rectangle is empty / zero cursors, no-op.
- *   2. If non-empty, dispatch into the linear multi-cursor plugin.
- *   3. If empty, no-op (the user dragged over an entirely
- *      atomic or off-screen region — leave them where they were).
+ * 列选择拖拽的最后一步：把矩形展开为光标列表，
+ * 并通过线性多光标插件派发出去。
+ *   1. 若矩形为空 / 零个光标，则不做任何操作。
+ *   2. 若非空，就派发到线性多光标插件中。
+ *   3. 若为空，则不做任何操作（用户拖过的区域全是原子节点或
+ *      在屏幕之外——保持原状即可）。
  */
 function commitColumnSelection(
   view: EditorView,
@@ -325,11 +312,9 @@ function commitColumnSelection(
     isHidden: defaultVirtualizationProbe,
   })
   if (cursors.length === 0) return
-  // Move the primary selection to the first cursor's position
-  // so the user has a recognisable focus point; the remaining
-  // entries become secondary cursors. The multi-cursor reducer
-  // dedupes against the primary selection automatically via
-  // input-handler.ts's range builder.
+  // 把主选区移动到第一个光标的位置，让用户有一个可辨认的焦点；
+  // 其余条目成为次要光标。多光标归约器会通过 input-handler.ts
+  // 的范围构建逻辑自动对主选区去重。
   const primary = cursors[0]
   const secondary = cursors.slice(1)
   const tr = view.state.tr
@@ -343,10 +328,9 @@ function commitColumnSelection(
 }
 
 /**
- * Detect if a viewport point sits inside a virtualized
- * (content-visibility: hidden) top-level block. Used as the
- * default `isVirtualizedAtPoint` in commit; tests inject a
- * stub instead.
+ * 判断某个视口点是否位于已虚拟化（content-visibility: hidden）
+ * 的顶层块内部。在提交时作为默认的 `isVirtualizedAtPoint` 使用；
+ * 测试则注入桩实现代替。
  */
 function defaultVirtualizationProbe(point: ViewportPoint): boolean {
   const el = document.elementFromPoint(point.x, point.y)

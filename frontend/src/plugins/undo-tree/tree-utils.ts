@@ -1,33 +1,32 @@
 /**
- * Tree traversal utilities for the branching undo tree.
+ * 分支撤销树的遍历工具。
  *
- * All functions are pure and operate on the `nodes` record by id.
- * They never mutate the input — callers receive a new structure
- * (when applicable) or a fresh boolean / array. This keeps the
- * reducer in `state.ts` composable and easy to test in isolation
- * (see `scripts/validate-undo-tree.ts`).
+ * 所有函数都是纯函数，按 id 操作 `nodes` 记录。它们从不修改
+ * 输入——调用方拿到的是新结构（如适用）或全新的布尔值 / 数组。
+ * 这让 `state.ts` 里的 reducer 保持可组合，也便于隔离测试
+ * （见 `scripts/validate-undo-tree.ts`）。
  *
- * Naming convention:
- *   - `get*`   — synchronous accessor; never throws.
- *   - `find*`  — synchronous search; returns null when missing.
- *   - `walk*`  — closure-based traversal with early-exit semantics.
+ * 命名约定：
+ *   - `get*`   —— 同步访问器；从不抛错。
+ *   - `find*`  —— 同步查找；缺失时返回 null。
+ *   - `walk*`  —— 基于闭包的遍历，带提前退出语义。
  */
 
 import type { BranchNode, UndoTreeState } from './types'
 
-/** Get a node by id. Returns null if missing. */
+/** 按 id 获取节点。缺失时返回 null。 */
 export function getNode(state: UndoTreeState, id: string): BranchNode | null {
   return state.nodes[id] ?? null
 }
 
-/** Get the parent of `id`. Returns null when `id` is the root. */
+/** 获取 `id` 的父节点。当 `id` 是根节点时返回 null。 */
 export function getParent(state: UndoTreeState, id: string): BranchNode | null {
   const node = state.nodes[id]
   if (!node || node.parentId === null) return null
   return state.nodes[node.parentId] ?? null
 }
 
-/** Get the children of `id` in declaration order. */
+/** 按声明顺序获取 `id` 的子节点。 */
 export function getChildren(state: UndoTreeState, id: string): BranchNode[] {
   const node = state.nodes[id]
   if (!node) return []
@@ -39,8 +38,8 @@ export function getChildren(state: UndoTreeState, id: string): BranchNode[] {
   return out
 }
 
-/** Is `ancestorId` an ancestor of `descendantId` (proper ancestor
- *  or self)? O(depth) — acceptable given our depth cap of ~50. */
+/** `ancestorId` 是否是 `descendantId` 的祖先（真祖先或自身）？
+ *  时间复杂度 O(depth)——在约 50 的深度上限内可以接受。 */
 export function isAncestor(
   state: UndoTreeState,
   ancestorId: string,
@@ -57,8 +56,8 @@ export function isAncestor(
 }
 
 /**
- * Walk from `id` to the root, yielding each node (inclusive).
- * Iteration stops early if `visitor` returns `false`.
+ * 从 `id` 向上走到根节点，逐个交给 `visitor`（含起点）。
+ * 若 `visitor` 返回 `false`，遍历提前结束。
  */
 export function walkToRoot(
   state: UndoTreeState,
@@ -68,7 +67,7 @@ export function walkToRoot(
   let cur: string | null = id
   const seen = new Set<string>()
   while (cur !== null) {
-    if (seen.has(cur)) break // cycle guard — defensive
+    if (seen.has(cur)) break // 环保护——防御性
     seen.add(cur)
     const node: BranchNode | undefined = state.nodes[cur]
     if (!node) break
@@ -78,9 +77,8 @@ export function walkToRoot(
 }
 
 /**
- * Lowest common ancestor of two nodes. Returns null when the two
- * nodes are in disjoint trees (should not happen given our single
- * root invariant, but we defend).
+ * 两个节点的最近公共祖先。当两个节点分属不相交的树时返回 null
+ * （单根不变量下不该发生，但做防御）。
  */
 export function findLCA(
   state: UndoTreeState,
@@ -105,8 +103,7 @@ export function findLCA(
   return null
 }
 
-/** Collect ids on the current path from root → `id` (inclusive).
- *  Order: root first. */
+/** 收集从根 → `id`（含）当前路径上的 id。顺序：根在前。 */
 export function getPathTo(state: UndoTreeState, id: string): string[] {
   const ids: string[] = []
   walkToRoot(state, id, n => {
@@ -116,7 +113,7 @@ export function getPathTo(state: UndoTreeState, id: string): string[] {
   return ids.reverse()
 }
 
-/** Collect all ids reachable from `id` (inclusive, DFS). */
+/** 收集从 `id` 出发可达的全部 id（含自身，深度优先）。 */
 export function collectSubtree(state: UndoTreeState, id: string): string[] {
   const out: string[] = []
   const stack: string[] = [id]
@@ -134,12 +131,12 @@ export function collectSubtree(state: UndoTreeState, id: string): string[] {
   return out
 }
 
-/** Count total nodes in the tree. */
+/** 统计树中的节点总数。 */
 export function countNodes(state: UndoTreeState): number {
   return Object.keys(state.nodes).length
 }
 
-/** Collect leaf ids (nodes with no children). */
+/** 收集叶子节点 id（没有子节点的节点）。 */
 export function collectLeaves(state: UndoTreeState): string[] {
   const out: string[] = []
   for (const id of Object.keys(state.nodes)) {
@@ -149,13 +146,12 @@ export function collectLeaves(state: UndoTreeState): string[] {
   return out
 }
 
-/** Build a JSON-friendly preview label from a PMNode, mirroring
- *  the behaviour of the original stub. Used when the user has not
- *  provided an explicit label.
+/** 从 PMNode 构建适合 JSON 的预览标签，复刻原始桩的行为。
+ *  当用户没有提供显式标签时使用。
  *
- *  Accepts any object exposing `textBetween(from, to, blockSep, leafSep)`
- *  and `content.size`. In production those are PMNode methods; in
- *  tests we pass a hand-built stand-in. */
+ *  接受任何暴露 `textBetween(from, to, blockSep, leafSep)` 和
+ *  `content.size` 的对象。生产环境是 PMNode 方法；测试里传入
+ *  手工构造的替代对象。 */
 export function nodeTextPreview(
   node: { textBetween: (a: number, b: number, s: string, e: string) => string; content: { size: number } },
   max = 32,

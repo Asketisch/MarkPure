@@ -5,18 +5,18 @@ use super::pane::{Orientation, Pane};
 #[cfg(test)]
 use super::workspace_state::WorkspaceState;
 
-/// Information about a folder in the workspace
+/// 工作区中某个文件夹的信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FolderInfo {
-    /// Unique ID for this folder
+    /// 该文件夹的唯一 ID
     pub id: String,
-    /// Absolute path to the folder
+    /// 文件夹的绝对路径
     pub path: String,
-    /// Display name
+    /// 显示名称
     pub name: String,
-    /// Whether the folder is expanded in the tree
+    /// 文件夹在树中是否已展开
     pub is_expanded: bool,
-    /// Whether this is the primary workspace folder
+    /// 是否是主工作区文件夹
     pub is_primary: bool,
 }
 
@@ -39,7 +39,7 @@ impl FolderInfo {
     }
 }
 
-/// Simple UUID generator (for use without external dependencies)
+/// 简易 UUID 生成器（避免引入外部依赖）
 fn uuid_simple() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let duration = SystemTime::now()
@@ -48,12 +48,12 @@ fn uuid_simple() -> String {
     format!("{:x}-{:x}", duration.as_secs(), duration.subsec_nanos())
 }
 
-/// Represents the workspace with multiple folders
+/// 表示包含多个文件夹的工作区
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workspace {
-    /// All folders in the workspace
+    /// 工作区中的所有文件夹
     pub folders: Vec<FolderInfo>,
-    /// Workspace name
+    /// 工作区名称
     pub name: String,
 }
 
@@ -65,9 +65,9 @@ impl Workspace {
         }
     }
 
-    /// Add a folder to the workspace
+    /// 向工作区添加文件夹
     pub fn add_folder(&mut self, path: String) -> Option<FolderInfo> {
-        // Check if already exists
+        // 检查是否已存在
         if self.folders.iter().any(|f| f.path == path) {
             return None;
         }
@@ -78,16 +78,16 @@ impl Workspace {
         Some(folder)
     }
 
-    /// Remove a folder from the workspace
+    /// 从工作区移除文件夹
     pub fn remove_folder(&mut self, path: &str) -> bool {
         let len_before = self.folders.len();
         self.folders.retain(|f| f.path != path);
 
         if self.folders.is_empty() {
-            // All folders removed
+            // 所有文件夹都被移除
             true
         } else if len_before == self.folders.len() + 1 {
-            // If we removed the primary, make first one primary
+            // 若移除了主文件夹，则把第一个设为新的主文件夹
             if let Some(first) = self.folders.first_mut() {
                 first.is_primary = true;
             }
@@ -97,17 +97,17 @@ impl Workspace {
         }
     }
 
-    /// Get the primary folder
+    /// 获取主文件夹
     pub fn primary_folder(&self) -> Option<&FolderInfo> {
         self.folders.iter().find(|f| f.is_primary)
     }
 
-    /// Get all folder paths
+    /// 获取所有文件夹路径
     pub fn folder_paths(&self) -> Vec<String> {
         self.folders.iter().map(|f| f.path.clone()).collect()
     }
 
-    /// Toggle folder expanded state
+    /// 切换文件夹的展开状态
     pub fn toggle_folder(&mut self, path: &str) -> bool {
         if let Some(folder) = self.folders.iter_mut().find(|f| f.path == path) {
             folder.is_expanded = !folder.is_expanded;
@@ -142,7 +142,7 @@ mod tests {
         let root_id = state.root_pane_id.clone();
         let new_pane_id = state.split_pane(&root_id, Orientation::Horizontal);
         assert!(new_pane_id.is_some());
-        assert_eq!(state.panes.len(), 3); // root, child1, child2
+        assert_eq!(state.panes.len(), 3); // 根、child1、child2
     }
 
     #[test]

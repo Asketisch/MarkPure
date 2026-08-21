@@ -1,14 +1,14 @@
 /**
- * File-system IPC wrappers.
+ * 文件系统相关 IPC 封装。
  *
- * Topic: file dialogs, open/save, directory tree, CRUD. The
- * "workspace" concept is enforced server-side in P2.6, so
- * these wrappers are dumb pass-throughs.
+ * 主题：文件对话框、打开/保存、目录树、文件增删改。
+ * “工作区”的概念在 Rust 后端校验，这些封装只是
+ * 纯粹的透传，不做任何业务判断。
  */
 import { ipc } from './ipc'
 import type { DocStats, FileEntry, FileInfo } from './types'
 
-// ============================== File dialogs ==============================
+// ============================== 文件对话框 ==============================
 
 export async function openFile(): Promise<FileInfo | null> {
   const path = await ipc<string>('pick_open_file')
@@ -35,7 +35,7 @@ export async function pickDirectory(): Promise<string | null> {
   return await ipc<string>('pick_directory')
 }
 
-// ============================== Directory tree ==============================
+// ============================== 目录树 ==============================
 
 export async function getDirectoryTree(
   path: string,
@@ -53,7 +53,7 @@ export async function unwatchDirectory(): Promise<void> {
   await ipc('unwatch_directory')
 }
 
-// ============================== File CRUD ==============================
+// ============================== 文件增删改 ==============================
 
 export async function createFile(path: string): Promise<void> {
   await ipc('create_file', { path })
@@ -71,7 +71,7 @@ export async function renameFile(path: string, newName: string): Promise<string>
   return await ipc('rename_file', { path, new_name: newName })
 }
 
-// ============================== Drag-and-drop ==============================
+// ============================== 拖放 ==============================
 
 export interface DroppedFile {
   content: string

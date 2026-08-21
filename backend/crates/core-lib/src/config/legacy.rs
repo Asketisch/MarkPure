@@ -1,108 +1,97 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::theme::ThemeId;
-// `WorkspaceRoot` is referenced in the struct field below and
-// in the migration code that synthesises a root from the legacy
-// `last_workspace` string. The richer add/remove/activate
-// helpers live in the `workspace_roots` submodule so this file
-// stays focused on the AppConfig struct, the per-field CRUD,
-// and the migration logic.
+// `WorkspaceRoot` 在下方的结构体字段和从旧版 `last_workspace` 字符串
+// 合成根目录的迁移代码中被引用。增删改/激活等更丰富的辅助方法位于
+// `workspace_roots` 子模块，因此本文件专注于 AppConfig 结构体、
+// 逐字段 CRUD 和迁移逻辑。
 use crate::workspace_root::WorkspaceRoot;
 
-/// Application configuration
+/// 应用配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// Editor settings
+    /// 编辑器设置
     pub editor: EditorConfig,
-    /// Window settings
+    /// 窗口设置
     pub window: WindowConfig,
-    /// Currently active theme
+    /// 当前活动主题
     pub theme: ThemeId,
-    /// Recent files (max 10)
+    /// 最近打开的文件（最多 10 个）
     #[serde(default)]
     pub recent_files: Vec<String>,
-    /// **Legacy** single-root hint. Kept on disk (under a different toml key)
-    /// for one release so users rolling back retain their data. New code
-    /// reads `workspace_roots` + `active_workspace_root_id` instead.
+    /// **旧版** 单根目录提示。为了回滚旧版本的用户能保留数据，
+    /// 在一个发布周期内仍以不同 TOML 键写入磁盘。新代码
+    /// 读取 `workspace_roots` + `active_workspace_root_id`。
     ///
-    /// Field name in TOML: `_legacy_last_workspace`.
+    /// TOML 中的字段名：`_legacy_last_workspace`。
     #[serde(default, rename = "_legacy_last_workspace", skip_serializing)]
     pub last_workspace: Option<String>,
-    /// All folders in the current workspace (P2-4 multi-root).
+    /// 当前工作区的所有文件夹（多根目录）。
     #[serde(default)]
     pub workspace_roots: Vec<WorkspaceRoot>,
-    /// Which root is currently active (drives the file tree, path
-    /// validation, tag/backlinks panel). `None` means "no folder open".
+    /// 当前活动的根目录（驱动文件树、路径校验、标签/反链面板）。
+    /// `None` 表示「没有打开文件夹」。
     #[serde(default)]
     pub active_workspace_root_id: Option<String>,
-    /// UI language (e.g., "zh", "en")
+    /// UI 语言（如 "zh"、"en"）
     #[serde(default)]
     pub language: Option<String>,
-    /// Expanded directory paths, keyed by root id.
+    /// 已展开的目录路径，按根目录 id 分组。
     ///
-    /// Stored as a map so each root remembers its own tree-expansion
-    /// state. Older configs (which used a flat `Vec<String>`) are
-    /// migrated in `load()` by attributing the entries to the active
-    /// root.
+    /// 以映射存储，使每个根目录记住自己的树展开状态。
+    /// 旧配置（使用扁平的 `Vec<String>`）在 `load()` 中被迁移，
+    /// 方法是将条目归属到活动根目录。
     #[serde(default)]
     pub expanded_dirs: std::collections::HashMap<String, Vec<String>>,
-    /// P2-7: Vim mode toggle. When true, the editor accepts
-    /// NORMAL/INSERT/VISUAL key sequences; when false, the
-    /// default Tiptap keymap runs. Persists across sessions;
-    /// toggled at runtime via `Cmd+.` or the command palette.
-    /// `#[serde(default)]` so existing config files (without
-    /// the field) deserialise to `false`.
+    /// Vim 模式开关。为 true 时编辑器接受
+    /// NORMAL/INSERT/VISUAL 按键序列；为 false 时使用默认的
+    /// Tiptap 键位。跨会话持久化；运行时通过 `Cmd+.` 或命令面板切换。
+    /// `#[serde(default)]` 让没有该字段的旧配置文件
+    /// 反序列化为 `false`。
     #[serde(default)]
     pub vim_mode: bool,
-    /// P0-X: Typora-style "Word Count Goal". When set
-    /// (>0), the status bar shows `<current> / <goal>
-    /// (<pct>%)` so the user can track progress against a
-    /// writing target (e.g. a 5000-word essay). Defaults
-    /// to `0` (disabled) so existing users' status bars
-    /// don't change.
+    /// 「字数目标」。大于 0 时状态栏显示 `<当前字数> / <目标>
+    ///（<百分比>%）`，让用户对照写作目标（如一篇 5000 字的文章）
+    /// 跟踪进度。默认 `0`（禁用），使现有用户的状态栏不变。
     #[serde(default)]
     pub word_count_goal: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorConfig {
-    /// Font family
+    /// 字体族
     pub font_family: String,
-    /// Font size in pixels
+    /// 字号（像素）
     pub font_size: u16,
-    /// Tab size in spaces
+    /// 制表符宽度（空格数）
     pub tab_size: u8,
-    /// Whether to use soft tabs (spaces) instead of hard tabs
+    /// 是否使用软制表符（空格）代替硬制表符
     pub soft_tabs: bool,
-    /// Whether to show line numbers
+    /// 是否显示行号
     pub line_numbers: bool,
-    /// Word wrap enabled
+    /// 是否启用自动换行
     pub word_wrap: bool,
-    /// Auto-save interval in seconds (0 = disabled)
+    /// 自动保存间隔（秒，0 表示禁用）
     pub auto_save_interval: u16,
-    /// Whether to run spell-checking on the active document.
-    /// On macOS this drives NSSpellChecker (full CJK + English);
-    /// on other platforms it falls back to the bundled English
-    /// dictionary and skips CJK.
+    /// 是否对当前文档运行拼写检查。
+    /// macOS 上使用 NSSpellChecker（完整的中英文字典）；
+    /// 其他平台回退到内置英文词典并跳过 CJK。
     ///
-    /// Defaults to true on macOS (where the OS provides a free,
-    /// high-quality checker) and false elsewhere so non-macOS
-    /// users aren't surprised by red underlines on the only
-    /// language they can spell-check (English).
+    /// macOS 默认为 true（系统提供了免费、高质量的检查器），
+    /// 其他平台默认为 false，避免非 macOS 用户
+    /// 因只能检查英文而在唯一可检查的语言上看到红下划线。
     #[serde(default = "default_spellcheck_enabled")]
     pub spellcheck_enabled: bool,
-    /// Override the spell-check language. `None` means "follow
-    /// the UI language" — the frontend passes the active
-    /// `i18n.locale` through. Set to e.g. `"en"` to keep an
-    /// English checker active while the UI is in Chinese.
+    /// 覆盖拼写检查语言。`None` 表示「跟随 UI 语言」——
+    /// 前端会传入当前 `i18n.locale`。例如设为 `"en"`
+    /// 可在 UI 为中文时仍保持英文检查器。
     #[serde(default)]
     pub spellcheck_language: Option<String>,
-    /// P0-X: lint markdown on save. When true, `save_file`
-    /// runs `lint_markdown` over the buffer before writing
-    /// to disk — trailing whitespace trimmed, final newline
-    /// ensured, 3+ blank lines collapsed. Defaults to
-    /// `false` so existing users' workflows don't change.
+    /// 保存时对 Markdown 做 lint。为 true 时 `save_file`
+    /// 在写入磁盘前对缓冲区调用 `lint_markdown`——
+    /// 去除行尾空白、确保末尾换行、合并 3 个以上的空行为 1 个。
+    /// 默认 `false`，使现有用户的工作流不变。
     #[serde(default)]
     pub lint_on_save: bool,
 }
@@ -113,15 +102,15 @@ fn default_spellcheck_enabled() -> bool {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindowConfig {
-    /// Window width
+    /// 窗口宽度
     pub width: f32,
-    /// Window height
+    /// 窗口高度
     pub height: f32,
-    /// Window X position
+    /// 窗口 X 坐标
     pub x: Option<f32>,
-    /// Window Y position
+    /// 窗口 Y 坐标
     pub y: Option<f32>,
-    /// Whether the window is maximized
+    /// 窗口是否最大化
     pub maximized: bool,
 }
 
@@ -138,10 +127,9 @@ impl Default for AppConfig {
                 auto_save_interval: 0,
                 spellcheck_enabled: default_spellcheck_enabled(),
                 spellcheck_language: None,
-                // P0-X: lint-on-save defaults to off so the
-                // change is opt-in. Users who want Typora-
-                // style automatic cleanup flip the toggle in
-                // Settings → Editor → "Lint on save".
+                // 保存时 lint 默认关闭，使该功能为可选。
+                // 想要自动清理的用户在「设置 → 编辑器 → 保存时 lint」
+                // 中打开开关。
                 lint_on_save: false,
             },
             window: WindowConfig {
@@ -165,16 +153,14 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    /// Load config from a file, or return default if not found.
+    /// 从文件加载配置；文件不存在时返回默认值。
     ///
-    /// Logs (to stderr) any error encountered so a corrupted config
-    /// file doesn't silently throw away the user's settings. We
-    /// still fall back to defaults so the app starts — surfacing the
-    /// error gives the user (or a CI run) a chance to recover or
-    /// report the corruption.
+    /// 将遇到的任何错误（输出到 stderr），使损坏的配置文件
+    /// 不会静默丢弃用户设置。我们仍回退到默认值让应用启动——
+    /// 输出错误给用户（或 CI 运行）恢复或报告损坏的机会。
     ///
-    /// Performs a one-way migration of legacy single-root fields into
-    /// the P2-4 multi-root shape. See [`Self::migrate_workspace_roots`].
+    /// 对旧版单根目录字段执行一次性迁移到多根目录形态。
+    /// 见 [`Self::migrate_workspace_roots`]。
     pub fn load(path: &PathBuf) -> Self {
         let raw = match std::fs::read_to_string(path) {
             Ok(s) => s,
@@ -197,8 +183,8 @@ impl AppConfig {
                     path.display(),
                     e
                 );
-                // Preserve the broken file so the user can recover
-                // their settings manually.
+                // 保留损坏的文件，让用户能手动恢复
+                // 他们的设置。
                 let backup = path.with_extension("toml.broken");
                 let _ = std::fs::write(&backup, raw);
                 Self::default()
@@ -208,18 +194,13 @@ impl AppConfig {
         cfg
     }
 
-    /// Migrate legacy single-root fields into the multi-root shape.
+    /// 把旧版单根目录字段迁移为多根目录形态。
     ///
-    /// 1. If `workspace_roots` is empty but the legacy `last_workspace`
-    ///    field has a value, synthesize a `WorkspaceRoot` from it and
-    ///    set `active_workspace_root_id` to the new id.
-    /// 2. If the legacy `expanded_dirs: Vec<String>`-shaped data is
-    ///    present (we can't read it through serde now that the field is
-    ///    a `HashMap`, so this migration is only relevant for in-memory
-    ///    callers — see `set_expanded_dirs_legacy`) we route those
-    ///    entries under the active root.
+    /// 若 `workspace_roots` 为空且旧 `last_workspace` 字段有值，
+    /// 从它合成一个 `WorkspaceRoot`，并把 `active_workspace_root_id`
+    /// 设为新 id。
     ///
-    /// Always safe to call; idempotent.
+    /// 始终可安全调用；幂等。
     pub fn migrate_workspace_roots(&mut self) {
         if self.workspace_roots.is_empty() {
             if let Some(path) = self.last_workspace.take() {
@@ -233,64 +214,60 @@ impl AppConfig {
         }
     }
 
-    /// Save config to a file
-    pub fn save(&self, path: &PathBuf) -> std::io::Result<()> {
+    /// 保存配置到文件（原子写：崩溃不会把 config.toml 留在截断状态）
+    pub fn save(&self, path: &Path) -> std::io::Result<()> {
         let s = toml::to_string_pretty(self).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+            std::io::Error::other(e.to_string())
         })?;
-        std::fs::write(path, s)
+        crate::atomic::atomic_write(path, &s)
     }
 
-    /// Get the default config file path
+    /// 获取默认配置文件路径
     pub fn config_path() -> PathBuf {
         crate::dirs::app_config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("config.toml")
     }
 
-    /// Add a file to recent files list (most recent first)
+    /// 把文件加入最近文件列表（最近的在最前）
     pub fn add_recent_file(&mut self, path: &str) {
-        // Remove if already exists
+        // 若已存在则先移除
         self.recent_files.retain(|p| p != path);
-        // Add to front
+        // 插到最前
         self.recent_files.insert(0, path.to_string());
-        // Keep only 10 most recent
+        // 只保留最近 10 个
         self.recent_files.truncate(10);
     }
 
-    /// Get recent files
+    /// 获取最近文件列表
     pub fn get_recent_files(&self) -> &[String] {
         &self.recent_files
     }
 
-    /// Clear all recent files
+    /// 清空最近文件列表
     pub fn clear_recent_files(&mut self) {
         self.recent_files.clear();
     }
 
-    /// **Deprecated** — single-root API, kept for backward compat.
+    /// **已弃用** — 旧版单根目录 API，为向后兼容保留。
     ///
-    /// New code should use [`add_workspace_root`](Self::add_workspace_root)
-    /// + [`set_active_workspace_root`](Self::set_active_workspace_root).
+    /// 新代码应使用 [`add_workspace_root`](Self::add_workspace_root)
+    /// + [`set_active_workspace_root`](Self::set_active_workspace_root)。
     #[deprecated(note = "use add_workspace_root / set_active_workspace_root instead")]
     pub fn set_last_workspace(&mut self, path: Option<String>) {
         self.last_workspace = path;
     }
 
-    /// **Deprecated** — single-root API. If `workspace_roots` is empty
-    /// after migration, this still returns the raw field for diagnostic
-    /// purposes; new code should read [`get_active_workspace_root`].
+    /// **已弃用** — 旧版单根目录 API。迁移后 `workspace_roots` 为空时
+    /// 仍返回原始字段用于诊断；新代码应读取 [`get_active_workspace_root`]。
     #[deprecated(note = "use get_active_workspace_root instead")]
     pub fn get_last_workspace(&self) -> Option<&String> {
         self.last_workspace.as_ref()
     }
 
-    // -------- Multi-root workspace API (P2-4) --------
+    // -------- 多根目录工作区 API --------
 
-    /// Add a folder to the workspace, returning the new root.
-    /// Refuses duplicates (same canonical path).
-
-    /// Set UI language
+    /// 设置 UI 语言
     pub fn set_language(&mut self, lang: Option<String>) {
         self.language = lang;
     }
@@ -300,15 +277,15 @@ impl AppConfig {
 mod tests {
     use super::*;
 
-    /// Build a config whose `workspace_roots` is empty but which
-    /// carries a legacy `last_workspace` value, simulating a pre-P2-4
-    /// config file. We do this programmatically (rather than via
-    /// TOML roundtrip) because the rename to `_legacy_last_workspace`
-    /// would require a different key on disk; the in-memory
-    /// `migrate_workspace_roots` only cares about the field value.
+    /// 构建一个 `workspace_roots` 为空但携带旧 `last_workspace` 值的配置，
+    /// 模拟 P2-4 之前的配置文件。我们以编程方式构造（而不是通过 TOML
+    /// 往返），因为改名为 `_legacy_last_workspace` 需要在磁盘上使用不同的键；
+    /// 内存中的 `migrate_workspace_roots` 只关心字段值。
     fn legacy_config_with_workspace(path: &str) -> AppConfig {
-        let mut cfg = AppConfig::default();
-        cfg.last_workspace = Some(path.to_string());
+        let mut cfg = AppConfig {
+            last_workspace: Some(path.to_string()),
+            ..AppConfig::default()
+        };
         cfg.migrate_workspace_roots();
         cfg
     }
@@ -316,21 +293,21 @@ mod tests {
     #[test]
     fn migrate_legacy_last_workspace_into_workspace_roots() {
         let cfg = legacy_config_with_workspace("/tmp");
-        // After migration, a single root exists.
+        // 迁移后存在单个根目录。
         assert_eq!(cfg.workspace_roots.len(), 1);
         let root = &cfg.workspace_roots[0];
-        // basename of canonical /tmp is "tmp".
+        // 规范化的 /tmp 基名为 "tmp"。
         assert_eq!(root.name, "tmp");
-        // Active id points at the new root.
+        // 活动 id 指向新根目录。
         assert_eq!(cfg.active_workspace_root_id.as_deref(), Some(root.id.as_str()));
-        // The legacy field is consumed.
+        // 旧字段已被消费。
         assert!(cfg.last_workspace.is_none());
     }
 
     #[test]
     fn migrate_is_idempotent() {
         let mut cfg = legacy_config_with_workspace("/tmp");
-        // Running migration again must not add a second root.
+        // 再次运行迁移不得添加第二个根目录。
         cfg.migrate_workspace_roots();
         cfg.migrate_workspace_roots();
         assert_eq!(cfg.workspace_roots.len(), 1);
@@ -350,7 +327,7 @@ mod tests {
         let r1 = cfg.add_workspace_root("/tmp").expect("first add");
         let dup = cfg.add_workspace_root("/tmp");
         assert!(dup.is_err());
-        // Active id stays pointing at r1.
+        // 活动 id 仍指向 r1。
         assert_eq!(cfg.active_workspace_root_id.as_deref(), Some(r1.id.as_str()));
     }
 
@@ -359,7 +336,7 @@ mod tests {
         let mut cfg = AppConfig::default();
         let a = cfg.add_workspace_root("/tmp").expect("a");
         let _b = cfg.add_workspace_root("/var").expect("b");
-        // Active is a (first add wins). Remove a → b should be active.
+        // 活动的是 a（首次添加优先）。移除 a → b 应为活动。
         assert!(cfg.remove_workspace_root(&a.id));
         assert_eq!(cfg.active_workspace_root_id.as_deref(), Some(_b.id.as_str()));
     }
@@ -373,12 +350,12 @@ mod tests {
         cfg.set_expanded_dirs_for(&b.id, vec!["/var/docs".to_string()]);
         assert_eq!(cfg.get_expanded_dirs_for(&a.id), &["/tmp/notes".to_string()]);
         assert_eq!(cfg.get_expanded_dirs_for(&b.id), &["/var/docs".to_string()]);
-        // Removing a drops its expanded-dirs memory.
+        // 移除 a 会丢弃它的展开目录记忆。
         assert!(cfg.remove_workspace_root(&a.id));
         assert!(cfg.get_expanded_dirs_for(&a.id).is_empty());
-        // b is unaffected.
+        // b 不受影响。
         assert_eq!(cfg.get_expanded_dirs_for(&b.id), &["/var/docs".to_string()]);
-        // And the second add is still active.
+        // 第二次添加仍为活动。
         assert_eq!(cfg.active_workspace_root_id.as_deref(), Some(b.id.as_str()));
     }
 }

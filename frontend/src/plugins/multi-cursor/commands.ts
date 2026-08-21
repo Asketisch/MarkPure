@@ -1,17 +1,16 @@
 /**
- * Multi-cursor command implementations.
+ * 多光标命令实现。
  *
- * These are the "what to do" — the actual PM dispatching.
- * The Tiptap `addCommands` shim in index.ts wraps them.
+ * 这些是“做什么”的部分——真正的 PM 派发逻辑。index.ts 中的
+ * Tiptap `addCommands` 垫片负责包装它们。
  *
- * The file is divided into:
- *   - `addCursor` — the Alt+Click entry point
- *   - `selectNextMatch` / `selectAllMatches` — Cmd+D / Cmd+Shift+L
- *   - `undoLastCursor` / `clearMultiCursors` — Cmd+U / Esc
+ * 本文件按用途分为：
+ *   - `addCursor` —— Alt+点击 的入口
+ *   - `selectNextMatch` / `selectAllMatches` —— Cmd+D / Cmd+Shift+L
+ *   - `undoLastCursor` / `clearMultiCursors` —— Cmd+U / Esc
  *
- * All functions take an `EditorView` and return a boolean
- * (the Tiptap command convention). The plugin state is
- * read via `multiCursorPluginKey.getState(view.state)`.
+ * 所有函数都接收 `EditorView` 并返回布尔值（Tiptap 命令约定）。
+ * 插件状态通过 `multiCursorPluginKey.getState(view.state)` 读取。
  */
 
 import { TextSelection } from '@tiptap/pm/state'
@@ -21,13 +20,12 @@ import { addCursorToList } from './state'
 import { findNextForCursors, findAllOccurrences } from './find-occurrence'
 
 /**
- * Add a secondary cursor at `pos`.
- * - `asRange: true` ⇒ make this a range cursor (Alt+Shift+Click)
- *   anchored at the current primary selection's head.
- * - Dedup is automatic.
- * - The primary selection moves to the new `pos` after the
- *   dispatch (VSCode behaviour: the last clicked position
- *   is the active cursor).
+ * 在 `pos` 处添加一个次要光标。
+ * - `asRange: true` ⇒ 生成一个区间光标（Alt+Shift+点击），
+ *   锚定在当前主选区的头部。
+ * - 自动去重。
+ * - 派发后主选区移动到新的 `pos`（与其他主流编辑器一致：
+ *   最后点击的位置是激活光标）。
  */
 export function addCursor(
   view: EditorView,
@@ -37,12 +35,11 @@ export function addCursor(
   if (!Number.isFinite(pos)) return false
   if (pos < 0 || pos > view.state.doc.content.size) return false
 
-  // Reject table cells and code blocks: those own their
-  // own internal cursor and would conflict.
+  // 拒绝表格单元格与代码块：它们自有一套内部光标，会互相冲突。
   try {
     const $pos = view.state.doc.resolve(pos)
     if ($pos.parent.type.spec.code) return false
-    // Walk up to see if we're inside a table cell.
+    // 向上遍历，确认是否位于表格单元格内。
     for (let d = $pos.depth; d > 0; d--) {
       if ($pos.node(d).type.spec.tableRole) return false
     }
@@ -58,9 +55,8 @@ export function addCursor(
   const anchor = opts.asRange ? opts.anchor ?? view.state.selection.head : undefined
   const { cursors, changed } = addCursorToList(state.cursors, { pos, anchor })
   if (!changed) {
-    // No-op: either duplicate or cap reached. Still move the
-    // primary selection to the click target so subsequent
-    // Cmd+D continues from there.
+    // 无变化：要么重复，要么已达上限。仍把主选区移到点击位置，
+    // 让后续的 Cmd+D 能从这里继续。
     view.dispatch(
       view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)),
     )
@@ -75,17 +71,17 @@ export function addCursor(
 }
 
 /**
- * Extract the "needle" the user is currently editing:
- *   1. If the primary selection is non-empty, use its text.
- *   2. Otherwise, expand the cursor to the word under it
- *      (mirrors the legacy `select-same-word` behaviour).
- *   3. Returns '' if neither produces a usable word.
+ * 提取用户当前正在编辑的“待查找词”：
+ *   1. 若主选区非空，取其文本。
+ *   2. 否则把光标扩展到其所在的单词（沿用旧的 `select-same-word`
+ *      行为）。
+ *   3. 两者都得不到可用单词时返回 ''。
  */
 export function currentNeedle(view: EditorView): { text: string; from: number; to: number } | null {
   const { state } = view
   const { selection } = state
 
-  // Case 1: explicit selection.
+  // 情况 1：存在显式选区。
   if (selection.from !== selection.to) {
     const text = state.doc.textBetween(selection.from, selection.to)
     if (text.trim()) {
@@ -93,7 +89,7 @@ export function currentNeedle(view: EditorView): { text: string; from: number; t
     }
   }
 
-  // Case 2: word under cursor.
+  // 情况 2：光标下的单词。
   const $head = selection.$head
   const text = $head.parent.textContent
   if (!text) return null
@@ -111,9 +107,8 @@ export function currentNeedle(view: EditorView): { text: string; from: number; t
 }
 
 /**
- * Cmd+D: select the next occurrence and add it as a range
- * secondary cursor. Falls back to wrap-around (start at
- * position 0) once the end of the doc is reached.
+ * Cmd+D：选中下一个出现位置并把它添加为区间次要光标。
+ * 到达文档末尾后回绕（从位置 0 重新开始）。
  */
 export function selectNextMatch(view: EditorView): boolean {
   const needle = currentNeedle(view)
@@ -122,8 +117,7 @@ export function selectNextMatch(view: EditorView): boolean {
   const state = multiCursorPluginKey.getState(view.state) as MultiCursorState | undefined
   const cursors = state?.cursors ?? []
 
-  // Build the "taken" set: every position that already has a
-  // cursor, including the primary selection's endpoints.
+  // 构建“已占用”集合：所有已有光标的位置，包括主选区的两个端点。
   const taken = new Set<number>()
   taken.add(needle.from)
   taken.add(needle.to)
@@ -136,7 +130,7 @@ export function selectNextMatch(view: EditorView): boolean {
 
   let found = findNextForCursors(view.state.doc, needle.text, needle.to, taken)
   if (!found) {
-    // Wrap around.
+    // 回绕到文档开头。
     found = findNextForCursors(view.state.doc, needle.text, 0, taken)
   }
   if (!found) return false
@@ -145,9 +139,8 @@ export function selectNextMatch(view: EditorView): boolean {
 }
 
 /**
- * Cmd+Shift+L: select every occurrence in the document.
- * The first occurrence becomes the primary; the rest are
- * range secondary cursors.
+ * Cmd+Shift+L：选中文档中的每一个出现位置。
+ * 第一个出现位置作为主光标；其余作为区间次要光标。
  */
 export function selectAllMatches(view: EditorView): boolean {
   const needle = currentNeedle(view)
@@ -156,7 +149,7 @@ export function selectAllMatches(view: EditorView): boolean {
   const occurrences = findAllOccurrences(view.state.doc, needle.text)
   if (occurrences.length === 0) return false
 
-  // Skip the first one — that's where the primary goes.
+  // 跳过第一个——主光标就落在那里。
   const rest = occurrences.slice(1)
   const cursors: Cursor[] = rest.map(o => ({ pos: o.to, anchor: o.from }))
 
@@ -168,8 +161,8 @@ export function selectAllMatches(view: EditorView): boolean {
 }
 
 /**
- * Cmd+U: pop the most recent cursor set off the history
- * stack. If history is empty, just clear.
+ * Cmd+U：从历史栈弹出最近一组光标。
+ * 历史为空时直接清除。
  */
 export function undoLastCursor(view: EditorView): boolean {
   const state = multiCursorPluginKey.getState(view.state) as MultiCursorState | undefined
@@ -181,8 +174,7 @@ export function undoLastCursor(view: EditorView): boolean {
 }
 
 /**
- * Esc: clear all secondary cursors. The primary selection
- * stays where it is.
+ * Esc：清除全部次要光标。主选区保持不动。
  */
 export function clearMultiCursors(view: EditorView): boolean {
   const state = multiCursorPluginKey.getState(view.state) as MultiCursorState | undefined

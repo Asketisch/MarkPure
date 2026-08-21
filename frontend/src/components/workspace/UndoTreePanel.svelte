@@ -1,25 +1,22 @@
 <script lang="ts">
   /**
-   * Undo Tree Panel (P0-8) — right-side panel that visualizes
-   * the branching undo tree as a tree of nodes. Mirrors the
-   * shape of `OutlinePanel.svelte` / `BacklinksPanel.svelte`:
-   *   - 260px wide right column
-   *   - Header with title + close button
-   *   - Body shows the tree (DFS, indented)
+   * 撤销树面板 —— 右侧面板，把分支撤销树以节点树形式可视化。
+   * 与 `OutlinePanel.svelte` / `BacklinksPanel.svelte` 的形态一致：
+   *   - 260px 宽的右列
+   *   - 带标题 + 关闭按钮的页头
+   *   - 主体展示树（深度优先、缩进）
    *
-   * Interaction:
-   *   - Click a node → switch to that branch
+   * 交互：
+   *   - 点击节点 → 切换到该分支
    *     (editor.commands.undoTree.undoToBranch(id))
-   *   - Hover shows the timestamp + label
-   *   - The current path is highlighted (background colour +
-   *     bold); the current leaf has a "▸" marker on its left.
-   *   - Sibling branches render with a thin "└" connector so
-   *     forks are visually obvious.
+   *   - 悬停显示时间戳与标签
+   *   - 当前路径高亮（背景色 + 加粗）；当前叶子左侧有“▸”标记。
+   *   - 兄弟分支用细“└”连接符渲染，分叉一目了然。
    *
-   * The plugin key is the source of truth — the panel re-renders
-   * whenever `editor.on('transaction', …)` updates the underlying
-   * `UndoTreeState`. Svelte 5's `$derived` reads through
-   * `editor.state` and re-evaluates on each transaction.
+   * 插件键是事实来源——`editor.state` 是普通对象属性，对 Svelte
+   * 并非响应式源，`$derived` 读取它不会在事务后重新求值。因此这里
+   * 订阅 `editor.on('transaction', …)`，把最新 `UndoTreeState` 写入
+   * `$state`，面板随之重新渲染。
    */
   import type { Editor } from '@tiptap/core'
   import { useI18n } from '$lib/stores/i18n.svelte'
@@ -38,18 +35,27 @@
 
   const i18n = useI18n()
 
-  /** Read the tree state from the plugin key. Svelte 5 tracks
-   *  `editor.state` as a dependency — every transaction
-   *  re-evaluates `$derived`, which keeps the panel in sync
-   *  with edits without an explicit subscription. */
-  let tree = $derived(undoTreePluginKey.getState(editor.state) as UndoTreeState | undefined)
-  /** Set of ids on the current path. Used for highlight. */
+  /** 从插件键读取树状态。`editor.state` 不是 Svelte 响应式源，
+   *  必须显式订阅事务事件并写入 `$state`，面板才能与编辑保持同步。 */
+  let tree = $state<UndoTreeState | undefined>(
+    undoTreePluginKey.getState(editor.state) as UndoTreeState | undefined,
+  )
+  $effect(() => {
+    const onTransaction = () => {
+      tree = undoTreePluginKey.getState(editor.state) as UndoTreeState | undefined
+    }
+    editor.on('transaction', onTransaction)
+    return () => {
+      editor.off('transaction', onTransaction)
+    }
+  })
+  /** 当前路径上的 id 集合，用于高亮。 */
   let currentPathSet = $derived(
     tree ? new Set(getPathTo(tree, tree.currentId)) : new Set<string>(),
   )
 
-  /** Render rows for a subtree. DFS, pre-order; respects
-   *  `node.collapsed` for the subtree toggle. */
+  /** 渲染子树的若干行。深度优先、前序；子树的折叠开关遵循
+   *  `node.collapsed`。 */
   function renderRows(
     state: UndoTreeState,
     nodeId: string,
@@ -63,7 +69,7 @@
     const children = node.childIds.map(cid => state.nodes[cid]).filter(Boolean) as BranchNode[]
     children.forEach((child, i) => {
       const sub = renderRows(state, child.id, depth + 1)
-      // Mark each direct child with whether a sibling follows.
+      // 标记每个直接子节点后面是否还有兄弟。
       sub[0].hasNextSibling = i < children.length - 1
       sub[0].isLastChild = i === children.length - 1
       out.push(...sub)

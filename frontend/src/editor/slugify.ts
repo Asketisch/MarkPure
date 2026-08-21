@@ -1,16 +1,13 @@
 /**
- * Slug helpers shared between the heading-id extension, the outline
- * panel, and the TOC node view.
+ * heading-id 扩展、大纲面板与 TOC 节点视图共用的 slug 助手。
  *
- * The GitHub-style slug is lowercased, with non-word characters
- * (including CJK characters) preserved, spaces collapsed to hyphens,
- * and capped at 60 characters. A position suffix disambiguates
- * duplicate titles — a heading's PM `pos` is unique within a document.
+ * slug 采用小写，保留非词字符（包括 CJK 字符），空格折叠为连字符，
+ * 长度上限 60 字符。用位置后缀区分重复标题——标题的 PM `pos` 在
+ * 文档内唯一。
  */
 
-/// Lowercase, strip non-word/non-CJK punctuation, collapse spaces
-/// to hyphens, and cap the length. Returns a non-empty string or
-/// the literal `"heading"` if the input is empty after normalisation.
+/// 转小写、去掉非词 / 非 CJK 标点、空格折叠为连字符并限制长度。
+/// 规范化后为空时返回非空字符串或字面量 `"heading"`。
 export function slugifyBase(text: string): string {
   const base = text
     .toLowerCase()
@@ -21,10 +18,8 @@ export function slugifyBase(text: string): string {
   return base || 'heading'
 }
 
-/// Compose the final slug with a tie-breaking suffix. The suffix is
-/// either a PM position (preferred) or a sequence number (when we
-/// don't have positions, e.g. when assigning ids to multiple
-/// headings that all happen to share the same title).
+/// 用决胜后缀组合最终 slug。后缀要么是 PM 位置（首选），要么是
+/// 序号（没有位置时，例如给多个恰好同名的标题分配 id）。
 export function slugifyWithSuffix(text: string, suffix: number | string): string {
   return `${slugifyBase(text)}-${suffix}`
 }

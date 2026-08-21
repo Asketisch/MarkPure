@@ -1,27 +1,23 @@
-//! Workspace-level scans: tag index, snippet listing, per-workspace
-//! CSS load, and backlinks. All four walk a folder tree with
-//! `walkdir` and aggregate results, so they live together to share
-//! the `is_hidden` helper and the imports.
+//! 工作区级扫描：标签索引、代码片段列表、按工作区加载的 CSS，
+//! 以及反向链接。这四个功能都用 `walkdir` 遍历文件夹树并聚合结果，
+//! 因此放在同一个文件中，共享 `is_hidden` 辅助函数和导入。
 //!
-//! These are P2-4 "multi-root aware by repetition": each call accepts
-//! a single `path`, and the renderer invokes them once per root when
-//! cross-root scans are needed. Cross-root aggregation is a Phase 3
-//! concern.
+//! 这些命令按「重复实现多根支持」的方式工作：每次调用只接受
+//! 单个 `path`，需要跨根扫描时渲染器会对每个根各调用一次。
+//! 跨根聚合属于后续迭代的范畴。
 
 use std::collections::HashMap;
 use std::path::Path;
 use walkdir::WalkDir;
 
-// ============================== Tags (P0-7) ==============================
+// ============================== 标签（P0-7） ==============================
 
-/// Extract `paths: Vec<String>` / `path: String` from the
-/// params, applying the same multi-root fallback rule that
-/// every other P2-4 scan uses. Returns the resolved list in
-/// call order; non-existent paths are kept (the per-scan loop
-/// skips them) so the caller doesn't need to pre-filter.
+/// 从参数中提取 `paths: Vec<String>` / `path: String`，应用与其他
+/// 扫描命令相同的多根回退规则。按调用顺序返回解析后的列表；
+/// 不存在的路径会保留（各扫描循环会跳过它们），这样调用方无需预先过滤。
 ///
-/// `pub(super)` so [`backlinks`] can reuse the same
-/// `path`/`paths` resolution rule.
+/// `pub(super)` 以便 [`backlinks`] 子模块复用相同的
+/// `path`/`paths` 解析规则。
 pub(super) fn extract_root_paths(
     params: &serde_json::Value,
 ) -> std::result::Result<Vec<String>, String> {
@@ -44,24 +40,18 @@ pub(super) fn extract_root_paths(
     Ok(paths)
 }
 
-/// P0-7: aggregate every `#tag` across the workspace into a
-/// `{name, count, files[]}` index. The renderer uses this to
-/// populate the Tag Pane and to build "filter by tag" search
-/// results.
+/// 把工作区内所有 `#标签` 聚合成 `{name, count, files[]}` 索引。
+/// 渲染器用它在「标签」面板中填充数据，并构建「按标签过滤」的搜索结果。
 ///
-/// P2-4: accepts `paths: Vec<String>` for cross-root scans
-/// (falls back to legacy `path: String`). Per-root tag counts
-/// are merged with the same `(name → count, files)` index
-/// shape the renderer already consumes; tag files are
-/// deduplicated so a tag present in both root-A and root-B
-/// counts as two occurrences on the same file only if the
-/// file paths are literally identical (rare; usually fine).
+/// 多根：接受 `paths: Vec<String>` 用于跨根扫描（回退到旧版
+/// `path: String`）。各根下的标签计数以渲染器已消费的
+/// `(name → count, files)` 索引形状合并；标签文件会去重，
+/// 因此同时存在于根 A 和根 B 的标签只有当文件路径完全相同时
+/// 才会在同一文件上计两次（很少见，通常无影响）。
 ///
-/// Scope: only files with a `.md` / `.markdown` / `.mdx`
-/// extension are scanned. Non-text content is skipped via the
-/// same UTF-8 read-and-fallback the workspace search uses
-/// (left as a future improvement; the renderer already
-/// tolerates unreadable files).
+/// 范围：只扫描 `.md` / `.markdown` / `.mdx` 扩展名的文件。
+/// 非文本内容通过与工作区搜索相同的 UTF-8 读取方式跳过
+/// （留作后续改进；渲染器已能容忍不可读文件）。
 pub fn cmd_get_workspace_tags(
     params: &serde_json::Value,
 ) -> std::result::Result<serde_json::Value, String> {
@@ -69,7 +59,7 @@ pub fn cmd_get_workspace_tags(
     let max_depth = params["max_depth"].as_u64().unwrap_or(10) as usize;
     let show_hidden = params["show_hidden"].as_bool().unwrap_or(false);
 
-    // tag -> { count, files }
+    // 索引结构：标签名 -> { 出现次数, 文件列表 }
     let mut index: HashMap<String, (u32, Vec<String>)> = HashMap::new();
 
     for path_str in &path_strs {
@@ -97,7 +87,7 @@ pub fn cmd_get_workspace_tags(
             }
             let content = match std::fs::read_to_string(path) {
                 Ok(c) => c,
-                Err(_) => continue, // binary or permission denied — skip
+                Err(_) => continue, // 二进制文件或权限被拒——跳过
             };
             for tag in markdown::extract_tags(&content) {
                 let entry = index.entry(tag.name).or_insert((0, Vec::new()));
@@ -110,7 +100,7 @@ pub fn cmd_get_workspace_tags(
         }
     }
 
-    // Stable, alphabetical ordering for the renderer.
+    // 稳定的字母序排序，方便渲染器展示。
     let mut tags: Vec<serde_json::Value> = index
         .into_iter()
         .map(|(name, (count, files))| {
@@ -130,13 +120,11 @@ pub fn cmd_get_workspace_tags(
     Ok(serde_json::json!({ "tags": tags }))
 }
 
-// ============================== Snippets (P2-5) ==============================
+// ============================== 代码片段（P2-5） ==============================
 
-/// P2-5: list the user's snippets stored in
-/// `~/.config/markpure/snippets/*.md`. Each snippet's name
-/// (filename minus `.md`) is the shortcode. Body is the
-/// file contents. We don't expand `$1`/`{{date}}` here — the
-/// renderer does that. The list is alphabetical.
+/// 列出存储在 `~/.config/markpure/snippets/*.md` 中的用户代码片段。
+/// 每个片段的名字（文件名去掉 `.md`）就是其短代码。内容即文件内容。
+/// 这里不展开 `$1`/`{{date}}` 等占位符——由渲染器负责。列表按字母序排列。
 pub fn cmd_list_snippets() -> std::result::Result<serde_json::Value, String> {
     let dir = mt_core::AppConfig::config_path()
         .parent()
@@ -180,36 +168,29 @@ pub fn cmd_list_snippets() -> std::result::Result<serde_json::Value, String> {
     Ok(serde_json::json!({ "snippets": snippets }))
 }
 
-// ============================== Per-workspace CSS (P1-7) ==============================
+// ============================== 按工作区加载 CSS（P1-7） ==============================
 
-/// P1-7: read every `*.css` file under `<workspace>/.markpure/styles/`
-/// and return them concatenated. The renderer injects the
-/// returned string into a global <style> element so per-workspace
-/// snippets override the global theme. Files are read in
-/// alphabetical order so the user can disambiguate with `01-…`,
-/// `02-…` prefixes. Files that don't exist are silently ignored —
-/// the absence of a `.markpure/styles/` directory is normal, not
-/// an error.
+/// 读取 `<workspace>/.markpure/styles/` 下的所有 `*.css` 文件并拼接返回。
+/// 渲染器把返回的字符串注入全局 <style> 元素，使按工作区定制的样式
+/// 覆盖全局主题。文件按字母序读取，用户可用 `01-…`、`02-…` 前缀
+/// 控制顺序。不存在的文件会被静默忽略——没有 `.markpure/styles/`
+/// 目录是正常情况，不是错误。
 ///
-/// P2-4 multi-root: when `paths: Vec<String>` is supplied,
-/// styles from each root are concatenated in **lexicographic
-/// order of root path**, and the **active root's styles are
-/// emitted last** so their CSS rules win the cascade — a
-/// multi-root variant of the "more specific wins" rule that
-/// the single-root version already implied (later file in
-/// alphabetical order wins). The optional `active_root_path`
-/// field tells the handler which root should come last; if
-/// omitted, the first element of `paths` is treated as active.
+/// 多根：当提供 `paths: Vec<String>` 时，各根的样式按根路径的**字典序**
+/// 拼接，且**活动根的样式最后输出**，让它的 CSS 规则在级联中胜出——
+/// 这是单根版本已有「更具体的胜出」规则（字母序靠后的文件胜出）在
+/// 多根场景下的变体。可选的 `active_root_path` 字段告诉处理器
+/// 哪个根应该放在最后；缺省时 `paths` 的第一个元素视为活动根。
 pub fn cmd_load_workspace_styles(
     params: &serde_json::Value,
 ) -> std::result::Result<serde_json::Value, String> {
     let path_strs = extract_root_paths(params)?;
     let active_root_path = params["active_root_path"].as_str();
 
-    // P2-4: order roots so the active one is last. Roots are
-    // otherwise sorted by path for stability across calls.
+    // 对根排序，让活动根排在最后。其余根按路径排序，保证多次调用时
+    // 顺序稳定。
     let mut roots = path_strs.clone();
-    roots.sort_by(|a, b| a.cmp(b));
+    roots.sort();
     if let Some(active) = active_root_path {
         if let Some(idx) = roots.iter().position(|r| r == active) {
             let active_root = roots.remove(idx);
@@ -267,13 +248,13 @@ pub fn cmd_load_workspace_styles(
     Ok(serde_json::json!({ "css": combined, "files": files }))
 }
 
-// ============================== shared helper ==============================
+// ============================== 共享辅助函数 ==============================
 
-/// True if a directory entry's name starts with a dot — these are
-/// skipped from workspace scans by default (`show_hidden=false`).
+/// 若目录条目的名字以点开头则返回 true——默认情况下
+/// （`show_hidden=false`）这些条目会从工作区扫描中跳过。
 ///
-/// `pub(super)` so the [`backlinks`] submodule can reuse the same
-/// "what counts as hidden" rule without duplicating it.
+/// `pub(super)` 以便 [`backlinks`] 子模块复用同一套
+/// 「什么算隐藏」的规则而无需重复实现。
 pub(super) fn is_hidden(entry: &walkdir::DirEntry) -> bool {
     entry
         .file_name()

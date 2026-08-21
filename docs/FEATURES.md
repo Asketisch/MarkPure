@@ -23,7 +23,7 @@
 
 - **关键文件**：`frontend/src/extensions/view/focus-mode-extension.ts`
 - **触发方式**：`F11` 或 `Cmd+Shift+Z`
-- **参考**：Typora F8、iA Writer、Bear（Mac）
+- **参考**：主流 Markdown 编辑器的全屏专注写作模式
 
 ### 1.3 Slash Command — P1-1（2026-06-08）✅
 
@@ -55,7 +55,7 @@ QuickSwitcher `Cmd+P` 模态补全文件；Wiki 链接 `[[` 触发 suggestion，
 
 ### 1.7 上标 / 下标（Sup / Sub）— P2-1（2026-06-08）✅
 
-`@tiptap/extension-superscript` + `@tiptap/extension-subscript`，自动补全 `^...^` 和 `~...~` 语法（GitHub Markdown 风格）。
+`@tiptap/extension-superscript` + `@tiptap/extension-subscript`，自动补全 `^...^` 和 `~...~` 语法（GFM Markdown 扩展语法）。
 
 - **关键文件**：`frontend/src/editor/editor.ts`（mark 注册）
 
@@ -66,7 +66,7 @@ QuickSwitcher `Cmd+P` 模态补全文件；Wiki 链接 `[[` 触发 suggestion，
 - **关键文件**：`frontend/src/extensions/blocks/footnote-extension.ts`、`backend/crates/markdown/src/pandoc.rs`
 - **触发方式**：命令面板 `insert.footnote_ref` / quick-insert「Footnote Reference」项
 
-### 1.9 真正多光标编辑（Multi-Cursor，VSCode 风格）— P0-3（2026-06-14）✅
+### 1.9 真正多光标编辑（Multi-Cursor）— P0-3（2026-06-14）✅
 
 自研多光标 plugin（无 `prosemirror-multicursor` 社区包依赖）。主光标保留在 PM 标准 `state.selection`，次光标列表存在 Plugin state；次光标走 `Decoration.widget` 绘制（1px 竖线 + 1s 闪烁），range 选区走 `Decoration.inline`。输入字符 / Backspace / Delete / 单行粘贴全部 fan-out 到所有光标（从后往前避免位置漂移）。边界：表格 cell / CodeBlock / 只读视图 / IME 组合中 / 同一位置重复 / 64 上限 全部处理。多光标不进 undo 栈（transient 模式），`prosemirror-history` 透明处理输入产生的 doc 变化。
 
@@ -80,11 +80,11 @@ QuickSwitcher `Cmd+P` 模态补全文件；Wiki 链接 `[[` 触发 suggestion，
   - `Esc` 清空所有次光标（保留主光标）
 - **状态栏**：右下角显示「多光标 (N)」（`status.multi_cursor` i18n key，3 语言均已翻译）
 - **验证**：`npx tsx scripts/validate-multi-cursor.ts` 15/15 通过；CSS 6 主题独立色值
-- **参考**：VSCode 多光标、MarkText Alt+Click
+- **参考**：主流编辑器的多光标交互
 
 ### 1.10 列选择（Column Selection，Alt+Drag）— P2-3（2026-06-15）✅
 
-VSCode / Sublime Text 风格的矩形选区。Alt+Drag 拖出矩形,实时绘制虚线 overlay；松开鼠标后将矩形按线高扫描展开为 N 个 range cursors,直接 dispatch 到 P0-3 多光标插件的 `set` meta —— 后续输入 / Backspace / Delete / 单行粘贴 / Esc / Cmd+U 全部复用现有 fan-out / 装饰 / 撤销链路,零新增代码。沿 y 轴每 `--editor-line-height`(默认 24px,CSS 变量可覆盖)采样,对每行调用 `posAtCoords({left, top: y})` 和 `posAtCoords({right, top: y})` 得到该行 range 的两端。边界处理:表格单元格 / 代码块跳过(复用 `commands.ts` 的 atomic 检测)、虚拟化隐藏块跳过(`elementFromPoint` + `.pm-virtual-hidden` 探测)、上限 64 行截断 + console.warn、3px 阈值低于则降级为单点 Alt+Click、Alt 提前释放取消提交、Esc 中途取消、Tab 切换 view.destroy 清理 listener。
+矩形区块选区。Alt+Drag 拖出矩形,实时绘制虚线 overlay；松开鼠标后将矩形按线高扫描展开为 N 个 range cursors,直接 dispatch 到 P0-3 多光标插件的 `set` meta —— 后续输入 / Backspace / Delete / 单行粘贴 / Esc / Cmd+U 全部复用现有 fan-out / 装饰 / 撤销链路,零新增代码。沿 y 轴每 `--editor-line-height`(默认 24px,CSS 变量可覆盖)采样,对每行调用 `posAtCoords({left, top: y})` 和 `posAtCoords({right, top: y})` 得到该行 range 的两端。边界处理:表格单元格 / 代码块跳过(复用 `commands.ts` 的 atomic 检测)、虚拟化隐藏块跳过(`elementFromPoint` + `.pm-virtual-hidden` 探测)、上限 64 行截断 + console.warn、3px 阈值低于则降级为单点 Alt+Click、Alt 提前释放取消提交、Esc 中途取消、Tab 切换 view.destroy 清理 listener。
 
 - **关键文件**:
   - `frontend/src/plugins/multi-cursor/column-select.ts` (~370 行,Plugin + 拖动状态机 + `flattenRectToCursors` 纯函数 + overlay 绘制 + `isInsideAtomicBlock` + `estimateLineHeight`)
@@ -100,11 +100,11 @@ VSCode / Sublime Text 风格的矩形选区。Alt+Drag 拖出矩形,实时绘制
   - `Esc` 中途取消拖动
 - **状态栏**:拖动中显示「列选」chip(`status.column_select` i18n key,3 语言均已翻译)
 - **验证**:`npx tsx scripts/validate-column-select.ts` 20/20 通过(normaliseRect 3 个,flattenRectToCursors 11 个,isInsideAtomicBlock 4 个,Cursor 形状 1 个,line-height 变化 2 个) + 多光标 15/15 回归无失败 + cargo workspace 110/110 通过
-- **参考**:VSCode 列选、Sublime Text 列编辑
+- **参考**:主流编辑器的列选择交互
 
 ### 1.16 Vim 模式 (Cmd+. 切换) — P2-7（2026-06-17）✅
 
-自研 mode 状态机（normal/insert/visual/visual-line/visual-block/replace 6 种），含完整 motions + operators + text objects + counts + 4 个 ex 命令，Vim's `V`/`Ctrl-V` 复用 P2-3 列选择。**关键文件**：`frontend/src/plugins/vim/`（11 文件 plugin + 100 LOC 扩展包装器），`frontend/src/extensions/editing/vim-extension.ts`（Tiptap 包装），`scripts/validate-vim.ts`（59/59 测试通过）。
+自研 mode 状态机（normal/insert/visual/visual-line/visual-block/replace 6 种），含完整 motions + operators + text objects + counts + 4 个 ex 命令，Vim 的 `V`/`Ctrl-V` 复用 P2-3 列选择。**关键文件**：`frontend/src/plugins/vim/`（11 文件 plugin + 100 LOC 扩展包装器），`frontend/src/extensions/editing/vim-extension.ts`（Tiptap 包装），`scripts/validate-vim.ts`（59/59 测试通过）。
 
 - **触发**:`Cmd+.`（macOS/Linux 全局）切换启用状态,持久化到 `AppConfig.vim_mode`。
 - **motions**:`h j k l` `w b e` `W B E` `0 $ ^` `gg G` `f F t T {char}` `{ } ( )` `%` `H M L`(约 18 个)。
@@ -119,7 +119,7 @@ VSCode / Sublime Text 风格的矩形选区。Alt+Drag 拖出矩形,实时绘制
 - **V1 未实现**(V2 候选):Emacs 模式、可重映射 keymap、marks、registers、search/replace、window splits、folding、macros、plugin system、`p`/`P` 读寄存器、cheat sheet 面板。
 - **V1 决策**:不集成 `prosemirror-vim`(2018 后未维护,PM 17 / Tiptap 3 不兼容);同 P0-3 选自研原因。
 - **测试**:`npx tsx scripts/validate-vim.ts` 59/59 通过 + 多光标 15/15 + 列选 20/20 + 撤销树 36/36 全部无回归。
-- **参考**:VSCode vim 扩展、Sublime Text Vintage、Obsidian Vim 模式、MarkText vim 模式。
+- **参考**:主流编辑器的 Vim 模式
 
 ---
 
@@ -130,7 +130,7 @@ VSCode / Sublime Text 风格的矩形选区。Alt+Drag 拖出矩形,实时绘制
 `FileWatcher`（notify crate）通过 `onFileChanges` IPC 推送；编辑器收到事件后对比当前 tab 文件路径，弹 `Dialog.svelte` 询问 **重新加载** / **保留我的修改** / **比较差异**。
 
 - **关键文件**：`backend/crates/fs/src/watcher.rs`、`frontend/src/editor/commands/workspace.ts:226`
-- **参考**：VSCode "File has changed on disk" 弹窗
+- **参考**：主流编辑器对磁盘文件变化的提示
 
 ### 2.2 文件树自动刷新 — P0-5（2026-06-08）✅
 
@@ -144,7 +144,7 @@ VSCode / Sublime Text 风格的矩形选区。Alt+Drag 拖出矩形,实时绘制
 
 - **关键文件**：`frontend/src/components/workspace/BacklinksPanel.svelte`、`backend/apps/desktop/src/workspace_ops/backlinks.rs:16`
 - **IPC**：`get_backlinks(page, workspace_path)`
-- **参考**：Obsidian 反链面板、Roam Research
+- **参考**：主流笔记应用的反链面板
 
 ### 2.4 标签树 / 标签侧边栏 — P0-7（2026-06-08）✅
 
@@ -173,7 +173,7 @@ VSCode / Sublime Text 风格的矩形选区。Alt+Drag 拖出矩形,实时绘制
 
 - **关键文件**：`frontend/src/app/App.svelte:28,123,1544-1580`、`backend/apps/desktop/src/workspace_ops/workspace_scans.rs:185-203`
 - **IPC**：`load_workspace_styles`
-- **参考**：Obsidian `.obsidian/snippets/`、VSCode `workbench.colorCustomizations`
+- **参考**：主流编辑器的工作区自定义样式
 
 ### 2.8 多根工作区（Multi-root Workspace）— P2-4（2026-06-XX）✅
 
@@ -181,7 +181,7 @@ VSCode / Sublime Text 风格的矩形选区。Alt+Drag 拖出矩形,实时绘制
 
 - **关键文件**：`frontend/src/stores/workspace.svelte.ts`、`frontend/src/components/workspace/WorkspaceRootTabs.svelte`、`backend/crates/core-lib/src/workspace_root.rs`、`backend/crates/core-lib/src/tab.rs:21`
 - **命令**：命令面板 `file.set_active_workspace_root`
-- **参考**：VSCode Multi-root Workspaces
+- **参考**：主流编辑器的多根工作区
 
 ### 2.9 文件树深度提升 — P1-10（2026-06-08，5 → 15）✅
 
@@ -259,7 +259,7 @@ macOS 通过 `objc2-app-kit::NSSpellChecker` 调用系统拼写检查（零字�
 
 - **关键文件**：`backend/apps/desktop/src/workspace_ops/workspace_scans.rs:135-180`（`cmd_list_snippets`）、`frontend/src/editor/commands/workspace.ts:408-413`
 - **i18n**：`snippet.empty` 三语完整翻译
-- **参考**：VSCode Snippets（TextMate 兼容）、Obsidian Templates 插件
+- **参考**：主流编辑器的代码片段与模板
 
 ### 6.2 自定义主题导入 / 导出 ✅
 
@@ -315,7 +315,7 @@ JSON 格式主题存储在 `~/.config/markpure/themes/`；通过 `backend/crates
 | 2026-06-13 | P1-8 | PNG 图片导出 |
 | 2026-06-13 | P2-6 | 大文档虚拟化 |
 | 实际合并 | P2-4 | 多根工作区（git b05dbeb，文档滞后） |
-| 2026-06-14 | P0-3 | 真正多光标编辑（VSCode 风格）：7 文件 plugin + 4 处键位 + 4 条 i18n + 15/15 测试 |
+| 2026-06-14 | P0-3 | 真正多光标编辑：7 文件 plugin + 4 处键位 + 4 条 i18n + 15/15 测试 |
 | 2026-06-15 | P2-3 | 列选择（Alt+Drag）：2 文件新增 + 6 处集成 + 20/20 测试 + 多光标 15/15 无回归 |
 | 2026-06-16 | P0-8 | 分支式撤销树：6 文件 plugin + 右侧面板 + 36/36 测试 + 多光标 15/15 + 列选 20/20 无回归 |
 | 2026-06-17 | P2-7 | Vim 模式（Cmd+. 切换）：12 文件 plugin（自研 mode FSM，无法用 prosemirror-vim）+ 8 处集成 + 状态栏 mode 芯片 + count/operator 暂存区 + 59/59 测试 + 多光标 15/15 + 列选 20/20 + 撤销树 36/36 无回归 |

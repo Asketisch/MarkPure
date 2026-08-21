@@ -1,9 +1,9 @@
 /**
- * Search & Replace plugin for ProseMirror
- * Ported from milkup's search plugin
+ * ProseMirror 的查找与替换插件
+ * 移植自 milkup 的 search 插件
  *
- * Performance: on document changes, existing match positions are remapped
- * via tr.mapping when possible, with a full re-search only when needed.
+ * 性能：文档变化时，已有的匹配位置尽可能经由 tr.mapping 重映射，
+ * 只有在必要时才做全量重新搜索。
  */
 
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
@@ -29,12 +29,12 @@ export interface SearchState {
 
 export const searchPluginKey = new PluginKey<SearchState>('markpure-search')
 
-/** Extract text and position map from the document using textBetween */
+/** 用 textBetween 从文档中提取文本与位置映射表 */
 function getDocText(doc: PMNode): { text: string; posMap: number[] } {
   const text = doc.textBetween(0, doc.content.size, '\n')
   const posMap: number[] = []
 
-  // Build position map: maps text index -> document position
+  // 构建位置映射表：文本下标 -> 文档位置
   let textIdx = 0
   doc.descendants((node, pos) => {
     if (node.isText) {
@@ -64,7 +64,7 @@ function findMatches(
   const { text, posMap } = getDocText(doc)
   const matches: Array<{ from: number; to: number }> = []
 
-  // Limit matches to prevent DoS from catastrophic backtracking
+  // 限制匹配数，防止灾难性回溯造成拒绝服务
   const MAX_MATCHES = 1000
   const startTime = Date.now()
   const TIMEOUT_MS = 2000
@@ -83,10 +83,10 @@ function findMatches(
     let match: RegExpExecArray | null
 
     while ((match = regex.exec(text)) !== null) {
-      // Timeout protection against catastrophic backtracking
+      // 针对灾难性回溯的超时保护
       if (Date.now() - startTime > TIMEOUT_MS) break
 
-      // Limit number of matches to prevent memory exhaustion
+      // 限制匹配数量，防止内存耗尽
       if (matches.length >= MAX_MATCHES) break
 
       if (match[0].length === 0) {
@@ -105,41 +105,10 @@ function findMatches(
       matches.push({ from, to })
     }
   } catch {
-    // invalid regex
+    // 无效正则
   }
 
   return matches
-}
-
-/**
- * Try to remap existing matches through a transaction's mapping.
- * Returns remapped matches, or null if remapping is unreliable
- * (e.g., matches were deleted or overlap with changes).
- */
-function tryRemapMatches(
-  tr: any,
-  oldMatches: Array<{ from: number; to: number }>
-): Array<{ from: number; to: number }> | null {
-  const mapping = tr.mapping
-  const remapped: Array<{ from: number; to: number }> = []
-
-  for (const match of oldMatches) {
-    const from = mapping.map(match.from, 1)
-    const to = mapping.map(match.to, -1)
-
-    // If the range collapsed or inverted, the match was deleted/modified
-    if (from >= to) continue
-
-    remapped.push({ from, to })
-  }
-
-  // If we lost too many matches relative to changes, do a full re-search
-  // to catch newly created matches from the edit
-  if (oldMatches.length > 0 && remapped.length < oldMatches.length * 0.5) {
-    return null
-  }
-
-  return remapped
 }
 
 function buildDecorations(
@@ -214,7 +183,7 @@ export function createSearchPlugin(): Plugin {
           }
         }
 
-        // Re-search on document changes
+        // 文档变化时重新搜索
         if (tr.docChanged && prev.query) {
           const options: SearchOptions = {
             caseSensitive: prev.caseSensitive,
@@ -222,24 +191,9 @@ export function createSearchPlugin(): Plugin {
             useRegex: prev.useRegex,
           }
 
-          // Try fast path: remap existing matches through the mapping.
-          // For simple edits (single char typed), this avoids full re-search.
-          // Fall back to full search if remapping is unreliable.
-          let matches: Array<{ from: number; to: number }>
-          const remapped = tryRemapMatches(tr, prev.matches)
-          if (remapped !== null && !prev.useRegex) {
-            // For literal searches, remapping is reliable -- but we still need
-            // to do a full re-search to catch NEW matches created by the edit.
-            // Only use the fast path for small edits where new matches are unlikely.
-            const changesSmall = tr.steps.length <= 1
-            if (changesSmall) {
-              matches = findMatches(newState.doc, prev.query, options)
-            } else {
-              matches = findMatches(newState.doc, prev.query, options)
-            }
-          } else {
-            matches = findMatches(newState.doc, prev.query, options)
-          }
+          // 每次事务后全量重搜：编辑可能产生新匹配，任何透过
+          // tr.mapping 的重映射「快速路径」都无法省掉这一步。
+          const matches = findMatches(newState.doc, prev.query, options)
 
           let currentIndex = prev.currentIndex
           if (currentIndex >= matches.length) {
@@ -265,7 +219,7 @@ export function createSearchPlugin(): Plugin {
   })
 }
 
-// ========== Helper functions ==========
+// ========== 辅助函数 ==========
 
 export function updateSearch(view: EditorView, query: string, options: SearchOptions): void {
   const tr = view.state.tr.setMeta(searchPluginKey, {

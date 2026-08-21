@@ -13,7 +13,9 @@
 | `OutlinePanel.svelte` | 大纲面板包装 |
 | `SearchBar.svelte` | 搜索替换栏（正则/大小写/全词匹配） |
 | `SourceEditor.svelte` | 源码模式（CodeMirror 6） |
-| `WorkspaceSearch.svelte` | 工作区全文搜索（防抖 + i18n） |
+| `WorkspaceSearch.svelte` | 工作区全文搜索外壳（防抖 + i18n + 键盘导航，~340 行） |
+| `WorkspaceSearchResult.svelte` | 搜索结果单行子组件（文件名/目录/行号 + 高亮 HTML） |
+| `workspaceSearchHighlight.ts` | 搜索结果高亮与路径工具：`highlightMatch`（UTF-8 字节偏移 → UTF-16 下标换算）、`getFileName` / `getDirectory` / `escapeHtml` |
 | `UndoTreePanel.svelte` | **P0-8** 分支式撤销树面板（260px 右侧栏）：DFS 缩进显示当前路径高亮、点击节点切换分支、▾/▸ 折叠子树、✕ 剪除非 current 分支 |
 
 P13a 拆分动机：`WorkSpace.svelte` 曾 612 行。现在外壳仅负责状态

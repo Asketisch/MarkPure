@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-/// Available theme IDs
+/// 可用的主题标识符
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ThemeId {
     Light,
@@ -34,7 +34,7 @@ impl ThemeId {
         )
     }
 
-    /// All available themes
+    /// 返回所有可用的主题
     pub fn all() -> &'static [ThemeId] {
         &[
             ThemeId::Light,
@@ -47,15 +47,15 @@ impl ThemeId {
         ]
     }
 
-    /// Cycle to the next theme
+    /// 循环切换到下一个主题
     pub fn cycle(&self) -> Self {
         let all = Self::all();
         let idx = all.iter().position(|t| *t == *self).unwrap_or(0);
         all[(idx + 1) % all.len()]
     }
 
-    /// Get theme ID from string
-    pub fn from_str(s: &str) -> Option<Self> {
+    /// 根据字符串解析出对应的主题标识符
+    pub fn from_id(s: &str) -> Option<Self> {
         match s {
             "Light" | "Cadmium Light" => Some(ThemeId::Light),
             "Dark" => Some(ThemeId::Dark),
@@ -75,7 +75,7 @@ impl std::fmt::Display for ThemeId {
     }
 }
 
-/// Custom theme definition
+/// 自定义主题的定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Theme {
     pub id: String,
@@ -86,7 +86,7 @@ pub struct Theme {
     pub colors: ThemeColors,
 }
 
-/// Theme colors
+/// 主题配色
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemeColors {
     // === UI 颜色 ===
@@ -209,7 +209,7 @@ impl Default for Theme {
     }
 }
 
-/// Get themes directory
+/// 获取主题存放目录
 pub fn themes_dir() -> PathBuf {
     let config_dir = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -219,7 +219,7 @@ pub fn themes_dir() -> PathBuf {
     config_dir
 }
 
-/// Load all custom themes
+/// 加载全部自定义主题
 pub fn load_custom_themes() -> Vec<Theme> {
     let dir = themes_dir();
     let mut themes = Vec::new();
@@ -240,7 +240,7 @@ pub fn load_custom_themes() -> Vec<Theme> {
     themes
 }
 
-/// Validate that a theme ID is safe to use as a filename
+/// 校验主题标识符是否可以安全用作文件名
 fn validate_theme_id(id: &str) -> std::result::Result<(), String> {
     if id.is_empty() {
         return Err("theme ID is empty".into());
@@ -248,7 +248,7 @@ fn validate_theme_id(id: &str) -> std::result::Result<(), String> {
     if id.contains("..") || id.contains('/') || id.contains('\\') || id.contains('\0') {
         return Err(format!("invalid theme ID: '{}'", id));
     }
-    // Check Windows reserved filenames
+    // 检查是否为 Windows 保留文件名
     let upper = id.to_uppercase();
     if upper == "CON" || upper == "PRN" || upper == "AUX" || upper == "NUL"
         || upper.starts_with("COM") || upper.starts_with("LPT")
@@ -258,22 +258,22 @@ fn validate_theme_id(id: &str) -> std::result::Result<(), String> {
     Ok(())
 }
 
-/// Save a custom theme
+/// 保存自定义主题
 pub fn save_custom_theme(theme: &Theme) -> Result<(), String> {
     validate_theme_id(&theme.id)?;
     let dir = themes_dir();
     let file_path = dir.join(format!("{}.json", theme.id));
     let content = serde_json::to_string_pretty(theme).map_err(|e| e.to_string())?;
-    fs::write(&file_path, content).map_err(|e| e.to_string())?;
+    crate::atomic::atomic_write(&file_path, &content).map_err(|e| e.to_string())?;
     Ok(())
 }
 
-/// Delete a custom theme
+/// 删除自定义主题
 pub fn delete_custom_theme(id: &str) -> Result<bool, String> {
     validate_theme_id(id)?;
     let dir = themes_dir();
     let file_path = dir.join(format!("{}.json", id));
-    // Ensure the resolved path is still within the themes directory
+    // 确保解析后的路径仍然位于主题目录之内
     let canonical_dir = dir.canonicalize().map_err(|e| e.to_string())?;
     let canonical_file = file_path.canonicalize().unwrap_or_else(|_| file_path.clone());
     if !canonical_file.starts_with(&canonical_dir) {
@@ -287,29 +287,29 @@ pub fn delete_custom_theme(id: &str) -> Result<bool, String> {
     }
 }
 
-/// Import theme from file path
+/// 从文件路径导入主题
 pub fn import_theme_from_path(file_path: &str) -> Result<Theme, String> {
     let content = fs::read_to_string(file_path).map_err(|e| e.to_string())?;
     let mut theme: Theme = serde_json::from_str(&content).map_err(|e| e.to_string())?;
 
-    // Ensure unique ID
+    // 确保主题标识符唯一
     theme.id = format!("custom_{}", generate_id());
 
     save_custom_theme(&theme)?;
     Ok(theme)
 }
 
-/// Export theme to file path
+/// 将主题导出到指定文件路径
 pub fn export_theme_to_path(id: &str, dest_path: &str) -> Result<bool, String> {
     let themes = load_custom_themes();
-    let theme = themes.iter().find(|t| &t.id == id).ok_or("Theme not found")?;
+    let theme = themes.iter().find(|t| t.id == id).ok_or("Theme not found")?;
 
     let content = serde_json::to_string_pretty(theme).map_err(|e| e.to_string())?;
     fs::write(dest_path, content).map_err(|e| e.to_string())?;
     Ok(true)
 }
 
-/// Generate a unique ID
+/// 生成唯一的标识符
 fn generate_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let now = SystemTime::now()

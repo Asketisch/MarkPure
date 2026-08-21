@@ -1,15 +1,13 @@
 <!--
-  Settings → General section.
+  设置 → 通用 区域。
 
-  Renders the editor prefs (font, tab size, soft tabs, line
-  numbers, word wrap, auto-save, lint-on-save, word-count goal)
-  plus spell-check and the backup / restore buttons.
+  渲染编辑器偏好（字体、Tab 宽度、软 Tab、行号、自动换行、
+  自动保存、保存时整理、字数目标）以及拼写检查、备份与恢复按钮。
 
-  Pure presentational component — all state lives in the parent
-  `Settings.svelte` which owns the `AppConfig` and the IPC
-  writers (`saveConfig`, `changeLanguage`, `handleExportConfig`,
-  `handleImportConfig`). We receive typed callbacks + the
-  loaded config and emit change events back through them.
+  纯展示组件——所有状态都存放在父组件 `Settings.svelte` 中，
+  由其持有 `AppConfig` 与各 IPC 写入函数（`saveConfig`、
+  `changeLanguage`、`handleExportConfig`、`handleImportConfig`）。
+  本组件只接收带类型的回调与已加载的配置，再通过它们上抛变更事件。
 -->
 
 <script lang="ts">
@@ -127,10 +125,9 @@
     />
   </div>
 
-  <!-- P0-X: Typora-style "lint on save" toggle.
-       When enabled, `save_file` runs `lint_markdown`
-       (trim trailing whitespace, ensure final newline,
-       collapse 3+ blank lines into 2) before writing to disk. -->
+  <!-- “保存时整理”开关。开启后 `save_file` 会在写盘前调用
+       `lint_markdown`（去除行尾空白、确保以换行结尾、
+       将连续 3 个以上的空行折叠为 2 个）。 -->
   <div class="setting-row">
     <label
       for="settings-lint-on-save"
@@ -146,10 +143,9 @@
     />
   </div>
 
-  <!-- P0-X: Typora-style word-count goal. When
-       set (>0), the status bar shows
-       `<current> / <goal> (<pct>%)` so the user can
-       track progress against a writing target. -->
+  <!-- 字数目标。设为大于 0 时，状态栏会显示
+       `<当前字数> / <目标> (<百分比>%)`，
+       方便用户跟踪写作进度。 -->
   <div class="setting-row">
     <label
       for="settings-word-count-goal"
@@ -165,9 +161,8 @@
     />
   </div>
 
-  <!-- P1-11: Spell check (toggle + language). On
-       non-macOS the tooltip warns the user that
-       only English is checked. -->
+  <!-- 拼写检查（开关 + 语言）。在非 macOS 平台上，
+       提示信息会告知用户仅检查英文。 -->
   <h3>{i18n.t('settings.spellcheck')}</h3>
   <div class="setting-row">
     <label
@@ -200,12 +195,9 @@
     </select>
   </div>
 
-  <!-- P0-X: Typora-style preferences export /
-       import. The user can back up the entire
-       `AppConfig` + keybindings + custom themes
-       to a single JSON file and restore them
-       later (typically on a fresh install or
-       after switching machines). -->
+  <!-- 偏好设置导出 / 导入。用户可以把完整的
+       `AppConfig` + 按键绑定 + 自定义主题备份到
+       单个 JSON 文件中，稍后（通常是新装或换机时）再恢复。 -->
   <h3>{i18n.t('settings.backup_restore')}</h3>
   <div class="setting-row">
     <label>{i18n.t('settings.export_preferences')}</label>

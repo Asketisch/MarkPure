@@ -1,16 +1,13 @@
 /**
- * Shared data types for the app-wide (non-document) IPC
- * wrappers. Extracted from `workspace.ts` so the type surface
- * sits next to its consumers without bloating the IPC
- * function file. These are pure data contracts — every one
- * round-trips through JSON to the Rust host — so a reviewer
- * can audit the shape here and the IPC command names in
- * `workspace.ts`.
+ * 应用级（非文档）IPC 包装的共享数据类型。
+ * 从 `workspace.ts` 中拆出，让类型定义紧邻其使用者，同时不
+ * 臃肿 IPC 函数文件。这些都是纯粹的数据契约——每一个都会
+ * 经 JSON 往返到 Rust 宿主——审查时在这里核对结构、在
+ * `workspace.ts` 里核对 IPC 命令名即可。
  */
 
-/** A single bookmark. `workspace_root_id` ties a bookmark to
- *  a multi-root workspace member (P2-4) so a root removal can
- *  offer to purge its bookmarks. */
+/** 单条书签。`workspace_root_id` 把书签关联到某个多根工作区成员，
+ *  这样移除根目录时可以顺带清理其书签。 */
 export interface Bookmark {
   id: string
   path: string
@@ -19,24 +16,21 @@ export interface Bookmark {
   tags: string[]
   created_at: number
   updated_at: number
-  /** P2-4: which WorkspaceRoot.id this bookmark belongs to. */
+  /** 该书签属于哪个 WorkspaceRoot.id。 */
   workspace_root_id?: string | null
 }
 
-/** A user-configurable keyboard binding. `accelerator` is the
- *  platform-neutral string form (`CmdOrCtrl+Shift+A`); the
- *  host translates it per-OS when dispatching. */
+/** 用户可配置的键盘绑定。`accelerator` 是平台无关的字符串形式
+ *  （`CmdOrCtrl+Shift+A`）；宿主派发时按操作系统翻译。 */
 export interface KeyBinding {
   id: string
   label: string
   accelerator: string | null
 }
 
-/** Typora-style preference export payload. `config` is the
- *  serialised `AppConfig` (subset + free-form keys so future
- *  fields don't break old backups); `keybindings` and
- *  `themes` are raw JSON arrays the host re-validates on
- *  import. */
+/** 偏好设置的导出负载。`config` 是序列化后的 `AppConfig`（部分字段
+ *  + 自由键，这样未来的新字段不会破坏旧备份）；`keybindings` 与
+ *  `themes` 是原始 JSON 数组，导入时由宿主重新校验。 */
 export interface ConfigExportPayload {
   version: number
   app: string
@@ -53,8 +47,7 @@ export interface ConfigExportPayload {
   themes: unknown[]
 }
 
-/** Report produced by `cmd_import_config` — one line the
- *  Settings dialog flashes after a restore. */
+/** `cmd_import_config` 生成的报告——设置对话框在恢复后闪烁显示的一行摘要。 */
 export interface ConfigImportReport {
   ok: boolean
   restored: string[]
@@ -63,30 +56,26 @@ export interface ConfigImportReport {
   keybindings_restored: number
 }
 
-/** Current UI locale + the catalogue of available ones
- *  (`available` is `[code, displayName]` pairs). */
+/** 当前界面语言 + 可用语言的目录（`available` 是 `[code, displayName]` 对）。 */
 export interface LocaleInfo {
   current: string
   available: [string, string][]
   translations: Record<string, string>
 }
 
-/** Static application banner info. */
+/** 静态的应用横幅信息。 */
 export interface AppInfo {
   name: string
   version: string
   description: string
 }
 
-/** A single workspace root — a folder the user has added to
- *  the current multi-root workspace. The `id` is stable across
- *  restarts (used by TabState.workspace_root_id, watcher
- *  handles, LRU GC) and `added_at` is a unix-seconds
- *  timestamp. `exists` is recomputed on every
- *  `list_workspace_roots` IPC and is `false` for missing
- *  paths (e.g. an external drive that's been unmounted).
- *  We never auto-delete missing roots — the user must
- *  invoke `remove_missing_workspace_roots` explicitly. */
+/** 单个工作区根目录——用户添加到当前多根工作区的文件夹。`id`
+ *  在重启之间保持稳定（被 TabState.workspace_root_id、监视句柄、
+ *  LRU 清理使用），`added_at` 是 unix 秒时间戳。`exists` 在每次
+ *  `list_workspace_roots` IPC 时重新计算，路径缺失（例如外部磁盘
+ *  被卸载）时为 `false`。我们不会自动删除缺失的根目录——必须由
+ *  用户显式调用 `remove_missing_workspace_roots`。 */
 export interface WorkspaceRoot {
   id: string
   path: string
@@ -100,34 +89,29 @@ export interface WorkspaceRoots {
   active_id: string | null
 }
 
-/** A single entry in the workspace-wide tag index. `count` is
- *  the total number of occurrences across the workspace,
- *  `files` is the deduplicated set of file paths that contain
- *  the tag at least once. */
+/** 工作区级标签索引中的单个条目。`count` 是该标签在整个工作区
+ *  中的出现总次数，`files` 是至少包含一次该标签的文件路径去重集合。 */
 export interface WorkspaceTag {
   name: string
   count: number
   files: string[]
 }
 
-/** A single backlink hit: `source_path` is the file that
- *  contains a `[[page]]`, `line` is the 1-based line number,
- *  `context` is a trimmed excerpt of the line. */
+/** 单条反向链接命中：`source_path` 是包含 `[[page]]` 的文件，
+ *  `line` 是从 1 开始的行号，`context` 是该行去除首尾空白后的摘录。 */
 export interface Backlink {
   source_path: string
   line: number
   context: string
 }
 
-/** Concatenated per-workspace CSS + the source filenames it
- *  was built from (for the Settings debug view). */
+/** 拼接后的每工作区 CSS + 构建它所用的源文件名（供设置页调试视图使用）。 */
 export interface WorkspaceStyles {
   css: string
   files: string[]
 }
 
-/** A user-defined snippet: `name` is the shortcode, `content`
- *  the expanded markdown text. */
+/** 用户自定义片段：`name` 是短代码，`content` 是展开后的 markdown 文本。 */
 export interface Snippet {
   name: string
   content: string

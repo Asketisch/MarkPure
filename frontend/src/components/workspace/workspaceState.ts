@@ -1,11 +1,9 @@
 /**
- * Sidebar dialog + error-banner state shape.
+ * 侧边栏对话框 + 错误横幅的状态形态。
  *
- * Extracted from `WorkSpace.svelte` so the `DialogState`
- * discriminated union and the auto-dismissing error-banner
- * helpers live in one focused module. The component still
- * owns the actual `$state` cells — we just define the types
- * and small helpers here.
+ * 从 `WorkSpace.svelte` 中拆出，让 `DialogState` 判别联合与自动
+ * 消失的错误横幅助手集中在一个模块。组件仍持有真正的 `$state`
+ * 单元——这里只定义类型与小块助手。
  */
 
 export interface DialogState {
@@ -18,10 +16,9 @@ export interface DialogState {
   onConfirm: (value?: string) => void | Promise<void>
 }
 
-/** Auto-dismiss an inline error banner after `ms` milliseconds.
- *  Returns a `setTimeout` handle the caller should keep in a
- *  module-scope variable so a second `flashError` can cancel
- *  the previous timer before scheduling a new one. */
+/** 在 `ms` 毫秒后自动消失内联错误横幅。返回一个 `setTimeout`
+ *  句柄，调用方应保存在模块作用域变量里，这样第二次 `flashError`
+ *  能在安排新定时器前取消上一个。 */
 export function flashError(
   setMessage: (msg: string | null) => void,
   clearTimer: () => void,

@@ -1,14 +1,12 @@
 <script lang="ts">
   /**
-   * Bookmarks panel — slides in from the right. Opened
-   * via the command palette (`tools.bookmarks`) or the
-   * Settings menu (no dedicated shortcut — `⌘B` is the
-   * sidebar toggle to match the EmptyState hint).
+   * 书签面板 —— 从右侧滑入。通过命令面板（`tools.bookmarks`）或
+   * 设置菜单打开（没有专属快捷键——`⌘B` 是侧边栏开关，与空状态
+   * 提示保持一致）。
    *
-   * Reads/writes through the existing `getBookmarks` /
-   * `addBookmark` / `updateBookmark` / `removeBookmark` IPC.
-   * The host wires `onOpen` to navigate the editor to the
-   * bookmarked file.
+   * 通过既有的 `getBookmarks` / `addBookmark` / `updateBookmark` /
+   * `removeBookmark` IPC 读写。宿主把 `onOpen` 接到编辑器导航到
+   * 书签文件。
    */
   import { onMount } from 'svelte'
   import {

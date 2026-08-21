@@ -1,13 +1,12 @@
 /**
- * Public entry point for the branching undo tree (P0-8).
+ * 分支撤销树的公共入口。
  *
- * Re-exports the plugin's public surface so callers can
- * `import { ... } from '$lib/plugins/undo-tree'` without
- * reaching into individual files.
+ * 重新导出插件的公共表面，调用方可以
+ * `import { ... } from '$lib/plugins/undo-tree'`，不必深入到
+ * 各个文件。
  *
- * Tiptap commands and keybindings live in
- * `extensions/editing/undo-tree-extension.ts`; this file is a
- * pure PM module.
+ * Tiptap 命令与按键绑定在 `extensions/editing/undo-tree-extension.ts`；
+ * 本文件是纯 PM 模块。
  */
 
 import { Plugin } from '@tiptap/pm/state'
@@ -64,15 +63,13 @@ export {
 } from './commands'
 
 /**
- * Build the undo-tree ProseMirror plugin.
+ * 构建撤销树 ProseMirror 插件。
  *
- * The plugin's `apply` reducer reads
- * `tr.getMeta(undoTreePluginKey)` and dispatches by `type`.
- * Doc-changing transactions with no undoTree meta fall through
- * to `applyAppend` (the "user typed something" path), unless
- * the transaction is tagged with `headingId` (heading-id
- * extension's `appendTransaction`, which doesn't change doc
- * content semantically and should not pollute history).
+ * 插件的 `apply` reducer 读取 `tr.getMeta(undoTreePluginKey)` 并按
+ * `type` 派发。无 undoTree meta 的文档变更事务落到 `applyAppend`
+ * （“用户输入了什么”路径），除非事务带有 `headingId` 标记
+ * （heading-id 扩展的 `appendTransaction`，语义上不改变文档内容，
+ * 不应污染历史）。
  */
 export function createUndoTreePlugin(): Plugin {
   return new Plugin({
@@ -81,12 +78,12 @@ export function createUndoTreePlugin(): Plugin {
     state: {
       init: (_, state) => initState(state.doc),
       apply(tr, prev, _old, newState) {
-        // Explicit undoTree meta: dispatch by type.
+        // 显式 undoTree meta：按 type 派发。
         const meta = tr.getMeta(undoTreePluginKey) as UndoTreeMeta | undefined
         if (meta) {
           return applyUndoTreeMeta(prev, meta)
         }
-        // Doc-changing transactions: append (unless suppressed).
+        // 文档变更事务：追加（除非被抑制）。
         if (!tr.docChanged) return prev
         if (tr.getMeta('headingId')) return prev
         return applyAppend(prev, { type: 'append', doc: newState.doc })

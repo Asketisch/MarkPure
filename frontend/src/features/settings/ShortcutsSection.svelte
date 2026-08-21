@@ -21,6 +21,7 @@
     platform,
     onStartRecording,
     onKeyCapture,
+    onStopRecording,
     onReset,
   }: {
     keybindings: KeyBinding[]
@@ -28,6 +29,7 @@
     platform: string
     onStartRecording: (id: string) => void
     onKeyCapture: (e: KeyboardEvent, binding: KeyBinding) => void
+    onStopRecording: () => void
     onReset: () => void
   } = $props()
 </script>
@@ -43,9 +45,22 @@
       <div class="kb-row">
         <span class="kb-label">{binding.label}</span>
         {#if recordingId === binding.id}
+          <!-- 按钮是分支渲染新建的，原生 autofocus 属性对动态插入
+               的元素不生效；Svelte 5 的 autofocus 动作会在插入 DOM
+               后聚焦，用户无需二次点击即可按键。 -->
           <button
             class="kb-key recording"
-            onkeydown={(e) => onKeyCapture(e, binding)}
+            autofocus
+            onkeydown={(e) => {
+              // Esc 取消录制，而不是被录成快捷键。
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                e.stopPropagation()
+                onStopRecording()
+                return
+              }
+              onKeyCapture(e, binding)
+            }}
           >{i18n.t('settings.press_keys')}</button>
         {:else}
           <button class="kb-key" onclick={() => onStartRecording(binding.id)}>

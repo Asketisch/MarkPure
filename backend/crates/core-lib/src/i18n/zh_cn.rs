@@ -1,12 +1,10 @@
-//! Translation table for locale `zh-CN` (简体中文).
+//! 语言环境 `zh-CN`（简体中文）的翻译表。
 //!
-//! Auto-extracted from the original `i18n.rs` during the P11
-//! refactor. To add a new key, add it here *and* in the other
-//! locale files so all three stay in sync. The data shape
-//! is deliberately flat so the file is easy to scan and
-//! merge.
+//! 在重构时从原 `i18n.rs` 自动提取。新增键时，要同时加到这里
+//! *以及*其他语言环境文件，让三者保持同步。数据结构刻意保持扁平，
+//! 便于扫描与合并。
 
-/// Translation key → value pairs for locale `zh-CN`.
+/// 语言环境 `zh-CN`（简体中文）的翻译键 → 值对。
 pub const ENTRIES: &[(&str, &str)] = &[
     ("app.name", "MarkPure"),
     ("app.description", "所见即所得 Markdown 编辑器"),
@@ -18,7 +16,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("menu.export_html", "导出 HTML"),
     ("menu.export_pdf", "导出 PDF"),
     ("menu.export_word", "导出 Word"),
-    // P1-8: PNG 图片导出（社交分享/博客长图场景）。
+    // PNG 图片导出（社交分享/博客长图场景）。
     ("menu.export_png", "导出 PNG"),
     ("menu.search", "搜索"),
     ("menu.settings", "设置"),
@@ -78,40 +76,40 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("status.saving", "正在保存..."),
     ("status.multi_cursor", "多光标"),
     ("status.column_select", "列选"),
-    // P0-X: Typora-style reading time + selection count.
+    // 阅读时间 + 选区字符数统计。
     ("status.selection", "已选"),
     ("status.selection_tooltip", "当前选区字符数"),
     ("status.reading_time_tooltip", "按 250 词/分钟估算的阅读时间"),
-    // P0-X: word-count goal chip.
+    // 字数目标徽标。
     ("status.word_goal", "{current} / {goal}（{pct}%）"),
     ("status.word_goal_tooltip", "字数目标进度"),
-    // P0-X: Typora-style "Saved X ago" indicator.
+    // 「X 前已保存」提示。
     ("status.saved_just_now", "已保存"),
     ("status.saved_seconds_ago", "刚刚保存"),
     ("status.saved_minutes_ago", "{n} 分钟前保存"),
     ("status.saved_hours_ago", "{n} 小时前保存"),
     ("status.saved_days_ago", "{n} 天前保存"),
     ("status.saved_at_tooltip", "距离上次成功保存到磁盘的时间"),
-    // P0-X: status-bar jump buttons.
+    // 状态栏跳转按钮。
     ("status.jump_buttons_aria", "文档导航"),
     ("status.jump_top_tooltip", "跳到顶部"),
     ("status.jump_bottom_tooltip", "跳到底部"),
-    // P0-X: lint-on-save toggle.
+    // 保存时整理开关。
     ("settings.lint_on_save", "保存时自动整理"),
     ("settings.lint_on_save_tooltip", "写入磁盘前自动删除行尾空白、确保文件以单个换行符结尾、把 3 行以上的连续空行压缩为 2 行。"),
-    // P0-X: Typora-style word-count goal.
+    // 字数目标设置。
     ("settings.word_count_goal", "字数目标"),
     ("settings.word_count_goal_tooltip", "大于 0 时，状态栏会显示当前字数与目标的进度（如 1247 / 5000 = 25%）。0 关闭显示。"),
-    // P0-X: Typora-style "✓ Saved" toast.
+    // 「✓ 已保存」轻提示。
     ("settings.saved_flash", "✓ 已保存"),
-    // P0-X: backup / restore preferences.
+    // 偏好设置备份 / 恢复。
     ("settings.backup_restore", "备份与恢复"),
     ("settings.export_preferences", "导出偏好设置"),
     ("settings.export_button", "导出…"),
     ("settings.import_preferences", "导入偏好设置"),
     ("settings.import_button", "导入…"),
     ("settings.import_report", "已恢复：{themes} 个主题（{skipped} 个跳过），{keybindings} 个快捷键"),
-    // P2-7: Vim 模式芯片 + ex 命令条标签。
+    // Vim 模式徽标 + ex 命令栏标签。
     ("status.vim_normal", "普通"),
     ("status.vim_insert", "插入"),
     ("status.vim_visual", "可视"),
@@ -258,27 +256,29 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("action.find_and_replace", "查找替换"),
     ("menu.toggle_sidebar", "切换侧边栏"),
     ("view.toggle_zen_mode", "切换专注模式"),
-    // P0-X: per-panel toggles.
+    // 各面板显示开关。
     ("view.toggle_tab_bar", "切换标签栏"),
     ("view.toggle_toolbar", "切换工具栏"),
     ("view.toggle_status_bar", "切换状态栏"),
-    // P0-X: Typora-style "Collapse / Expand All Headings".
+    // 「折叠 / 展开全部标题」。
     ("view.collapse_all_headings", "折叠所有标题"),
     ("view.expand_all_headings", "展开所有标题"),
     ("dialog.file_changed_title", "文件已外部修改"),
     ("dialog.file_changed_message", "{name} 已在 MarkPure 外部被修改。是否重新加载并放弃你的修改？"),
     ("dialog.reload", "重新加载"),
     ("dialog.keep_mine", "保留我的修改"),
-    // P0-X: Typora-style `[text](` link autocomplete.
+    // `[text](` 链接自动补全。
     ("link_suggest.placeholder", "筛选工作区文件…"),
     ("link_suggest.no_match", "未找到匹配文件"),
-    // Typora-style prompts for tabs that have unsaved edits.
+    // 未保存编辑的标签页关闭提示。
     ("dialog.unsaved_title", "关闭前保存更改？"),
     ("dialog.unsaved_message", "「{name}」有未保存的修改。是否在关闭前保存？"),
     ("dialog.discard", "不保存"),
     ("dialog.unsaved_other_tabs", "要关闭的其他标签页"),
     ("dialog.unsaved_all_tabs", "所有打开的标签页"),
     ("dialog.unsaved_right_tabs", "右侧的标签页"),
+    ("dialog.link_url_title", "链接地址"),
+    ("dialog.link_url_placeholder", "https://…"),
     ("tag_pane.title", "标签"),
     ("tag_pane.empty", "未发现标签"),
     ("tag_pane.no_match", "无匹配标签"),
@@ -298,8 +298,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("backlinks_pane.open_source", "打开源文档"),
     ("toolbar.superscript", "上标"),
     ("toolbar.subscript", "下标"),
-    // ---- P0-1/P0-2/P0-3: full i18n coverage (added 2026-06-09) ----
-    // Phase 1: silent-fallback bug fixes
+    // ---- 完整 i18n 覆盖（2026-06-09 添加） ----
+    // 阶段 1：静默回退 bug 修复
     ("palette.placeholder", "输入命令…"),
     ("palette.loading", "加载中…"),
     ("palette.no_results", "无结果"),
@@ -310,11 +310,11 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("bookmarks.empty", "暂无书签"),
     ("bookmarks.close_aria", "关闭书签"),
     ("bookmarks.remove_aria", "移除"),
-    // Phase 2: new toolbar keys
+    // 阶段 2：新增工具栏项
     ("toolbar.cycle_view_mode", "切换视图模式"),
     ("toolbar.tags", "标签"),
     ("toolbar.backlinks", "反链"),
-    // Phase 4: command palette registry keys
+    // 阶段 4：命令面板注册项
     ("cmd.category.format", "格式"),
     ("cmd.category.block", "块"),
     ("cmd.category.image", "图片"),
@@ -324,19 +324,19 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.file.close_tab", "关闭标签"),
     ("cmd.edit.select_same_word", "选择下一个相同词"),
     ("cmd.edit.copy_as_markdown", "复制为 Markdown"),
-    // P0-X: editor right-click context menu (Typora-style).
+    // 编辑器右键上下文菜单。
     ("context.copy_as_markdown", "复制为 Markdown"),
     ("context.copy_as_html", "复制为 HTML"),
     ("context.copy_as_plain", "复制为纯文本"),
     ("context.copy", "复制"),
     ("cmd.edit.copy_as_html", "复制为 HTML"),
     ("cmd.edit.copy_as_plain", "复制为纯文本"),
-    // P0-3: 多光标命令
+    // 多光标命令。
     ("cmd.edit.select_next_match", "选中下一个匹配"),
     ("cmd.edit.select_all_matches", "选中所有匹配"),
     ("cmd.edit.undo_last_cursor", "撤销上一次光标"),
     ("cmd.edit.clear_multi_cursor", "退出多光标"),
-    // P2-3: 列选择 (Alt+Drag)
+    // 列选择（Alt+拖拽）。
     ("cmd.edit.add_column_selection", "添加列选择"),
     ("cmd.block.move_up", "上移块"),
     ("cmd.block.move_down", "下移块"),
@@ -348,7 +348,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.view.toggle_focus_mode", "切换专注模式"),
     ("cmd.view.toggle_typewriter", "切换打字机滚动"),
     ("cmd.view.toggle_undo_tree", "显示撤销树"),
-    // P0-8: undo-tree navigation commands.
+    // 撤销树导航命令。
     ("cmd.undoTree.go_to_parent", "撤销树：跳到上级"),
     ("cmd.undoTree.prune_current", "撤销树：剪除当前分支"),
     ("undoTree.panel.title", "撤销树"),
@@ -370,7 +370,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.insert.frontmatter", "插入 YAML Frontmatter"),
     ("cmd.insert.fold", "折叠章节"),
     ("cmd.insert.snippet", "插入片段…"),
-    // Phase 5: workspace + outline + search + colorpicker + snippet
+    // 阶段 5：工作区 + 大纲 + 搜索 + 取色器 + 代码片段
     ("outline.search_placeholder", "搜索标题…"),
     ("outline.max_depth", "最大标题深度"),
     ("outline.depth.h1", "H1"),
@@ -397,7 +397,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("snippet.filter_placeholder", "过滤片段…"),
     ("snippet.empty", "未找到片段。请将 .md 文件添加到 ~/.config/markpure/snippets/。"),
     ("snippet.no_match", "无匹配的片段。"),
-    // Phase 6: settings + theme editor
+    // 阶段 6：设置 + 主题编辑器
     ("settings.theme.light", "浅色"),
     ("settings.theme.dark", "深色"),
     ("settings.theme.one_dark", "One Dark"),
@@ -427,7 +427,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.category.code", "代码"),
     ("settings.theme_editor.category.image", "图片"),
     ("settings.theme_editor.category.misc", "其他"),
-    // ThemeEditor color labels
+    // 主题编辑器颜色标签
     ("settings.theme_editor.color.bg", "背景"),
     ("settings.theme_editor.color.bg_secondary", "次级背景"),
     ("settings.theme_editor.color.bg_tab_active", "标签激活"),
@@ -462,7 +462,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.color.table_header_bg", "表头背景"),
     ("settings.theme_editor.color.highlight_bg", "高亮背景"),
     ("settings.theme_editor.color.cell_selected_bg", "选中单元格背景"),
-    // P1-11: 拼写检查 UI 字符串（右键菜单 + Settings）
+    // 拼写检查 UI 字符串（右键菜单 + 设置）
     ("spell.no_suggestions", "无建议"),
     ("spell.ignore_once", "忽略一次"),
     ("spell.add_to_dictionary", "添加到字典"),

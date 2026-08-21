@@ -329,10 +329,10 @@ cargo test --workspace         # 运行所有 Rust 测试（9 个测试，分布
 
 6 个内置主题（CSS 变量，定义在 `frontend/src/app/app.css`）：
 - `""` (Light) — Cadmium Light（白色背景）
-- `theme-dark` — VS Code Dark 风格
-- `theme-one-dark` — Atom One Dark 风格
+- `theme-dark` — 深色主题
+- `theme-one-dark` — One Dark 配色深色
 - `theme-graphite` — 石墨深色
-- `theme-ulysses` — Ulysses 暖色调风格
+- `theme-ulysses` — 米色暖色调风格
 - `theme-material-dark` — Material Design 深色
 
 主题标识统一使用 CSS class 名。后端 `cmd_get_config` 返回 CSS class（如 `"theme-dark"`），`cmd_set_config` 同时接受 CSS class 和人类可读标签。前端 `<div class="app-root {theme}">` 直接用 class 名。

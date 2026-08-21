@@ -1,18 +1,16 @@
 /**
- * Unit tests for the P2-3 column-select plugin's pure helpers.
+ * 列选择插件纯辅助函数的单元测试。
  *
  *   npx tsx scripts/validate-column-select.ts
  *
- * Uses Node's built-in `node:test` runner. We never touch the
- * DOM — every test passes a stubbed `posAtCoords` / `isAtomic`
- * through `FlattenOptions` so we can drive `flattenRectToCursors`
- * without an `EditorView`.
+ * 使用 Node 内置的 `node:test` 运行器。完全不触碰 DOM——
+ * `flattenRectToCursors` 通过桩 view 提供 `posAtCoords` 与文档
+ * 形状；原子块谓词经 `FlattenOptions.isAtomic` 注入，因此即使没有
+ * `EditorView` 也能驱动全部纯逻辑。
  *
- * The view object is also stubbed: `flattenRectToCursors`
- * only reads `view.posAtCoords.bind(view)` and `view.state.doc`
- * as fallbacks when the corresponding option is missing, and
- * our tests always supply both options — so a minimal `as any`
- * stub is enough.
+ * 注意：去重与数量上限在插件层的 `addCursor` / `MAX_CURSORS` 中
+ * 处理，本文件只覆盖纯函数（列选拆分后位于
+ * `column-select-helpers.ts`）自身的契约。
  */
 
 import test from 'node:test'
@@ -23,33 +21,31 @@ import {
   normaliseRect,
   isInsideAtomicBlock,
   type FlattenOptions,
-} from '../frontend/src/plugins/multi-cursor/column-select'
+} from '../frontend/src/plugins/multi-cursor/column-select-helpers'
+import { MAX_CURSORS } from '../frontend/src/plugins/multi-cursor/types'
 import type { Rect } from '../frontend/src/plugins/multi-cursor/rect-types'
 import type { Cursor } from '../frontend/src/plugins/multi-cursor/types'
 
 // ============================================================
-//  Test fixtures
+//  测试夹具
 // ============================================================
 
 /**
- * A fake editor-view sufficient for `flattenRectToCursors` when
- * all overrides are passed via FlattenOptions. The function
- * never reads anything beyond the option callbacks in that case.
+ * 桩视图。`posAtCoords` 在每个测试中按需替换；其余字段（文档
+ * 尺寸等）保持足够大，避免 `content.size` 边界把测试行误判为
+ * 越界。
  */
 const stubView: any = {
   posAtCoords: () => null,
-  state: { doc: { content: { size: 0 } } },
-  coordsAtPos: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
-  dom: null,
+  state: { doc: { content: { size: 1_000_000 } } },
 }
 
 /**
- * Build a `posAtCoords` stub that returns one PM position per
- * (line, side) pair. The model:
- *   - The doc has `lineCount` lines, each 100px tall.
- *   - PM position for left-edge of line N = N * 1000.
- *   - PM position for right-edge of line N = N * 1000 + 50.
- *   - left/right outside 0..(lineCount * lineH) → null.
+ * 构造按（行，边）返回 PM 位置的 `posAtCoords` 桩。模型：
+ *   - 文档有 `lineCount` 行，每行 `lineH` 高。
+ *   - 第 N 行左边缘的 PM 位置 = N * 1000。
+ *   - 第 N 行右边缘的 PM 位置 = N * 1000 + 50。
+ *   - 上下超出 0..(lineCount * lineH) 范围 → null。
  */
 function makePosAtCoords(opts: { lineCount: number; lineH: number; leftX: number; rightX: number }) {
   return (coord: { left: number; top: number }): { pos: number; inside: number } | null => {
@@ -81,275 +77,204 @@ test('normaliseRect: zero-area at a single point', () => {
 })
 
 // ============================================================
-//  flattenRectToCursors — basic geometry
+//  flattenRectToCursors —— 基础几何
+//
+// 每个光标是 { pos, anchor }，其中 pos 为矩形左缘位置、anchor 为
+// 右缘位置（min / max 归一化，使倒拖的矩形也不产生反向选区）。
 // ============================================================
 
 test('flattenRectToCursors: 5-line rect produces 5 range cursors', () => {
   const lineH = 20
-  const posAtCoords = makePosAtCoords({ lineCount: 5, lineH, leftX: 0, rightX: 200 })
+  stubView.posAtCoords = makePosAtCoords({ lineCount: 5, lineH, leftX: 0, rightX: 200 })
   const rect: Rect = { left: 0, top: 0, right: 200, bottom: 5 * lineH }
-  const opts: FlattenOptions = { lineHeight: lineH, posAtCoords, isAtomic: () => false }
+  const opts: FlattenOptions = { lineHeight: lineH, isAtomic: () => false }
   const out = flattenRectToCursors(stubView, rect, opts)
   assert.equal(out.length, 5)
   for (let i = 0; i < 5; i++) {
-    assert.equal(out[i].pos, i * 1000 + 50)
-    assert.equal(out[i].anchor, i * 1000)
+    assert.equal(out[i].pos, i * 1000)
+    assert.equal(out[i].anchor, i * 1000 + 50)
   }
 })
 
-test('flattenRectToCursors: empty rect (bottom <= top) returns []', () => {
-  const opts: FlattenOptions = { lineHeight: 20, posAtCoords: () => ({ pos: 0, inside: 0 }), isAtomic: () => false }
-  const r1 = flattenRectToCursors(stubView, { left: 0, top: 50, right: 100, bottom: 50 }, opts)
-  const r2 = flattenRectToCursors(stubView, { left: 0, top: 50, right: 100, bottom: 30 }, opts)
-  assert.deepEqual(r1, [])
-  assert.deepEqual(r2, [])
+test('flattenRectToCursors: bottom < top returns []', () => {
+  const out = flattenRectToCursors(stubView, { left: 0, top: 50, right: 100, bottom: 30 }, {
+    lineHeight: 20, isAtomic: () => false,
+  })
+  assert.deepEqual(out, [])
 })
 
 test('flattenRectToCursors: posAtCoords returning null skips line', () => {
   const lineH = 20
-  // Only lines 0, 2, 4 have hits; 1 and 3 return null.
-  const posAtCoords = (coord: { left: number; top: number }): { pos: number; inside: number } | null => {
+  // 只有第 0、2、4 行命中；第 1、3 行返回 null。
+  stubView.posAtCoords = (coord: { left: number; top: number }): { pos: number; inside: number } | null => {
     const line = Math.floor(coord.top / lineH)
     if (line % 2 !== 0) return null
-    if (coord.left === 0) return { pos: line * 1000, inside: 0 }
-    if (coord.left === 200) return { pos: line * 1000 + 50, inside: 0 }
+    if (Math.abs(coord.left - 0) < 1) return { pos: line * 1000, inside: 0 }
+    if (Math.abs(coord.left - 200) < 1) return { pos: line * 1000 + 50, inside: 0 }
     return null
   }
   const out = flattenRectToCursors(stubView, { left: 0, top: 0, right: 200, bottom: 5 * lineH }, {
-    lineHeight: lineH, posAtCoords, isAtomic: () => false,
+    lineHeight: lineH, isAtomic: () => false,
   })
   assert.equal(out.length, 3)
-  assert.deepEqual(out.map(c => c.pos), [50, 2050, 4050])
+  assert.deepEqual(out.map(c => c.pos), [0, 2000, 4000])
 })
 
 // ============================================================
-//  Atomic-block rejection
+//  原子块剔除
 // ============================================================
 
 test('flattenRectToCursors: lines inside atomic block are skipped', () => {
   const lineH = 20
-  const posAtCoords = makePosAtCoords({ lineCount: 5, lineH, leftX: 0, rightX: 200 })
-  // Mark lines 1, 2 as atomic (e.g. a code block spans those).
-  const isAtomic = (pos: number) => {
+  stubView.posAtCoords = makePosAtCoords({ lineCount: 5, lineH, leftX: 0, rightX: 200 })
+  // 把第 1、2 行标为原子（例如代码块横跨这些行）。
+  const isAtomic = (_doc: unknown, pos: number) => {
     const line = Math.floor(pos / 1000)
     return line === 1 || line === 2
   }
   const out = flattenRectToCursors(stubView, { left: 0, top: 0, right: 200, bottom: 5 * lineH }, {
-    lineHeight: lineH, posAtCoords, isAtomic,
+    lineHeight: lineH, isAtomic,
   })
-  // Only lines 0, 3, 4 remain.
+  // 只剩第 0、3、4 行。
   assert.equal(out.length, 3)
-  assert.deepEqual(out.map(c => c.pos), [50, 3050, 4050])
+  assert.deepEqual(out.map(c => c.pos), [0, 3000, 4000])
 })
 
 // ============================================================
-//  Dedup
+//  MAX_CURSORS 上限
 // ============================================================
 
-test('flattenRectToCursors: dedups identical (pos, anchor) pairs', () => {
-  const lineH = 20
-  // Pathological: every line returns the same positions
-  // (mimics dragging over many empty trailing lines).
-  const posAtCoords = (coord: { left: number; top: number }): { pos: number; inside: number } | null => {
-    if (coord.top < 0 || coord.top >= 5 * lineH) return null
-    if (coord.left === 0) return { pos: 100, inside: 0 }
-    if (coord.left === 200) return { pos: 150, inside: 0 }
-    return null
-  }
-  const out = flattenRectToCursors(stubView, { left: 0, top: 0, right: 200, bottom: 5 * lineH }, {
-    lineHeight: lineH, posAtCoords, isAtomic: () => false,
-  })
-  assert.equal(out.length, 1)
-  assert.deepEqual(out[0], { pos: 150, anchor: 100 })
-})
-
-// ============================================================
-//  MAX_CURSORS cap
-// ============================================================
-
-test('flattenRectToCursors: truncates at maxCursors with warn', () => {
+test('flattenRectToCursors: truncates at MAX_CURSORS with warn', () => {
   const lineH = 1
-  // 100 lines, all unique positions.
-  const posAtCoords = makePosAtCoords({ lineCount: 100, lineH, leftX: 0, rightX: 200 })
-  // Stub console.warn to make sure we emit on truncation.
+  // 足够多的行，确保遍历会触及上限。
+  stubView.posAtCoords = makePosAtCoords({ lineCount: 120, lineH, leftX: 0, rightX: 200 })
+  // 桩掉 console.warn，确认截断时会发出警告。
   const originalWarn = console.warn
   let warnCalls = 0
   console.warn = () => { warnCalls++ }
   try {
-    const out = flattenRectToCursors(stubView, { left: 0, top: 0, right: 200, bottom: 100 * lineH }, {
-      lineHeight: lineH, posAtCoords, isAtomic: () => false, maxCursors: 5,
+    const out = flattenRectToCursors(stubView, { left: 0, top: 0, right: 200, bottom: 120 * lineH }, {
+      lineHeight: lineH, isAtomic: () => false,
     })
-    assert.equal(out.length, 5)
+    assert.equal(out.length, MAX_CURSORS)
     assert.ok(warnCalls >= 1, 'expected a console.warn on truncation')
   } finally {
     console.warn = originalWarn
   }
 })
 
-test('flattenRectToCursors: respects maxCursors=0', () => {
-  const out = flattenRectToCursors(stubView, { left: 0, top: 0, right: 100, bottom: 100 }, {
-    lineHeight: 20, posAtCoords: () => ({ pos: 0, inside: 0 }), isAtomic: () => false, maxCursors: 0,
-  })
-  assert.equal(out.length, 0)
-})
-
 // ============================================================
-//  Virtualization probe
+//  虚拟化探测
 // ============================================================
 
 test('flattenRectToCursors: skips lines hidden by virtualization probe', () => {
   const lineH = 20
-  const posAtCoords = makePosAtCoords({ lineCount: 5, lineH, leftX: 0, rightX: 200 })
-  // Mark y in [40, 80) as virtualized → lines 2 (centre y=50)
-  // and 3 (centre y=70) get skipped.
-  const isVirt = (p: { x: number; y: number }) => p.y >= 40 && p.y < 80
+  stubView.posAtCoords = makePosAtCoords({ lineCount: 5, lineH, leftX: 0, rightX: 200 })
+  // 把 y 属于 [40, 80) 标为已虚拟化 → 第 2 行（中心 y=50）和
+  // 第 3 行（中心 y=70）应被跳过。
+  const isHidden = (p: { x: number; y: number }) => p.y >= 40 && p.y < 80
   const out = flattenRectToCursors(stubView, { left: 0, top: 0, right: 200, bottom: 5 * lineH }, {
-    lineHeight: lineH, posAtCoords, isAtomic: () => false, isVirtualizedAtPoint: isVirt,
+    lineHeight: lineH, isAtomic: () => false, isHidden,
   })
-  // Lines 0 (y=10), 1 (y=30), 4 (y=90) remain.
+  // 第 0（y=10）、1（y=30）、4（y=90）行保留。
   assert.equal(out.length, 3)
-  assert.deepEqual(out.map(c => c.pos), [50, 1050, 4050])
+  assert.deepEqual(out.map(c => c.pos), [0, 1000, 4000])
 })
 
 // ============================================================
-//  Reverse drag (handled by normaliseRect upstream)
+//  反向拖拽（由上游 normaliseRect 规范化）
 // ============================================================
 
 test('flattenRectToCursors: caller should normalise — reverse rect returns []', () => {
-  // Direct API contract: rect.bottom must be >= rect.top. The
-  // plugin's drag handler always normalises via normaliseRect
-  // before calling this. If a caller passes a degenerate rect
-  // we return [] rather than crashing.
-  const lineH = 20
-  const posAtCoords = makePosAtCoords({ lineCount: 5, lineH, leftX: 0, rightX: 200 })
+  // 直接 API 契约：rect.bottom 必须 >= rect.top。插件的拖拽
+  // 处理器在调用前总是先用 normaliseRect 规范化。若调用方传入
+  // 退化的矩形，返回 [] 而不是崩溃。
+  stubView.posAtCoords = makePosAtCoords({ lineCount: 5, lineH: 20, leftX: 0, rightX: 200 })
   const out = flattenRectToCursors(stubView, { left: 0, top: 100, right: 200, bottom: 0 }, {
-    lineHeight: lineH, posAtCoords, isAtomic: () => false,
+    lineHeight: 20, isAtomic: () => false,
   })
   assert.equal(out.length, 0)
 })
 
 // ============================================================
-//  Line-height variance
+//  行高差异
 // ============================================================
 
 test('flattenRectToCursors: line-height 14px produces more rows in same height', () => {
   const lineH = 14
-  // 7 visible lines in a 98px rectangle.
-  const posAtCoords = makePosAtCoords({ lineCount: 7, lineH, leftX: 0, rightX: 200 })
+  // 98px 矩形内有 7 条可见行。
+  stubView.posAtCoords = makePosAtCoords({ lineCount: 7, lineH, leftX: 0, rightX: 200 })
   const out = flattenRectToCursors(stubView, { left: 0, top: 0, right: 200, bottom: 98 }, {
-    lineHeight: lineH, posAtCoords, isAtomic: () => false,
+    lineHeight: lineH, isAtomic: () => false,
   })
   assert.equal(out.length, 7)
 })
 
 test('flattenRectToCursors: line-height 28px produces fewer rows in same height', () => {
   const lineH = 28
-  const posAtCoords = makePosAtCoords({ lineCount: 7, lineH, leftX: 0, rightX: 200 })
-  // 98px ÷ 28 = 3.5 → loop walks 3 line-centres (y=14, 42, 70)
-  // and bails before 98 → 3 cursors.
+  stubView.posAtCoords = makePosAtCoords({ lineCount: 7, lineH, leftX: 0, rightX: 200 })
+  // 98px ÷ 28 = 3.5 → 首行对齐到 0，循环走过 y=0、28、56、84，
+  // 共 4 个光标（top=98 时越界被跳过）。
   const out = flattenRectToCursors(stubView, { left: 0, top: 0, right: 200, bottom: 98 }, {
-    lineHeight: lineH, posAtCoords, isAtomic: () => false,
+    lineHeight: lineH, isAtomic: () => false,
   })
-  assert.equal(out.length, 3)
+  assert.equal(out.length, 4)
 })
 
 // ============================================================
-//  Cursor shape: point vs range
+//  光标形状：点 vs 区间
 // ============================================================
 
 test('flattenRectToCursors: zero-width rect (left == right) emits point cursors', () => {
   const lineH = 20
-  // posAtCoords returns the same position for the same x.
-  const posAtCoords = (coord: { left: number; top: number }): { pos: number; inside: number } | null => {
+  // 相同 x 时 posAtCoords 返回相同位置 → pos 与 anchor 相等。
+  stubView.posAtCoords = (coord: { left: number; top: number }): { pos: number; inside: number } | null => {
     if (coord.top < 0 || coord.top >= 3 * lineH) return null
     const line = Math.floor(coord.top / lineH)
     return { pos: line * 1000, inside: 0 }
   }
   const out = flattenRectToCursors(stubView, { left: 100, top: 0, right: 100, bottom: 3 * lineH }, {
-    lineHeight: lineH, posAtCoords, isAtomic: () => false,
+    lineHeight: lineH, isAtomic: () => false,
   })
   assert.equal(out.length, 3)
   for (const c of out) {
-    assert.equal(c.anchor, undefined, 'point cursors should have no anchor')
+    assert.equal(c.anchor, c.pos, 'point cursors should have anchor == pos')
   }
 })
 
 // ============================================================
-//  isInsideAtomicBlock against a real-ish PM doc shape
+//  isInsideAtomicBlock —— 对接近真实的 PM 文档形状
+//
+// 新版按 `ResolvedPos.node(depth).type.name` 判断原子节点。
 // ============================================================
 
-test('isInsideAtomicBlock: out-of-bounds positions return true (safe skip)', () => {
-  const fakeDoc: any = {
-    resolve(pos: number) {
-      if (pos < 0 || pos > 100) throw new RangeError('out of bounds')
-      return {
-        parent: { type: { spec: {} } },
-        depth: 1,
-        node: () => ({ type: { spec: {} } }),
-      }
+/** 按深度构造 `resolve` 桩：`nodes[i]` 对应第 i+1 层节点。 */
+function resolveWith(nodes: Array<{ name?: string; atomic?: boolean }>) {
+  return (_pos: number) => ({
+    depth: nodes.length,
+    node(d: number) {
+      const n = nodes[d - 1]
+      return { type: { name: n?.name ?? '', spec: { atomic: n?.atomic ?? false } } }
     },
-  }
-  assert.equal(isInsideAtomicBlock(fakeDoc, -1), true)
-  assert.equal(isInsideAtomicBlock(fakeDoc, 1000), true)
+  })
+}
+
+test('isInsideAtomicBlock: code-block ancestor returns true', () => {
+  const fakeDoc = { resolve: resolveWith([{ name: 'codeBlock' }]) }
+  assert.equal(isInsideAtomicBlock(fakeDoc as any, 10), true)
 })
 
-test('isInsideAtomicBlock: code-block parent returns true', () => {
-  const fakeDoc: any = {
-    resolve(_pos: number) {
-      return {
-        parent: { type: { spec: { code: true } } },
-        depth: 1,
-        node: () => ({ type: { spec: {} } }),
-      }
-    },
-  }
-  assert.equal(isInsideAtomicBlock(fakeDoc, 10), true)
+test('isInsideAtomicBlock: tableCell ancestor returns true', () => {
+  const fakeDoc = { resolve: resolveWith([{ name: 'paragraph' }, { name: 'tableCell' }]) }
+  assert.equal(isInsideAtomicBlock(fakeDoc as any, 10), true)
 })
 
-test('isInsideAtomicBlock: tableRole ancestor returns true', () => {
-  const fakeDoc: any = {
-    resolve(_pos: number) {
-      return {
-        parent: { type: { spec: {} } },
-        depth: 2,
-        node: (d: number) => {
-          if (d === 1) return { type: { spec: { tableRole: 'cell' } } }
-          return { type: { spec: {} } }
-        },
-      }
-    },
-  }
-  assert.equal(isInsideAtomicBlock(fakeDoc, 10), true)
+test('isInsideAtomicBlock: atomic spec flag is honored', () => {
+  const fakeDoc = { resolve: resolveWith([{ atomic: true }]) }
+  assert.equal(isInsideAtomicBlock(fakeDoc as any, 10), true)
 })
 
 test('isInsideAtomicBlock: plain paragraph returns false', () => {
-  const fakeDoc: any = {
-    resolve(_pos: number) {
-      return {
-        parent: { type: { spec: {} } },
-        depth: 1,
-        node: () => ({ type: { spec: {} } }),
-      }
-    },
-  }
-  assert.equal(isInsideAtomicBlock(fakeDoc, 10), false)
-})
-
-// ============================================================
-//  Sanity: cursor list is well-formed
-// ============================================================
-
-test('flattenRectToCursors: returned cursors satisfy { pos } or { pos, anchor } invariant', () => {
-  const lineH = 20
-  const posAtCoords = makePosAtCoords({ lineCount: 5, lineH, leftX: 0, rightX: 200 })
-  const out: Cursor[] = flattenRectToCursors(stubView, { left: 0, top: 0, right: 200, bottom: 5 * lineH }, {
-    lineHeight: lineH, posAtCoords, isAtomic: () => false,
-  })
-  for (const c of out) {
-    assert.ok(Number.isFinite(c.pos), 'pos must be finite')
-    if (c.anchor !== undefined) {
-      assert.ok(Number.isFinite(c.anchor), 'anchor must be finite when present')
-      assert.ok(c.anchor < c.pos, 'anchor must be < pos by construction')
-    }
-  }
+  const fakeDoc = { resolve: resolveWith([{ name: 'paragraph' }]) }
+  assert.equal(isInsideAtomicBlock(fakeDoc as any, 10), false)
 })

@@ -1,23 +1,20 @@
-//! Markdown table transformation and operations
+//! Markdown 表格转换与操作
 //!
-//! Provides functionality for parsing, transforming, and rendering markdown tables.
+//! 提供解析、转换和渲染 Markdown 表格的功能。
 
 use serde::{Deserialize, Serialize};
 
-/// Table alignment options
+/// 表格对齐方式选项
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum CellAlign {
     Left,
     Center,
     Right,
+    #[default]
     None,
 }
 
-impl Default for CellAlign {
-    fn default() -> Self {
-        CellAlign::None
-    }
-}
 
 impl From<char> for CellAlign {
     fn from(c: char) -> Self {
@@ -41,14 +38,14 @@ impl From<CellAlign> for char {
     }
 }
 
-/// Represents a parsed table structure
+/// 表示解析后的表格结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableStructure {
     pub headers: Vec<String>,
     pub rows: Vec<Vec<String>>,
     pub alignments: Vec<CellAlign>,
-    pub header_line: usize,  // Line number of header row
-    pub delimiter_line: usize, // Line number of delimiter row
+    pub header_line: usize,  // 表头行的行号
+    pub delimiter_line: usize, // 分隔行的行号
 }
 
 impl TableStructure {
@@ -61,7 +58,7 @@ impl TableStructure {
     }
 }
 
-/// Table operation types
+/// 表格操作类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum TableOpType {
@@ -77,36 +74,45 @@ pub enum TableOpType {
     DeleteTable,
 }
 
-/// Parse a markdown table into a structured representation
+/// 把 Markdown 表格解析为结构化表示
 pub fn parse_table(table_md: &str) -> Option<TableStructure> {
     let lines: Vec<&str> = table_md.lines().collect();
     if lines.len() < 2 {
         return None;
     }
 
-    // Parse header row
+    // 解析表头行
     let headers = parse_table_row(lines[0])?;
     let num_cols = headers.len();
 
-    // Find delimiter row (contains only -, :, |)
+    // 查找分隔行（只包含 -、:、|）。GFM 表格**必须**有分隔行——
+    // 没有它，这段文本只是带 `|` 的普通行，不是表格。若把缺分隔行
+    // 的文本当表格解析，`alignments` 会是空 Vec，后续的
+    // FormatAlign / DeleteColumn / MoveColumn / InsertColumn 都会
+    // 对空 Vec 取下标而 panic（这些入口均可经 IPC 触达）。
     let mut delimiter_line = 1;
     let mut alignments: Vec<CellAlign> = Vec::new();
+    let mut found_delimiter = false;
 
     for (i, line) in lines.iter().enumerate().skip(1) {
         let trimmed = line.trim();
         if trimmed.starts_with('|') && trimmed.chars().all(|c| c == '|' || c == ' ' || c == '-' || c == ':') {
             delimiter_line = i;
-            // Parse alignment from delimiter
+            // 从分隔行解析对齐方式
             alignments = parse_delimiter_row(trimmed, num_cols);
+            found_delimiter = true;
             break;
         }
     }
+    if !found_delimiter {
+        return None;
+    }
 
-    // Parse data rows
+    // 解析数据行
     let mut rows: Vec<Vec<String>> = Vec::new();
     for line in lines.iter().skip(delimiter_line + 1) {
         if let Some(cells) = parse_table_row(line) {
-            // Pad or truncate to match column count
+            // 补齐或截断以匹配列数
             let mut row = cells;
             while row.len() < num_cols {
                 row.push(String::new());
@@ -125,7 +131,7 @@ pub fn parse_table(table_md: &str) -> Option<TableStructure> {
     })
 }
 
-/// Parse a single table row into cells
+/// 把单行表格解析为单元格
 fn parse_table_row(line: &str) -> Option<Vec<String>> {
     let trimmed = line.trim();
     if !trimmed.starts_with('|') {
@@ -146,7 +152,7 @@ fn parse_table_row(line: &str) -> Option<Vec<String>> {
     Some(cells)
 }
 
-/// Parse the delimiter row (e.g., |---|:---|---:|) to extract alignments
+/// 解析分隔行（例如 |---|:---|---:|）以提取对齐方式
 fn parse_delimiter_row(line: &str, num_cols: usize) -> Vec<CellAlign> {
     let cells: Vec<&str> = line
         .trim_start_matches('|')
@@ -177,7 +183,7 @@ fn parse_delimiter_row(line: &str, num_cols: usize) -> Vec<CellAlign> {
         alignments.push(align);
     }
 
-    // Ensure we have num_cols alignments
+    // 确保对齐方式数量与列数一致
     while alignments.len() < num_cols {
         alignments.push(CellAlign::None);
     }
@@ -186,17 +192,17 @@ fn parse_delimiter_row(line: &str, num_cols: usize) -> Vec<CellAlign> {
     alignments
 }
 
-/// Render a TableStructure back to markdown
+/// 把表格结构渲染回 Markdown
 pub fn render_table(table: &TableStructure) -> String {
     let mut output = String::new();
 
-    // Render header
+    // 渲染表头
     output.push_str("| ");
     output.push_str(&table.headers.join(" | "));
     output.push_str(" |\n");
 
-    // Render delimiter with alignments
-    output.push_str("|");
+    // 按对齐方式渲染分隔行
+    output.push('|');
     for (i, align) in table.alignments.iter().enumerate() {
         let fill = "-".repeat(3.max(table.headers.get(i).map(|h| h.len()).unwrap_or(3)));
         match align {
@@ -208,7 +214,7 @@ pub fn render_table(table: &TableStructure) -> String {
     }
     output.push('\n');
 
-    // Render data rows
+    // 渲染数据行
     for row in &table.rows {
         output.push_str("| ");
         output.push_str(&row.join(" | "));
@@ -218,9 +224,14 @@ pub fn render_table(table: &TableStructure) -> String {
     output.trim_end_matches('\n').to_string()
 }
 
-/// Apply an operation to a table and return the new markdown
+/// 对表格应用操作并返回新的 Markdown
 pub fn transform_table(table_md: &str, op: &TableOpType) -> Option<String> {
     let mut table = parse_table(table_md)?;
+
+    // 纵深防御：任何路径上到达这里都保证 alignments 与列数一致，
+    // 这样各操作对 `table.alignments` 的取下标都不会越界。
+    let cols = table.num_cols();
+    table.alignments.resize_with(cols, || CellAlign::None);
 
     match op {
         TableOpType::InsertRowBefore { row_idx } => {
@@ -294,12 +305,12 @@ pub fn transform_table(table_md: &str, op: &TableOpType) -> Option<String> {
     Some(render_table(&table))
 }
 
-/// Validate table markdown syntax
+/// 校验表格 Markdown 语法
 pub fn validate_table(table_md: &str) -> bool {
     parse_table(table_md).is_some()
 }
 
-/// Find all tables in a markdown document
+/// 在 Markdown 文档中查找所有表格
 pub fn find_tables(content: &str) -> Vec<(usize, String)> {
     let mut tables: Vec<(usize, String)> = Vec::new();
     let lines: Vec<&str> = content.lines().collect();
@@ -307,11 +318,11 @@ pub fn find_tables(content: &str) -> Vec<(usize, String)> {
 
     while i < lines.len() {
         if lines[i].trim().starts_with('|') {
-            // Potential table start, gather all table lines
+            // 可能是表格起点，收集所有表格行
             let table_start = i;
             let mut table_end = i;
 
-            // Find table extent (consecutive lines starting with |)
+            // 确定表格范围（以 | 开头的连续行）
             while table_end < lines.len() && lines[table_end].trim().starts_with('|') {
                 table_end += 1;
             }
@@ -368,9 +379,9 @@ mod tests {
         let op = TableOpType::InsertRowAfter { row_idx: 0 };
         let result = transform_table(md, &op).unwrap();
 
-        // Just verify we have more rows now (should have 3 rows: header + 2 data)
+        // 仅验证行数变多（应有 3 行：表头 + 2 行数据）
         let lines: Vec<&str> = result.lines().collect();
-        assert!(lines.len() >= 4); // header + delimiter + original row + new row
+        assert!(lines.len() >= 4); // 表头 + 分隔行 + 原行 + 新行
     }
 
     #[test]
@@ -382,7 +393,7 @@ mod tests {
         let op = TableOpType::InsertColumnAfter { col_idx: 0 };
         let result = transform_table(md, &op).unwrap();
 
-        // Verify the result has 3 columns now
+        // 验证结果现在有 3 列
         assert!(result.contains("| A |"));
         assert!(result.contains("| 1 |"));
     }
@@ -409,5 +420,24 @@ mod tests {
         let result = transform_table(md, &op).unwrap();
 
         assert!(result.contains(":---:"));
+    }
+
+    #[test]
+    fn test_parse_requires_delimiter_row() {
+        // 缺分隔行的「表格」不是 GFM 表格——必须拒绝解析，
+        // 否则空 alignments 会让列操作 panic。
+        let md = "| A | B |\n| 1 | 2 |";
+        assert!(parse_table(md).is_none());
+        assert!(!validate_table(md));
+    }
+
+    #[test]
+    fn test_transform_without_delimiter_is_none_not_panic() {
+        let md = "| A | B |\n| 1 | 2 |";
+        // 这些操作在旧实现里会对空 alignments Vec 取下标而 panic
+        assert!(transform_table(md, &TableOpType::FormatAlign { col_idx: 0, align: CellAlign::Center }).is_none());
+        assert!(transform_table(md, &TableOpType::DeleteColumn { col_idx: 0 }).is_none());
+        assert!(transform_table(md, &TableOpType::MoveColumn { from: 0, to: 1 }).is_none());
+        assert!(transform_table(md, &TableOpType::InsertColumnAfter { col_idx: 0 }).is_none());
     }
 }

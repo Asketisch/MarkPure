@@ -1,24 +1,21 @@
 /**
- * Pure helpers used by the column-select plugin (P2-3).
+ * 列选择插件使用的纯辅助函数。
  *
- * Extracted from `column-select.ts` (where these used to sit at
- * the bottom of a 520-line file) so the per-helper pure functions
- * are testable in isolation, and so the main plugin file can
- * stay focused on DOM-event wiring + ProseMirror plugin
- * integration.
+ * 从 `column-select.ts` 中拆出（这些函数原本躺在 520 行文件的
+ * 底部），让各个纯函数可以独立测试，也让主插件文件可以专注于
+ * DOM 事件接线 + ProseMirror 插件集成。
  *
- * What's in here:
- *   - `normaliseRect`        — bounding-box normalisation so
- *                              direction doesn't matter
- *   - `isInsideAtomicBlock`  — atomic-block skip predicate (code,
- *                              tables, math) shared with commands.ts
- *   - `estimateLineHeight`   — DOM-based line-height probe
- *   - `flattenRectToCursors` — text-positions-to-cursor-array
- *                              reduction (the hot loop)
- *   - `FlattenOptions`       — tuning knobs for the reducer
+ * 内容清单：
+ *   - `normaliseRect`        — 外接矩形归一化，让拖拽方向无关
+ *   - `isInsideAtomicBlock`  — 原子块跳过谓词（代码块、表格、
+ *                              数学），与 commands.ts 共享
+ *   - `estimateLineHeight`   — 基于 DOM 的行高探测
+ *   - `flattenRectToCursors` — 把文本位置归约为光标数组
+ *                              （热点循环）
+ *   - `FlattenOptions`       — 归约器的调参旋钮
  *
- * These functions are stateless and side-effect free; the plugin
- * file owns the DOM event listeners and the drag state machine.
+ * 这些函数无状态、无副作用；插件文件负责 DOM 事件监听器与
+ * 拖拽状态机。
  */
 
 import type { EditorView } from '@tiptap/pm/view'
@@ -29,8 +26,8 @@ import {
   type ViewportPoint,
 } from './rect-types'
 
-/** Normalise a drag rectangle so `top <= bottom` and
- *  `left <= right` regardless of drag direction. */
+/** 归一化拖拽矩形，无论拖拽方向如何都保证
+ *  `top <= bottom` 且 `left <= right`。 */
 export function normaliseRect(a: ViewportPoint, b: ViewportPoint): Rect {
   return {
     left: Math.min(a.x, b.x),
@@ -40,11 +37,10 @@ export function normaliseRect(a: ViewportPoint, b: ViewportPoint): Rect {
   }
 }
 
-/** True if the ProseMirror position `pos` lives inside an
- *  "atomic" block — one whose contents can't be partially
- *  selected (code blocks, table cells, math nodes, etc.).
- *  Mirrors the predicate in `commands.ts` so column selection
- *  and cursor-add share the same notion of "atomic". */
+/** 若 ProseMirror 位置 `pos` 位于「原子」块内则返回 true——
+ *  即内容无法被部分选中的块（代码块、表格单元格、数学节点等）。
+ *  与 `commands.ts` 中的谓词保持一致，让列选择与光标添加
+ *  对「原子」有相同的理解。 */
 export function isInsideAtomicBlock(
   doc: import('@tiptap/pm/model').Node,
   pos: number,
@@ -66,10 +62,9 @@ export function isInsideAtomicBlock(
   return false
 }
 
-/** Best-effort line-height probe. Tries the computed style of
- *  the editor host and falls back to a 21px heuristic if the
- *  stylesheet hasn't loaded yet (e.g. during the very first
- *  render after a tab switch). */
+/** 尽力而为的行高探测。先尝试编辑器宿主的计算样式，若样式表
+ *  尚未加载（例如切换标签页后的首次渲染）则回退到 21px 的
+ *  启发式值。 */
 export function estimateLineHeight(view: EditorView): number {
   const root = view.dom as HTMLElement
   const cs = window.getComputedStyle(root)
@@ -80,28 +75,23 @@ export function estimateLineHeight(view: EditorView): number {
   return n
 }
 
-/** Knobs for [`flattenRectToCursors`]. All fields are
- *  optional; the defaults match what the column-select plugin
- *  itself uses in production. */
+/** [`flattenRectToCursors`] 的调参旋钮。所有字段均可选；
+ *  默认值与列选择插件在生产环境使用的相同。 */
 export interface FlattenOptions {
-  /** Overrides the default line-height probe (e.g. for
-   *  unit tests that don't have a real DOM). */
+  /** 覆盖默认的行高探测（例如给没有真实 DOM 的单元测试用）。 */
   lineHeight?: number
-  /** Overrides the atomic-block predicate. */
+  /** 覆盖原子块谓词。 */
   isAtomic?: (doc: import('@tiptap/pm/model').Node, pos: number) => boolean
-  /** Overrides the "is this viewport point in a hidden
-   *  virtualised block?" probe — defaults to assuming no
-   *  virtualisation in tests. */
+  /** 覆盖「该视口点是否处于被虚拟化的隐藏块内」的探测——
+   *  默认假定测试中没有虚拟化。 */
   isHidden?: (point: ViewportPoint) => boolean
 }
 
-/** Reduce a rectangular drag region to a flat list of cursors,
- *  one per line. Each cursor is anchored at the left edge of
- *  the rectangle on its row. Atomic blocks (code, tables,
- *  math) are skipped per line; virtualised-offscreen rows are
- *  skipped via `isHidden`. The result is capped at
- *  [`MAX_CURSORS`] to avoid blowing up the ProseMirror
- *  selection state on giant drags. */
+/** 把矩形拖拽区域归约为扁平的游标列表，每行一个。每个光标
+ *  都锚定在该行矩形的左缘。每行跳过原子块（代码、表格、数学）；
+ *  被虚拟化到屏幕外的行通过 `isHidden` 跳过。结果上限为
+ *  [`MAX_CURSORS`]，避免超大的拖拽把 ProseMirror 的选区状态
+ *  撑爆。 */
 export function flattenRectToCursors(
   view: EditorView,
   rect: Rect,
@@ -115,9 +105,8 @@ export function flattenRectToCursors(
   const doc = view.state.doc
   const contentSize = doc.content.size
 
-  // Walk every line the rectangle intersects. The top-most row
-  // is the start of the rect; the bottom-most row is the end
-  // (exclusive of the half-pixel below it).
+  // 遍历矩形相交的每一行。最顶部的行是矩形起点，最底部的行
+  // 是终点（不含其下半个像素）。
   const startY = Math.floor(rect.top / lineHeight) * lineHeight
   const endY = Math.floor(rect.bottom / lineHeight) * lineHeight
 
@@ -131,9 +120,8 @@ export function flattenRectToCursors(
     const point: ViewportPoint = { x: rect.left, y: y + 1 }
     if (isHidden(point)) continue
 
-    // Use the viewport point to find the ProseMirror position
-    // under the cursor. `posAtCoords` returns null for off-DOM
-    // positions; we skip those silently.
+    // 用视口点查找光标下方的 ProseMirror 位置。`posAtCoords`
+    // 对 DOM 之外的位置返回 null；我们静默跳过。
     const found = view.posAtCoords({
       left: rect.left,
       top: y + lineHeight / 2,
@@ -142,15 +130,13 @@ export function flattenRectToCursors(
     const pos = found.pos
     if (pos < 0 || pos > contentSize) continue
 
-    // Skip lines inside atomic blocks — the user can't put a
-    // secondary cursor inside a code block, table cell, etc.
+    // 跳过原子块内的行——用户无法把次光标放进代码块、
+    // 表格单元格等内部。
     if (isAtomic(doc, pos)) continue
 
-    // Walk rightward along the line until we leave the
-    // rectangle's right edge, then anchor the cursor at the
-    // rectangle's left edge. This gives every row a
-    // "selection from left edge of rect to where the rect ends
-    // on this row" cursor.
+    // 沿该行向右走到矩形的右缘之外，然后把光标锚定在矩形
+    // 的左缘。这样每一行都得到一个「从矩形左缘到本行矩形
+    // 结束处」的选区光标。
     const rightFound = view.posAtCoords({
       left: rect.right,
       top: y + lineHeight / 2,

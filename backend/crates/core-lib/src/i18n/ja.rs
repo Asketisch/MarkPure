@@ -1,12 +1,10 @@
-//! Translation table for locale `ja` (日本語).
+//! 语言环境 `ja`（日本語）的翻译表。
 //!
-//! Auto-extracted from the original `i18n.rs` during the P11
-//! refactor. To add a new key, add it here *and* in the other
-//! locale files so all three stay in sync. The data shape
-//! is deliberately flat so the file is easy to scan and
-//! merge.
+//! 在重构时从原 `i18n.rs` 自动提取。新增键时，要同时加到这里
+//! *以及*其他语言环境文件，让三者保持同步。数据结构刻意保持扁平，
+//! 便于扫描与合并。
 
-/// Translation key → value pairs for locale `ja`.
+/// 语言环境 `ja`（日本語）的翻译键 → 值对。
 pub const ENTRIES: &[(&str, &str)] = &[
     ("app.name", "MarkPure"),
     ("app.description", "WYSIWYG Markdown エディター"),
@@ -18,7 +16,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("menu.export_html", "HTML エクスポート"),
     ("menu.export_pdf", "PDF エクスポート"),
     ("menu.export_word", "Word エクスポート"),
-    // P1-8: PNG 画像エクスポート（SNS 共有・ブログ用長画像）。
+    // PNG 画像エクスポート（SNS 共有・ブログ用長画像）。
     ("menu.export_png", "PNG エクスポート"),
     ("menu.search", "検索"),
     ("menu.settings", "設定"),
@@ -78,40 +76,40 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("status.saving", "保存中..."),
     ("status.multi_cursor", "マルチカーソル"),
     ("status.column_select", "列選択"),
-    // P0-X: Typora-style reading time + selection count.
+    // 読了時間 + 選択範囲の文字数。
     ("status.selection", "選択中"),
     ("status.selection_tooltip", "現在の選択範囲の文字数"),
     ("status.reading_time_tooltip", "250 語/分で推定した読了時間"),
-    // P0-X: word-count goal chip.
+    // 字数目标徽标。
     ("status.word_goal", "{current} / {goal}（{pct}%）"),
     ("status.word_goal_tooltip", "文字数目標の進捗"),
-    // P0-X: Typora-style "Saved X ago" indicator.
+    // 「X 前已保存」提示。
     ("status.saved_just_now", "保存済み"),
     ("status.saved_seconds_ago", "数秒前に保存"),
     ("status.saved_minutes_ago", "{n} 分前に保存"),
     ("status.saved_hours_ago", "{n} 時間前に保存"),
     ("status.saved_days_ago", "{n} 日前に保存"),
     ("status.saved_at_tooltip", "ディスクへの最終保存からの経過時間"),
-    // P0-X: status-bar jump buttons.
+    // 状态栏跳转按钮。
     ("status.jump_buttons_aria", "文書ナビゲーション"),
     ("status.jump_top_tooltip", "先頭に移動"),
     ("status.jump_bottom_tooltip", "末尾に移動"),
-    // P0-X: lint-on-save toggle.
+    // 保存时整理开关。
     ("settings.lint_on_save", "保存時に整形"),
     ("settings.lint_on_save_tooltip", "保存前に行末の空白を削除し、ファイル末尾に改行を追加し、3 行以上の連続する空行を 2 行に折りたたみます。"),
-    // P0-X: Typora-style word-count goal.
+    // 字数目标设置。
     ("settings.word_count_goal", "文字数目標"),
     ("settings.word_count_goal_tooltip", "0 より大きい値を設定すると、ステータスバーに進捗（例：1247 / 5000 = 25%）が表示されます。0 で非表示。"),
-    // P0-X: Typora-style "✓ Saved" toast.
+    // 「✓ 已保存」轻提示。
     ("settings.saved_flash", "✓ 保存しました"),
-    // P0-X: backup / restore preferences.
+    // 偏好设置备份 / 恢复。
     ("settings.backup_restore", "バックアップと復元"),
     ("settings.export_preferences", "設定をエクスポート"),
     ("settings.export_button", "エクスポート…"),
     ("settings.import_preferences", "設定をインポート"),
     ("settings.import_button", "インポート…"),
     ("settings.import_report", "{themes} 個のテーマ（{skipped} 個スキップ）、{keybindings} 個のキーバインドを復元しました"),
-    // P2-7: Vim モードチップ + ex コマンドバーのラベル。
+    // Vim 模式徽标 + ex 命令栏标签。
     ("status.vim_normal", "ノーマル"),
     ("status.vim_insert", "インサート"),
     ("status.vim_visual", "ビジュアル"),
@@ -258,27 +256,29 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("action.find_and_replace", "検索と置換"),
     ("menu.toggle_sidebar", "サイドバー切替"),
     ("view.toggle_zen_mode", "Zen モード切替"),
-    // P0-X: per-panel toggles.
+    // 各面板显示开关。
     ("view.toggle_tab_bar", "タブバーの表示切替"),
     ("view.toggle_toolbar", "ツールバーの表示切替"),
     ("view.toggle_status_bar", "ステータスバーの表示切替"),
-    // P0-X: Typora-style "Collapse / Expand All Headings".
+    // 「折叠 / 展开全部标题」。
     ("view.collapse_all_headings", "すべての見出しを折りたたむ"),
     ("view.expand_all_headings", "すべての見出しを展開する"),
     ("dialog.file_changed_title", "ファイルが外部で変更されました"),
     ("dialog.file_changed_message", "{name} が MarkPure の外部で変更されました。読み込んで変更を破棄しますか？"),
     ("dialog.reload", "再読み込み"),
     ("dialog.keep_mine", "変更を保持"),
-    // P0-X: Typora-style `[text](` link autocomplete.
+    // `[text](` 链接自动补全。
     ("link_suggest.placeholder", "ワークスペースのファイルを絞り込む…"),
     ("link_suggest.no_match", "一致するファイルがありません"),
-    // Typora-style prompts for tabs that have unsaved edits.
+    // 未保存编辑的标签页关闭提示。
     ("dialog.unsaved_title", "閉じる前に変更を保存しますか？"),
     ("dialog.unsaved_message", "「{name}」には未保存の変更があります。閉じる前に保存しますか？"),
     ("dialog.discard", "保存しない"),
     ("dialog.unsaved_other_tabs", "閉じようとしている他のタブ"),
     ("dialog.unsaved_all_tabs", "開いているすべてのタブ"),
     ("dialog.unsaved_right_tabs", "右側のタブ"),
+    ("dialog.link_url_title", "リンクの URL"),
+    ("dialog.link_url_placeholder", "https://…"),
     ("tag_pane.title", "タグ"),
     ("tag_pane.empty", "タグが見つかりません"),
     ("tag_pane.no_match", "一致するタグがありません"),
@@ -298,8 +298,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("backlinks_pane.open_source", "ソースを開く"),
     ("toolbar.superscript", "上付き文字"),
     ("toolbar.subscript", "下付き文字"),
-    // ---- P0-1/P0-2/P0-3: full i18n coverage (added 2026-06-09) ----
-    // Phase 1: silent-fallback bug fixes
+    // ---- 完整 i18n 覆盖（2026-06-09 添加） ----
+    // 阶段 1：静默回退 bug 修复
     ("palette.placeholder", "コマンドを入力…"),
     ("palette.loading", "読み込み中…"),
     ("palette.no_results", "結果なし"),
@@ -310,11 +310,11 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("bookmarks.empty", "ブックマークがありません"),
     ("bookmarks.close_aria", "ブックマークを閉じる"),
     ("bookmarks.remove_aria", "削除"),
-    // Phase 2: new toolbar keys
+    // 阶段 2：新增工具栏项
     ("toolbar.cycle_view_mode", "ビュー切替"),
     ("toolbar.tags", "タグ"),
     ("toolbar.backlinks", "バックリンク"),
-    // Phase 4: command palette registry keys
+    // 阶段 4：命令面板注册项
     ("cmd.category.format", "書式"),
     ("cmd.category.block", "ブロック"),
     ("cmd.category.image", "画像"),
@@ -324,19 +324,19 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.file.close_tab", "タブを閉じる"),
     ("cmd.edit.select_same_word", "同じ単語を次に選択"),
     ("cmd.edit.copy_as_markdown", "Markdown としてコピー"),
-    // P0-X: editor right-click context menu (Typora-style).
+    // 编辑器右键上下文菜单。
     ("context.copy_as_markdown", "Markdown としてコピー"),
     ("context.copy_as_html", "HTML としてコピー"),
     ("context.copy_as_plain", "プレーンテキストとしてコピー"),
     ("context.copy", "コピー"),
     ("cmd.edit.copy_as_html", "HTML としてコピー"),
     ("cmd.edit.copy_as_plain", "プレーンテキストとしてコピー"),
-    // P0-3: マルチカーソルコマンド
+    // 多光标命令。
     ("cmd.edit.select_next_match", "次の一致を選択"),
     ("cmd.edit.select_all_matches", "すべての一致を選択"),
     ("cmd.edit.undo_last_cursor", "最後のカーソルを元に戻す"),
     ("cmd.edit.clear_multi_cursor", "マルチカーソルを解除"),
-    // P2-3: 列選択 (Alt+Drag)
+    // 列选择（Alt+拖拽）。
     ("cmd.edit.add_column_selection", "列選択を追加"),
     ("cmd.block.move_up", "ブロックを上に移動"),
     ("cmd.block.move_down", "ブロックを下に移動"),
@@ -348,7 +348,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.view.toggle_focus_mode", "フォーカスモード切替"),
     ("cmd.view.toggle_typewriter", "タイプライタースクロール切替"),
     ("cmd.view.toggle_undo_tree", "アンドゥツリーを表示"),
-    // P0-8: undo-tree navigation commands.
+    // 撤销树导航命令。
     ("cmd.undoTree.go_to_parent", "アンドゥツリー：親へ"),
     ("cmd.undoTree.prune_current", "アンドゥツリー：現在の枝を剪定"),
     ("undoTree.panel.title", "アンドゥツリー"),
@@ -370,7 +370,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("cmd.insert.frontmatter", "YAML Frontmatter を挿入"),
     ("cmd.insert.fold", "セクションを折りたたむ"),
     ("cmd.insert.snippet", "スニペットを挿入…"),
-    // Phase 5: workspace + outline + search + colorpicker + snippet
+    // 阶段 5：工作区 + 大纲 + 搜索 + 取色器 + 代码片段
     ("outline.search_placeholder", "見出しを検索…"),
     ("outline.max_depth", "最大見出し深度"),
     ("outline.depth.h1", "H1"),
@@ -397,7 +397,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("snippet.filter_placeholder", "スニペットをフィルター…"),
     ("snippet.empty", "スニペットが見つかりません。.md ファイルを ~/.config/markpure/snippets/ に追加してください。"),
     ("snippet.no_match", "一致するスニペットがありません。"),
-    // Phase 6: settings + theme editor
+    // 阶段 6：设置 + 主题编辑器
     ("settings.theme.light", "ライト"),
     ("settings.theme.dark", "ダーク"),
     ("settings.theme.one_dark", "One Dark"),
@@ -427,7 +427,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.category.code", "コード"),
     ("settings.theme_editor.category.image", "画像"),
     ("settings.theme_editor.category.misc", "その他"),
-    // ThemeEditor color labels
+    // 主题编辑器颜色标签
     ("settings.theme_editor.color.bg", "背景"),
     ("settings.theme_editor.color.bg_secondary", "セカンダリ背景"),
     ("settings.theme_editor.color.bg_tab_active", "タブアクティブ"),
@@ -462,7 +462,7 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.color.table_header_bg", "表ヘッダー背景"),
     ("settings.theme_editor.color.highlight_bg", "ハイライト背景"),
     ("settings.theme_editor.color.cell_selected_bg", "選択セル背景"),
-    // P1-11: スペルチェック UI 文字列（右クリックメニュー + Settings）
+    // 拼写检查 UI 字符串（右键菜单 + 设置）
     ("spell.no_suggestions", "候補なし"),
     ("spell.ignore_once", "今回は無視"),
     ("spell.add_to_dictionary", "辞書に追加"),

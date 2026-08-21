@@ -14,7 +14,7 @@
   let inputValue = $state(value)
   let isOpen = $state(false)
 
-  // Sync input value when prop changes
+  // 外部传入的 value 变化时同步输入框内容
   $effect(() => {
     inputValue = value
   })
@@ -32,20 +32,20 @@
       val = '#' + val
     }
     inputValue = val
-    // Validate hex color
+    // 校验十六进制颜色格式，合法才上抛
     if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
       onchange?.(val)
     }
   }
 
   function handleTextBlur() {
-    // Ensure valid format on blur
+    // 失焦时保证输入是合法格式，否则回退到原值
     if (!/^#[0-9A-Fa-f]{6}$/.test(inputValue)) {
       inputValue = value
     }
   }
 
-  // Preset colors
+  // 预设颜色
   const presets = [
     '#ff4444', '#ff8800', '#ffcc00', '#44bb44', '#00cccc', '#4488ff', '#aa44ff', '#ff44aa',
     '#888888', '#444444', '#000000', '#ffffff',

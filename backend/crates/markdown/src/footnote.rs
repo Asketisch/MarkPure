@@ -1,54 +1,45 @@
-//! Footnote parsing and rendering.
+//! 脚注的解析与渲染。
 //!
-//! The pandoc-style regex parser we used to ship in `pandoc.rs` is
-//! gone — it had a HashMap-based ordering bug and a name collision
-//! with the inline `^[…]` form. Instead we lean on pulldown-cmark's
-//! built-in `Event::FootnoteReference` and
-//! `Event::Start(Tag::FootnoteDefinition)` events, which are
-//! deterministic by document order.
+//! 我们过去在 `pandoc.rs` 里用的 pandoc 风格正则解析器已移除——
+//! 它有基于 HashMap 的排序 bug，且与内联 `^[…]` 形式存在命名冲突。
+//! 取而代之的是 pulldown-cmark 内置的 `Event::FootnoteReference` 和
+//! `Event::Start(Tag::FootnoteDefinition)` 事件，它们按文档顺序
+//! 确定性地产生。
 //!
-//! The helpers in this module are:
-//!   - `collect_footnotes(content)` — first pass over the event
-//!     stream that maps each `[^id]` label to a stable 1-based
-//!     document-order number. Used by callers (HTML/PDF/DOCX) that
-//!     need the same numbering on both the in-text reference and
-//!     the definition list.
-//!   - `render_footnote_section(notes)` — emits the trailing
-//!     `<section class="footnotes">…</section>` block to append
-//!     after the main body.
-//!   - `render_footnote_ref_html(label, number)` — emits the inline
-//!     `<sup>` reference for an `Event::FootnoteReference`.
-//!   - `render_footnote_def_li_html(label, content, number)` —
-//!     emits the `<li>` for an `Event::FootnoteDefinition`.
+//! 本模块的辅助函数：
+//!   - `collect_footnotes(content)` —— 对事件流做一遍遍历，把每个
+//!     `[^id]` 标签映射为以 1 起始的、按文档顺序的稳定编号。
+//!     供需要让文中引用和定义列表共用同一编号的调用方使用
+//!     （HTML / PDF / DOCX）。
+//!   - `render_footnote_section(notes)` —— 生成追加在主正文之后的
+//!     `<section class="footnotes">…</section>` 块。
+//!   - `render_footnote_ref_html(label, number)` —— 为
+//!     `Event::FootnoteReference` 生成内联 `<sup>` 引用。
+//!   - `render_footnote_def_li_html(label, content, number)` ——
+//!     为 `Event::FootnoteDefinition` 生成 `<li>`。
 //!
-//! All HTML strings use the same class names
-//! (`footnote-ref` / `footnote-back` / `fn-` / `fnref-`) so the
-//! default stylesheet can target them in one place.
+//! 所有 HTML 字符串使用同一组类名（`footnote-ref` / `footnote-back` /
+//! `fn-` / `fnref-`），方便默认样式表在同一个地方统一选中它们。
 
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use std::collections::BTreeMap;
 
-/// A footnote definition collected from the document, in document order.
+/// 从文档中按文档顺序收集到的脚注定义。
 #[derive(Debug, Clone)]
 pub struct Footnote {
-    /// Original label, e.g. `"1"` or `"note-1"`.
+    /// 原始标签，例如 `"1"` 或 `"note-1"`。
     pub label: String,
-    /// Plain-text body of the definition (already concatenated for
-    /// multi-paragraph footnotes).
+    /// 定义的纯文本正文（多段脚注已拼接）。
     pub content: String,
-    /// 1-based document-order number assigned to this footnote.
+    /// 分配给该脚注的、以 1 起始的文档顺序编号。
     pub number: usize,
 }
 
-/// Walk the event stream once and collect every footnote
-/// definition in document order. The returned `Vec<Footnote>` is
-/// the canonical order callers should use to number their inline
-/// references.
+/// 对事件流做一遍遍历，按文档顺序收集所有脚注定义。
+/// 返回的 `Vec<Footnote>` 是调用方编号内联引用时应遵循的规范顺序。
 ///
-/// `content` is rendered into HTML for the body's `<li>`. The
-/// helper does NOT escape HTML — callers that embed the result
-/// directly into a document are responsible for the surrounding
-/// shell.
+/// `content` 被渲染为 HTML，用于正文的 `<li>`。该辅助函数
+/// **不**转义 HTML——直接嵌入结果的调用方需自行处理外围外壳。
 pub fn collect_footnotes(content: &str) -> Vec<Footnote> {
     let mut opts = Options::empty();
     opts.insert(Options::ENABLE_FOOTNOTES);
@@ -57,9 +48,8 @@ pub fn collect_footnotes(content: &str) -> Vec<Footnote> {
     opts.insert(Options::ENABLE_TASKLISTS);
     let parser = Parser::new_ext(content, opts);
 
-    // Preserve insertion order via a BTreeMap keyed on the
-    // first-seen index of each label. Labels in Markdown are
-    // case-sensitive and ASCII-distinct in practice.
+    // 用以每个标签首次出现索引为键的 BTreeMap 保持插入顺序。
+    // 在实践里，Markdown 的标签区分大小写且按 ASCII 可区分。
     let mut by_label: BTreeMap<String, Footnote> = BTreeMap::new();
     let mut order: Vec<String> = Vec::new();
     let mut in_def_label: Option<String> = None;
@@ -81,25 +71,24 @@ pub fn collect_footnotes(content: &str) -> Vec<Footnote> {
                         Footnote {
                             label,
                             content: in_def_buf.trim().to_string(),
-                            number: 0, // assigned below
+                            number: 0, // 下方统一赋值
                         },
                     );
                     in_def_buf.clear();
                 }
             }
-            Event::Text(t) | Event::Code(t) => {
-                if in_def_label.is_some() {
+            Event::Text(t) | Event::Code(t)
+                if in_def_label.is_some() => {
                     if !in_def_buf.is_empty() {
                         in_def_buf.push(' ');
                     }
                     in_def_buf.push_str(&t);
                 }
-            }
             _ => {}
         }
     }
 
-    // Assign 1-based numbers in the order we first saw each label.
+    // 按首次看到各标签的顺序赋 1 起始的编号。
     let mut out = Vec::with_capacity(order.len());
     for (i, label) in order.iter().enumerate() {
         if let Some(mut note) = by_label.remove(label) {
@@ -110,9 +99,8 @@ pub fn collect_footnotes(content: &str) -> Vec<Footnote> {
     out
 }
 
-/// Render the trailing `<section class="footnotes">` block that
-/// appears at the end of the exported document. Returns an empty
-/// string when there are no footnotes.
+/// 渲染出现在导出文档末尾的 `<section class="footnotes">` 块。
+/// 没有脚注时返回空字符串。
 pub fn render_footnote_section(notes: &[Footnote]) -> String {
     if notes.is_empty() {
         return String::new();
@@ -130,16 +118,15 @@ pub fn render_footnote_section(notes: &[Footnote]) -> String {
     html
 }
 
-/// Render an in-text footnote reference as `<sup>` HTML. The
-/// `number` should come from `collect_footnotes` so reference and
-/// definition share the same label.
+/// 把文中脚注引用渲染为 `<sup>` HTML。`number` 应来自
+/// `collect_footnotes`，让引用与定义共用相同的编号。
 pub fn render_footnote_ref_html(label: &str, number: usize) -> String {
     format!(
         "<sup class=\"footnote-ref\"><a id=\"fnref-{label}\" href=\"#fn-{label}\">[{number}]</a></sup>",
     )
 }
 
-/// Render a single `<li>` for a footnote definition.
+/// 渲染脚注定义的单条 `<li>`。
 pub fn render_footnote_def_li_html(label: &str, number: usize, content: &str) -> String {
     format!(
         "<li id=\"fn-{label}\" value=\"{number}\">{} <a class=\"footnote-back\" href=\"#fnref-{label}\" title=\"Back to text\">&#8617;</a></li>\n",
@@ -147,7 +134,7 @@ pub fn render_footnote_def_li_html(label: &str, number: usize, content: &str) ->
     )
 }
 
-fn escape_html(s: &str) -> String {
+pub(crate) fn escape_html(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
@@ -162,14 +149,11 @@ mod tests {
     fn collects_named_and_numeric_footnotes_in_document_order() {
         let md = "First[^a] then[^1].\n\n[^1]: numeric\n[^a]: named\n";
         let notes = collect_footnotes(md);
-        // Order should be `[a, 1]` (the order in which the
-        // *references* appear, not the order of the definitions).
-        // pulldown-cmark emits definitions in source order, so
-        // here we have `[^a]` before `[^1]` in the body and
-        // `[^1]:` before `[^a]:` in the definitions.
-        // The label we keep is the one tied to the reference.
-        // For this test we just assert both labels are present
-        // and the numbers are 1, 2.
+        // 顺序应为 `[a, 1]`（按*引用*出现的顺序，而非定义的顺序）。
+        // pulldown-cmark 按源码顺序发出定义，因此这里正文中
+        // `[^a]` 在 `[^1]` 之前，而定义区 `[^1]:` 在 `[^a]:` 之前。
+        // 我们保留的标签是与引用绑定的那个。
+        // 本测试只断言两个标签都存在，且编号为 1、2。
         let labels: Vec<&str> = notes.iter().map(|n| n.label.as_str()).collect();
         assert!(labels.contains(&"a") || labels.contains(&"1"));
         assert_eq!(notes.len(), 2);

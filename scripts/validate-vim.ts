@@ -1,16 +1,14 @@
 /**
- * Lightweight sanity check for the Vim mode plugin (P2-7).
- * Run with:
+ * Vim 模式插件（P2-7）的轻量校验。运行方式：
  *
  *   npx tsx scripts/validate-vim.ts
  *
- * Uses Node's built-in `node:test` runner (Node 18+) so no
- * extra dev dependency is required.
+ * 使用 Node 内置的 `node:test` 运行器（Node 18+），无需额外开发
+ * 依赖。
  *
- * The tests intentionally avoid `EditorView` (which needs a
- * DOM). They cover the pure pieces — the FSM in `state.ts`,
- * the key-sequence parser in `key-parser.ts`, the motion /
- * operator / text-object helpers, and the ex command parser.
+ * 测试避开 `EditorView`（它需要 DOM）。覆盖纯逻辑部分——
+ * `state.ts` 中的 FSM、`key-parser.ts` 中的按键序列解析器、
+ * 移动 / 操作符 / 文本对象助手，以及 ex 命令解析器。
  */
 
 import test from 'node:test'
@@ -31,6 +29,8 @@ import {
 } from '../frontend/src/plugins/vim/key-parser'
 import { motionRange } from '../frontend/src/plugins/vim/motions'
 import { textObjectRange } from '../frontend/src/plugins/vim/text-objects'
+import { textIndexForPos, posForTextIndex, flatText } from '../frontend/src/plugins/vim/positions'
+import { Schema, Node as PMNode, Fragment } from 'prosemirror-model'
 import {
   applyDelete,
   applyChange,
@@ -45,7 +45,7 @@ import { vimPluginKey, type VimKey, type VimState, type VimMode } from '../front
 import type { Transaction } from '@tiptap/pm/state'
 
 // ----------------------------------------------------------------------
-// state.ts reducers
+// state.ts 的 reducers
 // ----------------------------------------------------------------------
 
 test('initState: defaults to disabled NORMAL with idle pending', () => {
@@ -70,7 +70,7 @@ test('emptyState: same shape as initState(false)', () => {
 
 test('applyVimMeta: setEnabled flips and preserves lastEx', () => {
   const s0 = initState(true)
-  // Build a fake transaction carrying the setEnabled meta.
+  // 构造一条携带 setEnabled meta 的假事务。
   const fakeTr = { getMeta: (k: unknown) => k === vimPluginKey ? { type: 'setEnabled', enabled: false } : undefined } as unknown as Transaction
   const s1 = applyVimMeta(s0, fakeTr)
   assert.equal(s1.enabled, false)
@@ -118,7 +118,7 @@ test('getMode + isParserActive: parser is active only in NORMAL/VISUAL', () => {
 // ----------------------------------------------------------------------
 
 function makeKey(k: string): VimKey {
-  // Helper: build a printable `VimKey` for tests.
+  // 助手：为测试构造可打印的 `VimKey`。
   if (k === 'esc' || k === 'enter' || k === 'backspace') {
     return { kind: 'special', key: k }
   }
@@ -421,160 +421,178 @@ test('executeEx: :wq saves then closes', async () => {
 })
 
 // ----------------------------------------------------------------------
-// motions.ts
+// positions.ts / motions.ts / text-objects.ts
 // ----------------------------------------------------------------------
+//
+// 这一组测试使用**真实的 ProseMirror 文档**（带 doc/paragraph/code_block
+// 等嵌套块的开/关位置 offset），而不是旧版"扁平文本下标 == 文档位置"的
+// 假模型。旧假模型掩盖了一个系统性 bug：每个块的开/关位置各占 1 个文档
+// 位置但不出现在扁平文本里，直接把文档位置当扁平下标用会让 w/f/iw 等
+// 所有基于文本的 motion 在真实文档上偏移。
+//
+// 文档位置约定（ProseMirror，已用探针实测验证）：doc 的 content 从位置 0
+// 开始（doc 节点自身不占"开启位置"），第一个段落 "hello world" 的 'h'
+// 在位置 1；`selection.head` / `doc.resolve` / `doc.textBetween` /
+// `descendants` 共享同一坐标系，`content.size` 恰好是文档末尾位置。
 
-/** Build a minimal EditorState-shaped object. The motion helpers
- *  read `doc.resolve(pos)`, `doc.textBetween(...)`, and
- *  `selection.head`. We fake those. */
-function fakeStateWithText(text: string, head = text.length): {
-  selection: { head: number }
-  doc: {
-    content: { size: number }
-    resolve: (pos: number) => {
-      start: () => number
-      end: () => number
-    }
-    textBetween: (a: number, b: number, s: string, e: string) => string
-  }
-} {
-  return {
-    selection: { head },
-    doc: {
-      content: { size: text.length },
-      resolve: (pos: number) => {
-        // Approximate: find the start of the line containing `pos`.
-        let start = 0
-        for (let i = pos - 1; i >= 0; i--) {
-          if (text[i] === '\n') { start = i + 1; break }
-        }
-        let end = text.length
-        for (let i = pos; i < text.length; i++) {
-          if (text[i] === '\n') { end = i; break }
-        }
-        return { start: () => start, end: () => end }
-      },
-      textBetween: (_a: number, _b: number, _s: string, _e: string) => text,
-    },
-  }
+const vimTestSchema = new Schema({
+  nodes: {
+    doc: { content: 'block+' },
+    paragraph: { content: 'inline*', group: 'block' },
+    code_block: { content: 'inline*', group: 'block' },
+    block_wrapper: { content: 'block+', group: 'block' },
+    text: { group: 'inline' },
+    hard_break: { group: 'inline', inline: true, leaf: true },
+  },
+})
+
+function p(text: string): PMNode {
+  return vimTestSchema.node('paragraph', null, text ? [vimTestSchema.text(text)] : [])
 }
 
-test('motionRange: lineStart lands at the line start', () => {
-  const state = fakeStateWithText('hello world', 6) as never
-  const r = motionRange(state, 'lineStart', 1)
-  assert.equal(r.from, 6)
-  assert.equal(r.to, 0)
+function codeBlock(lines: string[]): PMNode {
+  const content: PMNode[] = []
+  lines.forEach((l, i) => {
+    if (l) content.push(vimTestSchema.text(l))
+    if (i < lines.length - 1) content.push(vimTestSchema.node('hard_break', null, null))
+  })
+  return vimTestSchema.node('code_block', null, Fragment.fromArray(content))
+}
+
+function docOf(blocks: PMNode[]): PMNode {
+  return new PMNode(vimTestSchema.nodes.doc, null, Fragment.fromArray(blocks))
+}
+
+function st(doc: PMNode, head: number) {
+  return { doc, selection: { head } } as never
+}
+
+// 位置映射要在多种文档形状下成立：普通段落、带内联叶子的代码块、
+// 空块、以及嵌套块（嵌套块的第一个 textblock 会带前导分隔符）。
+const positionFixtures: Array<[string, PMNode]> = [
+  ['two paragraphs', docOf([p('abc def'), p('ghi')])],
+  ['trailing empty paragraph', docOf([p('hello world'), p('foo'), p('')])],
+  ['code block with hard_break', docOf([p('ab'), codeBlock(['ln1', 'ln2'])])],
+  ['single empty paragraph', docOf([p('')])],
+  ['nested blocks', docOf([
+    vimTestSchema.node('block_wrapper', null, Fragment.fromArray([p('x'), p('y')])),
+    p('tail'),
+  ])],
+]
+
+for (const [label, doc] of positionFixtures) {
+  test(`positions(${label}): textIndexForPos equals the textBetween prefix length at every position`, () => {
+    for (let pos = 0; pos <= doc.content.size; pos++) {
+      assert.equal(
+        textIndexForPos(doc, pos),
+        doc.textBetween(0, pos, '\n', '\n').length,
+        `pos=${pos}`,
+      )
+    }
+  })
+
+  test(`positions(${label}): round-trip posForTextIndex → textIndexForPos covers every text index`, () => {
+    const total = flatText(doc).length
+    for (let ti = 0; ti <= total; ti++) {
+      assert.equal(textIndexForPos(doc, posForTextIndex(doc, ti)), ti, `ti=${ti}`)
+    }
+  })
+}
+
+test('motions: w x2 crosses paragraphs and lands on the doc position (not the text index)', () => {
+  // doc = [p("hello world"), p("foo")]：扁平文本 "hello world\nfoo"（15 字符），
+  // content.size = 18。'h' 在文档位置 1；第二个段落的 'f' 在文档位置 14
+  // （扁平下标 12）。旧实现会返回 12 —— 那是第一段的关闭边界，无效位置。
+  const doc = docOf([p('hello world'), p('foo')])
+  const r = motionRange(st(doc, 1), 'wordForward', 2)
+  assert.equal(r.from, 1)
+  assert.equal(r.to, 14)
+  assert.equal(r.inclusive, false)
 })
 
-test('motionRange: lineEnd lands at the line end', () => {
-  const state = fakeStateWithText('hello world', 0) as never
-  const r = motionRange(state, 'lineEnd', 1)
-  assert.equal(r.from, 0)
-  assert.equal(r.to, 11)
-})
-
-test('motionRange: docStart lands at 0', () => {
-  const state = fakeStateWithText('hello', 5) as never
-  const r = motionRange(state, 'docStart', 1)
-  assert.equal(r.to, 0)
-})
-
-test('motionRange: docEnd lands at doc size', () => {
-  const state = fakeStateWithText('hello', 0) as never
-  const r = motionRange(state, 'docEnd', 1)
-  assert.equal(r.to, 5)
+test('motions: f finds the char at its doc position', () => {
+  // doc = [p("abc (x) y"), p("q")]：')' 的扁平下标 6，文档位置 7。
+  const doc = docOf([p('abc (x) y'), p('q')])
+  const r = motionRange(st(doc, 1), 'findChar', 1, ')')
+  assert.equal(r.to, 7)
   assert.equal(r.inclusive, true)
 })
 
-test('motionRange: left clamps to line start', () => {
-  const state = fakeStateWithText('hello', 2) as never
-  const r = motionRange(state, 'left', 10)
-  assert.equal(r.to, 0)
+test('motions: iw on the last paragraph covers only that word', () => {
+  // 光标在第二个段落 "foo" 的最后一个 'o' 上（文档位置 16，扁平下标 14）。
+  // 旧实现返回 {from:13, to:16}（跨进第一段）；正确是 [14, 17)。
+  const doc = docOf([p('hello world'), p('foo')])
+  const r = textObjectRange(st(doc, 16), 'word', 'i')
+  assert.equal(r.from, 14)
+  assert.equal(r.to, 17)
 })
 
-test('motionRange: right clamps to line end', () => {
-  const state = fakeStateWithText('hello', 2) as never
-  const r = motionRange(state, 'right', 10)
-  assert.equal(r.to, 5)
+test('motions: 0 / $ / h / l respect visual lines inside a code block', () => {
+  // doc = [p("ab"), code_block("ln1\\nln2")]：content.size = 13。
+  // 'l'(ln1) 在位置 5，'l'(ln2) 在位置 9。
+  const doc = docOf([p('ab'), codeBlock(['ln1', 'ln2'])])
+  assert.equal(flatText(doc), 'ab\nln1\nln2')
+
+  // $ 在 ln1 上：停在 "ln1" 行尾（位置 8，hard_break 之前），
+  // 而不是整个代码块内容结尾（旧实现取 $head.end() = 13）。
+  const eol = motionRange(st(doc, 5), 'lineEnd', 1)
+  assert.equal(eol.to, 8)
+
+  // l x10 在 ln1 上：钳制到本视觉行行尾，不越过 hard_break。
+  const right = motionRange(st(doc, 5), 'right', 10)
+  assert.equal(right.to, 8)
+
+  // h x10 在 ln2 上：钳制到本视觉行行首（位置 9）。
+  const left = motionRange(st(doc, 11), 'left', 10)
+  assert.equal(left.to, 9)
 })
 
-// ----------------------------------------------------------------------
-// text-objects.ts
-// ----------------------------------------------------------------------
-
-test('textObjectRange: iw on "hello world" with cursor=0 → covers hello', () => {
-  const text = 'hello world'
-  const state = {
-    selection: { head: 0 },
-    doc: {
-      content: { size: text.length },
-      textBetween: () => text,
-    },
-  } as never
-  const r = textObjectRange(state, 'word', 'i')
-  assert.equal(r.from, 0)
-  assert.equal(r.to, 5)
+test('motions: k / j move line-by-line inside a code block', () => {
+  const doc = docOf([p('ab'), codeBlock(['ln1', 'ln2'])])
+  assert.equal(motionRange(st(doc, 10), 'up', 1).to, 6)   // ln2 列 1 → ln1 列 1
+  assert.equal(motionRange(st(doc, 5), 'down', 1).to, 9)  // ln1 列 0 → ln2 列 0
+  // 越过代码块顶部仍受视觉行钳制。
+  assert.equal(motionRange(st(doc, 5), 'up', 5).to, 1)    // 到 "ab" 行
 })
 
-test('textObjectRange: aw on "hello world" with cursor=0 → covers "hello "', () => {
-  const text = 'hello world'
-  const state = {
-    selection: { head: 0 },
-    doc: {
-      content: { size: text.length },
-      textBetween: () => text,
-    },
-  } as never
-  const r = textObjectRange(state, 'word', 'a')
-  assert.equal(r.from, 0)
-  assert.equal(r.to, 6)
+test('motions: lineStart / lineEnd / firstNonBlank on flat-text lines', () => {
+  const doc = docOf([p('hello world'), p('foo')])
+  // 'w'（位置 7）→ 行首 'h'（位置 1）。
+  assert.equal(motionRange(st(doc, 7), 'lineStart', 1).to, 1)
+  // 'h'（位置 1）→ 行尾空隙（位置 12，p1 关闭边界 13 之前）。
+  assert.equal(motionRange(st(doc, 1), 'lineEnd', 1).to, 12)
+  // 缩进行 "  x"：^ 落在 'x' 上。
+  const indented = docOf([p('  x')])
+  assert.equal(motionRange(st(indented, 3), 'firstNonBlank', 1).to, 3)
 })
 
-test('textObjectRange: i" on \'"foo"bar\' with cursor=2 → covers foo', () => {
-  const text = '"foo"bar'
-  const state = {
-    selection: { head: 2 },
-    doc: {
-      content: { size: text.length },
-      textBetween: () => text,
-    },
-  } as never
-  const r = textObjectRange(state, 'stringDouble', 'i')
-  assert.equal(r.from, 1)
-  assert.equal(r.to, 4)
+test('motions: paragraph skip lands on the next block start', () => {
+  // doc = [p("aa"), p(""), p("bb")]：'}' 从第一段跳到 "bb" 行首（位置 7）。
+  const doc = docOf([p('aa'), p(''), p('bb')])
+  const r = motionRange(st(doc, 1), 'paragraphForward', 1)
+  assert.equal(r.to, 7)
 })
 
-test('textObjectRange: a" on \'"foo"bar\' with cursor=2 → covers "foo"', () => {
-  const text = '"foo"bar'
-  const state = {
-    selection: { head: 2 },
-    doc: {
-      content: { size: text.length },
-      textBetween: () => text,
-    },
-  } as never
-  const r = textObjectRange(state, 'stringDouble', 'a')
-  assert.equal(r.from, 0)
-  assert.equal(r.to, 5)
+test('motions: docStart / docEnd', () => {
+  const doc = docOf([p('hello'), p('world')])
+  assert.equal(motionRange(st(doc, 5), 'docStart', 1).to, 0)
+  assert.equal(motionRange(st(doc, 5), 'docEnd', 1).to, doc.content.size)
 })
 
 // ----------------------------------------------------------------------
-// operators.ts (smoke tests against a fake view)
+// operators.ts（用假视图做的冒烟测试）
 // ----------------------------------------------------------------------
 
 function fakeView(text: string, head: number) {
-  // We use a Box so the closures inside the helper can mutate
-  // `text` (via the fake tr's `delete`/`insertText`) while
-  // keeping a stable reference. The helper reads the text
-  // BEFORE mutating; the fake's `textBetween` reads the
-  // current value, which is the post-mutation state. To
-  // avoid that, `applyDelete` reads `textBetween` BEFORE
-  // dispatching the tr — but the production code reads it
-  // AFTER dispatch (which is the bug we want to test for).
+  // 用 Box 包裹文本，让助手里的闭包既能通过假 tr 的
+  // `delete`/`insertText` 修改 `text`，又保持引用稳定不变。
+  // 助手读取的是“修改前”的文本，而假的 `textBetween` 读到的
+  // 是当前值（即修改后的状态）。为避免这一点，`applyDelete` 在
+  // 派发 tr 之前读取 `textBetween`——但生产代码是在派发之后
+  // 读取的（这正是我们要测的 bug）。
   //
-  // The fix: capture the snapshot in the closure so the
-  // helper gets the pre-mutation text regardless of when
-  // the tr fires.
+  // 修复：在闭包里先捕获快照，这样无论 tr 何时触发，助手拿到的
+  // 都是修改前的文本。
   const box = { text }
   return {
     state: {
@@ -596,9 +614,8 @@ function fakeView(text: string, head: number) {
       },
       tr: {
         delete: function (a: number, b: number) {
-          // Capture pre-mutation text so the helper sees the
-          // original slice. (Real PM transactions are
-          // immutable, so this is just our fake being honest.)
+          // 先捕获修改前的文本，让助手看到原始切片。
+          // （真实的 PM 事务不可变，这里只是让假事务如实工作。）
           const pre = box.text
           box.text = pre.slice(0, a) + pre.slice(b)
           return this
@@ -648,35 +665,34 @@ test('applyDeleteChar: deletes N chars to the right', () => {
 test('applyChangeChar: replaces one char', () => {
   const v = fakeView('hello', 0)
   applyChangeChar(v, 'X')
-  // We don't read the mutated fake — just check it returns a tr.
-  // The fakeView's `tr` is mutated but the helper does the work;
-  // we only verify no throw.
+  // 不校验修改后的假视图——只确认没有抛错即可。
+  // fakeView 的 `tr` 会被改动，但真正做替换的是助手本身；
+  // 这里只需验证它不抛异常。
   assert.ok(true)
 })
 
 test('applyDeleteLine: deletes the whole line', () => {
   const v = fakeView('hello\nworld', 0)
   const r = applyDeleteLine(v, 1)
-  // Register contains the line + the trailing newline.
+  // 寄存器里包含整行以及行尾换行符。
   assert.ok(r.registerUpdate?.startsWith('hello'))
 })
 
 test('applyJoinLines: joins 2 lines with a space', () => {
   const v = fakeView('hello\nworld', 0)
   applyJoinLines(v, 2)
-  // Just verify it doesn't throw.
+  // 只验证它不抛错。
   assert.ok(true)
 })
 
 // ----------------------------------------------------------------------
-// Coverage summary
+// 覆盖情况小结
 // ----------------------------------------------------------------------
 
 test('coverage: 7 groups × ~5 tests each = ~35 tests in this file', () => {
-  // This test is a marker so a quick `wc -l scripts/validate-vim.ts`
-  // tells future maintainers the expected scale. The actual
-  // count is above (state, parser, ex, motions, text-objects,
-  // operators, types).
+  // 这个测试只是个标记，方便维护者用 `wc -l scripts/validate-vim.ts`
+  // 快速估算文件规模。实际覆盖的分组见上文（state、parser、ex、
+  // motions、text-objects、operators、types）。
   const groups = ['state', 'key-parser', 'ex-commands', 'motions', 'text-objects', 'operators']
   assert.equal(groups.length, 6)
 })

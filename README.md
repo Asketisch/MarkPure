@@ -2,16 +2,16 @@
 
 WYSIWYG Markdown 桌面编辑器。
 
-使用 Rust (wry + tao) 构建原生桌面壳，Svelte 5 + Tiptap (ProseMirror) 构建 WYSIWYG 编辑器前端，不依赖 Tauri 或 Electron。
+使用 Rust (wry + tao) 构建原生桌面壳，Svelte 5 + Tiptap (ProseMirror) 构建 WYSIWYG 编辑器前端。
 
 ## 功能特性
 
 | 功能 | 说明 |
 |------|------|
 | **所见即所得** | WYSIWYG Markdown 编辑体验 |
-| **即时渲染** | Typora 风格，光标附近显示 Markdown 语法标记，远离时隐藏 |
-| **多光标编辑** | VSCode 风格：Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/粘贴自动 fan-out |
-| **列选择** | VSCode / Sublime 风格：Alt+Drag 拖出矩形选区，自动展开为 N 个 range cursors；表格 / 代码块 / 虚拟化块自动跳过，64 行上限 |
+| **即时渲染** | 光标附近显示 Markdown 语法标记，远离时隐藏 |
+| **多光标编辑** | Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/粘贴自动 fan-out |
+| **列选择** | Alt+Drag 拖出矩形选区，自动展开为 N 个 range cursors；表格 / 代码块 / 虚拟化块自动跳过，64 行上限 |
 | **Vim 模式** | `Cmd+.` 切换 NORMAL/INSERT/VISUAL/V-LINE/V-BLOCK 六种模式；motions（hjkl/wb/e/0$/^/gg/G/f/F/t/T/{char}/{}/( )/%）、operators（d/c/y + dd/cc/yy + x/r/J/>>/<<）、text objects（iw/aw/ip/ap/i"/a"/i(/a(/i{/a{）、ex 命令（`:w` `:q` `:wq` `:e`）；V/Ctrl-V 复用列选择 plugin；状态栏 mode 芯片 + count/operator 暂存区；持久化到 `AppConfig.vim_mode` |
 | **多标签页** | 同时打开多个文档，支持脏状态追踪 |
 | **文件树管理** | 打开文件夹作为工作区，浏览、搜索、创建、重命名、删除文件 |
@@ -21,7 +21,7 @@ WYSIWYG Markdown 桌面编辑器。
 | **搜索替换** | 支持正则、大小写敏感、全词匹配 |
 | **源码模式** | 切换到 CodeMirror 原始 Markdown 编辑 |
 | **快速插入** | `@` 触发命令面板，快速插入标题、代码块、表格等 |
-| **多主题** | 浅色、VS Code Dark、Atom One Dark 等 6 种主题 |
+| **多主题** | 浅色、深色、One Dark 等 6 种主题 |
 | **导出** | 支持导出为 HTML、PDF、Word 和 PNG（图片） |
 | **CJK 支持** | CJK 字符感知的词数统计 |
 | **自动编码检测** | 支持读取 UTF-8、GBK、Shift_JIS、Big5 等编码的文件 |
@@ -128,8 +128,8 @@ MarkPure/
 │       │   ├── search/          # 工作区搜索
 │       │   ├── quick-insert/    # 快速插入
 │       │   └── outline/        # 大纲面板
-│       ├── extensions/         # Tiptap 扩展（17 个，含 P2-6 虚拟化）
-│       ├── plugins/            # ProseMirror 插件（5+ 个，含 P2-6 virtualization/、P0-3 multi-cursor/）
+│       ├── extensions/         # Tiptap 扩展（17 个，含大文档虚拟化）
+│       ├── plugins/            # ProseMirror 插件（5+ 个，含虚拟化与多光标实现）
 │       ├── nodeviews/          # ProseMirror NodeView（代码块）
 │       ├── stores/             # Svelte 5 runes 状态管理
 │       └── i18n/               # 国际化
@@ -264,8 +264,8 @@ MarkPure/
 ## 最近更新
 
 - **P2-7 Vim 模式（Cmd+. 切换）** — 自研 mode FSM 落地（`prosemirror-vim` 2018 后未维护且不兼容 PM 17 / Tiptap 3）。`frontend/src/plugins/vim/` 新增 11 文件 ~2500 LOC（types/state/key-parser/motions/operators/text-objects/ex-commands/visual/commands/decorations/index）+ `frontend/src/extensions/editing/vim-extension.ts`（~100 LOC Tiptap 包装）+ 集成 8 处（editor.ts 注册 + App.svelte $state/onTransaction/setVimExContext + StatusBar.svelte mode 芯片 + commandRegistry + keymap.rs `CmdOrCtrl+.` + config.rs `vim_mode: bool` + i18n 三语各 +10 key）。6 种 mode × 18 motions × 3 operators × 10+ text objects × 4 ex 命令（`:w`/`:q`/`:wq`/`:e`）；V/Ctrl-V 直接 dispatch 到 P2-3 列选择 plugin 复用矩形计算与多光标 fan-out；状态栏 mode 芯片 + count/operator 暂存区（`NORMAL│3d`）；IME 合成 pass-through；yank 寄存器 V1 填充不读（V2）。`npx tsx scripts/validate-vim.ts` 59/59 通过 + 多光标 15/15 + 列选 20/20 + 撤销树 36/36 全部无回归。详见 [docs/FEATURES.md](./docs/FEATURES.md)
-- **P2-3 列选择（Column Selection,VSCode/Sublime 风格）** — 自研 Alt+Drag 矩形选区落地。`frontend/src/plugins/multi-cursor/column-select.ts`（~370 行）+ `rect-types.ts`(~60 行)新增 2 文件,集成 6 处(editor.ts 插件注册 + App.svelte 派发 + StatusBar chip + app.css overlay + commandRegistry + 2 个 i18n key × 3 语言)。矩形按线高扫描展开为 N 个 range cursors,直接复用 P0-3 多光标的 fan-out / 装饰 / 撤销链路,零新增编辑代码。表格 / 代码块 / 虚拟化块跳过,3px 阈值下降级为单点 Alt+Click,64 行上限。`npx tsx scripts/validate-column-select.ts` 20/20 通过,多光标 15/15 无回归,cargo 110/110 通过。详见 [docs/FEATURES.md#110-列选择column-selectionaltdrag--p2-3-2026-06-15](./docs/FEATURES.md)
-- **P0-3 真正多光标编辑（VSCode 风格）** — 自研多光标 plugin 7 文件落地（`frontend/src/plugins/multi-cursor/`）。Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/单行粘贴自动 fan-out；状态栏显示「多光标 (N)」；4 处键位注册 + 4 条 i18n key（en/zh-CN/ja）；15/15 单元测试通过。详见 [docs/FEATURES.md#19-真正多光标编辑-multi-cursor-vscode-风格--p0-3-2026-06-14](./docs/FEATURES.md)
+- **P2-3 列选择（Column Selection）** — 自研 Alt+Drag 矩形选区落地。`frontend/src/plugins/multi-cursor/column-select.ts`（~370 行）+ `rect-types.ts`(~60 行)新增 2 文件,集成 6 处(editor.ts 插件注册 + App.svelte 派发 + StatusBar chip + app.css overlay + commandRegistry + 2 个 i18n key × 3 语言)。矩形按线高扫描展开为 N 个 range cursors,直接复用 P0-3 多光标的 fan-out / 装饰 / 撤销链路,零新增编辑代码。表格 / 代码块 / 虚拟化块跳过,3px 阈值下降级为单点 Alt+Click,64 行上限。`npx tsx scripts/validate-column-select.ts` 20/20 通过,多光标 15/15 无回归,cargo 110/110 通过。详见 [docs/FEATURES.md](./docs/FEATURES.md)
+- **P0-3 真正多光标编辑（Multi-Cursor）** — 自研多光标 plugin 7 文件落地（`frontend/src/plugins/multi-cursor/`）。Alt+Click 加光标、Cmd+D 选下个匹配、Cmd+Shift+L 全选匹配、Cmd+U 撤销、Esc 清空；输入/Backspace/单行粘贴自动 fan-out；状态栏显示「多光标 (N)」；4 处键位注册 + 4 条 i18n key（en/zh-CN/ja）；15/15 单元测试通过。详见 [docs/FEATURES.md](./docs/FEATURES.md)
 - **多根工作区 (P2-4)** — 工作区支持多根目录，根切换 pill、跨根搜索/书签、Tab 持久化含 root_id；命令 `file.set_active_workspace_root`
 - **文档化整改** — 23+ 项已实现功能从 COMPETITOR_TODO.md 下沉到 [docs/FEATURES.md](./docs/FEATURES.md)，README 与实现状态完全对齐
 - **P1-8 PNG 图片导出** — File ▸ Export ▸ PNG 一键导出当前文档为 PNG 长图，主题跟随编辑器，KaTeX/Mermaid/代码高亮/workspace 图片自动保留。零 Rust 新渲染依赖，复用 `image 0.25` 校验字节流

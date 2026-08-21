@@ -14,12 +14,10 @@
 
   let outline = $state<OutlineItem[]>([])
   let search = $state('')
-  /// Maximum heading depth to show. 0 = no headings, 1 = H1 only,
-  /// 6 = all levels. Stored as a plain number for easy binding to
-  /// the `<select>` value.
+  /// 显示到第几级标题。0 = 不显示标题，1 = 只显示 H1，
+  /// 6 = 全部级别。用普通数字存储，方便直接绑定到 `<select>` 的值。
   let maxDepth = $state(3)
-  /// Position of the editor selection; used to highlight the
-  /// heading the user is currently inside.
+  /// 编辑器选区的位置；用来高亮用户当前所在的标题。
   let selectionFrom = $state(0)
 
   $effect(() => {
@@ -29,13 +27,10 @@
     }
     const refresh = () => { outline = extractOutline(editor!) }
     refresh()
-    // Re-extract on every doc change so the outline reflects
-    // edits immediately. Without this, the user adds a heading
-    // and the panel still shows the old list. The update event
-    // fires on every transaction (incl. selection changes) which
-    // is O(n) per call — debounce so a burst of typing or a
-    // chain of selection moves doesn't pile up full re-extractions
-    // and freeze the UI.
+    // 每次文档变化都重新提取，确保大纲即时反映编辑结果。若不这样，
+    // 用户新增标题后面板仍显示旧列表。update 事件会在每个事务上
+    // 触发（包括选区变化），每次调用是 O(n)——因此做防抖，
+    // 避免连续打字或一连串光标移动堆积出大量全量提取而卡死界面。
     let refreshTimer: ReturnType<typeof setTimeout> | null = null
     const scheduleRefresh = () => {
       if (refreshTimer) clearTimeout(refreshTimer)
@@ -45,7 +40,7 @@
       }, 100)
     }
     editor.on('update', scheduleRefresh)
-    // Track selection so we can highlight the current heading.
+    // 跟踪选区，以便高亮当前所在的标题。
     const onSel = () => { selectionFrom = editor!.state.selection.from }
     editor.on('selectionUpdate', onSel)
     onSel()
@@ -56,7 +51,7 @@
     }
   })
 
-  /// Apply search and depth filters, then build a tree.
+  /// 套用搜索与深度过滤，然后构建成树。
   let tree = $derived.by(() => {
     const q = search.trim().toLowerCase()
     const filtered = outline.filter((it) => {
@@ -67,9 +62,8 @@
     return buildTree(filtered)
   })
 
-  /// The "current" heading is the deepest heading whose `pos`
-  /// is at or before the selection. We pre-compute it so the
-  /// recursive renderer can mark the right node.
+  /// “当前”标题是 `pos` 小于等于选区位置的那一层最深标题。
+  /// 预先算好它，递归渲染器才能标出正确的节点。
   let currentSlug = $derived.by(() => {
     let best: OutlineItem | null = null
     for (const it of outline) {
@@ -80,30 +74,24 @@
     return best?.slug ?? null
   })
 
-  // P0-X: Typora-style "scroll the outline to keep the
-  // current heading visible" behaviour. We query the DOM
-  // for the button matching the current slug and call
-  // `scrollIntoView` whenever the slug changes. Doing it
-  // via DOM lookup (instead of binding refs on every
-  // list item) keeps the snippet simple and avoids
-  // storing a closure per outline entry.
+  // “滚动大纲，让当前标题始终可见”的行为。当 slug 变化时，
+  // 通过 DOM 查找与当前 slug 匹配的按钮并调用 `scrollIntoView`。
+  // 用 DOM 查找（而不是给每个列表项绑定 ref）能让实现保持简单，
+  // 也避免为每条大纲项保存一个闭包。
   let lastScrolledSlug: string | null = null
   $effect(() => {
     if (!currentSlug || currentSlug === lastScrolledSlug) return
-    // `requestAnimationFrame` so the snippet has time to
-    // commit the `current` class change to the DOM before
-    // we look it up. Without this, on a fast selection
-    // change the button may still have `current: false`
-    // when `scrollIntoView` fires.
+    // 通过 `requestAnimationFrame` 给界面时间去把 `current`
+    // 类的变化提交到 DOM，然后再去查找。否则在快速移动选区时，
+    // `scrollIntoView` 触发时按钮可能仍是 `current: false`。
     requestAnimationFrame(() => {
       const el = document.querySelector(
         `.outline-item.current`,
       ) as HTMLElement | null
       if (el) {
-        // `block: 'nearest'` so the panel nudges only when
-        // the active heading goes off-screen — Typora does
-        // the same. `inline: 'nearest'` keeps the heading
-        // horizontally anchored.
+        // `block: 'nearest'` 让面板只在当前标题滚出屏幕时才
+        // 轻微滚动；`inline: 'nearest'` 保持标题在水平方向
+        // 上的锚定。
         el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
         lastScrolledSlug = currentSlug
       }
@@ -114,8 +102,7 @@
     onNavigate?.(item)
   }
 
-  /// Tree node used for nested rendering. Built from a flat
-  /// filtered list by stacking on level.
+  /// 嵌套渲染用的树节点。由扁平过滤列表按层级堆叠而成。
   interface TreeItem {
     item: OutlineItem
     children: TreeItem[]

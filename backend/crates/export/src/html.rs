@@ -1,18 +1,16 @@
 use markdown::to_html_with_diagrams_and_footnotes;
 
-/// Export markdown text to a standalone HTML document.
+/// 把 Markdown 文本导出为独立的 HTML 文档。
 ///
-/// The body is the result of `markdown::to_html_with_diagrams_and_footnotes`
-/// — which pre-renders any ` ```mermaid ` code blocks into inline SVG,
-/// rewrites `[^id]` footnote references to `<sup class="footnote-ref">`,
-/// and appends a `<section class="footnotes">` block at the end of the
-/// document. If the Mermaid CLI is unavailable, the blocks fall back to
-/// a styled `<pre class="mermaid-fallback">` showing the source plus
-/// an error message. Non-mermaid raw HTML in the source may pass through;
-/// we do NOT double-escape the body (that would render literal
-/// `&lt;h1&gt;` text), but we do strip any `<script>`/`<style>`/`<iframe>`/
-/// `<object>`/`<embed>` content as defense in depth, and we ship a CSP
-/// meta tag that disables inline scripts and remote script sources.
+/// 正文是 `markdown::to_html_with_diagrams_and_footnotes` 的结果——
+/// 它把任何 ` ```mermaid ` 代码块预渲染为内联 SVG，把 `[^id]` 脚注
+/// 引用改写为 `<sup class="footnote-ref">`，并在文档末尾追加
+/// `<section class="footnotes">` 块。若 Mermaid CLI 不可用，代码块
+/// 回退为带动画样式的 `<pre class="mermaid-fallback">`，展示源码
+/// 与一条错误消息。源中的非 mermaid 原始 HTML 可能原样通过；我们
+/// 不会对正文做二次转义（那会把 `&lt;h1&gt;` 渲染成字面量），但会
+/// 屏蔽任何 `<script>`/`<style>`/`<iframe>`/`<object>`/`<embed>`
+/// 内容作为纵深防御，并附带禁用内联脚本与远程脚本源的 CSP meta 标签。
 pub fn export_html(
     markdown: &str,
     title: &str,
@@ -23,11 +21,10 @@ pub fn export_html(
 
     let theme = theme_css.unwrap_or(DEFAULT_CSS);
 
-    // The CSP allows inline styles because the embedded `<style>` block
-    // sets the look, but blocks inline and remote script execution.
-    // `data:` is permitted for images so data: URIs from base64-embedded
-    // screenshots still render. `frame-src 'none'` blocks any
-    // `<iframe>` an attacker might have smuggled into the markdown.
+    // CSP 允许内联样式（嵌入的 `<style>` 块负责外观），但阻止内联与
+    // 远程脚本执行。`data:` 允许用于图片，使 base64 嵌入的截图 data: URI
+    // 仍能渲染。`frame-src 'none'` 阻止攻击者可能塞进 markdown 的任何
+    // `<iframe>`。
     let csp = "default-src 'none'; \
                style-src 'unsafe-inline'; \
                img-src 'self' data: https:; \
@@ -61,9 +58,8 @@ pub fn export_html(
     )
 }
 
-/// Escape `&`, `<`, `>`, `"` for safe inclusion in HTML text and
-/// double-quoted attribute values. Single quotes are not escaped —
-/// they have no special meaning in those contexts.
+/// 转义 `&`、`<`、`>`、`"`，以安全地放入 HTML 文本与双引号属性值。
+/// 单引号不转义——在这些上下文中它没有特殊含义。
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -71,26 +67,23 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/// Remove the body of any tag whose presence in an exported document
-/// would be a security hazard: `<script>`, `<style>` (the markdown
-/// converter will normally produce its own `<style>` only if asked),
-/// `<iframe>`, `<object>`, `<embed>`, `<noscript>`, and any inline
-/// event-handler attributes that could be smuggled in via
-/// `<a onclick="…">` or similar. We don't try to be a full HTML
-/// sanitizer here — `pulldown-cmark` already does most of the work —
-/// but we close the obvious holes.
+/// 移除任何出现在导出文档中有安全危害的标签正文：`<script>`、
+/// `<style>`（Markdown 转换器通常只在被要求时才产生自己的 `<style>`）、
+/// `<iframe>`、`<object>`、`<embed>`、`<noscript>`，以及可能经
+/// `<a onclick="…">` 之类塞入的任何内联事件处理属性。我们不打算
+/// 在此做完整的 HTML 消毒——`pulldown-cmark` 已处理大部分工作——
+/// 但我们堵上明显的漏洞。
 fn sanitize_body(html: &str) -> String {
-    // Step 1: drop dangerous tags AND their content. We do this with a
-    // small hand-rolled scanner so we don't pull in a heavyweight
-    // dependency. The implementation is a single forward pass that
-    // tracks when we're inside a tag we're stripping.
+    // 第 1 步：丢弃危险标签及其内容。我们用一个小型手工扫描器完成，
+    // 以免引入重量级依赖。实现是单次前向遍历，跟踪何时处于正在
+    // 剥离的标签内。
     let dangerous = ["script", "style", "iframe", "object", "embed", "noscript"];
     let mut out = String::with_capacity(html.len());
     let mut i = 0usize;
     let lower = html.to_ascii_lowercase();
     while i < html.len() {
         if html[i..].starts_with('<') {
-            // Find the end of the tag.
+            // 找到标签的结尾。
             if let Some(close_rel) = html[i..].find('>') {
                 let close = i + close_rel;
                 let tag_inner = &html[i + 1..close];
@@ -101,9 +94,8 @@ fn sanitize_body(html: &str) -> String {
                     .trim_start_matches('/')
                     .to_ascii_lowercase();
                 if dangerous.iter().any(|d| **d == tag_name) {
-                    // Try to skip up to and including the matching
-                    // closing tag. If we can't find one (malformed
-                    // HTML), drop the rest of the document.
+                    // 尝试跳到匹配的结束标签（含其本身）。若找不到
+                    //（HTML 格式错误），丢弃文档其余部分。
                     let close_tag = format!("</{}", tag_name);
                     if let Some(skip_end) = lower[i..].find(&close_tag) {
                         if let Some(real_end) = html[i + skip_end..].find('>') {
@@ -111,12 +103,11 @@ fn sanitize_body(html: &str) -> String {
                             continue;
                         }
                     }
-                    // No closing tag: drop everything from here on.
+                    // 没有结束标签：从当前位置丢弃全部内容。
                     break;
                 }
-                // Step 2: strip inline event-handler attributes from
-                // tags we keep. `on*` attributes execute JS even
-                // without `<script>` tags.
+                // 第 2 步：从保留的标签中剥离内联事件处理属性。
+                // 没有 `<script>` 标签时 `on*` 属性也能执行 JS。
                 let cleaned = strip_event_handlers(tag_inner);
                 out.push('<');
                 out.push_str(&cleaned);
@@ -125,51 +116,50 @@ fn sanitize_body(html: &str) -> String {
                 continue;
             }
         }
-        // Outside a tag: copy byte-for-byte.
-        // SAFETY: we only enter this branch when `html[i]` is not
-        // the start of a tag, so the byte is a UTF-8 lead or
-        // continuation byte, never a stray multi-byte char.
+        // 标签外：逐字节复制。
+        // SAFETY: 只有 `html[i]` 不是标签开头时才进入此分支，
+        // 因此该字节是 UTF-8 首字节或延续字节，绝不会是游离的
+        // 多字节字符。
         out.push(html[i..].chars().next().unwrap());
         i += html[i..].chars().next().unwrap().len_utf8();
     }
     out
 }
 
-/// Remove `on*=` attribute assignments from a tag's inner text.
-/// `<a href="x" onclick="bad()">` becomes `<a href="x">`.
-/// `<input onfocus>` (no value) is also removed.
+/// 从标签内文移除 `on*=` 属性赋值。
+/// `<a href="x" onclick="bad()">` 变为 `<a href="x">`。
+/// 无值的 `<input onfocus>` 也会被移除。
 fn strip_event_handlers(tag_inner: &str) -> String {
     if !tag_inner.contains("on") {
         return tag_inner.to_string();
     }
-    // We operate on the bytes between attribute name=value pairs.
-    // For each `onXXX="..."` or `onXXX='...'` or `onXXX=` (unquoted),
-    // we strip from `onXXX` through the closing quote / whitespace.
+    // 我们在属性名=值对之间的字节上操作。
+    // 对每个 `onXXX="..."` 或 `onXXX='...'` 或 `onXXX=`（未加引号），
+    // 从 `onXXX` 剥离到右引号 / 空白。
     let bytes = tag_inner.as_bytes();
     let mut out = String::with_capacity(tag_inner.len());
     let mut i = 0usize;
     while i < bytes.len() {
-        // Match "on" followed by a letter, then either '=' or
-        // whitespace.
+        // 匹配后跟字母的 "on"，然后是 '=' 或空白。
         if i + 2 < bytes.len()
             && bytes[i] == b'o'
             && bytes[i + 1] == b'n'
             && bytes[i + 2].is_ascii_alphabetic()
         {
-            // Find the end of the attribute name.
+            // 找到属性名的结尾。
             let mut j = i + 2;
             while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'-') {
                 j += 1;
             }
-            // Skip whitespace, then expect '='.
+            // 跳过空白，然后期待 '='。
             let mut k = j;
             while k < bytes.len() && bytes[k].is_ascii_whitespace() {
                 k += 1;
             }
             if k < bytes.len() && bytes[k] == b'=' {
-                // Skip the '='.
+                // 跳过 '='。
                 let mut v = k + 1;
-                // Skip whitespace before value.
+                // 跳过值前的空白。
                 while v < bytes.len() && bytes[v].is_ascii_whitespace() {
                     v += 1;
                 }
@@ -180,16 +170,16 @@ fn strip_event_handlers(tag_inner: &str) -> String {
                         v += 1;
                     }
                     if v < bytes.len() {
-                        v += 1; // consume closing quote
+                        v += 1; // 消费右引号
                     }
-                    // Also consume a single trailing space.
+                    // 同时消费一个尾随空格。
                     if v < bytes.len() && bytes[v] == b' ' {
                         v += 1;
                     }
                     i = v;
                     continue;
                 } else {
-                    // Unquoted value: consume until whitespace or '>'.
+                    // 未加引号的值：消费到空白或 '>'。
                     while v < bytes.len() && !bytes[v].is_ascii_whitespace() && bytes[v] != b'>' {
                         v += 1;
                     }
@@ -197,10 +187,15 @@ fn strip_event_handlers(tag_inner: &str) -> String {
                     continue;
                 }
             }
-            // Not actually an event handler; fall through and copy.
+            // 实际上不是事件处理属性；落到下面进行复制。
         }
-        out.push(bytes[i] as char);
-        i += 1;
+        // 按字符复制（而非按字节）：属性值里可能含多字节 UTF-8
+        // （如 `class="中文"`），逐字节 `as char` 会把每个字节变成
+        // 一个 Latin-1 字符，直接损坏导出内容。所有 ASCII 匹配都在
+        // 字符边界上成立，因此 `i` 始终位于字符边界。
+        let ch = tag_inner[i..].chars().next().unwrap();
+        out.push(ch);
+        i += ch.len_utf8();
     }
     out
 }
@@ -258,10 +253,9 @@ mod tests {
 
     #[test]
     fn body_is_not_double_escaped() {
-        // The body is rendered HTML and must remain valid HTML; we
-        // should NOT html_escape the body (that turns <h1> into
-        // &lt;h1&gt; and breaks rendering). This is a regression
-        // guard: an earlier version did double-escape.
+        // 正文是渲染后的 HTML，必须保持为有效 HTML；我们不应再对正文
+        // 做 html_escape（那会把 <h1> 变成 &lt;h1&gt; 并破坏渲染）。
+        // 这是回归防护：早期版本确实做了二次转义。
         let md = "# Title\n\nHello **world**\n";
         let out = export_html(md, "T", None);
         assert!(out.contains("<h1>Title</h1>"), "expected <h1> in output, got:\n{out}");
@@ -270,8 +264,8 @@ mod tests {
 
     #[test]
     fn strips_script_body() {
-        // Markdown that smuggles <script> must NOT execute when
-        // exported HTML is opened in a browser.
+        // 塞入 <script> 的 Markdown 在浏览器中打开导出的 HTML 时
+        // 绝不能执行。
         let md = "Hello\n\n<script>alert(1)</script>\n\nWorld";
         let out = export_html(md, "T", None);
         assert!(!out.to_ascii_lowercase().contains("<script"),
@@ -288,9 +282,8 @@ mod tests {
 
     #[test]
     fn strips_inline_event_handlers() {
-        // The markdown converter will produce a normal <a> tag for
-        // the link. We test our sanitizer directly to keep the test
-        // independent of pulldown-cmark output.
+        // 链接将由 Markdown 转换器生成正常的 <a> 标签。我们直接测试
+        // 消毒器，使测试独立于 pulldown-cmark 输出。
         let cleaned = strip_event_handlers(r#"a href="x" onclick="bad()" target="_blank""#);
         assert!(!cleaned.to_ascii_lowercase().contains("onclick"),
                 "onclick leaked: {cleaned}");
@@ -301,7 +294,7 @@ mod tests {
     #[test]
     fn title_is_escaped() {
         let out = export_html("body", "<script>alert(1)</script>", None);
-        // The title should be in <title>...</title> and escaped.
+        // 标题应位于 <title>...</title> 中并已转义。
         assert!(out.contains("&lt;script&gt;alert(1)&lt;/script&gt;"),
                 "title not escaped: {out}");
     }

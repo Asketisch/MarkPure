@@ -1,4 +1,4 @@
-// ============================== App info ==============================
+// ============================== 应用信息 ==============================
 
 pub fn cmd_get_app_info() -> std::result::Result<serde_json::Value, String> {
     Ok(serde_json::json!({

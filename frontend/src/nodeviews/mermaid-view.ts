@@ -1,17 +1,14 @@
 /**
- * Mermaid diagram — vanilla ProseMirror NodeView.
+ * Mermaid 图表 —— 原生 ProseMirror NodeView。
  *
- * `@tiptap/core` v3 doesn't ship a Svelte NodeViewRenderer in
- * the FOSS build, so we manage the DOM directly. The view
- * renders the diagram client-side by dynamically importing the
- * `mermaid` library and calling `mermaid.render(id, code)`. The
- * Rust backend `mmdc` path is no longer used for the editor
- * preview (it remains in the export pipeline — see
- * `backend/crates/markdown/src/mermaid.rs`).
+ * `@tiptap/core` v3 的 FOSS 构建没有附带 Svelte NodeViewRenderer，
+ * 因此直接操作 DOM。视图通过动态导入 `mermaid` 库并调用
+ * `mermaid.render(id, code)` 在客户端渲染图表。Rust 后端的
+ * `mmdc` 路径不再用于编辑器预览（仍保留在导出管线中——见
+ * `backend/crates/markdown/src/mermaid.rs`）。
  *
- * If the diagram source is invalid, `mermaid.render` throws
- * and we fall back to a styled code block showing the original
- * source plus the error message.
+ * 若图表源码无效，`mermaid.render` 会抛错，此时回退为一段带样式
+ * 的代码块，展示原始源码加错误信息。
  */
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -21,9 +18,8 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// Mermaid is loaded lazily so the ~500KB initial cost doesn't
-// block editor startup. The first NodeView to render kicks off
-// the dynamic import; subsequent renders await the same promise.
+// Mermaid 采用懒加载，避免约 500KB 的初始成本阻塞编辑器启动。
+// 第一个渲染的 NodeView 触发动态导入；后续渲染等待同一个 promise。
 let mermaidInitPromise: Promise<typeof import('mermaid').default> | null = null
 
 async function getMermaid(): Promise<typeof import('mermaid').default> {
@@ -33,10 +29,11 @@ async function getMermaid(): Promise<typeof import('mermaid').default> {
       const mermaid = mod.default
       mermaid.initialize({
         startOnLoad: false,
-        // `loose` keeps the parser forgiving of features the strict
-        // mode would reject; this is the same default the upstream
-        // Mermaid Live Editor uses.
-        securityLevel: 'loose',
+        // `strict`：渲染产物经 DOMPurify 净化，剥离 click 回调与
+        // 内嵌脚本——编辑器会打开用户来源不可信的 .md 文件，
+        // 图表里的 `<script>`/click handler 不得有机会执行。
+        // 代价是图表内 click 跳转失效（可接受）。
+        securityLevel: 'strict',
         theme: 'default',
       })
       return mermaid
@@ -71,7 +68,7 @@ class MermaidNodeView {
   selectNode() { this.dom.classList.add('ProseMirror-selectednode') }
   deselectNode() { this.dom.classList.remove('ProseMirror-selectednode') }
 
-  destroy() { /* nothing to clean up */ }
+  destroy() { /* 无需清理 */ }
 
   private render() {
     this.dom.innerHTML = ''
@@ -85,13 +82,22 @@ class MermaidNodeView {
   private async fetchAndPaint() {
     if (this.pending) return
     this.pending = true
+    // 捕获本次渲染的目标代码：渲染是异步的，期间用户可能又改了
+    // 代码——完成时若已过期则丢弃结果并按最新代码补渲染，
+    // 否则画面会停留在旧代码（stale SVG）直到下一次编辑。
+    const code = this.currentCode
     try {
       const mermaid = await getMermaid()
-      // mermaid.render() requires a unique DOM id per call to
-      // avoid clobbering concurrent renders in the same page.
+      // mermaid.render() 每次调用需要一个唯一的 DOM id，
+      // 避免同一页面里并发渲染互相覆盖。
       const id = `mmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      const { svg } = await mermaid.render(id, this.currentCode)
-      this.lastRendered = this.currentCode
+      const { svg } = await mermaid.render(id, code)
+      if (code !== this.currentCode) {
+        this.pending = false
+        this.render()
+        return
+      }
+      this.lastRendered = code
       this.dom.innerHTML = ''
       const wrap = document.createElement('div')
       wrap.className = 'mermaid-svg'
@@ -102,23 +108,27 @@ class MermaidNodeView {
       const sum = document.createElement('summary')
       sum.textContent = 'Source'
       const pre = document.createElement('pre')
-      const code = document.createElement('code')
-      code.textContent = this.currentCode
-      pre.appendChild(code)
+      const codeEl = document.createElement('code')
+      codeEl.textContent = code
+      pre.appendChild(codeEl)
       details.appendChild(sum)
       details.appendChild(pre)
       this.dom.appendChild(details)
     } catch (e) {
-      // mermaid.render() throws on syntax errors. Show the
-      // original source plus the error so the user can fix it
-      // — same UX as the previous `mmdc` fallback path.
+      if (code !== this.currentCode) {
+        this.pending = false
+        this.render()
+        return
+      }
+      // mermaid.render() 在语法错误时抛错。展示原始源码和错误
+      // 信息，便于用户修复——与之前 `mmdc` 回退路径的体验一致。
       this.dom.innerHTML = ''
       const fb = document.createElement('div')
       fb.className = 'mermaid-fallback'
       const pre = document.createElement('pre')
-      const code = document.createElement('code')
-      code.textContent = this.currentCode
-      pre.appendChild(code)
+      const codeEl = document.createElement('code')
+      codeEl.textContent = code
+      pre.appendChild(codeEl)
       fb.appendChild(pre)
       const err = document.createElement('div')
       err.className = 'mermaid-error'
@@ -150,28 +160,26 @@ export const MermaidExtension = Node.create({
     return ['pre', mergeAttributes(HTMLAttributes, { class: 'mermaid' }), 0]
   },
 
-  // ---- Markdown round-trip hooks ----
-  // We own a dedicated `mermaid` token name so we don't race with the
-  // built-in CodeBlock extension (which already handles `code` tokens
-  // and is registered first via StarterKit). Our `markdownTokenizer`
-  // matches only `` ```mermaid `` fences; any other fence falls through
-  // to marked's built-in `code` tokenizer.
+  // ---- Markdown 往返钩子 ----
+  // 独占一个 `mermaid` token 名，避免与内置的 CodeBlock 扩展竞争
+  // （它已经通过 StarterKit 优先注册并处理 `code` token）。我们的
+  // `markdownTokenizer` 只匹配 `` ```mermaid `` 围栏；其他围栏
+  // 交回 marked 内置的 `code` tokenizer。
   markdownTokenName: 'mermaid',
 
   markdownTokenizer: {
     name: 'mermaid',
     level: 'block',
     start: (src: string) => {
-      // Look for the next ```mermaid fence at the start of a line.
-      // Returning -1 for non-mermaid fences lets marked's `code`
-      // tokenizer handle them.
+      // 查找下一个位于行首的 ```mermaid 围栏。非 mermaid 围栏
+      // 返回 -1，交给 marked 的 `code` tokenizer 处理。
       const re = /^[ \t]*```mermaid\b/m
       const m = re.exec(src)
       return m ? m.index : -1
     },
     tokenize: (src: string) => {
-      // Match a complete ```mermaid ... ``` block. Captures the body
-      // (group 1) for the `text` field of the resulting token.
+      // 匹配完整的 ```mermaid ... ``` 块。把主体（分组 1）捕获为
+      // 结果 token 的 `text` 字段。
       const re = /^[ \t]*```mermaid[ \t]*\n([\s\S]*?)\n?[ \t]*```(?:[ \t]*$|\n)/m
       const m = re.exec(src)
       if (!m) return undefined
@@ -197,7 +205,7 @@ export const MermaidExtension = Node.create({
     const body = helpers.renderChildren(node.content ?? []) as string
     return ['```mermaid', body, '```'].join('\n')
   },
-  // ---- end markdown round-trip hooks ----
+  // ---- 结束：Markdown 往返钩子 ----
 
   addNodeView() {
     return (props) => {

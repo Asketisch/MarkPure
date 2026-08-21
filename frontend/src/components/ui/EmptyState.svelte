@@ -18,8 +18,8 @@
     onOpenFile?: (path: string) => void
     onOpenWorkspace?: (path: string) => void
     /**
-     * Fired when the user clicks a recent-file entry. The host
-     * wires this to `openFileByPath` + `openFileInNewTab`.
+     * 点击最近文件条目时触发。宿主把它接到
+     * `openFileByPath` + `openFileInNewTab` 上。
      */
     onOpenRecent?: (path: string) => void
   } = $props()
@@ -38,13 +38,21 @@
   })
 
   async function handleOpenFile() {
-    const info = await openFile()
-    if (info && onOpenFile) onOpenFile(info.path)
+    try {
+      const info = await openFile()
+      if (info && onOpenFile) onOpenFile(info.path)
+    } catch (e) {
+      console.error('[EmptyState] open file failed:', e)
+    }
   }
 
   async function handleOpenWorkspace() {
-    const path = await pickDirectory()
-    if (path && onOpenWorkspace) onOpenWorkspace(path)
+    try {
+      const path = await pickDirectory()
+      if (path && onOpenWorkspace) onOpenWorkspace(path)
+    } catch (e) {
+      console.error('[EmptyState] pick directory failed:', e)
+    }
   }
 
   async function handleClearRecent() {

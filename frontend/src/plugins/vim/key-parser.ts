@@ -1,57 +1,54 @@
 /**
- * Key-sequence parser for the Vim mode plugin (P2-7).
+ * Vim 模式插件的按键序列解析器。
  *
- * The parser is a small finite state machine that consumes
- * `VimKey`s one at a time and returns either a fully-parsed
- * `VimCommand` (ready to execute) or a "still buffering"
- * signal (the caller updates the plugin's `pending` field).
+ * 解析器是一个小型有限状态机，逐个消费 `VimKey`，
+ * 并返回两种结果之一：一个完全解析好的 `VimCommand`（可直接执行），
+ * 或者一个「仍在缓冲中」的信号（由调用方更新插件的 `pending` 字段）。
  *
- * The FSM has 5 "active" states (idle / count / operator /
- * motion / text-object / ex). INSERT mode is handled at the
- * plugin level — the parser is dormant while in INSERT, so
- * this file only deals with NORMAL/VISUAL keys.
+ * 状态机包含若干「活动」状态（空闲 / 计数 / 操作符 / 移动 /
+ * 文本对象 / ex 命令）。插入模式在插件层面处理——解析器在插入模式下
+ * 处于休眠状态，因此本文件只处理普通 / 可视模式下的按键。
  *
- * Tables (internal):
- *   - MOTION_TABLE        — single-key motion names
- *   - OPERATOR_TABLE      — d / c / y
- *   - TEXT_OBJECT_TABLE   — w / p / " / ' / ` / ( / { / [ / <
- *   - VISUAL_TRIGGER      — v / V / Ctrl-V
- *   - INSERT_TRIGGER      — i / I / a / A / o / O / s / S
- *   - SPECIAL_KEYS        — Escape, Ctrl-R, Ctrl-C, etc.
+ * 查找表（内部使用）：
+ *   - MOTION_TABLE        —— 单键移动的名称
+ *   - OPERATOR_TABLE      —— d / c / y
+ *   - TEXT_OBJECT_TABLE   —— w / p / " / ' / ` / ( / { / [ / <
+ *   - VISUAL_TRIGGER      —— v / V / Ctrl-V
+ *   - INSERT_TRIGGER      —— i / I / a / A / o / O / s / S
+ *   - SPECIAL_KEYS        —— Escape、Ctrl-R、Ctrl-C 等
  *
- * Parse flow for `3dw` (delete 3 words):
- *   1. '3' from idle      → pending: { kind: 'count', digits: 3 }
- *   2. 'd' from count     → pending: { kind: 'operator', op: 'delete', count: 3 }
- *   3. 'w' from operator  → READY { type: 'deleteMotion', motion: 'wordForward', count: 3 }
- *      state resets to idle, plugin dispatches the command.
+ * `3dw`（删除 3 个单词）的解析流程：
+ *   1. 空闲态收到 '3'   → pending: { kind: 'count', digits: 3 }
+ *   2. 计数态收到 'd'   → pending: { kind: 'operator', op: 'delete', count: 3 }
+ *   3. 操作符态收到 'w' → READY { type: 'deleteMotion', motion: 'wordForward', count: 3 }
+ *      状态重置为空闲，插件派发该命令。
  *
- * Parse flow for `d3w` (also delete 3 words — count-after-motion):
- *   1. 'd' from idle      → pending: { kind: 'operator', op: 'delete', count: 1 }
- *   2. '3' from operator  → pending: { kind: 'motion', motion: ?, count: 3, op: 'delete' }
- *      (we keep a "phantom" motion slot until the next key fills it)
- *   3. 'w' from motion    → READY { type: 'deleteMotion', motion: 'wordForward', count: 3 }
+ * `d3w`（同样是删除 3 个单词——计数后置于移动之后）的解析流程：
+ *   1. 空闲态收到 'd'   → pending: { kind: 'operator', op: 'delete', count: 1 }
+ *   2. 操作符态收到 '3' → pending: { kind: 'motion', motion: ?, count: 3, op: 'delete' }
+ *      （在下一个按键填入前，保留一个「幽灵」移动槽位）
+ *   3. 移动态收到 'w'   → READY { type: 'deleteMotion', motion: 'wordForward', count: 3 }
  *
- * Double-operator (`dd` / `cc` / `yy`):
- *   1. 'd' from idle      → operator { op: 'delete', count: 1 }
- *   2. 'd' from operator  → READY { type: 'deleteLine', count: 1 }
- *      (linewise delete; matches Vim's `dd` behaviour)
+ * 双操作符（`dd` / `cc` / `yy`）：
+ *   1. 空闲态收到 'd'   → operator { op: 'delete', count: 1 }
+ *   2. 操作符态收到 'd' → READY { type: 'deleteLine', count: 1 }
+ *      （整行删除；与 Vim 的 `dd` 行为一致）
  *
- * `:` opens the ex bar:
- *   1. ':' from idle      → pending: { kind: 'ex', text: '' }
- *   2. 'w' from ex        → pending: { kind: 'ex', text: 'w' }
- *   3. Enter              → READY { type: 'ex', cmd: { type: 'write' } }
- *   4. Escape             → noOp (resets pending)
+ * `:` 打开 ex 命令栏：
+ *   1. 空闲态收到 ':'   → pending: { kind: 'ex', text: '' }
+ *   2. ex 态收到 'w'    → pending: { kind: 'ex', text: 'w' }
+ *   3. 收到 Enter       → READY { type: 'ex', cmd: { type: 'write' } }
+ *   4. 收到 Escape      → noOp（重置 pending）
  *
- * Out-of-scope for V1 (deferred to V2):
- *   - `g`-prefixed motions (gg, ge, g_, gj, gk) — V1 only
- *     implements gg as a single key bound by the FSM (not as `g`
- *     followed by another `g`).
- *   - Find char with repeat (`f{a}{count}`) — V1 only implements
- *     the basic `f{a}` motion; the count is read but not applied
- *     to the motion result.
- *   - Operator + motion repeat (`.`).
- *   - Registers (`"a{op}`).
- *   - Marks / jump list.
+ * 不在第一版支持范围内（推迟到后续版本）：
+ *   - `g` 前缀的移动（gg、ge、g_、gj、gk）——第一版只把 gg
+ *     作为状态机直接绑定的单个按键实现（而不是 `g` 之后再跟
+ *     另一个 `g`）。
+ *   - 带重复次数的字符查找（`f{a}{count}`）——第一版只实现
+ *     基础的 `f{a}` 移动；计数会被读取但不会作用于移动结果。
+ *   - 操作符 + 移动的重复执行（`.`）。
+ *   - 寄存器（`"a{op}`）。
+ *   - 标记 / 跳转列表。
  */
 
 import {
@@ -69,10 +66,9 @@ import {
 import { MOTION_TABLE, OPERATOR_TABLE, TEXT_OBJECT_TABLE } from './tables'
 import { parseExText } from './ex-parser'
 export { parseExText } from './ex-parser'
-// Pure command-construction helpers (ready / errorResult /
-// opToMotionCmd / serializeBuffer / …) live in
-// `key-parser-helpers.ts`. We import them for use in the FSM
-// below and re-export so existing consumers keep working.
+// 纯粹的命令构造辅助函数（ready / errorResult / opToMotionCmd /
+// serializeBuffer / …）位于 `key-parser-helpers.ts`。这里引入它们
+// 供下方状态机使用，并重新导出，让既有的使用者继续正常工作。
 import {
   ready,
   errorResult,
@@ -91,12 +87,11 @@ export {
   opToLinewise,
   serializeBuffer,
 } from './key-parser-helpers'
-// Transition handlers (special / ctrl / visual / motion-slot /
-// idle) live in `state-handlers.ts`; `handleCharKey` is the
-// only state handler that stays here (it's the megafunction
-// that delegates to them). Re-export preserves the historical
-// `import { ... } from './key-parser'` surface for callers that
-// imported the handlers directly.
+// 各类转换处理器（特殊键 / Ctrl / 可视模式 / 移动槽位 / 空闲态）
+// 位于 `state-handlers.ts`；`handleCharKey` 是唯一留在这里的
+// 状态处理器（它是一个巨大函数，负责把工作委托给上述各处理器）。
+// 重新导出是为了保留历史 `import { ... } from './key-parser'`
+// 的接口形态，方便直接引用过这些处理器的调用方。
 import {
   handleSpecialKey,
   handleCtrlKey,
@@ -113,40 +108,38 @@ export {
 } from './state-handlers'
 
 /* ------------------------------------------------------------------ *
- *  Key tables                                                         *
+ *  按键查找表                                                          *
  * ------------------------------------------------------------------ *
- *  See `./tables.ts` for the static lookup tables
- *  (MOTION_TABLE, OPERATOR_TABLE, TEXT_OBJECT_TABLE).
+ *  静态查找表（MOTION_TABLE、OPERATOR_TABLE、TEXT_OBJECT_TABLE）
+ *  参见 `./tables.ts`。
  */
 
 /* ------------------------------------------------------------------ *
- *  Public API                                                         *
+ *  公共接口                                                           *
  * ------------------------------------------------------------------ */
 
-/** Normalise a browser `KeyboardEvent` to a Vim key token.
+/** 把浏览器的 `KeyboardEvent` 规范化为 Vim 按键标记。
  *
- *  Returns a tagged union so the parser doesn't have to think
- *  about key codes / shift states directly. The `isMac` flag
- *  disambiguates `Ctrl-V` (block visual) from `Cmd-V` (paste). */
+ *  返回一个带标签的联合类型，解析器无需直接关心键码或 Shift 状态。
+ *  `isMac` 标志用于区分 `Ctrl-V`（块选可视模式）与 `Cmd-V`（粘贴）。 */
 export function parseKey(event: KeyboardEvent, isMac: boolean): VimKey {
-  // Ctrl-combos (Cmd-combos on macOS are NOT Vim keys — they belong
-  // to the OS / app-level shortcuts; the parser sees only `Ctrl`).
+  // Ctrl 组合键（macOS 上的 Cmd 组合键不是 Vim 按键——它们属于
+  // 操作系统或应用级快捷键；解析器只关心 `Ctrl`）。
   if (event.ctrlKey && !event.metaKey) {
     if (event.key === 'r' || event.key === 'R') return { kind: 'ctrl', key: 'r' }
     if (event.key === 'v' || event.key === 'V') return { kind: 'ctrl', key: 'v' }
     if (event.key === 'c' || event.key === 'C') return { kind: 'ctrl', key: 'c' }
     if (event.key === 'f' || event.key === 'F') return { kind: 'ctrl', key: 'f' }
-    // Generic Ctrl-X returns as a special token so the caller can
-    // decide what to do (default: pass through to PM).
+    // 通用 Ctrl-X 以特殊标记返回，由调用方决定如何处理
+    // （默认：透传给编辑器）。
     return { kind: 'ctrl', key: event.key.toLowerCase() }
   }
-  // `Cmd+.` is the toggle; the plugin handles it before this
-  // function is called. We still normalise the key for the
-  // ext-ctrl path on non-mac.
+  // `Cmd+.` 是模式切换键；插件会在调用本函数之前处理它。
+  // 在非 Mac 平台的扩展 Ctrl 路径上，我们仍会对按键做规范化处理。
   if (event.metaKey) {
     return { kind: 'meta', key: event.key.toLowerCase() }
   }
-  // Shift-combos (e.g. `>` typed with shift).
+  // Shift 组合键（例如按住 Shift 输入的 `>`）。
   if (event.key === 'Escape') return { kind: 'special', key: 'escape' }
   if (event.key === 'Enter') return { kind: 'special', key: 'enter' }
   if (event.key === 'Backspace') return { kind: 'special', key: 'backspace' }
@@ -159,48 +152,44 @@ export function parseKey(event: KeyboardEvent, isMac: boolean): VimKey {
   if (event.key === 'End') return { kind: 'special', key: 'end' }
   if (event.key === 'PageUp') return { kind: 'special', key: 'pageup' }
   if (event.key === 'PageDown') return { kind: 'special', key: 'pagedown' }
-  // Printable character.
+  // 可打印字符。
   if (event.key.length === 1) return { kind: 'char', key: event.key }
-  // Unknown (e.g. function keys). Caller decides what to do.
+  // 未知按键（例如功能键）。由调用方决定如何处理。
   return { kind: 'special', key: event.key.toLowerCase() }
 }
 
-/** Parse a Vim key in the context of the current state. Returns
- *  a `ParseResult` describing whether the parser is still
- *  buffering, has produced a ready command, or hit an error. */
+/** 在当前状态的上下文中解析一个 Vim 按键。返回一个 `ParseResult`，
+ *  描述解析器是仍在缓冲、已产生可执行命令，还是遇到了错误。 */
 export type ParseResult =
   | { kind: 'pending'; state: VimState }
   | { kind: 'ready'; cmd: VimCommand; state: VimState }
   | { kind: 'error'; message: string; state: VimState }
 
-/** Main entry point. Mutates a logical next state and reports
- *  whether the caller should dispatch a `VimCommand` to the
- *  editor (or just update the plugin state). */
+/** 主入口。推进出一个逻辑上的下一个状态，并报告调用方
+ *  是应当向编辑器派发 `VimCommand`，还是只需更新插件状态。 */
 export function tryParseCommand(
   state: VimState,
   key: VimKey,
 ): ParseResult {
-  // 1. Special-key handling (Escape, Enter, Ctrl-C).
+  // 1. 特殊键处理（Escape、Enter、Ctrl-C）。
   if (key.kind === 'special') {
     return handleSpecialKey(state, key.key)
   }
-  // 2. Ctrl-combos (Vim's reserved set).
+  // 2. Ctrl 组合键（Vim 保留的按键集合）。
   if (key.kind === 'ctrl') {
     return handleCtrlKey(state, key.key)
   }
-  // 3. Printable / shifted characters.
+  // 3. 可打印字符 / 带 Shift 的字符。
   if (key.kind === 'char') {
     return handleCharKey(state, key.key)
   }
-  // 4. Meta-combos (Cmd+X) — we don't currently intercept these
-  //    in Vim mode; the plugin should have already returned false
-  //    at the `handleKeyDown` shim. If we get here, treat as noop.
+  // 4. Meta 组合键（Cmd+X）——Vim 模式目前不拦截这类按键；
+  //    插件应在 `handleKeyDown` 转接层就返回 false。若走到这里，按空操作处理。
   return { kind: 'pending', state: { ...state, pending: { kind: 'idle' } } }
 }
 
-/** Render the pending buffer as a human-readable string for the
- *  status-bar transient area. Examples: `'3'`, `'3d'`, `'d3'`,
- *  `'ci'`, `':w'`. Returns `''` when idle. */
+/** 把待处理缓冲渲染为人类可读的字符串，用于状态栏的临时显示区域。
+ *  示例：`'3'`、`'3d'`、`'d3'`、`'ci'`、`':w'`。空闲时返回 `''`。 */
 export function serializePending(state: VimState): string {
   return serializeBuffer(state.pending)
 }
@@ -208,11 +197,11 @@ export function serializePending(state: VimState): string {
 function handleCharKey(state: VimState, key: string): ParseResult {
   const p = state.pending
 
-  // ----- ex bar (highest priority: ':' is pending, every char
-  //       is appended to the ex text) -----
+  // ----- ex 命令栏（优先级最高：':‘ 处于待处理状态，每个字符
+  //       都会追加到 ex 命令文本中）-----
   if (p.kind === 'ex') {
     if (key === ':') {
-      // Double-colon: ignored, noop.
+      // 双冒号：忽略，按空操作处理。
       return { kind: 'pending', state }
     }
     return {
@@ -221,16 +210,14 @@ function handleCharKey(state: VimState, key: string): ParseResult {
     }
   }
 
-  // ----- visual mode: each printable is a motion that EXTENDS
-  //       the visual range. We never reset pending; we just
-  //       record the motion and let the plugin re-derive the
-  //       selection from anchor + head. -----
+  // ----- 可视模式：每个可打印字符都是一个「扩展」可视范围的移动。
+  //       我们从不重置 pending；只是记录移动，并让插件根据
+  //       锚点 + 光标重新推导选区。-----
   if (state.mode === 'visual' || state.mode === 'visual-line' || state.mode === 'visual-block') {
     return handleVisualKey(state, key)
   }
 
-  // ----- text-object: we have an i/a modifier and now expect
-  //       the text-object character. -----
+  // ----- 文本对象：已收到 i/a 修饰符，现在等待文本对象字符。-----
   if (p.kind === 'text-object-mod') {
     const obj = TEXT_OBJECT_TABLE[key]
     if (!obj) return errorResult(`unknown text object: ${key}`, state)
@@ -244,17 +231,17 @@ function handleCharKey(state: VimState, key: string): ParseResult {
     )
   }
 
-  // ----- motion slot: the parser is waiting for the motion key
-  //       (we already collected an operator + count). -----
+  // ----- 移动槽位：解析器正在等待移动按键
+  //       （已收集到操作符 + 计数）。-----
   if (p.kind === 'motion') {
     return handleMotionSlotKey(state, key)
   }
 
-  // ----- operator pending: next char is either a motion, a
-  //       text-object modifier (i/a), or a double-operator. -----
+  // ----- 操作符待处理：下一个字符要么是移动、要么是文本对象
+  //       修饰符（i/a），要么是双操作符。-----
   if (p.kind === 'operator') {
     if (key === p.op[0]) {
-      // dd / cc / yy — double-operator.
+      // dd / cc / yy —— 双操作符。
       return ready(
         opToLinewise(p.op, p.count),
         state,
@@ -269,22 +256,22 @@ function handleCharKey(state: VimState, key: string): ParseResult {
       }
     }
     if (key === 'f' || key === 'F' || key === 't' || key === 'T') {
-      // Find char: op + f{a}. Wait for the character.
+      // 字符查找：操作符 + f{a}。等待目标字符。
       return {
         kind: 'pending',
         state: { ...state, pending: { kind: 'motion', motion: findCharToMotion(key), count: p.count, op: p.op } },
       }
     }
-    // Count-after-operator (`d3w` ≡ `3dw`): open a motion slot.
-    // Note: `0` is a motion, not a digit, so digits here means
-    // we treat the input as the start of a count.
+    // 操作符后的计数（`d3w` ≡ `3dw`）：打开移动槽位。
+    // 注意：`0` 是移动指令而不是数字，因此这里的数字意味着
+    // 我们把输入当作计数的开始。
     if (isDigit(key) && key !== '0') {
       return {
         kind: 'pending',
         state: { ...state, pending: { kind: 'motion', motion: 'left' as Motion, count: Number(key), op: p.op } },
       }
     }
-    // Standard motion: d{motion}, c{motion}, y{motion}.
+    // 标准移动：d{移动}、c{移动}、y{移动}。
     const motion = MOTION_TABLE[key]
     if (!motion) return errorResult(`unknown motion: ${key}`, state)
     return ready(
@@ -294,7 +281,7 @@ function handleCharKey(state: VimState, key: string): ParseResult {
     )
   }
 
-  // ----- count: the user is typing digits. -----
+  // ----- 计数：用户正在输入数字。-----
   if (p.kind === 'count') {
     if (isDigit(key)) {
       return {
@@ -302,21 +289,20 @@ function handleCharKey(state: VimState, key: string): ParseResult {
         state: { ...state, pending: { kind: 'count', digits: Math.min(MAX_VIM_COUNT, p.digits * 10 + Number(key)) } },
       }
     }
-    // Non-digit: treat the count as complete and re-handle the key.
+    // 非数字：把计数视为已结束，并重新处理该按键。
     return handleFromIdle(state, key, p.digits)
   }
 
-  // ----- idle: handle from scratch. -----
+  // ----- 空闲态：从头处理。-----
   return handleFromIdle(state, key, 1)
 }
 
 
 /* ------------------------------------------------------------------ *
- *  Ex command parsing                                                 *
+ *  ex 命令解析                                                        *
  * ------------------------------------------------------------------ *
- *  Ex-command parsing lives in `./ex-parser.ts` so the FSM
- *  dispatch above and the static command catalogue stay in
- *  separate concerns. The export is re-exported from this file
- *  so existing `import { parseExText } from './key-parser'`
- *  call sites keep working.
+ *  ex 命令解析位于 `./ex-parser.ts`，使得上方的状态机派发逻辑
+ *  与静态命令目录各司其职。本文件重新导出该解析函数，
+ *  让既有 `import { parseExText } from './key-parser'`
+ *  调用点继续正常工作。
  */

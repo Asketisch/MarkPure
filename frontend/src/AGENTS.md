@@ -11,3 +11,4 @@
 | [`plugins/`](./plugins/AGENTS.md) | ProseMirror 插件 |
 | [`nodeviews/`](./nodeviews/AGENTS.md) | 自定义 NodeView |
 | [`stores/`](./stores/AGENTS.md) | 状态管理 |
+| [`app/`](./app/AGENTS.md) | 应用外壳（状态 / handlers / 模板子组件） |

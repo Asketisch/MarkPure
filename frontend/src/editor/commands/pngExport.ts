@@ -1,32 +1,29 @@
 /**
- * P1-8 PNG export — frontend rendering pipeline.
+ * PNG 导出——前端渲染流水线。
  *
- * The Rust host is a thin byte-stream sink (see
- * `apps/desktop/src/export_ops.rs:cmd_export_png` and
- * `crates/export/src/png.rs`); all pixel-level work happens
- * here so the export inherits the editor's WYSIWYG engine
- * verbatim — same KaTeX math, same Mermaid SVG, same
- * CodeMirror highlighting, same theme palette.
+ * Rust 宿主只是一个薄的字节流接收端（见
+ * `apps/desktop/src/export_ops.rs:cmd_export_png` 与
+ * `crates/export/src/png.rs`）；所有像素级工作都在这里完成，
+ * 这样导出就能原样继承编辑器的所见即所得引擎——同样的 KaTeX
+ * 公式、同样的 Mermaid SVG、同样的代码高亮与主题色板。
  *
- * Flow:
- *  1. Read the active theme's CSS variables off the live
- *     `.app-root` so the snapshot matches the user's view.
- *  2. Spin up a hidden DOM container off-screen and inject the
- *     rendered markdown HTML into it.
- *  3. Wait for `document.fonts.ready` (KaTeX woff2 lives in
- *     the npm bundle; until that promise resolves the math
- *     glyphs would render as missing-character boxes).
- *  4. Hand the container to `html-to-image` which walks the
- *     DOM into a `<canvas>` and returns a PNG data URL.
- *  5. Push the base64 portion back through the IPC wrapper.
+ * 流程：
+ *  1. 从实时的 `.app-root` 读取当前主题的 CSS 变量，让快照与
+ *     用户所见一致。
+ *  2. 在屏幕外创建一个隐藏的 DOM 容器，把渲染好的 markdown
+ *     HTML 注入进去。
+ *  3. 等待 `document.fonts.ready`（KaTeX 的 woff2 字体打包在
+ *     npm bundle 里；该 Promise 不 resolve 的话，公式字形会
+ *     渲染成缺字方框）。
+ *  4. 把容器交给 `html-to-image`，由它把 DOM 绘制进
+ *     `<canvas>` 并返回 PNG data URL。
+ *  5. 把 base64 部分经 IPC 封装回传给宿主。
  */
 
 import { toPng } from 'html-to-image'
 
-/// CSS variables that have to be carried over from the live
-/// editor theme to the standalone export document. The order
-/// matches `frontend/src/app/app.css` so the file reads top
-/// to bottom in the same shape.
+/// 必须从实时编辑器主题带到独立导出文档的 CSS 变量。
+/// 顺序与 `frontend/src/app/app.css` 保持一致，便于从上到下对照。
 const THEME_VARS = [
   '--bg',
   '--bg-secondary',
@@ -61,13 +58,11 @@ const THEME_VARS = [
 ] as const
 
 /**
- * Read the active theme's CSS variables off the live
- * `.app-root` element and serialise them into a `:root { … }`
- * block that can be embedded in the standalone HTML export.
+ * 从实时的 `.app-root` 元素读取当前主题的 CSS 变量，序列化成
+ * 一个可嵌入独立 HTML 导出的 `:root { … }` 块。
  *
- * Falls back to an empty string if the root or any variable
- * is missing — the caller should treat an empty result as
- * "use the export-default CSS instead".
+ * 若根元素或任一变量缺失则回退为空字符串——调用方应把空结果
+ * 视为「改用导出默认 CSS」。
  */
 export function serializeActiveTheme(): string {
   if (typeof document === 'undefined') return ''
@@ -84,36 +79,31 @@ export function serializeActiveTheme(): string {
 }
 
 /**
- * Build a hidden DOM container, inject the rendered HTML, wait
- * for async resources (fonts, Mermaid SVG), snapshot via
- * `html-to-image`, and tear down the container.
+ * 构建一个隐藏的 DOM 容器，注入渲染好的 HTML，等待异步资源
+ * （字体、Mermaid SVG）就绪，用 `html-to-image` 截图，最后
+ * 回收容器。
  *
- * Returns the PNG data URL (`data:image/png;base64,…`) ready
- * for IPC transport.
+ * 返回可直接用于 IPC 传输的 PNG data URL
+ * （`data:image/png;base64,…`）。
  *
- * @param html    The HTML markup to render (typically the live
- *                ProseMirror's `outerHTML`).
- * @param width   The rendered width in pixels. The caller should
- *                pass the live editor's `offsetWidth` so the
- *                export matches what the user sees — fixed
- *                values clip when the sidebar / outline panel
- *                is open. Defaults to 800 to keep callers that
- *                don't know the width sane.
+ * @param html    要渲染的 HTML 标记（通常取自实时 ProseMirror
+ *                的 `outerHTML`）。
+ * @param width   以像素为单位的渲染宽度。调用方应传入实时编辑器
+ *                的 `offsetWidth`，这样导出才能与用户所见一致——
+ *                侧边栏 / 大纲面板打开时，固定值会产生裁剪。
+ *                默认 800，让不知道宽度的调用方也有合理值。
  */
 export async function snapshotHtmlToPng(
   html: string,
   width: number = 800,
 ): Promise<string> {
   const node = document.createElement('div')
-  // Pinned to the viewport (top:0/left:0) with `z-index:-1` and
-  // `pointer-events:none` so the user never sees it. We do NOT
-  // use the traditional `position:absolute; left:-99999px`
-  // off-screen trick — that interacted badly with the P2-6
-  // top-block virtualization extension, which sets
-  // `content-visibility: auto` on off-screen blocks and causes
-  // the browser to skip layout/paint for them. With the node
-  // positioned inside the viewport, the browser correctly
-  // decides every block is on-screen and renders them all.
+  // 钉在视口内（top:0/left:0），配 `z-index:-1` 和
+  // `pointer-events:none`，用户永远不会看到它。我们不使用传统的
+  // `position:absolute; left:-99999px` 屏幕外技巧——那会与
+  // 顶部块虚拟化扩展互相干扰：该扩展对屏幕外的块设置
+  // `content-visibility: auto`，浏览器会跳过它们的布局与绘制。
+  // 把容器放在视口内后，浏览器会正确判定每个块都在屏内并全部渲染。
   node.style.cssText = [
     'position:fixed',
     'top:0',
@@ -131,14 +121,11 @@ export async function snapshotHtmlToPng(
   node.innerHTML = html
   document.body.appendChild(node)
 
-  // Belt-and-braces override: even with the container at (0, 0)
-  // a multi-thousand-block document would still have its tail
-  // blocks fall outside the viewport, which would let
-  // `content-visibility: auto` skip them. Force every block
-  // to render during the snapshot, then restore the original
-  // behaviour in the `finally`. The unique ID makes a leaked
-  // <style> easy to spot in devtools (and is also why we look
-  // for an existing one before injecting).
+  // 双保险覆盖：即使容器位于 (0, 0)，上千个块的文档尾部仍会
+  // 掉出视口，从而让 `content-visibility: auto` 跳过它们。
+  // 强制每个块在截图期间都参与渲染，并在 `finally` 里恢复原状。
+  // 唯一 ID 让泄漏的 <style> 在 devtools 里一目了然（这也是
+  // 注入前先查找已有元素的原因）。
   let styleEl: HTMLStyleElement | null = null
   const existing = document.getElementById('__mt_png_force_visible')
   if (!existing) {
@@ -150,26 +137,23 @@ export async function snapshotHtmlToPng(
   }
 
   try {
-    // KaTeX ships its glyphs as woff2 inside the npm bundle.
-    // Until the browser has finished downloading + parsing
-    // those, math would render as boxes.
+    // KaTeX 的字形以 woff2 打包在 npm bundle 里。在浏览器完成
+    // 下载与解析之前，公式会渲染成方框。
     if (typeof (document as any).fonts?.ready?.then === 'function') {
       await (document as any).fonts.ready
     }
-    // Two animation frames cover most layout/paint settling;
-    // a follow-up 50ms timeout covers Mermaid SVG node insertion
-    // (already inline-cached by the markdown renderer, but cheap
-    // insurance against late paint).
+    // 两个动画帧覆盖大多数布局 / 绘制稳定过程；再补一个 50ms
+    // 超时覆盖 Mermaid SVG 节点的插入（渲染器已经内联缓存了它，
+    // 这只是针对迟到绘制的廉价保险）。
     await new Promise<void>((r) =>
       requestAnimationFrame(() => requestAnimationFrame(() => r())),
     )
     await new Promise<void>((r) => setTimeout(r, 50))
 
-    // `toPng` reads the node's CSS `background` to fill the
-    // canvas, so the `var(--bg,…)` value above is what
-    // actually shows up — light theme = white, dark theme =
-    // dark. Passing an explicit `backgroundColor` overrides
-    // that and would force one colour on every export.
+    // `toPng` 读取节点的 CSS `background` 来填充画布，因此上面
+    // 的 `var(--bg,…)` 值就是实际显示的颜色——浅色主题为白色、
+    // 深色主题为深色。显式传入 `backgroundColor` 会覆盖它，
+    // 导致每次导出都强制同一种颜色。
     const dataUrl = await toPng(node, {
       pixelRatio: 2,
       cacheBust: false,

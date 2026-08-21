@@ -1,10 +1,9 @@
 /**
- * TOC node view.
+ * 目录（TOC）节点视图。
  *
- * Renders a live, clickable list of the document's headings. Reacts
- * to editor updates by re-extracting the heading tree and rebuilding
- * the DOM. Clicking a list item sets the editor selection to the
- * heading's PM position and scrolls it into view.
+ * 渲染文档标题的实时可点击列表。随编辑器更新重新提取标题树并
+ * 重建 DOM。点击列表项会把编辑器选区定位到该标题的 PM 位置，
+ * 并滚动到可见区域。
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
 import type { Editor } from '@tiptap/core'
@@ -26,9 +25,8 @@ export class TocNodeView {
     this.dom.className = 'toc-block'
     this.refresh()
 
-    // Re-render whenever the document changes. Use `transaction`
-    // (low-level) rather than `update` so we catch heading edits
-    // regardless of where they happen in the doc.
+    // 文档变化时重新渲染。用底层 `transaction` 事件而非 `update`，
+    // 这样无论标题编辑发生在文档何处都能被捕获。
     const handler = () => this.refresh()
     editor.on('transaction', handler)
     this.updateListener = () => editor.off('transaction', handler)
@@ -37,9 +35,8 @@ export class TocNodeView {
   update(node: PMNode): boolean {
     if (node.type.name !== 'toc') return false
     this.currentNode = node
-    // TOC node itself doesn't change — content is sourced from
-    // the rest of the document. We just need to know we're still
-    // a valid toc node; the transaction listener will refresh.
+    // TOC 节点自身不会变化——内容来源于文档其余部分。这里只需
+    // 确认自己仍是有效的 toc 节点；真正的刷新由事务监听器完成。
     return true
   }
 
@@ -62,10 +59,9 @@ export class TocNodeView {
       return
     }
 
-    // Build a nested tree from the flat list so the TOC respects
-    // heading levels (a level-2 heading is a child of the most
-    // recent level-1 heading, etc.). Ungrouped items (e.g. a
-    // level-3 at the top of the doc) become top-level entries.
+    // 由扁平列表构建嵌套树，让目录遵循标题层级（2 级标题挂在
+    // 最近的 1 级标题之下，依此类推）。未分组的项（例如出现在
+    // 文档开头的 3 级标题）成为顶层条目。
     const rootChildren: TreeItem[] = []
     const stack: { level: number; children: TreeItem[] }[] = [{ level: 0, children: rootChildren }]
     for (const item of items) {
@@ -85,34 +81,28 @@ export class TocNodeView {
 interface TreeItem {
   item: OutlineItem
   children: TreeItem[]
-  /** P0-X: outline number string ("1.", "1.1.", …) assigned
-   *  by `assignNumbers` before render. Undefined before
-   *  assignment. */
+  /** 大纲编号字符串（“1.”、“1.1.”……），由 `assignNumbers`
+   *  在渲染前赋给节点。赋值之前为 undefined。 */
   label?: string
 }
 
-/** P0-X: Typora-style TOC auto-numbering. We walk the
- *  tree top-down, incrementing a per-level counter as we
- *  encounter headings. The resulting numbering is
- *  classic Outline (`1.` / `1.1.` / `1.1.1.`) and lives
- *  in a `<span class="toc-num">` sibling of the link so
- *  the user can still copy the heading text alone (the
- *  number is rendered as a separate CSS-pseudo-style
- *  element would be a stretch for accessibility).
+/** TOC 自动编号。自顶向下遍历树，每遇到一个标题就让对应层级的
+ *  计数器加一。最终编号是经典大纲样式（`1.` / `1.1.` / `1.1.1.`），
+ *  渲染在链接旁边的 `<span class="toc-num">` 中，用户仍可单独
+ *  复制标题文本（若把编号做成独立的 CSS 伪元素样式，对无障碍
+ *  支持是一种挑战）。
  *
- *  The function takes an array of counters (one per
- *  level) and mutates it in place so the recursion
- *  matches the depth hierarchy.
+ *  函数接收一个每层一个计数器的数组并原地修改，让递归过程与
+ *  层级深度一一对应。
  */
 function assignNumbers(items: TreeItem[], counters: number[]): string[] {
   const labels: string[] = []
   for (const ti of items) {
     const level = ti.item.level
     counters[level - 1] = (counters[level - 1] ?? 0) + 1
-    // Reset deeper levels — Typora resets all sub-numbers
-    // when a parent increments, so "1.1.3" doesn't become
-    // "1.2.3" by accident when the user adds a sibling
-    // heading at level 2.
+    // 重置更深层级——当父级递增时，所有子级编号全部归零，
+    // 这样用户在 2 级新增一个同级标题时，“1.1.3”不会意外
+    // 变成“1.2.3”。
     for (let d = level; d < counters.length; d++) counters[d] = 0
     const trimmed = counters.slice(0, level).join('.')
     ti.label = `${trimmed}.`
@@ -127,11 +117,9 @@ function assignNumbers(items: TreeItem[], counters: number[]): string[] {
 function renderTree(items: TreeItem[]): HTMLElement {
   const ul = document.createElement('ul')
   ul.className = 'toc-list'
-  // P0-X: assign outline numbers to every node in the
-  // tree before rendering. The counters array is
-  // scratch space — we reset it to all zeros at the
-  // top of each top-level render so a new render
-  // doesn't leak state from the previous one.
+  // 渲染前给树中每个节点分配大纲编号。计数器数组只是临时
+  // 工作区——每次顶层渲染开头都重置为全零，保证新一次渲染
+  // 不会沿用上一次的状态。
   assignNumbers(items, [])
   for (const ti of items) {
     const li = document.createElement('li')
@@ -144,9 +132,8 @@ function renderTree(items: TreeItem[]): HTMLElement {
       e.preventDefault()
       handleJump(a)
     })
-    // Wrap the number + heading text in their own spans
-    // so CSS can style them differently (e.g. right-
-    // align the number, dim the colour).
+    // 把编号与标题文本分别放进各自的 span，CSS 才能分别
+    // 设置样式（例如编号右对齐、颜色变淡）。
     const numSpan = document.createElement('span')
     numSpan.className = 'toc-num'
     numSpan.textContent = ti.label ?? ''
@@ -165,13 +152,11 @@ function renderTree(items: TreeItem[]): HTMLElement {
 }
 
 function handleJump(a: HTMLAnchorElement) {
-  // Find the editor by walking up from the link's DOM root.
+  // 从链接的 DOM 根沿树向上找到编辑器容器。
   const root = a.closest('.ProseMirror') as HTMLElement | null
   if (!root) return
-  // The editor instance is stashed on the DOM via Tiptap's
-  // `editor.view`. Easier: dispatch via a custom event that the
-  // host (App.svelte) listens for and translates into an editor
-  // command. We dispatch a window event with the position.
+  // 更简单的做法：派发宿主（App.svelte）监听的自定义事件，
+  // 由宿主把它转成编辑器命令。这里通过 window 事件携带位置。
   const pos = Number(a.dataset.pos)
   if (!Number.isFinite(pos)) return
   window.dispatchEvent(new CustomEvent('toc-jump', { detail: { pos } }))

@@ -8,10 +8,9 @@
     editor?: Editor | null
     onNavigate?: (item: OutlineItem) => void
     onClose?: () => void
-    // P1-5: invoked when the user clicks the "Insert TOC" button
-    // in the panel header. We let the host (App.svelte) drive
-    // the actual editor command so the toolbar state stays in
-    // sync with the editor instance.
+    // 点击面板头部“插入目录”按钮时触发。实际的编辑器命令
+    // 由宿主（App.svelte）执行，这样工具栏状态始终与
+    // 编辑器实例保持同步。
     onInsertToc?: () => void
   }
 

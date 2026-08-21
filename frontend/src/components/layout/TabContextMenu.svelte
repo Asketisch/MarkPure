@@ -1,9 +1,7 @@
 <script lang="ts">
   /**
-   * The right-click menu that pops up over a tab. The host
-   * (App.svelte) tracks the menu's open/closed state +
-   * position; this component is a presentational view of
-   * the four "close" actions.
+   * 在标签上弹出的右键菜单。宿主（App.svelte）跟踪菜单的开合状态
+   * 与位置；本组件只是四个“关闭”动作的展示视图。
    */
   import { useI18n } from '$lib/stores/i18n.svelte'
 
@@ -16,14 +14,14 @@
     onCloseToRight,
     onCloseMenu,
   }: {
-    /** Viewport coordinates from the right-click event. */
+    /** 来自右键事件的视口坐标。 */
     x: number
     y: number
     onClose: () => void
     onCloseOthers: () => void
     onCloseAll: () => void
     onCloseToRight: () => void
-    /** Notify the host to clear its open state. */
+    /** 通知宿主清空其打开状态。 */
     onCloseMenu: () => void
   } = $props()
 

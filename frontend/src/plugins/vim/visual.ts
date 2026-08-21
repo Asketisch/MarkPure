@@ -1,33 +1,28 @@
 /**
- * Visual-mode state machine for the Vim mode plugin (P2-7).
+ * Vim 模式插件的视觉模式状态机。
  *
- * Three visual modes:
- *   - `visual` (character-wise, v)
- *   - `visual-line` (line-wise, V)
- *   - `visual-block` (block-wise, Ctrl-V)
+ * 三种视觉模式：
+ *   - `visual`（逐字符，v）
+ *   - `visual-line`（逐行，V）
+ *   - `visual-block`（块状，Ctrl-V）
  *
- * Storage:
- *   - The "from" end of the visual range lives in plugin state
- *     as `visualAnchor` (a PM position). The "to" end is the
- *     current `state.selection.head`.
- *   - For `visual-block` we use PM's `CellSelection` so column-
- *     wise mapping works correctly when the doc mutates.
+ * 存储：
+ *   - 视觉区间的“起点”端存放在插件状态里，即 `visualAnchor`
+ *     （一个 PM 位置）。“终点”端是当前的 `state.selection.head`。
+ *   - `visual-block` 使用 PM 的 `CellSelection`，文档变动时列向
+ *     映射才能正确工作。
  *
- * Visual mode operations:
- *   - `enterVisualMode(view, kind, anchor)` — sets the selection
- *     to a single point at the cursor and remembers the anchor.
- *   - `extendSelectionByMotion(view, state, motion, count)` —
- *     re-derives the selection from `{ anchor, head }`.
- *   - `exitVisualMode(view)` — collapses the selection to a
- *     point at the head.
- *   - `enterColumnMode(view, anchor, head)` — CellSelection for
- *     block mode (the rectangle lives in the selection; the
- *     plugin's decorations draw the per-line highlight).
+ * 视觉模式操作：
+ *   - `enterVisualMode(view, kind, anchor)` —— 把选区设成光标处
+ *     的单点并记住锚点。
+ *   - `extendSelectionByMotion(view, state, motion, count)` ——
+ *     由 `{ anchor, head }` 重新推导选区。
+ *   - `exitVisualMode(view)` —— 把选区坍缩到头部单点。
+ *   - `enterColumnMode(view, anchor, head)` —— 块模式使用
+ *     CellSelection（矩形存在选区里；插件的装饰绘制逐行高亮）。
  *
- * The visual range is consumed by the operators in
- * `operators.ts` (via `applyDelete` etc.) by reading
- * `view.state.selection` directly — no separate "visual
- * range" struct is needed.
+ * 视觉区间由 `operators.ts` 中的操作符（`applyDelete` 等）直接
+ * 读取 `view.state.selection` 消费——无需单独的“视觉区间”结构。
  */
 
 import { TextSelection } from '@tiptap/pm/state'
@@ -41,18 +36,18 @@ import type { Motion } from './types'
  *  Public API                                                         *
  * ------------------------------------------------------------------ */
 
-/** Enter visual mode of the given kind at the cursor position. */
+/** 在光标位置进入指定类型的视觉模式。 */
 export function enterVisualMode(view: EditorView, kind: 'char' | 'line' | 'block'): void {
   const head = view.state.selection.head
   const tr = view.state.tr
   tr.setMeta(vimPluginKey, { type: 'setVisualAnchor', anchor: head })
-  // For `block`, we also pre-place a CellSelection at the head
-  // so `extendSelectionByMotion` can grow it column-wise.
+  // `block` 模式下预先在头部放置一个 CellSelection，这样
+  // `extendSelectionByMotion` 可以按列扩展它。
   if (kind === 'block') {
     try {
       tr.setSelection(CellSelection.create(view.state.doc, head))
     } catch {
-      // Tables not available — fall back to plain selection.
+      // 表格不可用——回退为普通选区。
       tr.setSelection(TextSelection.create(view.state.doc, head))
     }
   } else if (kind === 'line') {
@@ -65,7 +60,7 @@ export function enterVisualMode(view: EditorView, kind: 'char' | 'line' | 'block
   view.dispatch(tr)
 }
 
-/** Re-derive the visual selection from `{ anchor, head }` plus a motion. */
+/** 由 `{ anchor, head }` 加上一个 motion 重新推导视觉选区。 */
 export function extendSelectionByMotion(
   view: EditorView,
   state: VimState,
@@ -76,22 +71,22 @@ export function extendSelectionByMotion(
   if (state.visualAnchor == null) return
   const head = view.state.selection.head
   const r = motionRange(view.state, motion, count, char)
-  // For V-BLOCK we let the existing CellSelection grow column-wise
-  // by reading the row extents. Simpler: use the head's PM row to
-  // find the start/end columns and build a new CellSelection.
+  // V-BLOCK 模式下让既有 CellSelection 按行范围向列扩展。
+  // 简化做法：取头部所在的 PM 行，算出起止列后构建新的
+  // CellSelection。
   if (state.mode === 'visual-block') {
     extendBlockSelection(view, state.visualAnchor, r.to)
     return
   }
   const tr = view.state.tr
-  // For V-LINE: extend to the new line's end / start.
+  // V-LINE 模式：扩展到新行的末尾 / 开头。
   if (state.mode === 'visual-line') {
     const $new = view.state.doc.resolve(Math.max(state.visualAnchor, r.to))
     const start = Math.min(state.visualAnchor, $new.start())
     const end = Math.max(state.visualAnchor, $new.end())
     tr.setSelection(TextSelection.create(view.state.doc, start, end))
   } else {
-    // character-wise visual.
+    // 逐字符视觉模式。
     const from = Math.min(state.visualAnchor, r.to)
     const to = Math.max(state.visualAnchor, r.to)
     tr.setSelection(TextSelection.create(view.state.doc, from, to))
@@ -100,7 +95,7 @@ export function extendSelectionByMotion(
   void head
 }
 
-/** Exit visual mode: collapse to a point at the head. */
+/** 退出视觉模式：把选区坍缩到头部单点。 */
 export function exitVisualMode(view: EditorView): void {
   const head = view.state.selection.head
   const tr = view.state.tr
@@ -110,10 +105,10 @@ export function exitVisualMode(view: EditorView): void {
   view.dispatch(tr)
 }
 
-/** Build a `CellSelection` covering the rectangle between `anchor` and `head`. */
+/** 构建覆盖 `anchor` 与 `head` 之间矩形的 `CellSelection`。 */
 export function enterColumnMode(view: EditorView, anchor: number, head: number): void {
   const doc = view.state.doc
-  // Find the line boundaries for both positions.
+  // 找到两个位置各自所在行的边界。
   const $a = doc.resolve(Math.min(anchor, head))
   const $b = doc.resolve(Math.max(anchor, head))
   const start = $a.start()
@@ -126,8 +121,8 @@ export function enterColumnMode(view: EditorView, anchor: number, head: number):
     tr.setMeta(vimPluginKey, { type: 'enterMode', mode: 'visual-block' })
     view.dispatch(tr)
   } catch {
-    // CellSelection not available (e.g. doc has no table schema).
-    // Fall back to character-wise visual.
+    // CellSelection 不可用（例如文档没有表格 schema）。
+    // 回退为逐字符视觉模式。
     enterVisualMode(view, 'char')
   }
 }
@@ -154,6 +149,6 @@ function extendBlockSelection(view: EditorView, anchor: number, head: number): v
     tr.setSelection(sel)
     view.dispatch(tr)
   } catch {
-    // No-op: leave the existing selection in place.
+    // 空操作：保留现有选区。
   }
 }

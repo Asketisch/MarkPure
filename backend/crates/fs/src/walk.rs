@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
 
-/// Git file status
+/// Git 文件状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum GitStatus {
@@ -18,7 +18,7 @@ pub enum GitStatus {
     Unmerged,
 }
 
-/// File entry in the directory tree
+/// 目录树中的文件条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileEntry {
     pub name: String,
@@ -31,9 +31,13 @@ pub struct FileEntry {
     pub git_status: Option<GitStatus>,
 }
 
-/// Walk a directory and return a tree structure of files
-/// depth: maximum depth to recurse (0 = unlimited)
-pub async fn walk_directory(path: &Path, depth: u32, show_hidden: bool) -> Result<Vec<FileEntry>> {
+/// 遍历目录并返回文件的树形结构
+/// depth：最大递归深度（0 表示不限制）
+///
+/// 同步函数：内部包含 git 子进程与递归文件系统遍历，全部是阻塞 I/O。
+/// 之前的 async 签名只会误导调用方以为它不会阻塞；IPC 处理线程
+/// 本来就应当同步等待目录树结果，所以这里直接如实暴露为同步 API。
+pub fn walk_directory(path: &Path, depth: u32, show_hidden: bool) -> Result<Vec<FileEntry>> {
     let path = path.to_path_buf();
     let repo_root = find_git_root(&path);
     let git_statuses = if let Some(ref root) = repo_root {
@@ -41,13 +45,11 @@ pub async fn walk_directory(path: &Path, depth: u32, show_hidden: bool) -> Resul
     } else {
         None
     };
-    // Guard against symlink cycles: a directory can appear via multiple
-    // paths (e.g. `dir/loop/loop/...`). Without a visited-set the
-    // recursion below would either blow the stack or — on a "soft" cycle
-    // bounded only by `max_depth` — silently truncate the tree. We track
-    // each visited directory by its `(dev, ino)` on Unix (zero syscall
-    // beyond the `metadata()` we already do per entry) and by its
-    // canonical path elsewhere.
+    // 防止符号链接环：一个目录可能通过多条路径出现（例如 `dir/loop/loop/...`）。
+    // 若没有已访问集合，下面的递归要么栈溢出，要么在仅受 `max_depth` 限制的
+    // 「软」环上静默截断目录树。在 Unix 上按 `(dev, ino)` 记录每个已访问的
+    // 目录（除了每个条目已经做的 `metadata()` 调用外，零额外系统调用），
+    // 其他平台则用规范化路径记录。
     let mut visited: HashSet<DirKey> = HashSet::new();
     let entries = walk_dir_sync(
         &path,
@@ -61,7 +63,7 @@ pub async fn walk_directory(path: &Path, depth: u32, show_hidden: bool) -> Resul
     Ok(entries)
 }
 
-/// Opaque directory identity used to detect symlink cycles during a walk.
+/// 遍历期间用于检测符号链接环的不透明目录标识。
 #[derive(Clone, Eq, PartialEq, Hash)]
 enum DirKey {
     #[cfg(unix)]
@@ -71,19 +73,18 @@ enum DirKey {
 }
 
 impl DirKey {
-    // `path` is only consumed by the non-unix branch — `MetadataExt`
-    // gives us dev/ino for free on unix. Suppress the warning on
-    // unix so we don't have to rename one side and break the
-    // signature symmetry.
+    // `path` 只在非 Unix 分支被消费——Unix 上 `MetadataExt` 直接提供了
+    // dev/ino。在 Unix 上抑制该警告，这样我们不必重命名某一侧而破坏
+    // 签名对称性。
     #[cfg_attr(unix, allow(unused_variables))]
     fn for_path(path: &Path, meta: &std::fs::Metadata) -> Self {
         #[cfg(unix)]
         {
             use std::os::unix::fs::MetadataExt;
-            return DirKey::Unix {
+            DirKey::Unix {
                 dev: meta.dev(),
                 ino: meta.ino(),
-            };
+            }
         }
         #[cfg(not(unix))]
         {
@@ -97,7 +98,7 @@ impl DirKey {
     }
 }
 
-/// Load all git statuses for a repo into a HashMap for fast lookup
+/// 将仓库的所有 Git 状态载入 HashMap 以便快速查询
 fn load_git_status_map(repo_root: &Path) -> Option<std::collections::HashMap<String, GitStatus>> {
     let output = std::process::Command::new("git")
         .args(["status", "--porcelain", "-uall"])
@@ -113,32 +114,47 @@ fn load_git_status_map(repo_root: &Path) -> Option<std::collections::HashMap<Str
     let mut map = std::collections::HashMap::new();
 
     for line in stdout.lines() {
-        if line.len() < 3 {
-            continue;
+        if let Some((normalized, git_status)) = parse_git_status_line(line) {
+            map.insert(normalized, git_status);
         }
-        let status_chars = &line[..2];
-        let file_path = line[3..].trim().trim_start_matches('"').trim_end_matches('"');
-
-        // Normalize path to use forward slashes for consistent lookup
-        let normalized = file_path.replace('\\', "/");
-
-        let git_status = match (status_chars.chars().next()?, status_chars.chars().nth(1)?) {
-            ('?', '?') => GitStatus::Untracked,
-            ('!', '!') => GitStatus::Ignored,
-            ('u', _) | (_, 'u') | ('U', _) | (_, 'U') => GitStatus::Unmerged,
-            ('A', _) => GitStatus::Added,
-            ('M', _) => GitStatus::Modified,
-            ('D', _) => GitStatus::Deleted,
-            ('R', _) => GitStatus::Renamed,
-            ('C', _) => GitStatus::Copied,
-            (' ', 'M') => GitStatus::Modified,
-            _ => GitStatus::Modified,
-        };
-
-        map.insert(normalized, git_status);
     }
 
     Some(map)
+}
+
+/// 解析一行 `git status --porcelain` 输出，返回（规范化路径，状态）。
+/// 重命名/复制行形如 `old -> new`：只有新路径对应盘上实际文件，
+/// 必须以箭头后的部分为键，否则真实文件查不到自己的状态。
+fn parse_git_status_line(line: &str) -> Option<(String, GitStatus)> {
+    if line.len() < 3 {
+        return None;
+    }
+    let status_chars = &line[..2];
+    let file_path = line[3..].trim();
+    let file_path = file_path
+        .split_once(" -> ")
+        .map(|(_, new)| new)
+        .unwrap_or(file_path)
+        .trim()
+        .trim_matches('"');
+
+    // 规范化路径为前向斜杠，以保证查询一致
+    let normalized = file_path.replace('\\', "/");
+
+    let git_status = match (status_chars.chars().next()?, status_chars.chars().nth(1)?) {
+        ('?', '?') => GitStatus::Untracked,
+        ('!', '!') => GitStatus::Ignored,
+        ('u', _) | (_, 'u') | ('U', _) | (_, 'U') => GitStatus::Unmerged,
+        ('A', _) => GitStatus::Added,
+        ('M', _) => GitStatus::Modified,
+        ('D', _) => GitStatus::Deleted,
+        ('R', _) => GitStatus::Renamed,
+        ('C', _) => GitStatus::Copied,
+        (' ', 'M') => GitStatus::Modified,
+        _ => GitStatus::Modified,
+    };
+
+    Some((normalized, git_status))
 }
 
 fn walk_dir_sync(
@@ -150,16 +166,14 @@ fn walk_dir_sync(
     git_statuses: Option<&std::collections::HashMap<String, GitStatus>>,
     visited: &mut HashSet<DirKey>,
 ) -> Result<Vec<FileEntry>> {
-    // Stat the directory itself first so we can dedupe by (dev, ino).
-    // If `metadata()` fails the path is already gone; surface the error
-    // so the user sees a meaningful "permission denied / not found"
-    // rather than an empty tree.
+    // 先对目录本身做 stat，以便按 (dev, ino) 去重。
+    // 若 `metadata()` 失败，说明路径已不存在；把错误抛给上层，
+    // 让用户看到有意义的「权限被拒绝 / 未找到」提示，而不是空目录树。
     let self_meta = std::fs::metadata(path).map_err(Error::Io)?;
     let self_key = DirKey::for_path(path, &self_meta);
     if !visited.insert(self_key) {
-        // We've already walked this directory via another path
-        // (symlink cycle). Return an empty list — the parent still
-        // shows the entry, we just don't recurse into it again.
+        // 我们已通过另一条路径遍历过该目录（符号链接环）。
+        // 返回空列表——父目录仍会显示该条目，只是不再递归进入。
         return Ok(Vec::new());
     }
 
@@ -172,11 +186,11 @@ fn walk_dir_sync(
         let metadata = item.metadata().map_err(Error::Io)?;
         let name = item.file_name().to_string_lossy().to_string();
 
-        // Skip common non-markdown directories always
+        // 始终跳过常见的非 Markdown 目录
         if name == "node_modules" || name == "target" {
             continue;
         }
-        // Skip hidden files/directories unless show_hidden is enabled
+        // 除非启用了显示隐藏文件，否则跳过隐藏文件/目录
         if !show_hidden && name.starts_with('.') {
             continue;
         }
@@ -186,7 +200,7 @@ fn walk_dir_sync(
             t.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_secs_f64())
         });
 
-        // Check if file extension is supported
+        // 检查文件扩展名是否受支持
         if !is_dir && !is_markdown_file(&name) {
             continue;
         }
@@ -231,7 +245,7 @@ fn walk_dir_sync(
         });
     }
 
-    // Sort: directories first, then by name
+    // 排序：目录优先，其余按名称排序
     entries.sort_by(|a, b| {
         match (a.is_dir, b.is_dir) {
             (true, false) => std::cmp::Ordering::Less,
@@ -243,7 +257,7 @@ fn walk_dir_sync(
     Ok(entries)
 }
 
-/// Check if a file is a supported markdown file
+/// 检查文件是否为受支持的 Markdown 文件
 fn is_markdown_file(name: &str) -> bool {
     let lower = name.to_lowercase();
     lower.ends_with(".md")
@@ -255,7 +269,7 @@ fn is_markdown_file(name: &str) -> bool {
         || lower.ends_with(".mkdn")
 }
 
-/// Find the .git directory by walking up from the given path
+/// 从给定路径向上逐级查找 .git 目录
 fn find_git_root(path: &Path) -> Option<std::path::PathBuf> {
     let mut current = path.to_path_buf();
     loop {
@@ -269,20 +283,58 @@ fn find_git_root(path: &Path) -> Option<std::path::PathBuf> {
     None
 }
 
-/// Compute aggregated git status for a directory based on its children
+/// 根据子条目计算目录的聚合 Git 状态
 fn compute_dir_status(children: &[FileEntry]) -> Option<GitStatus> {
     for child in children {
-        // File with change
-        if !child.is_dir && child.git_status.is_some() {
-            let s = child.git_status.as_ref().unwrap();
-            if matches!(s, GitStatus::Added | GitStatus::Modified | GitStatus::Deleted | GitStatus::Untracked) {
-                return Some(GitStatus::Modified);
+        // 有变更的文件
+        if !child.is_dir {
+            if let Some(s) = &child.git_status {
+                if matches!(s, GitStatus::Added | GitStatus::Modified | GitStatus::Deleted | GitStatus::Untracked) {
+                    return Some(GitStatus::Modified);
+                }
             }
         }
-        // Subdirectory with change
+        // 有变更的子目录
         if child.is_dir && child.git_status.is_some() {
             return Some(GitStatus::Modified);
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_git_status_line_plain() {
+        let (path, status) = parse_git_status_line(" M src/main.rs").unwrap();
+        assert_eq!(path, "src/main.rs");
+        assert_eq!(status, GitStatus::Modified);
+    }
+
+    #[test]
+    fn parse_git_status_line_rename_uses_new_path() {
+        // 重命名/复制行的键必须是新路径，否则盘上的实际文件
+        // 永远匹配不到自己的状态。
+        let (path, status) = parse_git_status_line("R  old.md -> new.md").unwrap();
+        assert_eq!(path, "new.md");
+        assert_eq!(status, GitStatus::Renamed);
+
+        let (path, status) = parse_git_status_line("C  a.md -> b.md").unwrap();
+        assert_eq!(path, "b.md");
+        assert_eq!(status, GitStatus::Copied);
+    }
+
+    #[test]
+    fn parse_git_status_line_quoted_rename() {
+        let (path, _) = parse_git_status_line("R  \"my old.md\" -> \"my new.md\"").unwrap();
+        assert_eq!(path, "my new.md");
+    }
+
+    #[test]
+    fn parse_git_status_line_rejects_short_lines() {
+        assert!(parse_git_status_line("M").is_none());
+        assert!(parse_git_status_line("").is_none());
+    }
 }

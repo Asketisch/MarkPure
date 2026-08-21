@@ -365,10 +365,8 @@ html, body, #app {
   font-size: var(--editor-font-size);
   line-height: 1.7;
   color: var(--text);
-  /* Typora-style: long lines wrap by default. The
-     Settings → Editor → "Word Wrap" toggle adds a
-     `no-wrap` class on the host so single-line
-     paragraphs (e.g. URLs, code) stay on one row. */
+  /* 长行默认自动换行。「设置 → 编辑器 → 自动换行」开关会在宿主上
+     添加一个 `no-wrap` 类，让单行段落（如 URL、代码）保持单行。 */
   white-space: pre-wrap;
   word-wrap: break-word;
 }
@@ -379,11 +377,9 @@ html, body, #app {
   overflow-x: auto;
 }
 
-/* Typora-style: optional line numbers. The
-   `prose-editor` host receives `no-line-numbers`
-   when the user disables the toggle in Settings. We
-   default to off so we don't add a new gutter; users
-   who enable it get a faux ruler via CSS counters. */
+/* 可选的行号显示。用户在设置里关闭行号开关时，`prose-editor`
+   宿主会收到 `no-line-numbers` 类。默认不显示行号，避免引入新的
+   装订线；开启后通过 CSS 计数器绘制一条假标尺。 */
 .prose-editor:not(.no-line-numbers) .ProseMirror {
   position: relative;
 }
@@ -403,17 +399,12 @@ html, body, #app {
 /* Paragraph */
 .ProseMirror p { margin: 0.4em 0; }
 
-/* P0-X: Typora-style "Collapse All Headings" toggle.
-   When `.editor-area.headings-collapsed` is on we
-   collapse every non-heading block (paragraph / list /
-   blockquote / pre / hr / …) into a thin marker line so
-   the user can scan only the heading structure. The doc
-   itself is never mutated — toggling back is just a class
-   flip. We keep headings at full height so the user can
-   still click them to jump; we use `line-height: 0.1` +
-   `overflow: hidden` so the collapsed blocks render as a
-   thin rule instead of disappearing entirely (matches
-   Typora's "outline-only" view). */
+/* 「折叠全部标题」开关。当 `.editor-area.headings-collapsed`
+   存在时，把所有非标题块（段落 / 列表 / 引用 / 代码块 / 分割线 /
+   …）收成一条细标记线，让用户只浏览标题结构。文档本身不会被改动
+   ——切换回来只是去掉该类。标题块保持完整高度以便点击跳转；用
+   `line-height: 0.1` + `overflow: hidden` 把折叠块渲染成细线，
+   而不是完全消失（类似“仅大纲”视图）。 */
 .editor-area.headings-collapsed .ProseMirror > *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
   height: 4px;
   margin: 2px 0;
@@ -698,6 +689,85 @@ html, body, #app {
   font-size: 12px;
 }
 
+/* Link URL prompt (quick-insert "Link" — wry has no window.prompt) */
+.link-url-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 25vh;
+  z-index: 9000;
+}
+
+.link-url-dialog {
+  width: 420px;
+  max-width: 90vw;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.link-url-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.link-url-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.link-url-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.link-url-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.link-url-cancel,
+.link-url-ok {
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.link-url-cancel:hover {
+  background: var(--menu-hover-bg);
+}
+
+.link-url-ok {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.link-url-ok:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Image */
 .ProseMirror img {
   max-width: 100%;
@@ -731,13 +801,10 @@ html, body, #app {
   display: inline-block;
 }
 
-/* P0-X: Typora-style image resize handles. The
-   `image-extension.ts` NodeView appends three
-   absolutely-positioned handles (corner, right edge,
-   bottom edge) to every `<figure.image-figure>`. We hide
-   them by default and reveal on hover/selection so the
-   editor stays clean when the user isn't interacting with
-   an image. */
+/* 图片缩放拖柄。`image-extension.ts` 的 NodeView 会给每个
+   `<figure.image-figure>` 追加三个绝对定位的拖柄（角部、右边、
+   底边）。默认隐藏，悬停或选中时显示，避免编辑器在非交互时显得
+   杂乱。 */
 .ProseMirror figure.image-figure {
   position: relative;
   display: inline-block;
@@ -783,12 +850,9 @@ html, body, #app {
   border-radius: 3px;
 }
 
-/* P0-X: Typora-style alt-text caption input. Rendered
-   inside every `<figure.image-figure>` by the NodeView.
-   We keep the input hidden until the figure is
-   selected (matches Typora's "show alt text on hover")
-   so the editor doesn't look cluttered with empty
-   input boxes by default. */
+/* 图片替代文本输入框。由 NodeView 渲染在每个
+   `<figure.image-figure>` 内部。默认隐藏，等图片被选中时才显示
+   （悬停显示替代文本），避免编辑器默认充满空白输入框而显得杂乱。 */
 .ProseMirror figure.image-figure .image-caption-input {
   display: none;
   width: 100%;
@@ -972,13 +1036,9 @@ html, body, #app {
   pointer-events: none;
 }
 
-/* P0-X: Typora-style window-level drop affordance.
-   When the user drags a file from Finder over the
-   MarkPure window (and the pointer is outside the
-   editor's own drop target), we show a translucent
-   overlay + a centred "Drop to open" hint. Mirrors
-   Typora's behaviour where any non-editor region also
-   accepts file drops. */
+/* 窗口级拖放提示。当用户从访达把文件拖到 MarkPure 窗口上（且
+   指针位于编辑器自身拖放目标之外）时，展示一层半透明遮罩和一个
+   居中的“Drop to open”提示，让编辑区之外的区域也能接收文件拖放。 */
 .app-root.window-drag-active::after {
   content: '';
   position: fixed;
@@ -1011,13 +1071,10 @@ html, body, #app {
   filter: blur(1px);
 }
 
-/* P0-X: Typora-style focus mode. The
-   `FocusModeExtension` decorates the paragraph containing
-   the cursor with `data-focus-current` so we can restore
-   full opacity to the focused paragraph only. Without this
-   rule, the legacy `:has(+ *)` selectors above mis-fade
-   the paragraph the user is editing and make the editor
-   feel broken. */
+/* 专注模式。`FocusModeExtension` 会给光标所在段落加上
+   `data-focus-current` 标记，这样只把当前专注的段落恢复为完全不
+   透明。缺少这条规则时，上面旧的 `:has(+ *)` 选择器会把正在编辑
+   的段落也一起调淡，导致编辑器看起来很怪。 */
 .focus-mode .ProseMirror > *[data-focus-current],
 .focus-mode .ProseMirror > *[data-focus-current] * {
   opacity: 1 !important;
@@ -1083,12 +1140,9 @@ html, body, #app {
   color: var(--menu-hover-text);
 }
 
-/* P0-X: Typora-style outline numbering. The
-   `.toc-num` span carries the `1.` / `1.1.` prefix;
-   `.toc-text` holds the heading label. We dim the
-   number to a secondary colour so it reads as a
-   prefix marker rather than competing with the
-   heading text. */
+/* 大纲编号。`.toc-num` 承载 `1.` / `1.1.` 这类前缀，
+   `.toc-text` 存放标题文本。编号用次要颜色调暗，让它读起来像
+   前缀标记，而不是与标题文字抢眼。 */
 .toc-block .toc-num {
   color: var(--text-secondary);
   margin-right: 6px;
@@ -1462,10 +1516,8 @@ html, body, #app {
   margin: 0 6px;
 }
 
-/* P0-X: Typora-style floating table bubble menu. Anchored
-   above the current cell via inline `top` / `left` from
-   App.svelte. Uses the same `.tb-btn` styling so it
-   matches the static toolbar. */
+/* 表格浮动气泡菜单。由 App.svelte 通过行内 `top` / `left`
+   定位到当前单元格上方。复用 `.tb-btn` 的样式，与静态工具栏保持一致。 */
 .table-bubble {
   position: absolute;
   transform: translateX(-50%);
@@ -1486,10 +1538,9 @@ html, body, #app {
   font-size: 11px;
 }
 
-/* P0-X: Typora-style `[text](` link autocomplete popup.
-   Mirrors the QuickInsertPopup styling so users get a
-   consistent popup affordance. Positioned via inline
-   `top` / `left` from App.svelte's `linkSuggestPosition`. */
+/* `[text](` 链接自动补全弹窗。复用 QuickInsertPopup 的样式，
+   让用户获得一致的弹窗体验。位置由 App.svelte 的
+   `linkSuggestPosition` 通过行内 `top` / `left` 决定。 */
 .link-suggest-popup {
   position: fixed;
   z-index: 9999;

@@ -21,7 +21,7 @@
   let previewOpen = $state(false)
   let isModified = $state(false)
 
-  // Built-in theme colors (fallback when no custom theme selected)
+  // 内置主题的颜色（未选择自定义主题时的回退值）
   const builtinThemeColors: Record<string, Partial<ThemeColors>> = {
     '': {
       bg: '#ffffff', bg_secondary: '#f6f8fa', bg_tab_active: '#ffffff', bg_tab_inactive: '#e8e8e8',
@@ -112,12 +112,12 @@
   async function load() {
     try {
       themes = await getThemes()
-      // Select first custom theme or initialize with current built-in theme
+      // 优先选中第一个自定义主题，否则用当前内置主题初始化
       if (themes.length > 0) {
         selectedTheme = themes[0]
         editedColors = { ...themes[0].colors }
       } else if (currentThemeId && builtinThemeColors[currentThemeId]) {
-        // No custom themes - initialize with current built-in theme
+        // 没有自定义主题——用当前内置主题初始化
         selectedTheme = {
           id: currentThemeId,
           name: currentThemeId === '' ? i18n.t('settings.theme.light') : currentThemeId,
@@ -147,7 +147,7 @@
     const builtin = builtinThemeColors[themeId]
     if (!builtin) return
 
-    // Create a new custom theme based on the built-in
+    // 基于内置主题创建一个新的自定义主题
     const newTheme: Theme = {
       id: `custom_${Date.now()}`,
       name: i18n.t('settings.theme_editor.custom_default_name').replace('{date}', new Date().toLocaleDateString()),
@@ -175,7 +175,7 @@
       selectedTheme = toSave
       isModified = false
       onThemeUpdated?.(toSave)
-      // Reload themes
+      // 重新加载主题列表
       await load()
     } catch (e) {
       console.error('Failed to save theme:', e)

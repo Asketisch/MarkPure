@@ -1,12 +1,10 @@
-//! Per-format autocompletion suggestions for the frontmatter
-//! editor. Each list is intentionally short — we list the
-//! fields users actually reach for (title, date, tags, …)
-//! rather than a full Hugo / Jekyll catalogue.
+//! 面向 frontmatter 编辑器、按格式区分的自动补全建议。
+//! 每个列表都刻意保持精简——只列出用户真正会用的字段
+//! （title、date、tags 等），而不是 Hugo / Jekyll 的完整清单。
 
 use super::types::{CompletionKind, FrontmatterCompletion, FrontmatterFormat};
 
-/// Public entry point: return the completions appropriate
-/// for the document's frontmatter format.
+/// 公共入口：根据文档 frontmatter 的格式返回合适的补全建议。
 pub fn get_frontmatter_completions(format: FrontmatterFormat) -> Vec<FrontmatterCompletion> {
     match format {
         FrontmatterFormat::Yaml => get_yaml_completions(),

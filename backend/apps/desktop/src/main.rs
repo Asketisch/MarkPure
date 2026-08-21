@@ -1,31 +1,26 @@
-//! MarkPure desktop entry point.
+//! MarkPure 桌面端入口。
 //!
-//! As of P8 the bulk of the IPC implementation lives in
-//! topic-specific modules:
+//! 目前绝大部分 IPC 实现分布在按主题划分的模块中：
 //!
-//!   - `state`          — types (`IpcMessage`, `IpcResponse`,
-//!                        `AppState`, `AppEvent`) and the
-//!                        `lock_or_recover` + `escape_for_js`
-//!                        helpers used by every handler.
-//!   - `dispatch`       — the single `handle_command`
-//!                        routing table.
-//!   - `file_ops`       — file dialog, open / save, directory
-//!                        tree, file CRUD, drag-and-drop.
-//!   - `editor_ops`     — outline / wikilinks / tags, the
-//!                        LRU document registry, markdown
-//!                        extensions (mermaid, frontmatter,
-//!                        table, folding, pandoc), spell check.
-//!   - `workspace_ops`  — tabs, config, recent files, themes,
-//!                        keybindings, i18n, bookmarks, app info.
-//!   - `export_ops`     — HTML / PDF / Word export, workspace
-//!                        search, asset (image) upload.
+//! - `state` —— 类型（`IpcMessage`、`IpcResponse`、`AppState`、
+//!   `AppEvent`）及每个处理器都会用到的 `lock_or_recover` +
+//!   `escape_for_js` 辅助函数。
+//! - `dispatch` —— 唯一的 `handle_command` 路由表。
+//! - `file_ops` —— 文件对话框、打开 / 保存、目录树、
+//!   文件增删改、拖放。
+//! - `editor_ops` —— 大纲 / 双链 / 标签、LRU 文档注册表、
+//!   Markdown 扩展（mermaid、frontmatter、table、folding、
+//!   pandoc）、拼写检查。
+//! - `workspace_ops` —— 标签页、配置、最近文件、主题、
+//!   快捷键、i18n、书签、应用信息。
+//! - `export_ops` —— HTML / PDF / Word 导出、工作区
+//!   搜索、资源（图片）上传。
 //!
-//! This file holds only:
-//!   - The module declarations above.
-//!   - The asset-serving handler for `mt://localhost` URLs.
-//!   - The `main()` function that wires the wry WebView and
-//!     the tao event loop together.
-//!   - The platform-specific native menu setup (macOS only).
+//! 本文件只保留：
+//! - 上面的模块声明。
+//! - 为 `mt://localhost` URL 提供资源的处理器。
+//! - 把 wry WebView 与 tao 事件循环接起来的 `main()` 函数。
+//! - 平台相关的原生菜单配置（仅 macOS）。
 
 mod dispatch;
 mod editor_ops;
@@ -43,12 +38,11 @@ use tao::window::WindowBuilder;
 use wry::http::{header::CONTENT_TYPE, Response, StatusCode};
 use wry::WebViewBuilder;
 
-// ============================== Asset serving ==============================
+// ============================== 资源服务 ==============================
 
-/// Serve a file from the embedded Vite build. Used for
-/// `mt://localhost/...` requests from the WebView. Falls
-/// through to `index.html` for SPA routes so deep links
-/// like `mt://localhost/some/note` work after a reload.
+/// 提供嵌入的 Vite 构建产物中的文件。用于 WebView 发出的
+/// `mt://localhost/...` 请求。SPA 路由回退到 `index.html`，
+/// 让 `mt://localhost/some/note` 这类深链接在刷新后也能工作。
 fn serve_asset(path: &str) -> Response<Vec<u8>> {
     let path = path.trim_start_matches('/');
 
@@ -60,7 +54,7 @@ fn serve_asset(path: &str) -> Response<Vec<u8>> {
             .unwrap();
     }
 
-    // SPA fallback
+    // SPA 回退
     if let Some(file) = state::Assets::get("index.html") {
         let mime = file.metadata.mimetype();
         return Response::builder()
@@ -75,7 +69,7 @@ fn serve_asset(path: &str) -> Response<Vec<u8>> {
         .unwrap()
 }
 
-// ============================== Main ==============================
+// ============================== 主入口 ==============================
 
 fn main() {
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
@@ -85,17 +79,17 @@ fn main() {
         lock_or_recover(&state.proxy).replace(proxy);
     }
 
-    // Check if this is a child window
+    // 判断是否为子窗口
     let is_child = std::env::args().any(|a| a.starts_with("--child-window="));
 
-    // Load window icon (PNG at 256x256)
-    // Try multiple locations: dev mode (project root) and bundle mode (Resources/)
+    // 加载窗口图标（256x256 PNG）
+    // 尝试多个位置：开发模式（项目根目录）与打包模式（Resources/）
     fn find_icon_path() -> Option<std::path::PathBuf> {
         let dev_path = std::path::Path::new("icons/256x256.png");
         if dev_path.exists() {
             return Some(dev_path.to_path_buf());
         }
-        // Try bundle mode: executable is in Contents/MacOS/, icons in Contents/Resources/icons/
+        // 尝试打包模式：可执行文件在 Contents/MacOS/，图标在 Contents/Resources/icons/
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
                 let bundle_path = exe_dir
@@ -136,6 +130,9 @@ fn main() {
     #[cfg(target_os = "macos")]
     setup_macos_menu();
 
+    // `wry::WebView` 只被 UI 线程侧的回调（自定义协议处理器、
+    // 事件循环处理器）使用；允许其 Arc 包装不满足 Send+Sync。
+    #[allow(clippy::arc_with_non_send_sync)]
     let webview: Arc<Mutex<Option<wry::WebView>>> = Arc::new(Mutex::new(None));
     let wv_clone = webview.clone();
     let state_clone = state.clone();
@@ -151,7 +148,7 @@ fn main() {
     if dev_mode {
         builder = builder.with_url("http://localhost:5173");
     } else if is_child {
-        // Child window loads the same app but in tear-off mode
+        // 子窗口以撕离模式加载同一个应用
         builder = builder.with_url("mt://localhost");
     } else {
         builder = builder.with_url("mt://localhost");
@@ -168,7 +165,7 @@ fn main() {
             }
         };
 
-        // Fast path: execute inline and deliver response immediately.
+        // 快速路径：内联执行并立即下发响应。
         if let Some(response) = dispatch::handle_command(&msg, &state_for_handler) {
             let js = match serde_json::to_string(&response) {
                 Ok(s) => s,
@@ -186,8 +183,8 @@ fn main() {
             return;
         }
 
-        // Slow path: offload to tokio thread pool. The response
-        // will be delivered via EventLoopProxy → IpcResponse event.
+        // 慢速路径：卸载到 tokio 线程池。响应
+        // 通过 EventLoopProxy → IpcResponse 事件送达。
         dispatch::dispatch_slow(msg, state_for_handler.clone());
     });
 
@@ -216,7 +213,7 @@ fn main() {
                     }
                 }
             }
-            // Async IPC responses arrive here from tokio worker threads.
+            // 异步 IPC 响应从此处从 tokio 工作线程送达。
             Event::UserEvent(AppEvent::IpcResponse { js }) => {
                 if let Ok(wv) = webview_for_el.lock() {
                     if let Some(ref webview) = *wv {
@@ -226,13 +223,10 @@ fn main() {
                     }
                 }
             }
-            // Spell-check requests are dispatched here because
-            // NSSpellChecker on macOS must run on the main
-            // thread (this IS the main thread — tao
-            // `event_loop.run` requires it). On other platforms
-            // we fall through to the embedded English
-            // dictionary, which is thread-agnostic but goes
-            // through this arm anyway for path uniformity.
+            // 拼写检查请求在这里分发，因为 macOS 上的 NSSpellChecker
+            // 必须在主线程运行（这里就是主线程——tao 的
+            // `event_loop.run` 要求如此）。其他平台则回退到内置的
+            // 英文词典，它与线程无关，但为了路径统一仍会经过此分支。
             Event::UserEvent(AppEvent::SpellCheckRequest { text, lang, reply }) => {
                 #[cfg(target_os = "macos")]
                 let result: Result<Vec<spellcheck::SpellError>, String> = {
@@ -241,9 +235,8 @@ fn main() {
                 };
                 #[cfg(not(target_os = "macos"))]
                 let result: Result<Vec<spellcheck::SpellError>, String> = {
-                    // English-only fallback. CJK languages
-                    // produce empty errors (see
-                    // `spellcheck::check_spelling`).
+                    // 仅英文回退。中日韩语言会产生空错误（见
+                    // `spellcheck::check_spelling`）。
                     let r = spellcheck::check_spelling(&text, &lang);
                     Ok(r.errors)
                 };
@@ -266,7 +259,7 @@ fn setup_macos_menu() {
 
     let menubar = NSMenu::new(mtm);
 
-    // App menu
+    // 应用菜单
     let app_menu = NSMenu::new(mtm);
     let app_item = NSMenuItem::new(mtm);
     unsafe {
@@ -284,7 +277,7 @@ fn setup_macos_menu() {
     }
     menubar.addItem(&app_item);
 
-    // Edit menu
+    // 编辑菜单
     let edit_menu = NSMenu::new(mtm);
     let edit_item = NSMenuItem::new(mtm);
     unsafe {

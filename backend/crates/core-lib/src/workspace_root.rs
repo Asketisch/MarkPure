@@ -1,46 +1,44 @@
-//! WorkspaceRoot — a single folder in a multi-root workspace (P2-4).
+//! WorkspaceRoot —— 多根工作区中的一个文件夹。
 //!
-//! Each root is a canonicalized absolute path with a stable UUID. Roots are
-//! the source of truth for "which folders are open"; the older
-//! `Workspace { folders: Vec<FolderInfo> }` model derives its view from this.
+//! 每个根都是带稳定唯一 ID 的规范化绝对路径。根是「打开哪些文件夹」
+//! 的事实来源；更早的 `Workspace { folders: Vec<FolderInfo> }` 模型
+//! 的视图由此派生。
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// A single workspace root folder (multi-root workspace member).
+/// 单个工作区根文件夹（多根工作区成员）。
 ///
-/// Distinct from `FolderInfo` (which carries per-pane derived state such as
-/// `is_expanded`): `WorkspaceRoot` is the persisted, canonical record.
+/// 与 `FolderInfo`（携带每个面板的派生状态，如 `is_expanded`）不同：
+/// `WorkspaceRoot` 是持久化的规范记录。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WorkspaceRoot {
-    /// Stable UUID; survives restarts. Used as the `workspace_id` on file
-    /// watcher events and as the discriminator in `TabState.workspace_root_id`.
+    /// 稳定唯一 ID；重启后仍保留。用作文件监听事件的 `workspace_id`，
+    /// 以及 `TabState.workspace_root_id` 的判别依据。
     pub id: String,
-    /// Absolute, canonicalized path. Never empty.
+    /// 绝对的规范化路径。永不为空。
     pub path: String,
-    /// Display name (derived from `path` basename at creation time, but
-    /// renameable later).
+    /// 显示名（创建时取自 `path` 的 basename，之后可重命名）。
     pub name: String,
-    /// Unix-epoch seconds at which this root was added. Used for stable
-    /// sort order in UI.
+    /// 添加该根时的 Unix 纪元秒。用于 UI 中的稳定排序。
     #[serde(default)]
     pub added_at: u64,
 }
 
 impl WorkspaceRoot {
-    /// Build a new `WorkspaceRoot` from a raw user-supplied path.
+    /// 从用户提供的原始路径构建新的 `WorkspaceRoot`。
     ///
-    /// Performs canonicalization (best-effort: if the path doesn't exist yet
-    /// we keep the original to avoid losing user intent), generates a
-    /// stable-looking UUID from the current time + a counter, and derives
-    /// the display name from the path's basename.
+    /// 执行规范化（尽力而为：路径尚不存在时保留原始值，避免丢失
+    /// 用户意图），用「秒 + 亚秒纳秒 + 进程内序号」生成
+    /// 跨进程碰撞概率可忽略的唯一 ID，并从路径的 basename
+    /// 派生显示名。
     pub fn from_path(path: &str) -> Self {
         Self::from_path_with_time(path, current_unix_secs(), next_root_seq())
     }
 
-    /// Test-friendly constructor: caller supplies `added_at` and a sequence
-    /// number that gets mixed into the id so two roots added in the same
-    /// second still get distinct ids.
+    /// 便于测试的构造函数：调用方提供 `added_at` 和一个序列号，
+    /// 两者与当前亚秒纳秒一起混入 id，使同一秒内（甚至跨进程
+    /// 重启落在同一秒时）添加的两个根也能获得不同的 id。
     pub fn from_path_with_time(path: &str, added_at: u64, seq: u64) -> Self {
         let canonical = std::fs::canonicalize(path)
             .ok()
@@ -53,7 +51,7 @@ impl WorkspaceRoot {
             .unwrap_or(&canonical)
             .to_string();
 
-        let id = format!("root-{:x}-{:x}", added_at, seq);
+        let id = format!("root-{:x}-{:x}-{:x}", added_at, current_subsec_nanos(), seq);
 
         Self {
             id,
@@ -63,14 +61,13 @@ impl WorkspaceRoot {
         }
     }
 
-    /// Build a [`WorkspaceRoot`] from a path that the caller has already
-    /// canonicalized. Use this from `AppConfig::add_workspace_root` where
-    /// we resolve the path once for dedup and then want to skip a second
-    /// `std::fs::canonicalize` round-trip (which can block for tens of
-    /// seconds on a stalled network mount and freeze the wry IPC thread).
+    /// 从调用方已规范化的路径构建 [`WorkspaceRoot`]。供
+    /// `AppConfig::add_workspace_root` 使用——那里我们为去重解析一次路径，
+    /// 之后想跳过第二次 `std::fs::canonicalize` 往返（在停滞的网络挂载上
+    /// 可能阻塞数十秒并冻结 wry IPC 线程）。
     ///
-    /// The path is still treated as best-effort: it is never empty and the
-    /// display name falls back to the full path if no basename exists.
+    /// 路径仍然按尽力而为处理：永不为空，且当没有 basename 时
+    /// 显示名回退为完整路径。
     pub fn from_canonical_path(canonical: &str, added_at: u64, seq: u64) -> Self {
         debug_assert!(!canonical.is_empty(), "from_canonical_path requires non-empty path");
         let name = PathBuf::from(canonical)
@@ -78,7 +75,7 @@ impl WorkspaceRoot {
             .and_then(|n| n.to_str())
             .unwrap_or(canonical)
             .to_string();
-        let id = format!("root-{:x}-{:x}", added_at, seq);
+        let id = format!("root-{:x}-{:x}-{:x}", added_at, current_subsec_nanos(), seq);
         Self {
             id,
             path: canonical.to_string(),
@@ -87,8 +84,8 @@ impl WorkspaceRoot {
         }
     }
 
-    /// Returns true if the directory still exists on disk. Used by the
-    /// startup "missing root" recovery flow (see `cmd_list_workspace_roots`).
+    /// 若目录在磁盘上仍然存在则返回 true。
+    /// 供启动时的「根目录缺失」恢复流程使用（见 `cmd_list_workspace_roots`）。
     pub fn exists(&self) -> bool {
         PathBuf::from(&self.path).is_dir()
     }
@@ -99,6 +96,17 @@ pub(crate) fn current_unix_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// 当前时间的亚秒纳秒部分，混入根 ID 以区分
+/// 「同一秒、不同进程」的 id（`next_root_seq` 每进程从 0 计数，
+/// 单独使用无法防跨进程碰撞）。
+pub(crate) fn current_subsec_nanos() -> u32 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
         .unwrap_or(0)
 }
 
@@ -122,13 +130,13 @@ mod tests {
 
     #[test]
     fn from_path_keeps_original_when_missing() {
-        // Path that almost certainly does not exist.
+        // 几乎肯定不存在的路径。
         let r = WorkspaceRoot::from_path_with_time(
             "/this/path/should/not/exist/zzz_xyz",
             200,
             2,
         );
-        // We don't canonicalize nonexistent paths, so the original is kept.
+        // 不存在的路径不做规范化，因此保留原始值。
         assert_eq!(r.path, "/this/path/should/not/exist/zzz_xyz");
     }
 
@@ -139,9 +147,8 @@ mod tests {
         assert_ne!(a.id, b.id);
     }
 
-    /// Phase 5: `exists()` returns true for the current
-    /// process's temp dir (which always exists) and false
-    /// for a path that almost certainly doesn't.
+    /// `exists()` 对当前进程的临时目录返回 true（它总是存在），
+    /// 对一个几乎肯定不存在的路径返回 false。
     #[test]
     fn exists_reports_actual_disk_state() {
         let real = WorkspaceRoot::from_path("/tmp");
@@ -152,10 +159,9 @@ mod tests {
         assert!(!bogus.exists(), "missing path should report false");
     }
 
-    /// `from_canonical_path` must NOT touch the filesystem. We
-    /// hand it a path that definitely doesn't exist; the
-    /// constructor must accept it verbatim and produce a root
-    /// whose `path` field matches the input byte-for-byte.
+    /// `from_canonical_path` 绝不能触碰文件系统。我们
+    /// 传给它一个肯定不存在的路径；构造函数必须原样接受它，
+    /// 并产生 `path` 字段与输入逐字节一致的根。
     #[test]
     fn from_canonical_path_does_not_resolve() {
         let bogus = "/this/path/does/not/exist/abc_xyz";
@@ -166,14 +172,13 @@ mod tests {
         assert!(r.id.starts_with("root-"));
     }
 
-    /// `from_canonical_path` falls back to the full path as
-    /// the display name when the basename is empty (e.g. the
-    /// path is just "/"). This matches the existing fallback
-    /// in `from_path_with_time`.
+    /// basename 为空时（例如路径就是 "/"），`from_canonical_path`
+    /// 用完整路径作为显示名。这与 `from_path_with_time`
+    /// 中已有的回退逻辑一致。
     #[test]
     fn from_canonical_path_falls_back_to_full_path_for_name() {
-        // "/" has an empty `file_name()` on Unix; the
-        // constructor should fall back to the full path.
+        // 在 Unix 上 "/" 的 `file_name()` 为空；
+        // 构造函数应回退为完整路径。
         let r = WorkspaceRoot::from_canonical_path("/", 1, 1);
         assert_eq!(r.path, "/");
         assert_eq!(r.name, "/");

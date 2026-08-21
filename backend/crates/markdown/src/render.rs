@@ -1,17 +1,14 @@
-//! Markdown → HTML rendering pipeline with Mermaid diagram support
-//! and footnote handling.
+//! Markdown → HTML 渲染管线，支持 Mermaid 图表与脚注处理。
 //!
-//! This module is the bridge between the pulldown-cmark event stream and
-//! the export pipelines. It walks the events, intercepts ` ```mermaid `
-//! code blocks (replacing them with pre-rendered SVGs), and rewrites
-//! footnote references to use the project's HTML class conventions.
+//! 本模块是 pulldown-cmark 事件流与导出管线之间的桥梁。它遍历事件，
+//! 拦截 ` ```mermaid ` 代码块（替换为预渲染的 SVG），并将脚注引用
+//! 改写为项目自身的 HTML class 约定。
 //!
-//! Two entry points are exported:
-//!   - [`to_html_with_diagrams`] — the original P1 entry point
-//!     (mermaid only; kept for backward compatibility with tests
-//!     and the desktop app's IPC layer).
-//!   - [`to_html_with_diagrams_and_footnotes`] — adds footnote
-//!     handling. Use this for any user-facing export.
+//! 导出两个入口：
+//!   - [`to_html_with_diagrams`]——最初的入口（仅 mermaid；为与测试
+//!     及桌面应用 IPC 层向后兼容而保留）。
+//!   - [`to_html_with_diagrams_and_footnotes`]——增加脚注处理。
+//!     任何面向用户的导出请使用此入口。
 
 use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
 
@@ -21,21 +18,17 @@ use crate::footnote::{
 };
 use crate::mermaid::render_mermaid_to_svg_cached;
 
-/// Convert markdown text to HTML, pre-rendering any ` ```mermaid ` code
-/// blocks into inline SVG. The result is suitable for direct embedding
-/// in a standalone HTML document.
+/// 将 Markdown 文本转换为 HTML，把任何 ` ```mermaid ` 代码块预渲染为
+/// 内联 SVG。结果适合直接嵌入独立的 HTML 文档。
 ///
-/// Behaviour:
-/// - Non-mermaid code blocks pass through to `pulldown_cmark::html::push_html`
-///   as usual.
-/// - Mermaid blocks are replaced with `<div class="mermaid">…</div>`
-///   containing the SVG payload.
-/// - When `mmdc` is not available (or the diagram fails to render), the
-///   original source is wrapped in a `<pre class="mermaid-fallback">…</pre>`
-///   with the error message in a sibling `<div class="mermaid-error">`.
-/// - If the pre-render pipeline panics or fails wholesale, we fall back
-///   to the plain `to_html` output so a single broken diagram never
-///   blocks the entire export.
+/// 行为：
+/// - 非 mermaid 代码块照常交给 `pulldown_cmark::html::push_html` 处理。
+/// - Mermaid 块替换为包含 SVG 载荷的 `<div class="mermaid">…</div>`。
+/// - 当 `mmdc` 不可用（或图表渲染失败）时，原始源码包裹在
+///   `<pre class="mermaid-fallback">…</pre>` 中，错误消息放在
+///   同级 `<div class="mermaid-error">` 中。
+/// - 若预渲染管线整体 panic 或失败，我们回退到普通 `to_html` 输出，
+///   使单个损坏的图表永远不会阻塞整个导出。
 pub fn to_html_with_diagrams(markdown: &str) -> String {
     let blocks = collect_mermaid_blocks(markdown);
     let rendered: Vec<Option<MermaidHtml>> = blocks
@@ -75,7 +68,7 @@ pub fn to_html_with_diagrams(markdown: &str) -> String {
                 }
             }
             _ if in_mermaid.is_some() => {
-                // Ignore nested events while inside a mermaid block.
+                // 忽略 mermaid 块内的嵌套事件。
             }
             _ => {
                 pulldown_cmark::html::push_html(
@@ -89,22 +82,17 @@ pub fn to_html_with_diagrams(markdown: &str) -> String {
     out
 }
 
-/// Convert markdown text to HTML, pre-rendering mermaid diagrams AND
-/// rewriting footnote references/definitions to use the project's
-/// `<sup class="footnote-ref">` / `<section class="footnotes">` shell.
+/// 将 Markdown 文本转换为 HTML，预渲染 mermaid 图表，并改写脚注
+/// 引用/定义，使用项目自身的 `<sup class="footnote-ref">` /
+/// `<section class="footnotes">` 外壳。
 ///
-/// Numbers are assigned to footnote references in document order (the
-/// order in which `[^id]` first appears in the body), and the
-/// definition list at the bottom of the document follows the same
-/// numbering. The walker suppresses pulldown-cmark's default
-/// `<sup><a>[N]</a></sup>` output and replaces it with the project's
-/// own element.
+/// 编号按脚注*定义*在源码中出现的顺序分配，正文内联引用与
+/// 文档底部的定义列表共用同一编号。遍历器抑制 pulldown-cmark 默认的
+/// `<sup><a>[N]</a></sup>` 输出，替换为项目自身的元素。
 pub fn to_html_with_diagrams_and_footnotes(markdown: &str) -> String {
-    // Pre-collect footnotes so the reference and the definition
-    // list share the same label→number mapping. We also need this
-    // *before* the event walk because pulldown-cmark emits footnote
-    // *definitions* at the end of the stream — without the pre-pass
-    // we'd number references without a stable order.
+    // 预收集脚注，使引用与定义列表共享同一 label→number 映射。
+    // 还须在事件遍历*之前*完成，因为 pulldown-cmark 在事件流末尾才
+    // 发出脚注*定义*——没有预扫描，我们就无法用稳定顺序编号引用。
     let notes = collect_footnotes(markdown);
     let label_to_number: std::collections::HashMap<&str, usize> = notes
         .iter()
@@ -121,33 +109,40 @@ pub fn to_html_with_diagrams_and_footnotes(markdown: &str) -> String {
     let mut out = String::new();
     let mut block_idx: usize = 0;
     let mut in_mermaid: Option<String> = None;
-    // While we're inside a footnote definition, suppress the default
-    // rendering and emit our own `<li>` instead.
+    // 在脚注定义内部时，抑制默认渲染，改发我们自己的 `<li>`。
     let mut in_def: Option<String> = None;
     let mut in_def_buf: String = String::new();
-    // Track which definitions we've already emitted so we don't
-    // double-render if the user references the same footnote twice.
+    // 记录已发出的定义，避免用户两次引用同一脚注时重复渲染。
     let mut emitted_defs: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for event in events {
-        // Footnote reference → inline `<sup>`.
+        // 脚注引用 → 内联 `<sup>`。
         if let Event::FootnoteReference(label) = &event {
-            let number = label_to_number
-                .get(label.as_ref())
-                .copied()
-                .unwrap_or(1);
-            out.push_str(&render_footnote_ref_html(label.as_ref(), number));
+            match label_to_number.get(label.as_ref()) {
+                Some(&number) => {
+                    out.push_str(&render_footnote_ref_html(label.as_ref(), number));
+                }
+                // 无对应定义的引用：保留原标签（与 word/pdf 导出对
+                // 未知标签的处理一致）。绝不能回退到 1——会与真实
+                // 存在的脚注 1 撞号。pulldown-cmark 目前不会对无
+                // 定义的引用发出该事件，此分支是防御性兜底。
+                None => {
+                    out.push_str(&format!(
+                        "<sup class=\"footnote-ref\">[^{}]</sup>",
+                        crate::footnote::escape_html(label)
+                    ));
+                }
+            }
             continue;
         }
-        // Footnote definition start → switch into the def-collector.
+        // 脚注定义开始 → 切入定义收集器。
         if let Event::Start(Tag::FootnoteDefinition(label)) = &event {
             in_def = Some(label.to_string());
             in_def_buf.clear();
             continue;
         }
-        // Inside a def, accumulate text. Other event types
-        // (e.g. `SoftBreak`) are dropped to keep the `<li>` body
-        // as plain text.
+        // 在定义内部累积文本。其他事件类型（如 `SoftBreak`）被丢弃，
+        // 使 `<li>` 正文保持纯文本。
         if in_def.is_some() {
             match &event {
                 Event::Text(t) | Event::Code(t) => {
@@ -158,7 +153,7 @@ pub fn to_html_with_diagrams_and_footnotes(markdown: &str) -> String {
                 }
                 _ => {}
             }
-            // Don't continue to the general handler.
+            // 不要继续到通用处理器。
         }
         if let Event::End(TagEnd::FootnoteDefinition) = &event {
             if let Some(label) = in_def.take() {
@@ -176,13 +171,12 @@ pub fn to_html_with_diagrams_and_footnotes(markdown: &str) -> String {
             continue;
         }
 
-        // If we're inside a def, skip the default HTML output for
-        // this event.
+        // 若在定义内部，跳过该事件的默认 HTML 输出。
         if in_def.is_some() {
             continue;
         }
 
-        // Mermaid interception (unchanged from `to_html_with_diagrams`).
+        // 拦截 mermaid（与 `to_html_with_diagrams` 一致）。
         match event {
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang)))
                 if lang.as_ref() == "mermaid" =>
@@ -209,7 +203,7 @@ pub fn to_html_with_diagrams_and_footnotes(markdown: &str) -> String {
                 }
             }
             _ if in_mermaid.is_some() => {
-                // Ignore nested events while inside a mermaid block.
+                // 忽略 mermaid 块内的嵌套事件。
             }
             _ => {
                 pulldown_cmark::html::push_html(
@@ -220,35 +214,32 @@ pub fn to_html_with_diagrams_and_footnotes(markdown: &str) -> String {
         }
     }
 
-    // Append the trailing footnote section. `render_footnote_section`
-    // returns "" when there are no footnotes.
+    // 追加尾部脚注小节。`render_footnote_section` 在无脚注时返回 ""。
     let section = render_footnote_section(&notes);
     out.push_str(&section);
     out
 }
 
-// Suppress an unused-import warning for `FootnoteDef` when no test
-// imports it. The struct is re-exported from `crate::footnote` for
-// external use; we don't need it here.
+// 当没有测试导入 `FootnoteDef` 时抑制未使用导入警告。该结构体从
+// `crate::footnote` 重导出供外部使用；此处并不需要。
 #[allow(dead_code)]
 fn _ensure_footnote_def_linked(_: FootnoteDef) {}
 
-/// A pre-rendered mermaid block. The HTML is either an inline SVG
-/// (`<div class="mermaid">…</div>`) or a soft fallback
-/// (`<pre class="mermaid-fallback">…</pre>`).
+/// 一个预渲染的 mermaid 块。HTML 要么是内联 SVG
+///（`<div class="mermaid">…</div>`），要么是软回退
+///（`<pre class="mermaid-fallback">…</pre>`）。
 struct MermaidHtml {
     html: String,
 }
 
-/// Walk the markdown text once and return the (line_number, source) of
-/// every ` ```mermaid ` block. Uses the same heuristic as
-/// `extract_mermaid_blocks` so the two stay in sync.
+/// 遍历 Markdown 文本一次，返回所有 ` ```mermaid ` 块的
+/// (行号, 源码)。使用与 `extract_mermaid_blocks` 相同的启发式，
+/// 使两者保持同步。
 fn collect_mermaid_blocks(markdown: &str) -> Vec<(usize, String)> {
     crate::mermaid::extract_mermaid_blocks(markdown)
 }
 
-/// Render a single mermaid source to its HTML representation, or to a
-/// fallback HTML block if rendering failed.
+/// 将单个 mermaid 源码渲染为其 HTML 表示；渲染失败则渲染为回退 HTML 块。
 fn render_one(source: &str) -> Option<MermaidHtml> {
     let result = render_mermaid_to_svg_cached(source);
     let html = if let (Some(svg), true) = (result.svg.as_ref(), result.is_valid) {
@@ -263,9 +254,8 @@ fn render_one(source: &str) -> Option<MermaidHtml> {
     Some(MermaidHtml { html })
 }
 
-/// Build the soft-fallback HTML for a mermaid block: a `<pre>` containing
-/// the original source plus a `<div>` with the error message. Used when
-/// `mmdc` is unavailable or the diagram fails to render.
+/// 为 mermaid 块构建软回退 HTML：含原始源码的 `<pre>` 加上含错误
+/// 消息的 `<div>`。当 `mmdc` 不可用或图表渲染失败时使用。
 fn fallback_html(source: &str, error: &str) -> String {
     format!(
         r#"<pre class="mermaid-fallback"><code>{}</code><div class="mermaid-error">{}</div></pre>"#,
@@ -281,10 +271,9 @@ fn escape_html_text(s: &str) -> String {
 }
 
 fn escape_for_html_attr(s: &str) -> String {
-    // SVG output from mmdc is already XML — it uses `<` and `>` heavily
-    // inside the body. We embed the SVG inline as the innerHTML of a
-    // `<div>`, so we don't need to escape `<` and `>`. The only thing we
-    // need to guard against is breaking the surrounding `<div …>` tag.
+    // mmdc 的 SVG 输出已是 XML——正文中大量使用 `<` 和 `>`。我们把
+    // SVG 内联嵌入为 `<div>` 的 innerHTML，因此无需转义 `<` 和 `>`。
+    // 唯一需要防范的是破坏外围的 `<div …>` 标签。
     s.replace('&', "&amp;")
         .replace('"', "&quot;")
 }
@@ -311,9 +300,8 @@ mod tests {
 
     #[test]
     fn test_to_html_passthrough_when_no_mermaid() {
-        // A document with no mermaid blocks should produce the same
-        // output as the plain to_html function (apart from minor
-        // whitespace differences from the event walker).
+        // 不含 mermaid 块的文档应产生与普通 to_html 函数相同的输出
+        //（除事件遍历器带来的微小空白差异外）。
         let md = "# Title\n\nHello **world**.\n";
         let out = to_html_with_diagrams(md);
         assert!(out.contains("<h1>Title</h1>"));
@@ -333,21 +321,36 @@ mod tests {
 
     #[test]
     fn test_to_html_mermaid_block_falls_back() {
-        // With MMDC_DISABLED set, mermaid blocks should fall back to a
-        // pre.mermaid-fallback block.
+        // 设置了 MMDC_DISABLED 时，mermaid 块应回退为 pre.mermaid-fallback 块。
         std::env::set_var("MMDC_DISABLED", "1");
         let md = "before\n\n```mermaid\ngraph TD\n    A --> B\n```\n\nafter\n";
         let out = to_html_with_diagrams(md);
         std::env::remove_var("MMDC_DISABLED");
 
-        // The fallback should contain the source.
+        // 回退内容应包含源码。
         assert!(
             out.contains("mermaid-fallback") || out.contains("graph TD"),
             "expected fallback in output: {}",
             out
         );
-        // surrounding text should still be there
+        // 周围文本仍应存在
         assert!(out.contains("before"));
         assert!(out.contains("after"));
+    }
+
+    #[test]
+    fn test_footnote_ref_without_definition_stays_literal() {
+        // pulldown-cmark 对无定义的引用不发出 FootnoteReference 事件，
+        // 原样作为纯文本输出——不会与任何脚注编号撞号。
+        let md = "Hello[^1] and bye[^missing].\n\n[^1]: real note\n";
+        let out = to_html_with_diagrams_and_footnotes(md);
+        assert!(
+            out.contains("bye[^missing]."),
+            "undefined ref should stay literal text: {out}"
+        );
+        assert!(
+            out.contains(">[1]</a></sup>"),
+            "defined footnote should keep its number: {out}"
+        );
     }
 }

@@ -1,19 +1,16 @@
 /**
- * Export / copy-as handlers extracted from `App.svelte`.
+ * 从 `App.svelte` 中拆出的导出 / 复制为 处理器。
  *
- * This module owns the HTML/PDF/Word/PNG export entry points
- * plus the "Copy as Markdown / HTML / Plain" helper. The host
- * passes a small deps bag (`getActiveTab`, `getMarkdown`) and
- * the IPC wrappers; the handlers stay side-effect free except
- * for the shared `exportingPng` guard, which lives here as a
- * module `$state` so the toolbar can disable the button while
- * a snapshot is in flight.
+ * 本模块拥有 HTML/PDF/Word/PNG 各导出入口，以及「复制为
+ * Markdown / HTML / 纯文本」辅助函数。宿主传入一个小型依赖袋
+ * （`getActiveTab`、`getMarkdown`）与 IPC 包装；处理器除了共享
+ * 的 `exportingPng` 守卫外保持无副作用——该守卫以模块 `$state`
+ * 形式存在这里，让快照进行中时工具栏可以禁用按钮。
  *
- * Each handler mirrors what the old inline code did exactly —
- * empty-document short-circuits, large-doc info log, cancel
- * swallowing, and theme-aware HTML/PNG via the dynamic
- * `pngExport` import. Moving the block out of `App.svelte`
- * keeps that 3500-line file a little more navigable.
+ * 每个处理器都与原先内联代码的行为完全一致——空文档短路、
+ * 大文档信息日志、取消吞掉，以及经由动态 `pngExport` 导入的
+ * 主题感知 HTML/PNG。把这坨代码搬出 `App.svelte`，让那个
+ * 3500 行的文件稍微好导航一些。
  */
 
 import type { Editor } from '@tiptap/core'
@@ -27,9 +24,9 @@ import {
 import type { Tab } from './handlers/types'
 
 export interface ExportDeps {
-  /** Reader for the live Tiptap editor (null before mount). */
+  /** 实时 Tiptap 编辑器的读取器（挂载前为 null）。 */
   getEditor: () => Editor | null
-  /** Reader for the active tab (title + path + fallback content). */
+  /** 活动标签页的读取器（标题 + 路径 + 兜底内容）。 */
   getActiveTab: () => Tab | undefined
 }
 
@@ -39,22 +36,20 @@ export interface ExportActions {
   handleExportPdf: () => Promise<void>
   handleExportWord: () => Promise<void>
   handleExportPng: () => Promise<void>
-  /** True while a PNG snapshot is in flight. */
+  /** PNG 快照进行中时为 true。 */
   exportingPng: boolean
 }
 
-/** Heuristic threshold for the "long document" warning. A
- *  typical 1000-paragraph `synth-1k.md` weighs in around
- *  30-50 KB so 100 KB gives a comfortable cushion before we
- *  start asking the user to wait. */
+/** 「长文档」警告的启发式阈值。典型的 1000 段 `synth-1k.md`
+ *  体积在 30-50 KB 左右，因此 100 KB 留有充足余量，之后我们
+ *  才开始提示用户等待。 */
 const LONG_DOC_BYTES = 100 * 1024
 
 export function createExportActions(deps: ExportDeps): ExportActions {
   let exportingPng = $state(false)
 
-  /** Resolve the markdown to export for the active tab, falling
-   *  back to the tab's on-disk content. The title strips `.md`
-   *  for the Save dialog's default filename. */
+  /** 解析活动标签页要导出的 markdown，缺省时回退到标签页的
+   *  磁盘内容。标题去掉 `.md` 后缀，用作保存对话框的默认文件名。 */
   function snapshot(): { content: string; title: string } | null {
     const tab = deps.getActiveTab()
     if (!tab) return null
@@ -64,8 +59,8 @@ export function createExportActions(deps: ExportDeps): ExportActions {
     return { content, title }
   }
 
-  /** Pure-copy helper: the browser Clipboard API is fine for
-   *  all three formats, no Rust IPC needed. */
+  /** 纯复制辅助函数：浏览器的剪贴板 API 对三种格式都够用，
+   *  无需 Rust IPC。 */
   async function handleCopyAs(format: 'markdown' | 'html' | 'plain'): Promise<void> {
     const editor = deps.getEditor()
     if (!editor) return
@@ -85,9 +80,8 @@ export function createExportActions(deps: ExportDeps): ExportActions {
     const snap = snapshot()
     if (!snap) return
     try {
-      // P1-8: serialise the active theme so the standalone HTML
-      // matches the live editor palette. The dynamic import
-      // keeps `pngExport.ts` out of the eager bundle.
+      // 序列化当前主题，让独立的 HTML 与实时编辑器的配色一致。
+      // 动态导入让 `pngExport.ts` 不进入首屏打包。
       const { serializeActiveTheme } = await import('$lib/editor/commands/pngExport')
       await exportHtmlIpc(snap.content, snap.title, serializeActiveTheme())
     } catch (e) {
@@ -100,9 +94,8 @@ export function createExportActions(deps: ExportDeps): ExportActions {
     if (!snap || !deps.getActiveTab()) return
     const tab = deps.getActiveTab()!
     try {
-      // P0-9: pass the source file path so the PDF export
-      // can resolve relative image references (e.g.
-      // ![](./images/foo.png)).
+      // 传入源文件路径，让 PDF 导出能解析相对路径的图片引用
+      // （例如 ![](./images/foo.png)）。
       await exportPdfIpc(snap.content, snap.title, tab.path)
     } catch (e) {
       console.error('Failed to export PDF:', e)
@@ -124,9 +117,8 @@ export function createExportActions(deps: ExportDeps): ExportActions {
     const snap = snapshot()
     if (!snap) return
 
-    // Empty document: skip the IPC round-trip and the
-    // (essentially-blank) save dialog. The user will see a
-    // console message instead of an empty PNG file.
+    // 空文档：跳过 IPC 往返和（基本空白的）保存对话框。
+    // 用户会看到一条控制台消息，而不是一个空 PNG 文件。
     if (!snap.content || !snap.content.trim()) {
       console.warn('PNG export: document is empty')
       return
@@ -140,30 +132,24 @@ export function createExportActions(deps: ExportDeps): ExportActions {
     exportingPng = true
     try {
       const { snapshotHtmlToPng } = await import('$lib/editor/commands/pngExport')
-      // Snapshot the live editor DOM. This piggy-backs on the
-      // existing Tiptap render — KaTeX, Mermaid, CodeMirror
-      // highlighting and workspace images are all already in
-      // the DOM, so the resulting PNG is pixel-identical to
-      // what the user sees on screen.
+      // 给实时编辑器 DOM 截图。这搭的是既有 Tiptap 渲染的便车——
+      // KaTeX、Mermaid、CodeMirror 高亮与工作区图片都已存在于
+      // DOM 中，因此生成的 PNG 与用户屏幕上的内容逐像素一致。
       const host = document.querySelector('.ProseMirror') as HTMLElement | null
       if (!host) {
         console.warn('PNG export: editor DOM not found')
         return
       }
-      // Pass the live editor's width so the export mirrors
-      // the column the user is looking at (the sidebar /
-      // outline panel change the available width; a fixed
-      // 800px would clip).
+      // 传入实时编辑器的宽度，让导出镜像用户正在看的栏宽
+      // （侧边栏 / 大纲面板会改变可用宽度；固定 800px 会裁剪）。
       const dataUrl = await snapshotHtmlToPng(host.outerHTML, host.offsetWidth)
-      // Strip the `data:image/png;base64,` prefix — the Rust
-      // side decodes pure base64.
+      // 去掉 `data:image/png;base64,` 前缀——Rust 端解码纯 base64。
       const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
       try {
         await exportPngIpc(base64, snap.title)
       } catch (e) {
-        // The Rust side returns `Cancelled` when the user
-        // dismisses the save dialog; that's a normal flow and
-        // shouldn't spam the console with an error stack.
+        // 用户关闭保存对话框时 Rust 端返回 `Cancelled`；这是正常
+        // 流程，不该向控制台刷错误堆栈。
         const msg = e instanceof Error ? e.message : String(e)
         if (msg.toLowerCase().includes('cancel')) return
         console.error('Failed to export PNG:', e)

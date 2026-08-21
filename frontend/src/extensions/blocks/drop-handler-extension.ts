@@ -4,21 +4,21 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 export const dropHandlerPluginKey = new PluginKey('dropHandler')
 
 /**
- * Checks if the data transfer contains file data (from external sources)
+ * 判断数据传输是否包含文件数据（来自外部来源）
  */
 function hasFileData(dataTransfer: DataTransfer | null): boolean {
   if (!dataTransfer) return false
-  // Check if there's a prosemirror internal marker
+  // 检查是否存在 prosemirror 内部标记
   const types = Array.from(dataTransfer.types)
   const isInternal = types.includes('application/prosemirror')
-  // If it's internal prosemirror drag, let ProseMirror handle it
+  // 若是 prosemirror 内部拖拽，交给 ProseMirror 处理
   if (isInternal && types.length === 1) return false
-  // Otherwise check for files
+  // 否则按外部文件拖拽处理
   return dataTransfer.files?.length > 0
 }
 
 /**
- * Checks if the data transfer contains image data
+ * 判断数据传输是否包含图片数据
  */
 function hasImageData(dataTransfer: DataTransfer | null): boolean {
   if (!dataTransfer) return false
@@ -32,7 +32,7 @@ function hasImageData(dataTransfer: DataTransfer | null): boolean {
 }
 
 /**
- * Converts a File to base64 data URL
+ * 把 File 转成 base64 数据 URL
  */
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -47,10 +47,9 @@ export interface DropHandlerOptions {
   onFilesDropped?: (files: File[]) => void
   onImagesDropped?: (images: { file: File; base64: string }[]) => void
   /**
-   * Optional callback invoked when the drop pipeline fails (most
-   * commonly when a dropped image can't be read as base64). The
-   * default behaviour is to log to the console; consumers that
-   * surface toasts should wire this up.
+   * 可选回调：拖放管线失败时调用（最常见于拖入的图片无法读成
+   * base64）。默认行为是打印控制台日志；想弹出提示的消费者
+   * 可接上这个回调。
    */
   onDropError?: (err: Error) => void
 }
@@ -89,7 +88,7 @@ export const DropHandlerExtension = Extension.create<DropHandlerOptions>({
             },
 
             dragleave: (_view, event) => {
-              // Only remove highlight if leaving the editor entirely
+              // 只有完全离开编辑器时才移除高亮
               const relatedTarget = event.relatedTarget as Node | null
               if (!relatedTarget || !_view.dom.contains(relatedTarget)) {
                 const editorEl = _view.dom.closest('.editor-container')
@@ -106,12 +105,12 @@ export const DropHandlerExtension = Extension.create<DropHandlerOptions>({
               const dataTransfer = event.dataTransfer
               if (!dataTransfer) return false
 
-              // Check if this is an internal ProseMirror drag
+              // 判断是否为 ProseMirror 内部拖拽
               const isInternal =
                 dataTransfer.types.includes('application/prosemirror') &&
                 dataTransfer.types.length === 1
 
-              // If internal drag (text moving within editor), let ProseMirror handle it
+              // 若是内部拖拽（编辑器内移动文本），交给 ProseMirror 处理
               if (isInternal && dataTransfer.files.length === 0) {
                 return false
               }
@@ -120,15 +119,14 @@ export const DropHandlerExtension = Extension.create<DropHandlerOptions>({
 
               if (files.length === 0) return false
 
-              // Separate images from other files
+              // 把图片与其他文件分开
               const imageFiles = files.filter(f => f.type.startsWith('image/'))
               const otherFiles = files.filter(f => !f.type.startsWith('image/'))
 
-              // Handle image drops (async, don't block)
+              // 处理图片拖放（异步，不阻塞）
               if (imageFiles.length > 0) {
-                // Read each image in parallel, with explicit error
-                // handling. A single corrupted file should not
-                // swallow the whole batch as an unhandled rejection.
+                // 并行读取每张图片，并做显式错误处理。单个损坏文件
+                // 不应让整批以未处理的 rejection 形式吞掉。
                 Promise.all(
                   imageFiles.map(async file => ({
                     file,
@@ -139,23 +137,21 @@ export const DropHandlerExtension = Extension.create<DropHandlerOptions>({
                     options.onImagesDropped?.(images)
                   })
                   .catch(err => {
-                    // Log + report to the host (the App catches and
-                    // shows a toast). Without this `.catch` a
-                    // corrupted file would log an unhandled promise
-                    // rejection and leave the editor in a stuck
-                    // "drag-highlight" state.
+                    // 记录日志并上报宿主（App 捕获后弹提示）。少了
+                    // 这个 `.catch`，损坏文件会留下未处理的 promise
+                    // rejection，编辑器还会卡在“拖拽高亮”状态。
                     console.error('[DropHandler] failed to read image:', err)
                     if (editorEl) {
                       editorEl.classList.remove('drag-highlight')
                     }
                     options.onDropError?.(err)
                   })
-                return true // Prevent default handling
+                return true // 阻止默认处理
               }
 
-              // Handle non-image file drops (e.g., .md files)
+              // 处理非图片文件的拖放（如 .md 文件）
               if (otherFiles.length > 0) {
-                // Get file paths - in Electron/native apps, files have a path property
+                // 获取文件路径——在原生应用中，文件带有 path 属性
                 const paths = otherFiles
                   .map(f => (f as any).path)
                   .filter(Boolean)

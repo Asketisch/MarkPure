@@ -1,10 +1,7 @@
 /**
- * P2-6: Tiptap extension wrapper for the top-block
- * virtualization plugin. Exposes a single command
- * (`setVirtualizationConfig`) for runtime config overrides;
- * the plugin itself runs automatically based on document size.
- *
- * @see /Users/admin/Code/CNB/MarkPure/docs/COMPETITOR_TODO.md P2-6
+ * 顶层块虚拟化插件的 Tiptap 扩展包装。暴露单个命令
+ * （`setVirtualizationConfig`）用于运行时配置覆盖；插件本身按
+ * 文档大小自动运行。
  */
 
 import { Extension } from '@tiptap/core'
@@ -16,14 +13,13 @@ declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     virtualization: {
       /**
-       * Override the default virtualization config at runtime.
-       * Pass a partial config; unspecified fields keep their
-       * current values.
+       * 运行时覆盖默认的虚拟化配置。传入部分配置；未指定的字段
+       * 保持当前值。
        */
       setVirtualizationConfig: (config: Partial<VirtualizationConfig>) => ReturnType
       /**
-       * Report a measured height for a top-block at `index`.
-       * Typically called by NodeViews or external observers.
+       * 上报 `index` 处顶层块的测量高度。通常由 NodeViews 或外部
+       * 观察者调用。
        */
       reportBlockHeight: (index: number, height: number) => ReturnType
     }
@@ -31,7 +27,7 @@ declare module '@tiptap/core' {
 }
 
 export interface VirtualizationExtensionOptions {
-  /** Optional initial config overrides. */
+  /** 可选的初始配置覆盖。 */
   config?: Partial<VirtualizationConfig>
 }
 

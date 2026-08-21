@@ -72,14 +72,11 @@
   }
 
   onMount(() => {
-    // Listen for keyboard-driven navigation from the extension.
-    // The extension emits a *delta* (+1 / -1) rather than an
-    // absolute index, so the popup applies the delta to its own
-    // activeIndex. This keeps index state local to the popup,
-    // which means two QuickInsertExtension instances (e.g. one
-    // for `@` and one for `/`) can no longer clobber each
-    // other's selection — the previous bug that left the
-    // Suggestion plugin in a state that swallowed input.
+    // 监听来自扩展的键盘导航。扩展发出的是*增量*（+1 / -1）而非
+    // 绝对下标，因此弹出层把增量应用到自己的 activeIndex。这让
+    // 下标状态局限在弹出层内部，两个 QuickInsertExtension 实例
+    // （例如一个用于 `@`、一个用于 `/`）不再互相覆盖选择——此前
+    // 的 bug 会让 Suggestion 插件停在吞掉输入的状态。
     const handleNavigate = (e: Event) => {
       const detail = (e as CustomEvent).detail
       const delta = detail?.delta
@@ -93,7 +90,7 @@
     return () => window.removeEventListener('quick-insert-navigate', handleNavigate)
   })
 
-  // Group items by category
+  // 按类别分组条目
   let groupedItems = $derived.by(() => {
     const groups: { category: string; items: { item: QuickInsertItem; globalIndex: number }[] }[] = []
     let currentCat = ''

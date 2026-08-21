@@ -1,66 +1,54 @@
-//! macOS `NSSpellChecker` bridge.
+//! macOS `NSSpellChecker` 桥接模块。
 //!
-//! This module is compiled only on macOS. It wraps the system
-//! `NSSpellChecker` to provide CJK + native English spell
-//! checking with **zero** bundled dictionary cost (the
-//! dictionaries are part of macOS itself, hundreds of MB
-//! lazy-loaded by the OS).
+//! 本模块仅在 macOS 上编译。它封装系统 `NSSpellChecker`，提供
+//! 中日韩 + 原生英语拼写检查，**零**内置字典开销（字典属于
+//! macOS 本身的一部分，由操作系统懒加载，体积达数百 MB）。
 //!
-//! ## Threading
+//! ## 线程模型
 //!
-//! `NSSpellChecker::sharedSpellChecker()` is documented as
-//! safe to call off the main thread, but downstream calls
-//! like `setLanguage:` and `checkString:` are NOT documented
-//! as thread-safe. The desktop app's `editor_ops.rs` IPC
-//! handler dispatches each spell-check request to the main
-//! thread via `EventLoopProxy::send_event(SpellCheckRequest)`
-//! and `Event::UserEvent` in `main.rs` invokes
-//! `check_with_nsspellchecker` from the tao event loop,
-//! which IS the main thread. Calling this function from a
-//! worker thread is unsupported and may crash.
+//! `NSSpellChecker::sharedSpellChecker()` 文档声明可在主线程之外
+//! 调用，但 `setLanguage:`、`checkString:` 等下游调用并未声明为
+//! 线程安全。桌面应用的 `editor_ops.rs` IPC 处理器通过
+//! `EventLoopProxy::send_event(SpellCheckRequest)` 把每条拼写检查
+//! 请求派发到主线程，并由 `main.rs` 中的 `Event::UserEvent` 在
+//! tao 事件循环（即主线程）内调用 `check_with_nsspellchecker`。
+//! 从工作线程调用此函数不受支持，且可能崩溃。
 //!
 //! ## UTF-16 ↔ UTF-8
 //!
-//! `NSString` and the `NSRange` it returns are in UTF-16 code
-//! units. Our [`SpellError`] reports UTF-8 byte offsets — the
-//! shape the existing English path and frontend already use.
-//! We walk the input string once to build a UTF-16 → UTF-8
-//! offset map so each NSRange can be O(1) translated. BMP
-//! characters (every CJK char + ASCII) are one UTF-16 unit;
-//! emoji and surrogate pairs are two units but are not
-//! returned as spelling results in practice.
+//! `NSString` 及其返回的 `NSRange` 以 UTF-16 编码单元计。我们的
+//! [`SpellError`] 报告 UTF-8 字节偏移——这正是现有英语路径与前端
+//! 已使用的形态。我们对输入字符串遍历一次，构建 UTF-16 → UTF-8
+//! 偏移映射，使每个 NSRange 都能 O(1) 转换。BMP 字符（所有中日韩
+//! 字符与 ASCII）是 1 个 UTF-16 单元；emoji 与代理对是 2 个单元，
+//! 但实际上不会被返回为拼写结果。
 
 use crate::types::SpellError;
 use objc2::rc::Retained;
 use objc2_app_kit::NSSpellChecker;
 use objc2_foundation::{NSRange, NSString, NSTextCheckingType};
 
-/// Run `text` through the system `NSSpellChecker` and return
-/// per-misspelling errors with up to 5 suggestions each.
+/// 用系统 `NSSpellChecker` 检查 `text`，返回每条错拼错误及至多
+/// 5 条建议。
 ///
-/// `lang` is a BCP-47 tag (e.g. `"en"`, `"zh-CN"`, `"ja"`);
-/// `NSSpellChecker::setLanguage:` returns `false` if it
-/// doesn't recognize the tag — we log to stderr and fall back
-/// to the user's default language in that case rather than
-/// hard-erroring (the user still gets *some* checker, just
-/// not the one they asked for).
+/// `lang` 是 BCP-47 标签（如 `"en"`、`"zh-CN"`、`"ja"`）；
+/// 若 `NSSpellChecker::setLanguage:` 无法识别该标签则返回 `false`
+/// ——此时我们记录到 stderr 并回退到用户的默认语言，而不是硬性
+/// 报错（用户仍会得到*某个*检查器，只是不一定是他们要求的那个）。
 ///
-/// MUST run on the main thread; see module docs.
+/// 必须在主线程运行；见模块文档。
 pub fn check_with_nsspellchecker(text: &str, lang: &str) -> Vec<SpellError> {
     if text.is_empty() {
         return Vec::new();
     }
 
-    // SAFETY: NSSpellChecker::sharedSpellChecker is the
-    // canonical accessor for the per-process singleton; objc2
-    // returns a +1 retained handle.
+    // SAFETY: NSSpellChecker::sharedSpellChecker 是进程级单例的
+    // 规范访问器；objc2 返回 +1 持有的句柄。
     let checker: Retained<NSSpellChecker> = unsafe { NSSpellChecker::sharedSpellChecker() };
 
-    // SAFETY: setLanguage: is documented to accept any
-    // BCP-47 string and return false if it isn't recognized.
-    // We don't surface the failure as an error — the system
-    // will fall back to the user's default language, which
-    // is the friendly outcome for an unsupported tag.
+    // SAFETY: setLanguage: 文档声明接受任意 BCP-47 字符串，无法
+    // 识别时返回 false。我们不把失败作为错误呈现——系统会回退到
+    // 用户的默认语言，这是不受支持标签下最友好的结果。
     let lang_ns = NSString::from_str(lang);
     let _ok = unsafe { checker.setLanguage(&lang_ns) };
 
@@ -68,13 +56,12 @@ pub fn check_with_nsspellchecker(text: &str, lang: &str) -> Vec<SpellError> {
     let total_units = text_ns.length();
     let full_range = NSRange { location: 0, length: total_units };
 
-    // Batch check the whole string. We pass only the Spelling
-    // type so we don't get spurious grammar / smart-quote /
-    // date-detection hits in the output stream.
+    // 批量检查整个字符串。我们只传 Spelling 类型，避免输出流中
+    // 出现虚假的语法 / 智能引号 / 日期检测命中。
     //
-    // `inSpellDocumentWithTag: 0` means "don't track this
-    // call as part of a long-running document session" — we
-    // use 0 because each IPC request is stateless.
+    // `inSpellDocumentWithTag: 0` 表示「不将本次调用作为
+    // 长期文档会话的一部分跟踪」——我们用 0，因为每条 IPC
+    // 请求都是无状态的。
     let results: Retained<objc2_foundation::NSArray<objc2_foundation::NSTextCheckingResult>> = unsafe {
         checker.checkString_range_types_options_inSpellDocumentWithTag_orthography_wordCount(
             &text_ns,
@@ -92,9 +79,9 @@ pub fn check_with_nsspellchecker(text: &str, lang: &str) -> Vec<SpellError> {
         return Vec::new();
     }
 
-    // Build the UTF-16 → UTF-8 byte offset map. text.encode_utf16()
-    // yields exactly the same code units NSString uses, so the
-    // index lines up perfectly with NSRange.location / length.
+    // 构建 UTF-16 → UTF-8 字节偏移映射。text.encode_utf16()
+    // 产生与 NSString 完全相同的编码单元，因此索引与
+    // NSRange.location / length 精确对齐。
     let utf16_to_utf8 = build_utf16_to_utf8_map(text);
 
     let mut errors = Vec::with_capacity(count);
@@ -102,7 +89,7 @@ pub fn check_with_nsspellchecker(text: &str, lang: &str) -> Vec<SpellError> {
         let result = unsafe { results.objectAtIndex(i) };
         let range = unsafe { result.range() };
 
-        // Translate UTF-16 (location, length) to UTF-8 (start, end).
+        // 把 UTF-16 的 (location, length) 转换为 UTF-8 的 (start, end)。
         let start_u16 = range.location as usize;
         let end_u16 = start_u16 + range.length as usize;
         let Some(&start_byte) = utf16_to_utf8.get(start_u16) else {
@@ -119,10 +106,9 @@ pub fn check_with_nsspellchecker(text: &str, lang: &str) -> Vec<SpellError> {
             None => continue,
         };
 
-        // Suggestions are a second NSSpellChecker call per
-        // misspelling — the batch checkString: doesn't return
-        // them inline. The OS caches per-word lookups so the
-        // amortized cost is small for typical document sizes.
+        // 建议是每条错拼的第二次 NSSpellChecker 调用——批量
+        // checkString: 不会内联返回它们。操作系统会缓存逐词查询，
+        // 因此对典型文档规模而言摊还成本很小。
         let suggestions = unsafe {
             checker
                 .guessesForWordRange_inString_language_inSpellDocumentWithTag(
@@ -150,25 +136,20 @@ pub fn check_with_nsspellchecker(text: &str, lang: &str) -> Vec<SpellError> {
     errors
 }
 
-/// Build a map from UTF-16 code-unit offset → UTF-8 byte
-/// offset for the given string. The last entry maps the
-/// end-of-string position so `[..end]` slicing works without
-/// special-casing.
+/// 为给定字符串构建 UTF-16 编码单元偏移 → UTF-8 字节偏移的映射。
+/// 最后一项映射字符串结束位置，使 `[..end]` 切片无需特殊处理。
 ///
-/// Both encodings count code units, so the map has
-/// `text.encode_utf16().count() + 1` entries. For ASCII +
-/// BMP CJK text — the dominant case — each char contributes
-/// one UTF-16 unit and 1-3 UTF-8 bytes; for an emoji (two
-/// UTF-16 surrogates) we record both surrogate positions
-/// pointing at the start of the emoji's UTF-8 bytes, which
-/// preserves the invariant `map[location + length]` ==
-/// "byte just past the last char of the range".
+/// 两种编码均按编码单元计数，因此映射共有
+/// `text.encode_utf16().count() + 1` 项。对 ASCII + BMP 中日韩
+/// 文本——最常见的情形——每个字符贡献 1 个 UTF-16 单元和 1-3 个
+/// UTF-8 字节；对 emoji（2 个 UTF-16 代理单元）我们记录两个代理
+/// 位置都指向 emoji UTF-8 字节的起始，从而保持不变量
+/// `map[location + length]` == 「范围最后一个字符之后的那个字节」。
 fn build_utf16_to_utf8_map(text: &str) -> Vec<usize> {
     let mut map = Vec::with_capacity(text.len() + 1);
     for (byte_idx, ch) in text.char_indices() {
-        // A char is either 1 or 2 UTF-16 units. Push one
-        // entry per surrogate so NSRange offsets can land
-        // mid-emoji without panicking.
+        // 一个字符是 1 或 2 个 UTF-16 单元。为每个代理单元压入
+        // 一个条目，使 NSRange 偏移落在 emoji 中间也不会 panic。
         for _ in 0..ch.len_utf16() {
             map.push(byte_idx);
         }
@@ -189,25 +170,23 @@ mod tests {
 
     #[test]
     fn test_utf16_to_utf8_map_cjk() {
-        // Each CJK char is 3 UTF-8 bytes and 1 UTF-16 unit.
+        // 每个中日韩字符占 3 个 UTF-8 字节、1 个 UTF-16 单元。
         let map = build_utf16_to_utf8_map("你好");
-        // After "你" (byte 0-2): UTF-16 idx 0 → byte 0
-        // After "好" (byte 3-5): UTF-16 idx 1 → byte 3
-        // End marker: UTF-16 idx 2 → byte 6
+        // 「你」之后（字节 0-2）：UTF-16 索引 0 → 字节 0
+        // 「好」之后（字节 3-5）：UTF-16 索引 1 → 字节 3
+        // 结束标记：UTF-16 索引 2 → 字节 6
         assert_eq!(map, vec![0, 3, 6]);
     }
 
     #[test]
     fn test_utf16_to_utf8_map_mixed() {
-        // ASCII + CJK + ASCII
+        // ASCII + 中日韩 + ASCII
         let map = build_utf16_to_utf8_map("a你b");
-        // 'a' is 1 byte 1 unit; '你' is 3 bytes 1 unit; 'b' is 1 byte 1 unit
+        // 'a' 1 字节 1 单元；'你' 3 字节 1 单元；'b' 1 字节 1 单元
         assert_eq!(map, vec![0, 1, 4, 5]);
     }
 
-    // Note: live NSSpellChecker calls are NOT covered by unit
-    // tests because they require a main-thread Cocoa runtime
-    // and are wildly slow to spin up under `cargo test`.
-    // The integration is verified by the manual macOS test
-    // matrix in the plan (Phase 4).
+    // 注意：真实的 NSSpellChecker 调用不纳入单元测试，因为它们需要
+    // 主线程的 Cocoa 运行时，且 `cargo test` 下启动极慢。集成验证
+    // 由计划中的手工 macOS 测试矩阵完成。
 }

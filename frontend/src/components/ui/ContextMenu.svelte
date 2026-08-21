@@ -1,10 +1,9 @@
 <script lang="ts">
   interface MenuItem {
-    /** Display label. Not required for separator items. */
+    /** 显示文本。分隔条项目不需要。 */
     label?: string
     action?: () => void
-    /** When true, this item renders as a thin divider
-     *  instead of a clickable button. */
+    /** 为 true 时该项渲染为一条细分隔线，而非可点击的按钮。 */
     separator?: boolean
     disabled?: boolean
   }
@@ -32,7 +31,7 @@
     onClose()
   }
 
-  // Position the menu within viewport
+  // 将菜单定位到视口内的 (x, y) 处
   let menuStyle = $derived(() => {
     return `left: ${x}px; top: ${y}px;`
   })

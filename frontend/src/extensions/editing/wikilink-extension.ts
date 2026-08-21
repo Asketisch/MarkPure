@@ -5,15 +5,13 @@ import { InputRule } from '@tiptap/core'
 export interface WikiLinkOptions {
   HTMLAttributes: Record<string, unknown>
   /**
-   * Called when the user clicks a `[[Page]]` link. The host wires
-   * this to `openFileByPath` (or a create-new-file flow when the
-   * page doesn't exist yet). Required for the link to do anything.
+   * 用户点击 `[[Page]]` 链接时调用。宿主把它接到 `openFileByPath`
+   * （或页面尚不存在时的新建文件流程）。让链接产生行为所必需。
    */
   onClickLink?: (page: string) => void
   /**
-   * Called on hover with ~200ms debounce. The host uses this to
-   * show a preview popover with the linked file's first few
-   * paragraphs.
+   * 悬停时调用，约 200ms 防抖。宿主用它展示一个预览浮层，
+   * 内含链接文件的开头几段。
    */
   onHoverLink?: (page: string, el: HTMLElement) => void
 }
@@ -101,13 +99,12 @@ export const WikiLinkExtension = Mark.create<WikiLinkOptions>({
   },
 
   /**
-   * Convert `[[` to a `[[wikilink]]` mark.
+   * 把 `[[` 转成 `[[wikilink]]` mark。
    *
-   * The Tiptap `InputRule` machinery sees a plain `[[foo]]` as the
-   * trigger and rewrites it to a wikilink-marked range in one go.
-   * We match the *closing* `]]` and only fire when the cursor
-   * follows it — that way users can type `[[` mid-word (e.g. in
-   * code) without surprise.
+   * Tiptap 的 `InputRule` 机制把普通的 `[[foo]]` 当作触发条件，
+   * 一次性改写成 wikilink-mark 覆盖的范围。我们匹配*闭合*的 `]]`，
+   * 且只在光标紧随其后时触发——这样用户可以在词中（例如代码里）
+   * 输入 `[[` 而不被打扰。
    */
   addInputRules() {
     return [
@@ -119,15 +116,14 @@ export const WikiLinkExtension = Mark.create<WikiLinkOptions>({
           const page = pipeIdx >= 0 ? raw.slice(0, pipeIdx).trim() : raw.trim()
           const alias = pipeIdx >= 0 ? raw.slice(pipeIdx + 1).trim() : undefined
           if (!page) return
-          // Replace the literal text with the same text but
-          // wrapped in a wikilink mark. The user keeps the alias
-          // visible (no `[[` brackets in the rendered doc).
+          // 用同样的文本替换字面文本，但包一层 wikilink mark。
+          // 别名保持可见（渲染文档中没有 `[[` 括号）。
           const text = alias ?? page
           chain()
             .insertContentAt({ from: range.from, to: range.to }, [
               { type: 'text', text, marks: [{ type: this.name, attrs: { page, alias } }] },
             ])
-            // Move the cursor to right after the inserted text.
+            // 把光标移到插入文本的紧后方。
             .setTextSelection(range.from + text.length)
             .run()
         },
@@ -136,9 +132,8 @@ export const WikiLinkExtension = Mark.create<WikiLinkOptions>({
   },
 
   /**
-   * Convert pasted `[[Page]]` strings into real wikilink marks.
-   * Without this, the user gets a literal text node with the
-   * brackets in it, which the renderer then doesn't recognize.
+   * 把粘贴的 `[[Page]]` 字符串转成真正的 wikilink mark。
+   * 没有它，用户得到的是带方括号的字面文本节点，渲染器无法识别。
    */
   addPasteRules() {
     return [
@@ -166,7 +161,7 @@ export const WikiLinkExtension = Mark.create<WikiLinkOptions>({
       new Plugin({
         key: wikiLinkPluginKey,
         props: {
-          // Click on a wikilink → fire the host callback.
+          // 点击 wikilink → 触发宿主回调。
           handleClick(view, _pos, event) {
             const target = event.target as HTMLElement | null
             const linkEl = target?.closest('[data-wikilink]') as HTMLElement | null
@@ -186,24 +181,3 @@ export const WikiLinkExtension = Mark.create<WikiLinkOptions>({
     return {}
   },
 })
-
-/**
- * Parse wiki links from markdown text and convert them to a format
- * that can be rendered by the editor
- */
-export function parseWikiLinks(text: string): { text: string; links: Array<{ start: number; end: number; page: string; alias: string | null }> } {
-  const linkRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
-  const links: Array<{ start: number; end: number; page: string; alias: string | null }> = []
-  let match
-
-  while ((match = linkRegex.exec(text)) !== null) {
-    links.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      page: match[1].trim(),
-      alias: match[2]?.trim() || null,
-    })
-  }
-
-  return { text, links }
-}

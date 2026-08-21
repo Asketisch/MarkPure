@@ -1,52 +1,44 @@
 /**
- * Parser for the Vim `:` ex-command bar (P2-7 + P0-X).
+ * Vim 命令式（ex-command）状态栏的解析器。
  *
- * Extracted from `key-parser.ts` (where this used to sit at the
- * bottom of a 640-line file) so the EX-command catalogue —
- * `:w`, `:q`, `:wq`, `:e <path>`, `:b<N>` — lives next to its
- * matching `ExCmd` enum without the FSM dispatch logic
- * getting in the way.
+ * 从 `key-parser.ts` 中拆出（它过去位于一个 640 行文件的末尾），
+ * 让 EX 命令目录——`:w`、`:q`、`:wq`、`:e <路径>`、`:b<N>`——
+ * 与对应的 `ExCmd` 枚举放在一起，不受 FSM 派发逻辑干扰。
  *
- * The parser is intentionally strict: anything we don't
- * recognise returns `{ kind: 'error', message }` so the
- * caller (the status bar / command palette) can surface
- * "unknown command: :foo" to the user instead of silently
- * no-op'ing.
+ * 解析器刻意保持严格：任何无法识别的输入都返回
+ * `{ kind: 'error', message }`，由调用方（状态栏/命令面板）
+ * 向用户展示“unknown command: :foo”，而不是悄悄忽略。
  *
- * Adding a new EX command:
- *   1. Add the variant to `ExCmd` in `./types.ts`.
- *   2. Add the match arm below.
- *   3. Update `executeEx` in `./ex-commands.ts` to handle it.
+ * 新增一个 EX 命令：
+ *   1. 在 `./types.ts` 的 `ExCmd` 中新增枚举变体。
+ *   2. 在下方新增对应的匹配分支。
+ *   3. 在 `./ex-commands.ts` 的 `executeEx` 中处理它。
  */
 
 import type { ExCmd } from './types'
 
 type ExParseResult = { kind: 'ok'; cmd: ExCmd } | { kind: 'error'; message: string }
 
-/** Parse the text after `:` (the leading colon has already been
- *  consumed by the FSM) into a structured `ExCmd`. Returns
- *  `{ kind: 'error', message }` for anything we don't recognise. */
+/** 把 `:` 之后的文本（前导冒号已由 FSM 消费）解析为结构化的
+ *  `ExCmd`。无法识别的输入返回 `{ kind: 'error', message }`。 */
 export function parseExText(text: string): ExParseResult {
   const t = text.trim()
   if (t === 'w') return { kind: 'ok', cmd: { type: 'write' } }
   if (t === 'q') return { kind: 'ok', cmd: { type: 'quit' } }
   if (t === 'wq' || t === 'x') return { kind: 'ok', cmd: { type: 'writeQuit' } }
   if (t === 'e') return { kind: 'ok', cmd: { type: 'reload' } }
-  // P0-X: `:e <path>` — open a file by relative path. The
-  // host (`executeEx`) resolves the path against the
-  // workspace root and dispatches the standard
-  // `handleOpenFile` flow. Empty path is rejected so we
-  // don't accidentally open the literal `:e ` arg.
+  // `:e <path>` —— 按相对路径打开文件。宿主（`executeEx`）
+  // 以工作区根目录为基准解析路径，并走标准的 `handleOpenFile`
+  // 流程。空路径会被拒绝，避免误打开字面的 `:e ` 参数。
   if (t.startsWith('e ')) {
     const path = t.slice(2).trim()
     if (!path) return { kind: 'error', message: '`:e` requires a path' }
     return { kind: 'ok', cmd: { type: 'edit', path } }
   }
-  // P0-X: `:b<N>` — switch to tab N (1-indexed). Mirrors
-  // Vim's built-in `:b[uffer]` command. Trailing path
-  // arguments aren't supported (Vim's `:b foo` would match
-  // by name, but that requires fuzzy-matching open tabs
-  // which V2 can add).
+  // `:b<N>` —— 切换到第 N 个标签页（从 1 开始编号）。
+  // 相当于 Vim 内置的 `:b[uffer]` 命令。不支持带路径参数
+  // （Vim 的 `:b foo` 按名称匹配，这需要对已打开的标签页
+  // 做模糊匹配，可留待后续版本实现）。
   const bufMatch = t.match(/^b(\d+)$/)
   if (bufMatch) {
     const idx = parseInt(bufMatch[1], 10)

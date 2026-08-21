@@ -20,12 +20,10 @@
   let wrapCompartment = new Compartment()
   let updating = false
 
-  // P0-X: Typora-style source-editor preferences. We read
-  // from `document.documentElement` (where App.svelte's
-  // `applyEditorConfig` writes the values) instead of
-  // threading a prop down, because the SourceEditor mounts
-  // lazily inside the split pane and re-keying it on every
-  // Settings change would force a teardown.
+  // 源码编辑器的偏好设置：从 `document.documentElement` 读取
+  // （App.svelte 的 `applyEditorConfig` 会把值写到这里），而不是
+  // 用 prop 层层下传。因为 SourceEditor 是在分栏中懒挂载的，
+  // 每次设置变化就重新 key 会强制销毁重建整个编辑器。
   function readEditorPrefs() {
     const root = document.documentElement
     const rootStyle = getComputedStyle(root)
@@ -35,7 +33,7 @@
     return { tabSize, softTabs, wordWrap }
   }
 
-  // React to content prop changes (e.g., switching tabs or toggling source mode)
+  // 响应 content 属性的变化（例如切换标签页或开关源码模式）
   $effect(() => {
     if (cm && content !== undefined) {
       const current = cm.state.doc.toString()
@@ -49,32 +47,23 @@
     }
   })
 
-  // P0-X: re-apply word-wrap when the user toggles it in
-  // Settings. CodeMirror's `EditorView.lineWrapping` is a
-  // plain extension so we reconfigure via the
-  // `wrapCompartment` instead of recreating the editor.
-  $effect(() => {
-    if (!cm) return
-    const { wordWrap } = readEditorPrefs()
-    cm.dispatch({
-      effects: wrapCompartment.reconfigure(wordWrap ? CMView.lineWrapping : []),
-    })
-  })
+  // 追踪当前已应用的换行状态，避免对无变化的样式属性改动做
+  // 多余的 reconfigure dispatch。纯闭包变量，模板不使用，无需 $state。
+  let wrapApplied = false
 
   onMount(() => {
     const isDark = detectDarkTheme()
     const prefs = readEditorPrefs()
+    wrapApplied = prefs.wordWrap
     cm = new CMView({
       state: CMState.create({
         doc: content,
         extensions: [
-          // basicSetup includes line numbers via gutter;
-          // users who disable `line_numbers` in Settings
-          // want a clean source view, so we don't add an
-          // extra gutter config and let `basicSetup` win
-          // (typing a Tab inserts `\t` when softTabs is
-          // false, which matches user expectation for a
-          // Typora-like source editor).
+          // basicSetup 已经通过 gutter 自带行号；在设置里关闭
+          // `line_numbers` 的用户希望源码视图干净整洁，因此这里
+          // 不再追加额外的 gutter 配置，交给 `basicSetup` 处理
+          // （softTabs 关闭时按 Tab 插入 `\t`，符合用户对源码
+          // 编辑器的预期）。
           basicSetup,
           mdLang(),
           themeCompartment.of(createThemeExtension(isDark)),
@@ -83,17 +72,33 @@
               onUpdate(update.state.doc.toString())
             }
           }),
-          // P0-X: word-wrap respects Settings. Default
-          // to true (matches the legacy behaviour) so an
-          // uninstalled user with no `--editor-word-wrap`
-          // CSS variable still gets a wrapped editor.
+          // 自动换行跟随设置。默认开启（与旧行为一致），
+          // 这样没有 `--editor-word-wrap` CSS 变量的环境
+          // 依然能获得自动换行的编辑器。
           wrapCompartment.of(prefs.wordWrap ? CMView.lineWrapping : []),
         ],
       }),
       parent: container,
     })
 
+    // 用户在设置里切换自动换行时重新应用。configOps.applyEditorConfig
+    // 把 `--editor-word-wrap` 写到根元素 style 上（不是响应式源），
+    // 所以观察该属性变化，通过 `wrapCompartment` 重新配置，而不是
+    // 重建整个编辑器。
+    const root = document.documentElement
+    const prefsObserver = new MutationObserver(() => {
+      if (!cm) return
+      const { wordWrap } = readEditorPrefs()
+      if (wordWrap === wrapApplied) return
+      wrapApplied = wordWrap
+      cm.dispatch({
+        effects: wrapCompartment.reconfigure(wordWrap ? CMView.lineWrapping : []),
+      })
+    })
+    prefsObserver.observe(root, { attributes: true, attributeFilter: ['style'] })
+
     return () => {
+      prefsObserver.disconnect()
       cm?.destroy()
     }
   })

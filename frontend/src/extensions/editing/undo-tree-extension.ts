@@ -1,35 +1,28 @@
 /**
- * Branching undo tree (P0-8) — Tiptap extension wrapper.
+ * 分支式撤销树 —— Tiptap 扩展包装层。
  *
- * Wraps the pure ProseMirror plugin from
- * `frontend/src/plugins/undo-tree/` in a Tiptap `Extension` and
- * exposes typed commands under the `undoTree.*` namespace.
+ * 把 `frontend/src/plugins/undo-tree/` 中的纯 ProseMirror 插件包装成
+ * Tiptap `Extension`，并在 `undoTree.*` 命名空间下暴露类型化命令。
  *
- * Replaces the previous snapshot-stub (which was a self-admitted
- * "Snapshot-based, NOT a real branching history yet" — see the
- * 2026-06 pre-P0-8 docs/COMPETITOR_TODO.md revision). The new
- * implementation tracks a true tree topology with `parentId` /
- * `childIds` and a `currentId` pointer that the user can move
- * between siblings and ancestors.
+ * 取代了之前的快照占位实现（它自己也承认“基于快照，还不是真正的
+ * 分支历史”）。新的实现用 `parentId` / `childIds` 记录真实树形拓扑，
+ * 并通过 `currentId` 指针让用户在兄弟节点与祖先之间移动。
  *
- * Storage model:
- *   - Each node holds a frozen `state.doc.toJSON()` snapshot.
- *   - 50 nodes max (LRU trim of non-current leaves).
- *   - Throttle window: 1 second per leaf — typing bursts collapse
- *     into one node, fresh branches after a switch always
- *     allocate a new child.
+ * 存储模型：
+ *   - 每个节点持有一份冻结的 `state.doc.toJSON()` 快照。
+ *   - 最多 50 个节点（对非当前叶子做 LRU 清理）。
+ *   - 节流窗口：每个叶子 1 秒——打字爆发合并为一个节点，切换后的
+ *     新分支总是分配新的子节点。
  *
- * Relationship with PM history:
- *   - The plugin runs *alongside* StarterKit's `prosemirror-history`.
- *     `Cmd+Z` / `Cmd+Shift+Z` continue to use PM's linear history.
- *   - The tree is the branching view; "switch branch" is a
- *     `tr.replaceWith` that PM records as one event (so the user
- *     can PM-undo a branch switch).
+ * 与 PM 历史的关系：
+ *   - 插件与 StarterKit 的 `prosemirror-history` *并排* 运行。
+ *     `Cmd+Z` / `Cmd+Shift+Z` 继续使用 PM 的线性历史。
+ *   - 树是分支视角；“切换分支”是一条 `tr.replaceWith`，PM 把它
+ *     记为一次事件（因此用户可以 PM 撤销一次分支切换）。
  *
- * Decorations:
- *   - Minimal today. The right-side panel drives the primary UI;
- *     decorations are reserved for future "gutter markers at edit
- *     points" work.
+ * 装饰：
+ *   - 目前保持最少。右侧面板承载主要 UI；装饰留给未来的
+ *     “在编辑点显示槽位标记”工作。
  */
 
 import { Extension } from '@tiptap/core'
@@ -47,10 +40,10 @@ export const UndoTreeExtension = Extension.create({
   name: 'undoTree',
 
   addCommands() {
-    // The Tiptap `addCommands` registry is closed; we escape with
-    // `as unknown as Record<...>` like the multi-cursor extension
-    // does (see editor.ts:67-111). Callers reach the commands via
-    // `editor.commands.undoToBranch(...)` etc.
+    // Tiptap 的 `addCommands` 注册表是封闭的；与多光标扩展一样，
+    // 用 `as unknown as Record<...>` 绕过类型限制（见 editor.ts
+    // 的 addCommands 组装）。调用方通过 `editor.commands.undoToBranch(...)`
+    // 等命令访问。
     return {
       undoToBranch: (branchId: string) => undoToBranch(branchId),
       labelBranch: (branchId: string, label: string) => labelBranch(branchId, label),

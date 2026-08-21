@@ -1,5 +1,5 @@
 use rfd::FileDialog;
-// ============================== File dialogs ==============================
+// ============================== 文件对话框 ==============================
 
 pub fn cmd_pick_open_file() -> std::result::Result<serde_json::Value, String> {
     let path = FileDialog::new()
@@ -28,10 +28,10 @@ pub fn cmd_pick_directory() -> std::result::Result<serde_json::Value, String> {
     Ok(serde_json::Value::String(path.to_string_lossy().to_string()))
 }
 
-/// Native file picker restricted to `.json` files. Used by
-/// the Settings panel's "Import Theme" action — the WebView's
-/// `input[type=file]` API only exposes a sandboxed name, not
-/// the absolute path the Rust `import_theme` command needs.
+/// 限制为 `.json` 文件的原生文件选择器。供设置面板的
+/// “导入主题”操作使用——WebView 的 `input[type=file]` API
+/// 只能拿到沙箱化后的文件名，无法获得 Rust `import_theme`
+/// 命令所需的绝对路径。
 pub fn cmd_pick_theme_file() -> std::result::Result<serde_json::Value, String> {
     let path = FileDialog::new()
         .add_filter("Theme", &["json"])

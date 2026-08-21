@@ -1,22 +1,20 @@
 /**
- * Tiptap command shims for the Vim mode plugin (P2-7).
+ * Vim 模式插件的 Tiptap 命令封装。
  *
- * These wrap the lower-level helpers in `operators.ts` /
- * `motions.ts` / `text-objects.ts` into Tiptap-style
- * `({ editor, state, dispatch }) => boolean` commands. The
- * Vim extension's `addCommands` registry exposes them as
- * `editor.commands.vimEnterInsert()` etc.
+ * 这些命令把 `operators.ts` / `motions.ts` / `text-objects.ts`
+ * 里的底层助手包装成 Tiptap 风格
+ * `({ editor, state, dispatch }) => boolean` 命令。Vim 扩展的
+ * `addCommands` 注册表把它们暴露为 `editor.commands.vimEnterInsert()`
+ * 等。
  *
- * Each command:
- *   - Reads from `view.state` (selection, doc).
- *   - Calls a pure helper to compute a range / op result.
- *   - Dispatches a transaction with the mutation AND a Vim
- *     meta (`enterMode`, `setPending`, etc.) so the plugin's
- *     `apply` reducer updates the Vim state.
+ * 每个命令：
+ *   - 从 `view.state` 读取（选区、文档）。
+ *   - 调用纯助手计算范围 / 操作结果。
+ *   - 派发一条同时带改动与 Vim meta（`enterMode`、`setPending` 等）
+ *     的事务，让插件的 `apply` reducer 更新 Vim 状态。
  *
- * The dispatched transaction is BOTH a doc change and a
- * meta change. PM's history records it; P0-8's undo tree
- * also picks it up.
+ * 派发的事务既是文档变更又是 meta 变更。PM 的 history 记录它；
+ * 撤销树也会拾取它。
  */
 
 import type { Editor } from '@tiptap/core'
@@ -42,7 +40,7 @@ import {
 import { enterVisualMode as enterVisualModeInner, exitVisualMode } from './visual'
 
 /* ------------------------------------------------------------------ *
- *  Mode switches                                                       *
+ *  模式切换                                                            *
  * ------------------------------------------------------------------ */
 
 export function enterInsertMode(view: EditorView, variant: 'i' | 'I' | 'a' | 'A' | 'o' | 'O' | 's' | 'S'): boolean {
@@ -107,9 +105,8 @@ export function enterInsertMode(view: EditorView, variant: 'i' | 'I' | 'a' | 'A'
 }
 
 export function enterReplaceMode(_view: EditorView): boolean {
-  // V1: replace mode is a stub. The status bar chip will show
-  // 'REPLACE' but the editor behaves like INSERT (no char-level
-  // overstrike yet). V2 implements proper overstrike.
+  // 当前版本：替换模式是桩实现。状态栏会显示“REPLACE”，但编辑器
+  // 行为等同 INSERT（尚无字符级覆盖）。后续版本再做真正的覆盖输入。
   return true
 }
 
@@ -128,7 +125,7 @@ export function exitToNormalMode(view: EditorView): boolean {
 }
 
 /* ------------------------------------------------------------------ *
- *  Standalone operators                                                *
+ *  独立操作符                                                          *
  * ------------------------------------------------------------------ */
 
 export function deleteChar(view: EditorView, count: number): boolean {
@@ -191,7 +188,7 @@ export function redoCmd(editor: Editor): boolean {
 }
 
 /* ------------------------------------------------------------------ *
- *  Range-based operators (operator + motion / text object)             *
+ *  基于区间的操作符（操作符 + motion / 文本对象）                        *
  * ------------------------------------------------------------------ */
 
 export function deleteMotion(view: EditorView, motion: Motion, count: number, char?: string): boolean {
@@ -199,7 +196,6 @@ export function deleteMotion(view: EditorView, motion: Motion, count: number, ch
   const res = applyDelete(view, r)
   dispatchResult(view, res)
   return true
-  void char
 }
 
 export function changeMotion(view: EditorView, motion: Motion, count: number, char?: string): boolean {
@@ -207,7 +203,6 @@ export function changeMotion(view: EditorView, motion: Motion, count: number, ch
   const res = applyChange(view, r)
   dispatchResult(view, res)
   return true
-  void char
 }
 
 export function yankMotion(view: EditorView, motion: Motion, count: number, char?: string): boolean {
@@ -215,7 +210,6 @@ export function yankMotion(view: EditorView, motion: Motion, count: number, char
   const res = applyYank(view, r)
   dispatchResult(view, res)
   return true
-  void char
 }
 
 export function deleteTextObject(view: EditorView, obj: Parameters<typeof textObjectRange>[1], mod: Parameters<typeof textObjectRange>[2]): boolean {
@@ -240,7 +234,7 @@ export function yankTextObject(view: EditorView, obj: Parameters<typeof textObje
 }
 
 /* ------------------------------------------------------------------ *
- *  Linewise                                                            *
+ *  行级操作符                                                          *
  * ------------------------------------------------------------------ */
 
 export function deleteLineCmd(view: EditorView, count: number): boolean {
@@ -266,7 +260,7 @@ export function yankLineCmd(view: EditorView, count: number): boolean {
 }
 
 /* ------------------------------------------------------------------ *
- *  Motion-only (cursor move, no operator)                             *
+ *  仅移动光标（无操作符）                                                *
  * ------------------------------------------------------------------ */
 
 export function moveByMotion(view: EditorView, motion: Motion, count: number, char?: string): boolean {
@@ -279,14 +273,14 @@ export function moveByMotion(view: EditorView, motion: Motion, count: number, ch
   return true
 }
 
-/** Exit visual mode (Esc / Ctrl-C in visual / etc.). */
+/** 退出可视模式（可视模式下的 Esc / Ctrl-C 等）。 */
 export function exitVisualCmd(view: EditorView): boolean {
   exitVisualMode(view)
   return true
 }
 
 /* ------------------------------------------------------------------ *
- *  Helpers                                                             *
+ *  辅助函数                                                            *
  * ------------------------------------------------------------------ */
 
 function dispatchResult(view: EditorView, res: { tr: Transaction; cursorPos?: number; registerUpdate?: string; nextMode?: VimMode }): void {
@@ -308,7 +302,7 @@ function clampToDoc(view: EditorView, pos: number): number {
   return Math.max(0, Math.min(pos, size))
 }
 
-/** Convenience: dispatch a parsed `VimCommand` to the editor. */
+/** 便捷函数：把解析出的 `VimCommand` 派发给编辑器。 */
 export function dispatchVimCommand(view: EditorView, cmd: VimCommand): boolean {
   if (cmd.type === 'motion') {
     return moveByMotion(view, cmd.motion, cmd.count, cmd.char)
@@ -371,7 +365,7 @@ export function dispatchVimCommand(view: EditorView, cmd: VimCommand): boolean {
     return dedentLine(view, cmd.count)
   }
   if (cmd.type === 'redo') {
-    // The plugin calls `editor.commands.redo()` directly.
+    // 插件直接调用 `editor.commands.redo()`。
     return false
   }
   if (cmd.type === 'noOp' || cmd.type === 'error') {

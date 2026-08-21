@@ -1,21 +1,18 @@
 /**
- * Top-block virtualization ProseMirror plugin.
+ * 顶层块虚拟化 ProseMirror 插件。
  *
- * Wraps off-viewport top-level blocks in a `pm-virtual-hidden`
- * decoration. CSS uses `content-visibility: auto` +
- * `contain-intrinsic-size` so the browser skips layout/paint for
- * off-screen blocks while preserving their box dimensions
- * (no scrollbar jumps).
+ * 把视口之外的顶层块包进 `pm-virtual-hidden` 装饰。CSS 结合
+ * `content-visibility: auto` 与 `contain-intrinsic-size`，让浏览器
+ * 跳过屏幕外块的布局与绘制，同时保留其盒模型尺寸（不会出现
+ * 滚动条跳动）。
  *
- * Activation:
- *   - top-block count <= `threshold`  →  fast path, no decorations
- *   - top-block count  > `threshold`  →  enable; only
- *     `[firstVisible - buffer, lastVisible + buffer]` is rendered
+ * 生效条件：
+ *   - 顶层块数量 <= `threshold`  →  快捷路径，不加任何装饰
+ *   - 顶层块数量  > `threshold`  →  启用；只渲染
+ *     `[firstVisible - buffer, lastVisible + buffer]` 范围内的块
  *
- * Container blocks (list/table/codeBlock-with-children) are
- * never virtualized: their internals are always kept live.
- *
- * @see /Users/admin/Code/CNB/MarkPure/docs/COMPETITOR_TODO.md P2-6
+ * 容器类块（列表/表格/带子节点的代码块）永不虚拟化：其内部
+ * 始终保持活跃。
  */
 
 import { Plugin, PluginKey } from '@tiptap/pm/state'
@@ -35,28 +32,28 @@ import {
 } from './virtualization/types'
 
 // ---------------------------------------------------------------------------
-// Plugin state
+// 插件状态
 // ---------------------------------------------------------------------------
 
 export interface VirtualizationState {
-  /** Master switch; false when threshold not exceeded. */
+  /** 总开关；未超过阈值时为 false。 */
   enabled: boolean
-  /** Top-level block metadata, in document order. */
+  /** 顶层块元数据，按文档顺序排列。 */
   topBlocks: TopBlockMeta[]
-  /** Index of the first top-block currently within the visible window. */
+  /** 当前位于可见窗口内的第一个顶层块下标。 */
   firstVisible: number
-  /** Index of the last top-block currently within the visible window. */
+  /** 当前位于可见窗口内的最后一个顶层块下标。 */
   lastVisible: number
-  /** Cached decoration set. */
+  /** 缓存好的装饰集。 */
   decorations: DecorationSet
-  /** Effective config (initial + runtime overrides). */
+  /** 生效中的配置（初始值 + 运行时覆盖）。 */
   config: VirtualizationConfig
 }
 
 export const virtualizationPluginKey = new PluginKey<VirtualizationState>('markpure-virtualization')
 
 // ---------------------------------------------------------------------------
-// Meta transactions
+// Meta 事务
 // ---------------------------------------------------------------------------
 
 interface SetMeasuredHeightMeta {
@@ -80,10 +77,10 @@ type VirtualizationMeta =
   | SetConfigMeta
 
 // ---------------------------------------------------------------------------
-// Helpers
+// 辅助函数
 // ---------------------------------------------------------------------------
 
-/** Walk up from `view.dom` to find the first vertically scrollable ancestor. */
+/** 从 `view.dom` 向上查找第一个可垂直滚动的祖先元素。 */
 function findScrollContainer(view: EditorView): HTMLElement | null {
   let el: HTMLElement | null = view.dom.parentElement
   while (el) {
@@ -97,10 +94,9 @@ function findScrollContainer(view: EditorView): HTMLElement | null {
 }
 
 /**
- * Compute first/last block indices that intersect the viewport
- * `[scrollTop, scrollTop + viewportHeight]`. Binary search for
- * the first block whose bottom edge dips into view, then linear
- * forward scan (typically O(1) in practice) for the last.
+ * 计算与视口 `[scrollTop, scrollTop + viewportHeight]` 相交的首尾块下标。
+ * 先用二分查找第一个底边进入视口的块，再向前线性扫描（实践中
+ * 通常为 O(1)）找到最后一个。
  */
 function computeVisibleRange(
   blocks: readonly TopBlockMeta[],
@@ -114,7 +110,7 @@ function computeVisibleRange(
   const top = scrollTop
   const bottom = scrollTop + viewportHeight
 
-  // Binary search: first block whose bottom edge is below `top`.
+  // 二分查找：第一个底边位于 `top` 之下的块。
   let first = 0
   let lo = 0
   let hi = n - 1
@@ -129,7 +125,7 @@ function computeVisibleRange(
     }
   }
 
-  // Linear scan forward: last block whose top edge is above `bottom`.
+  // 向前线性扫描：最后一个顶边位于 `bottom` 之上的块。
   let last = first
   for (let i = first; i < n; i++) {
     if (blocks[i].offsetTop < bottom) {
@@ -144,7 +140,7 @@ function computeVisibleRange(
   return { first, last }
 }
 
-/** Build the DecorationSet marking blocks outside [first, last] as hidden. */
+/** 构建把 [first, last] 之外的块标记为隐藏的 DecorationSet。 */
 function buildDecorations(
   doc: PMNode,
   blocks: readonly TopBlockMeta[],
@@ -170,14 +166,13 @@ function buildDecorations(
 }
 
 // ---------------------------------------------------------------------------
-// Public API: imperative helpers
+// 公共 API：命令式辅助函数
 // ---------------------------------------------------------------------------
 
 /**
- * Dispatch a transaction to update a block's measured height.
- * Falls back to a no-op if the plugin is not installed or the
- * index is invalid. Designed to be called from a
- * `ResizeObserver` callback attached to top-block DOM nodes.
+ * 派发事务更新某个块的实际测量高度。
+ * 若插件未安装或下标无效则退化为空操作。设计为由绑定在顶层块
+ * DOM 节点上的 `ResizeObserver` 回调调用。
  */
 export function reportBlockHeight(
   view: EditorView,
@@ -194,14 +189,13 @@ export function reportBlockHeight(
 }
 
 // ---------------------------------------------------------------------------
-// Plugin factory
+// 插件工厂
 // ---------------------------------------------------------------------------
 
 /**
- * Create the virtualization plugin. Pass `initialConfig` to
- * override `DEFAULT_VIRTUALIZATION_CONFIG` at construction time;
- * runtime overrides go through the `setConfig` command (added
- * by the Tiptap extension wrapper in Phase 3).
+ * 创建虚拟化插件。可传 `initialConfig` 在构造时覆盖
+ * `DEFAULT_VIRTUALIZATION_CONFIG`；运行时的覆盖通过 `setConfig`
+ * 命令完成（由 Tiptap 扩展包装层提供）。
  */
 export function createVirtualizationPlugin(
   initialConfig?: Partial<VirtualizationConfig>,
@@ -230,7 +224,7 @@ export function createVirtualizationPlugin(
       apply(tr, prev, _oldState, newState) {
         const meta = tr.getMeta(virtualizationPluginKey) as VirtualizationMeta | undefined
 
-        // Re-enumerate top blocks on any doc change.
+        // 文档有任何变化时都重新枚举顶层块。
         let topBlocks = tr.docChanged
           ? enumerateTopBlocks(newState.doc)
           : prev.topBlocks
@@ -260,8 +254,7 @@ export function createVirtualizationPlugin(
           }
         }
 
-        // Recompute offsets after a doc change or a measured-height
-        // change that diverged from the estimate.
+        // 文档变化或测量高度与估算偏离后，重新计算各块偏移。
         if (measuredChanged || tr.docChanged) {
           topBlocks = recomputeOffsets(topBlocks)
           firstVisible = Math.max(0, Math.min(firstVisible, topBlocks.length - 1))
@@ -323,8 +316,8 @@ export function createVirtualizationPlugin(
           resizeObserver = new ResizeObserver(() => schedule())
           resizeObserver.observe(container)
         }
-        // Schedule an initial visible-range computation in case
-        // the editor scrolled before this view() ran.
+        // 安排一次初始可见范围计算，防止 view() 执行前编辑器
+        // 已经发生过滚动。
         schedule()
       }
 

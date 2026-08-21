@@ -1,19 +1,14 @@
 <script lang="ts">
   /**
-   * The tab bar (and its right-click context menu) shown
-   * above the editor area.
+   * 编辑器区域上方的标签栏（及其右键菜单）。
    *
-   * This component is purely presentational: it takes the
-   * current tab list + active id, and a set of operations
-   * that the host wires up. The host owns the state machine
-   * (Tab interface, switchTab, closeTab, etc.) because
-   * those touch Rust, the doc registry, and other concerns
-   * outside this component.
+   * 本组件纯属展示层：接收当前标签列表 + 激活 id，以及一组由宿主
+   * 接入的操作。宿主持有状态机（Tab 接口、switchTab、closeTab 等），
+   * 因为这些会触及 Rust、文档注册表以及本组件之外的其他关注点。
    */
 
-  /// The minimum tab shape this component needs. Defined
-  /// structurally rather than imported from `$lib/editor/commands`
-  /// so the component is testable in isolation.
+  /// 本组件所需的最小标签形态。采用结构化定义而不是从
+  /// `$lib/editor/commands` 导入，便于组件独立测试。
   export interface Tab {
     id: number
     path: string | null
@@ -30,6 +25,7 @@
     onCloseOthers,
     onCloseAll,
     onCloseToRight,
+    onPromote,
     onContextMenu,
   }: {
     tabs: Tab[]
@@ -39,10 +35,12 @@
     onCloseOthers: (id: number) => void
     onCloseAll: () => void
     onCloseToRight: (id: number) => void
+    /** 双击预览标签提升为普通标签。标签状态归宿主所有，
+     *  组件只发信号，不直接改 `tab.preview`。 */
+    onPromote?: (id: number) => void
     /**
-     * Fires on right-click at `(mouseEvent, tabId)`. The
-     * host decides where to show the menu (typically a
-     * floating div at the cursor position).
+     * 在 `(mouseEvent, tabId)` 上右键时触发。菜单显示在哪里由宿主
+     * 决定（通常是一个位于光标处的浮动 div）。
      */
     onContextMenu: (e: MouseEvent, id: number) => void
   } = $props()
@@ -55,7 +53,7 @@
       class:active={tab.id === activeTabId}
       class:preview={tab.preview}
       onclick={() => onSwitch(tab.id)}
-      ondblclick={() => { tab.preview = false }}
+      ondblclick={() => onPromote?.(tab.id)}
       onauxclick={(e) => { if (e.button === 1) { e.preventDefault(); onClose(tab.id) } }}
       oncontextmenu={(e) => onContextMenu(e, tab.id)}
     >

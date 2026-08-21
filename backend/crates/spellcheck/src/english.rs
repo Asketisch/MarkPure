@@ -1,46 +1,40 @@
-//! English-only spell checker.
+//! 仅支持英文的拼写检查器。
 //!
-//! Built-in ~1.8K-word dictionary embedded with `include_str!`
-//! at compile time, plus a Levenshtein-distance suggestion
-//! generator. Used as the fallback path on Windows / Linux
-//! (where the macOS NSSpellChecker bridge is unavailable)
-//! and as the canonical implementation for English on every
-//! platform.
+//! 内置约 1.8K 词的词典，编译期通过 `include_str!` 嵌入，
+//! 并带一个基于编辑距离的纠错建议生成器。
+//! 作为 Windows / Linux（无法使用 macOS NSSpellChecker 桥接）
+//! 上的回退路径，也是所有平台上英文的权威实现。
 //!
-//! The CJK languages have their own backend (see
-//! `crate::macos` on macOS); this file is intentionally
-//! ASCII-letter-only and will simply not flag CJK text.
+//! 中日韩语言有各自的实现（macOS 上见 `crate::macos`）；
+//! 本文件刻意只处理 ASCII 字母，不会标记中日韩文本。
 
 use crate::types::SpellError;
 use regex::Regex;
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::OnceLock;
 
-// Maximum Levenshtein distance we consider when suggesting. Distance > 2
-// almost never produces useful suggestions in practice and explodes the
-// inner loop.
+// 生成建议时考虑的最大编辑距离。距离 > 2 在实践中几乎
+// 不会产生有用建议，还会让内层循环爆炸。
 const MAX_EDIT_DISTANCE: usize = 2;
 
-// How many suggestions to surface per misspelling.
+// 每个拼写错误最多展示多少条建议。
 const TOP_N_SUGGESTIONS: usize = 5;
 
-// Regex for splitting on word boundaries. Compiled lazily so a syntax
-// error (impossible — it's a constant — but defensive) is caught once
-// and reused on every call.
+// 按单词边界切分的正则。惰性编译，这样语法错误（不可能发生——
+// 它是常量——但防御一下）只会被捕获一次，并在每次调用时复用。
 static WORD_RE: OnceLock<Regex> = OnceLock::new();
 fn word_re() -> &'static Regex {
     WORD_RE.get_or_init(|| {
-        // \b[a-zA-Z]+\b — ASCII letter runs delimited by word boundary.
-        // Safe to unwrap: constant pattern, syntax-checked at compile time
-        // by `regex` macros in stricter setups; here we keep it as a
-        // function so a future tweak doesn't crash the entire app.
+        // \b[a-zA-Z]+\b——以单词边界分隔的 ASCII 字母串。
+        // 可以安全 unwrap：常量模式在编译期就已校验；
+        // 这里保留为函数，方便日后微调而不会让整个应用崩溃。
         Regex::new(r"\b[a-zA-Z]+\b").expect("spellcheck word regex is valid")
     })
 }
 
-// Dictionary is loaded once per process — it is ~50KB of static text and
-// building a HashMap of it on every `check` call dominated the cost for
-// small inputs. OnceLock gives us lazy init with no extra deps.
+// 词典每个进程只加载一次——它是约 12KB 的静态文本，
+// 每次 `check` 调用都重新构建一遍 HashMap 会占大头成本。
+// OnceLock 提供惰性初始化且不引入额外依赖。
 static DICT: OnceLock<HashMap<&'static str, ()>> = OnceLock::new();
 pub(crate) fn english_dictionary() -> &'static HashMap<&'static str, ()> {
     DICT.get_or_init(|| {
@@ -56,36 +50,33 @@ pub(crate) fn english_dictionary() -> &'static HashMap<&'static str, ()> {
     })
 }
 
-/// Check English spelling of `text`, returning per-word errors with
-/// suggestions. Skips ASCII acronyms (≤5 chars, all uppercase) and
-/// single-character tokens.
+/// 检查 `text` 的英文拼写，返回带建议的逐词错误。
+/// 跳过全大写的 ASCII 缩写（≤5 字符）和单字符标记。
 pub fn check(text: &str) -> Vec<SpellError> {
     let dict = english_dictionary();
     let word_re = word_re();
     let mut errors = Vec::new();
 
     for cap in word_re.captures_iter(text) {
-        // `captures_iter` always yields a non-empty match group at
-        // index 0, but be defensive: an unexpected empty match would
-        // otherwise panic on `as_str()`.
+        // `captures_iter` 在第 0 组始终产出非空匹配，
+        // 但防御一下：意外的空匹配会在 `as_str()` 时 panic。
         let Some(m) = cap.get(0) else { continue };
         let word = m.as_str();
 
-        // Skip very short words (a, I, etc.). Use `chars().count()`
-        // rather than `len()` so a single CJK or wide char doesn't
-        // get treated as multi-byte and slip through.
+        // 跳过非常短的词（a、I 等）。用 `chars().count()` 而非
+        // `len()`，避免单个 CJK 或宽字符被当作多字节而漏检。
         if word.chars().count() <= 1 {
             continue;
         }
 
-        // Skip words that are all uppercase (acronyms).
+        // 跳过全大写的词（缩写）。
         if word.chars().all(|c| c.is_uppercase()) && word.chars().count() <= 5 {
             continue;
         }
 
         let lower = word.to_lowercase();
 
-        // Check if word exists in dictionary.
+        // 检查词是否在词典中。
         if !dict.contains_key(lower.as_str()) {
             let suggestions = generate_suggestions(&lower, dict);
             errors.push(SpellError {
@@ -100,24 +91,22 @@ pub fn check(text: &str) -> Vec<SpellError> {
     errors
 }
 
-/// Generate suggestions for a misspelled word using simple edit distance.
+/// 用简单的编辑距离为拼错的词生成建议。
 ///
-/// Pre-filters the dictionary by character-length difference (a miss-by-3+
-/// character candidate can never be within edit distance 2), and tracks
-/// the top-N candidates with a min-heap so a 50k-word dictionary scan
-/// costs O(dict × word_len²) for the Levenshtein calls but O(log TOP_N)
-/// per push. We never collect more than TOP_N suggestions in memory.
+/// 先用字符长度差预过滤词典（错 3+ 个字符的候选词不可能落在
+/// 编辑距离 2 以内），再用最小堆跟踪前 N 个候选：全词典（约 1.8K 词）
+/// 的 Levenshtein 调用为 O(词典 × 词长²)，每次入堆为 O(log TOP_N)。
+/// 内存中从不持有超过 TOP_N 条建议。
 fn generate_suggestions(word: &str, dict: &HashMap<&str, ()>) -> Vec<String> {
-    // BinaryHeap is a max-heap. We push (distance, word) and pop the
-    // *largest* distance when the heap exceeds TOP_N — i.e. the worst
-    // candidate. The strings inside the tuple act as a stable
-    // tiebreaker so we never exceed TOP_N entries.
+    // BinaryHeap 是最大堆。我们压入 (distance, word)，当堆超过 TOP_N
+    // 时弹出**最大的**距离——即最差的候选。元组内的字符串作为稳定
+    // 的平局决胜，确保堆始终不超过 TOP_N 条。
     let mut heap: BinaryHeap<(usize, String)> = BinaryHeap::with_capacity(TOP_N_SUGGESTIONS + 1);
 
     let word_chars = word.chars().count();
-    // Quick length filter: edit distance ≤ MAX_EDIT_DISTANCE implies
-    // length difference ≤ MAX_EDIT_DISTANCE. We use char count (not
-    // bytes) to match what `levenshtein_distance` actually compares.
+    // 快速长度过滤：编辑距离 ≤ MAX_EDIT_DISTANCE 意味着
+    // 长度差 ≤ MAX_EDIT_DISTANCE。用字符数（而非字节）与
+    // `levenshtein_distance` 实际比较的内容保持一致。
     let min_len = word_chars.saturating_sub(MAX_EDIT_DISTANCE);
     let max_len = word_chars + MAX_EDIT_DISTANCE;
 
@@ -130,18 +119,18 @@ fn generate_suggestions(word: &str, dict: &HashMap<&str, ()>) -> Vec<String> {
         if dist <= MAX_EDIT_DISTANCE {
             heap.push((dist, dict_word.to_string()));
             if heap.len() > TOP_N_SUGGESTIONS {
-                heap.pop(); // discard the worst (largest distance)
+                heap.pop(); // 丢弃最差的（距离最大的）候选
             }
         }
     }
 
-    // Drain into a sorted vec.
+    // 排空到排好序的向量中。
     let mut out: Vec<(usize, String)> = heap.into_vec();
     out.sort_by_key(|(d, _)| *d);
     out.into_iter().map(|(_, w)| w).collect()
 }
 
-/// Calculate Levenshtein distance between two strings.
+/// 计算两个字符串之间的编辑距离。
 fn levenshtein_distance(a: &str, b: &str) -> usize {
     let a_len = a.chars().count();
     let b_len = b.chars().count();
@@ -159,8 +148,8 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
         row[0] = i;
     }
 
-    for j in 0..=b_len {
-        matrix[0][j] = j;
+    for (j, cell) in matrix[0].iter_mut().enumerate() {
+        *cell = j;
     }
 
     let a_chars: Vec<char> = a.chars().collect();
@@ -197,10 +186,9 @@ mod tests {
 
     #[test]
     fn test_check_detects_typo() {
-        // "sel" is not in dict_en.txt; "sell" is. We expect 'sel' to
-        // be flagged with at least one short-distance suggestion.
-        // The dict is a subset of common English words, so we don't
-        // assume 'hello' is present.
+        // "sel" 不在 dict_en.txt 中；"sell" 在。我们期望 'sel'
+        // 被标记，并给出至少一条短距离建议。
+        // 词典只是常见英文词的子集，因此不能假设 'hello' 一定存在。
         let errs = check("sel and world");
         assert!(!errs.is_empty(), "expected 'sel' to be flagged");
         let sel = errs.iter().find(|e| e.word == "sel").expect("sel in errors");
@@ -209,14 +197,14 @@ mod tests {
             "expected 'sell' or 'self' in suggestions, got {:?}",
             sel.suggestions
         );
-        // "and" and "world" are in the dict, so they must not be flagged.
+        // "and" 和 "world" 在词典中，因此一定不会被标记。
         assert!(errs.iter().all(|e| e.word != "and"));
         assert!(errs.iter().all(|e| e.word != "world"));
     }
 
     #[test]
     fn test_dictionary_is_cached() {
-        // Two back-to-back calls share the same dict (no panic, no rebuild).
+        // 连续两次调用共享同一份词典（不 panic、不重建）。
         let a: *const HashMap<&'static str, ()> = english_dictionary();
         let b: *const HashMap<&'static str, ()> = english_dictionary();
         assert_eq!(a, b, "dictionary should be cached across calls");
@@ -224,12 +212,10 @@ mod tests {
 
     #[test]
     fn test_length_prefilter() {
-        // A word with drastically different length from any dict word
-        // shouldn't crash and shouldn't produce suggestions.
+        // 与词典中任何词长度都相差极大的词不应崩溃，也不应产生建议。
         let suggestions = generate_suggestions("xyzqq", english_dictionary());
-        // No length match → no suggestions. This is the win — without
-        // the prefilter, this would have run a Levenshtein matrix for
-        // every dict word.
+        // 无长度匹配 → 无建议。这正是预过滤的价值——没有它，
+        // 就得为每个词典词跑一遍编辑距离矩阵。
         assert!(suggestions.is_empty());
     }
 }

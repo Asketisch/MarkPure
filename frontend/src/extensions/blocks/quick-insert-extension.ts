@@ -3,17 +3,15 @@ import { PluginKey } from '@tiptap/pm/state'
 import Suggestion, { type SuggestionProps, type SuggestionKeyDownProps } from '@tiptap/suggestion'
 import { searchQuickInsert, type QuickInsertItem } from '../quick-insert-config'
 
-// Per-instance plugin keys so each trigger (@, /, ...) gets its own
-// Suggestion state machine. Previously both instances shared a single
-// module-level `popupActiveIndex` / `filteredItemsCount` plus the
-// window globals `__qi_props` and `__qi_active`, which meant the two
-// instances could clobber each other's state and — crucially — could
-// leave the Suggestion plugin in a half-open state that swallowed
-// subsequent keystrokes (i.e. "WYSIWYG can't input at all").
+// 每个触发符（@、/ 等）使用独立的插件 key，各自拥有自己的
+// Suggestion 状态机。过去两个实例共用一个模块级
+// `popupActiveIndex` / `filteredItemsCount`，外加 window 全局变量
+// `__qi_props` 和 `__qi_active`，导致两个实例互相污染状态，更严重
+// 的是可能让 Suggestion 插件停在半开状态，吞掉后续按键输入
+// （表现就是“所见即所得模式下完全无法输入”）。
 //
-// The popup now owns the active index and the props reference; the
-// extension only emits events with a navigation delta. Nothing on
-// `window` is mutated by the extension itself.
+// 现在选中索引和 props 引用都由弹层自己持有；扩展只派发带
+// 导航增量的事件，自身不再改动 `window` 上的任何东西。
 
 export function getPluginKey(trigger: string): PluginKey {
   return new PluginKey(`quickInsert-${trigger}`)
@@ -36,17 +34,12 @@ export const QuickInsertExtension = Extension.create<{ triggerChar: string }>({
         char: trigger,
         pluginKey: getPluginKey(trigger),
         allowSpaces: false,
-        // P0-X: Typora-style IME guard. Suppress the popup
-        // while a CJK IME composition is open — otherwise
-        // typing `@` inside Pinyin candidate "你好"
-        // would pop the QuickInsert popup and the user's
-        // composition window would silently collapse on
-        // commit. The composition lifecycle is owned by
-        // ProseMirror's view (`view.composing`) and the
-        // browser DOM event (`event.isComposing`); we
-        // gate on both because the suggestion plugin
-        // reads from `state` directly, not from the DOM
-        // event.
+        // IME 守卫：当中日韩输入法正处于组词状态时抑制弹层。
+        // 否则在拼音候选 "你好" 里输入 `@` 会弹出快速插入
+        // 面板，提交时用户的组词窗口会被悄悄关闭。组词生命周期
+        // 由 ProseMirror 视图（`view.composing`）和浏览器 DOM
+        // 事件（`event.isComposing`）共同管理；这里两个信号都
+        // 检查，因为建议插件直接读 `state` 而不是 DOM 事件。
         allow: ({ state, isActive }) => {
           void state
           void isActive
@@ -66,12 +59,10 @@ export const QuickInsertExtension = Extension.create<{ triggerChar: string }>({
         render: () => {
           return {
             onStart: (props: SuggestionProps<QuickInsertItem>) => {
-              // Embed the trigger so the popup can verify the event
-              // belongs to its currently-active trigger if it cares
-              // to. We don't filter at the popup — the popup is a
-              // single shared widget and "last event wins" is the
-              // intended behaviour — but the trigger is in the
-              // detail for any future per-trigger popups.
+              // 把触发符一并放进事件，弹层如需核对该事件属于哪个
+              // 当前激活的触发符，可以直接读取。弹层本身不做过滤——
+              // 它是单一共享控件，“以最后事件为准”是有意为之——
+              // 但触发符留在 detail 中，便于将来实现按触发符区分的弹层。
               window.dispatchEvent(new CustomEvent('quick-insert-start', { detail: { ...props, trigger } }))
             },
             onUpdate: (props: SuggestionProps<QuickInsertItem>) => {
@@ -83,11 +74,9 @@ export const QuickInsertExtension = Extension.create<{ triggerChar: string }>({
             onKeyDown: ({ event }: SuggestionKeyDownProps) => {
               if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault()
-                // Send a navigation DELTA rather than an absolute
-                // index — the popup applies the delta to its own
-                // activeIndex. This way the extension holds no
-                // index state and two instances cannot clobber
-                // each other.
+                // 派发的是“导航增量”而不是绝对下标——弹层把增量
+                // 应用到自己维护的 activeIndex 上。这样扩展自身不
+                // 持有下标状态，两个实例之间也不会互相覆盖。
                 const delta = event.key === 'ArrowDown' ? 1 : -1
                 window.dispatchEvent(new CustomEvent('quick-insert-navigate', { detail: { delta, trigger } }))
                 return true
@@ -98,7 +87,7 @@ export const QuickInsertExtension = Extension.create<{ triggerChar: string }>({
                 return true
               }
               if (event.key === 'Escape') {
-                // Let the suggestion plugin handle exit
+                // 交给建议插件自己去处理退出
                 return false
               }
               return false

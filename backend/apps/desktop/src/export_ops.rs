@@ -1,11 +1,9 @@
-//! Export + asset IPC handlers.
+//! 导出 + 资源 IPC 处理器。
 //!
-//! Topic: turning a document into HTML/PDF/Word, saving +
-//! uploading images, and the workspace-level file-search
-//! entry point. The single-file (non-asset) export handlers
-//! are `cmd_export_html` / `cmd_export_pdf` / `cmd_export_word`
-//! — they share a `pick_save_target` helper that handles the
-//! rfd dialog boilerplate.
+//! 主题：把文档转为 HTML/PDF/Word、保存并上传图片，以及工作区
+//! 级文件搜索入口。单文件（非资源）导出处理器是 `cmd_export_html` /
+//! `cmd_export_pdf` / `cmd_export_word`——它们共享一个处理
+//! rfd 对话框样板代码的 `pick_save_target` 辅助函数。
 
 use super::file_ops::ensure_path_in_workspace;
 use super::state::AppState;
@@ -13,7 +11,7 @@ use base64::Engine;
 use rfd::FileDialog;
 use std::path::PathBuf;
 
-// ============================== Export ==============================
+// ============================== 导出 ==============================
 
 pub fn cmd_export_html(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
     let content = params["content"]
@@ -23,18 +21,16 @@ pub fn cmd_export_html(params: &serde_json::Value) -> std::result::Result<serde_
         .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("Untitled");
-    // P1-8: optional inline theme CSS. When the caller supplies
-    // a `:root { … }` block of CSS variables it overrides the
-    // built-in `DEFAULT_CSS` palette so the standalone HTML
-    // matches the live editor theme. Older callers omit the
-    // field entirely and get the light-fallback styling.
+    // 可选的内嵌主题 CSS。当调用方提供 `:root { … }` 形式的 CSS 变量块时，
+    // 它会覆盖内置的 `DEFAULT_CSS` 调色板，让独立 HTML 与编辑器
+    // 当前主题一致。旧调用方完全省略该字段，得到浅色回退样式。
     let theme_css = params.get("theme_css").and_then(|v| v.as_str());
 
     let html = export::export_html(content, title, theme_css);
 
     let path = FileDialog::new()
         .add_filter("HTML", &["html"])
-        .set_file_name(&format!("{}.html", title))
+        .set_file_name(format!("{}.html", title))
         .set_title("Export HTML")
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())?;
@@ -52,15 +48,14 @@ pub fn cmd_export_pdf(params: &serde_json::Value) -> std::result::Result<serde_j
         .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("Untitled");
-    // P0-9: optional source file path so the PDF renderer can
-    // resolve relative image references like `![](./img.png)`.
-    // `None` is fine — relative images will simply be skipped
-    // (matching the pre-P0-9 behaviour for unresolvable URLs).
+    // 可选的源文件路径，让 PDF 渲染器能解析 `![](./img.png)` 这类
+    // 相对图片引用。`None` 也无妨——相对图片会被直接跳过
+    // （与无法解析 URL 时的旧行为一致）。
     let source_path = params.get("source_path").and_then(|v| v.as_str());
 
     let path = FileDialog::new()
         .add_filter("PDF", &["pdf"])
-        .set_file_name(&format!("{}.pdf", title))
+        .set_file_name(format!("{}.pdf", title))
         .set_title("Export PDF")
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())?;
@@ -83,7 +78,7 @@ pub fn cmd_export_word(params: &serde_json::Value) -> std::result::Result<serde_
 
     let path = FileDialog::new()
         .add_filter("Word Document", &["docx"])
-        .set_file_name(&format!("{}.docx", title))
+        .set_file_name(format!("{}.docx", title))
         .set_title("Export Word Document")
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())?;
@@ -93,17 +88,14 @@ pub fn cmd_export_word(params: &serde_json::Value) -> std::result::Result<serde_
     Ok(serde_json::json!({ "path": path.to_string_lossy() }))
 }
 
-/// P1-8: persist a PNG byte stream produced by the frontend's
-/// `html-to-image` snapshot. The frontend owns pixel generation
-/// (so KaTeX / Mermaid / code-highlight / theme are rendered with
-/// the same fidelity as the editor); we just decode the base64
-/// transport, validate the bytes, and write to disk.
+/// 持久化前端 `html-to-image` 快照产生的 PNG 字节流。前端负责
+/// 像素生成（因此 KaTeX / Mermaid / 代码高亮 / 主题与编辑器中的
+/// 保真度一致）；我们只解码 base64 传输、校验字节并写入磁盘。
 ///
-/// `params.bytes_b64` is the standard base64 of a PNG file
-/// (alpha-format `data:image/png;base64,…` is also accepted —
-/// the leading `data:` prefix is stripped before decoding so the
-/// frontend can pass back whatever `html-to-image` gives it).
-/// `params.title` is used as the default filename.
+/// `params.bytes_b64` 是 PNG 文件的标准 base64（也接受
+/// `data:image/png;base64,…` 形式——解码前会去掉开头的 `data:`
+/// 前缀，这样前端可以原样回传 `html-to-image` 给出的任何形式）。
+/// `params.title` 用作默认文件名。
 pub fn cmd_export_png(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
     let bytes_b64 = params["bytes_b64"]
         .as_str()
@@ -113,8 +105,8 @@ pub fn cmd_export_png(params: &serde_json::Value) -> std::result::Result<serde_j
         .and_then(|v| v.as_str())
         .unwrap_or("Untitled");
 
-    // Strip an optional `data:image/png;base64,` prefix so the
-    // frontend can hand us either form directly.
+    // 去掉可选的 `data:image/png;base64,` 前缀，
+    // 让前端两种形式都能直接传。
     let payload = bytes_b64
         .strip_prefix("data:image/png;base64,")
         .unwrap_or(bytes_b64);
@@ -125,7 +117,7 @@ pub fn cmd_export_png(params: &serde_json::Value) -> std::result::Result<serde_j
 
     let path = FileDialog::new()
         .add_filter("PNG Image", &["png"])
-        .set_file_name(&format!("{}.png", title))
+        .set_file_name(format!("{}.png", title))
         .set_title("Export PNG Image")
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())?;
@@ -136,7 +128,7 @@ pub fn cmd_export_png(params: &serde_json::Value) -> std::result::Result<serde_j
     Ok(serde_json::json!({ "path": path_str }))
 }
 
-// ============================== Workspace search ==============================
+// ============================== 工作区搜索 ==============================
 
 pub fn cmd_search_workspace(
     params: &serde_json::Value,
@@ -145,9 +137,8 @@ pub fn cmd_search_workspace(
         .as_str()
         .ok_or("Missing 'query' parameter")?;
 
-    // P2-4: accept either `paths: Vec<String>` (multi-root) or
-    // `path: String` (legacy single-root). Empty `paths` falls
-    // back to `path` for back-compat with pre-multi-root callers.
+    // 接受 `paths: Vec<String>`（多根）或 `path: String`（旧版单根）。
+    // 空的 `paths` 回退到 `path`，与多根之前的调用方保持兼容。
     let mut path_strs: Vec<String> = params["paths"]
         .as_array()
         .map(|a| {
@@ -191,21 +182,19 @@ pub fn cmd_search_workspace(
             .map_err(|e| e.to_string())?
     };
 
-    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }
 
-// ============================== Assets ==============================
+// ============================== 资源 ==============================
 
 pub fn cmd_save_pasted_image(
     params: &serde_json::Value,
     _state: &AppState,
 ) -> std::result::Result<serde_json::Value, String> {
-    // P2-4: prefer `workspace_root_path` (the active root's
-    // path) but fall back to the legacy `workspace_path` field
-    // for older callers. Both names point at the same thing
-    // for single-root callers; for multi-root callers the
-    // renderer MUST pass `workspace_root_path` so the image
-    // lands in the right root's `.assets/images/`.
+    // 优先使用 `workspace_root_path`（活动根的路径），但回退到旧版
+    // `workspace_path` 字段以兼容旧调用方。单根调用方两者指向同一
+    // 位置；多根调用方必须传 `workspace_root_path`，图片才会保存到
+    // 正确根的 `.assets/images/`。
     let workspace_path = params["workspace_root_path"]
         .as_str()
         .or_else(|| params["workspace_path"].as_str())
@@ -218,7 +207,7 @@ pub fn cmd_save_pasted_image(
     let result = assets::save_pasted_image(workspace_path, base64_data, original_name)
         .map_err(|e| e.to_string())?;
 
-    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }
 
 pub fn cmd_upload_image_remote(
@@ -233,7 +222,7 @@ pub fn cmd_upload_image_remote(
     let api_key = params.get("api_key").and_then(|v| v.as_str());
 
     let result = assets::upload_image_remote(base64_data, upload_url, api_key);
-    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }
 
 pub fn cmd_image_to_base64(
@@ -254,7 +243,7 @@ pub fn cmd_get_file_info(
         .as_str()
         .ok_or("Missing 'path' parameter")?;
     let result = assets::get_file_info(path).map_err(|e| e.to_string())?;
-    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }
 
 pub fn cmd_track_file(
@@ -277,8 +266,8 @@ pub fn cmd_is_file_modified(
     Ok(serde_json::json!({ "is_modified": is_modified }))
 }
 
-// Suppress unused-import warnings for helpers only used
-// transitively (the compiler will catch real bugs).
+// 抑制仅供间接使用的辅助函数的未使用导入警告
+// （编译器会捕获真正的 bug）。
 #[allow(dead_code)]
 fn _ensure_path_in_workspace_referenced(_p: &PathBuf, _r: &PathBuf) {
     let _ = ensure_path_in_workspace;

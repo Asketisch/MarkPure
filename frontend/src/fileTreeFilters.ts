@@ -1,44 +1,37 @@
 /**
- * Path + tree helpers used by the workspace sidebar.
+ * 工作区侧边栏使用的路径与树助手。
  *
- * Split out of `WorkSpace.svelte` during the P13 audit so
- * the 12-line path utilities + the 10-line `filterTree`
- * aren't cluttering a 471-line UI component. Each helper is
- * pure (no IPC, no state) so it's trivial to unit-test in
- * isolation.
+ * 从 `WorkSpace.svelte` 中拆出，12 行的路径工具 + 10 行的
+ * `filterTree` 不再挤在 471 行的 UI 组件里。每个助手都是纯函数
+ * （无 IPC、无状态），便于独立单元测试。
  */
 import type { FileEntry } from '$lib/editor/commands'
 
 /**
- * Detect which path separator a path uses. Files dragged in
- * from Windows use backslashes; we preserve whichever
- * separator the user already has.
+ * 检测路径使用的分隔符。从 Windows 拖入的文件用反斜杠；我们保留
+ * 用户已有的分隔符。
  */
 export function pathSeparator(p: string): string {
   return p.includes('\\') ? '\\' : '/'
 }
 
-/** Join a parent path and a child name with the right
- *  separator (avoiding double separators when the parent
- *  already ends in one). */
+/** 用正确的分隔符拼接父路径与子名称（父路径已以分隔符结尾时避免
+ *  出现双分隔符）。 */
 export function joinPath(base: string, name: string): string {
   const sep = pathSeparator(base)
   return base.endsWith(sep) ? base + name : base + sep + name
 }
 
-/** Extract the last path component. Returns an empty
- *  string rather than `null` for safety — callers always
- *  render the result. */
+/** 提取最后一个路径分量。出于安全返回空字符串而非 `null`——调用方
+ *  总是会渲染结果。 */
 export function basename(p: string): string {
   return p.split(/[/\\]/).pop() ?? ''
 }
 
 /**
- * Filter a `FileEntry` tree by a case-insensitive substring
- * match on the entry name. A directory stays visible if any
- * of its descendants matches, so the user sees the matching
- * path even when searching for a file nested several levels
- * deep.
+ * 按条目标名的大小写不敏感子串匹配过滤 `FileEntry` 树。只要目录
+ * 的任一后代命中，目录就保持可见，这样即使用户搜索嵌套好几层的
+ * 文件也能看到匹配路径。
  */
 export function filterTree(entries: FileEntry[], query: string): FileEntry[] {
   if (!query) return entries

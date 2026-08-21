@@ -1,3 +1,4 @@
+pub mod atomic;
 pub mod config;
 pub mod dirs;
 pub mod document;

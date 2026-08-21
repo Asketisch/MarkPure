@@ -1,70 +1,63 @@
 /**
- * Types and invariants for the Vim mode plugin (P2-7).
+ * Vim 模式插件的类型与不变量。
  *
- * The Vim plugin lives entirely in PM plugin state. It runs
- * alongside the existing keymap, multi-cursor (P0-3), column
- * select (P2-3), and branching undo tree (P0-8) — none of
- * which are modified. Vim is opt-in via the `enabled` flag
- * (mirrored from `AppConfig.vim_mode`); when `false`, the
- * plugin's `handleKeyDown` returns `false` immediately so
- * the default Tiptap keymap handles every key.
+ * Vim 插件完全存活于 PM 插件状态中，与既有的快捷键映射、
+ * 多光标、列选择、分支式撤销树并行运行——它们都无需改动。
+ * Vim 通过 `enabled` 标志启用（镜像自 `AppConfig.vim_mode`）；
+ * 当其为 `false` 时，插件的 `handleKeyDown` 立即返回 `false`，
+ * 由默认的 Tiptap 快捷键映射处理所有按键。
  *
- * Mode state machine:
+ * 模式状态机：
  *
  *     NORMAL ⇄ INSERT
  *       │  │  ↑↓
  *       │  └─── ESC / Ctrl-C
  *       │
- *       ├─→ VISUAL  (v)         ⇄ NORMAL on operator / Esc
- *       ├─→ V-LINE  (V)         ⇄ NORMAL on operator / Esc
- *       └─→ V-BLOCK (Ctrl-V)    ⇄ NORMAL on operator / Esc
+ *       ├─→ VISUAL  (v)         ⇄ 操作符或 Esc 后回到 NORMAL
+ *       ├─→ V-LINE  (V)         ⇄ 操作符或 Esc 后回到 NORMAL
+ *       └─→ V-BLOCK (Ctrl-V)    ⇄ 操作符或 Esc 后回到 NORMAL
  *                  ↓
- *                  A / I  → INSERT (per-line for V-BLOCK)
+ *                  A / I  → INSERT（V-BLOCK 时逐行）
  *
- * Invariants:
- *   1. `enabled` mirrors `AppConfig.vim_mode` and is set
- *      exclusively by the Tiptap extension's `setEnabled`
- *      command. The plugin does NOT persist it itself.
- *   2. `pending` is the parser's working buffer. While
- *      `mode === 'insert'`, the parser is dormant (the
- *      browser's text input flows through PM default).
- *   3. `register` is the yank buffer. V1 populates it on
- *      `y`/`d`/`c` but does NOT consume it (V2 wires up
- *      `p`/`P`).
- *   4. `visualAnchor` is set on entering VISUAL/V-LINE/
- *      V-BLOCK and cleared on exit. It's the "from" side
- *      of the visual range; the PM selection holds the
- *      "to" side at the head.
- *   5. `isComposing` is set by `compositionstart`/`end`
- *      listeners so `handleKeyDown` can ignore keystrokes
- *      during IME composition (CJK input).
- *   6. `maxCount` caps `3` in `3dw` to keep one fan-out
- *      bounded.
+ * 不变量：
+ *   1. `enabled` 镜像 `AppConfig.vim_mode`，且仅由 Tiptap 扩展的
+ *      `setEnabled` 命令设置。插件自身不会持久化它。
+ *   2. `pending` 是解析器的工作缓冲。当 `mode === 'insert'` 时，
+ *      解析器休眠（浏览器的文本输入走 PM 默认流程）。
+ *   3. `register` 是复制缓冲。第一版在 `y`/`d`/`c` 时写入它，
+ *      但不会消费它（`p`/`P` 在后续版本接通）。
+ *   4. `visualAnchor` 在进入 VISUAL/V-LINE/V-BLOCK 时设置、
+ *      退出时清除。它是可视范围的「起始」端；PM 选区在光标处
+ *      持有「结束」端。
+ *   5. `isComposing` 由 `compositionstart`/`end` 监听器设置，
+ *      让 `handleKeyDown` 在输入法组合输入（中文等）期间
+ *      忽略按键。
+ *   6. `maxCount` 限制 `3dw` 中的 `3`，让单次扇出有界。
  */
 
 import { PluginKey } from '@tiptap/pm/state'
 import type { DecorationSet } from '@tiptap/pm/view'
 
-/** Vim mode state. The 6 modes map to the status-bar chip variants. */
+/** Vim 模式状态。6 种模式对应状态栏色块的不同变体。 */
 export type VimMode =
   | 'normal'
   | 'insert'
-  | 'visual'      // character-wise (v)
-  | 'visual-line' // line-wise (V)
-  | 'visual-block'// block-wise (Ctrl-V)
-  | 'replace'     // REPLACE mode (R); reserved for V2
+  | 'visual'      // 逐字可视模式 (v)
+  | 'visual-line' // 逐行可视模式 (V)
+  | 'visual-block'// 逐块可视模式 (Ctrl-V)
+  | 'replace'     // 替换模式 (R)；为后续版本预留
 
-/** Operator identity. `d`/`c`/`y` are the only V1 operators. */
+/** 操作符标识。`d`/`c`/`y` 是唯一的三个第一版操作符。 */
 export type Operator = 'delete' | 'change' | 'yank'
 
-/** Normalised keystroke fed into the parser. Output of `parseKey()`. */
+/** 送入解析器的规范化按键。`parseKey()` 的输出。 */
 export type VimKey =
   | { kind: 'char'; key: string }
   | { kind: 'ctrl'; key: string }
   | { kind: 'meta'; key: string }
   | { kind: 'special'; key: string }
 
-/** Motion identity. Names match Vim's key sequences. */
+/** 移动指令标识。名称与 Vim 的按键序列一致。 */
 export type Motion =
   | 'left' | 'right' | 'up' | 'down'
   | 'wordForward' | 'wordBackward'
@@ -79,99 +72,96 @@ export type Motion =
   | 'matchingBracket'
   | 'screenTop' | 'screenMiddle' | 'screenBottom'
 
-/** Text object identity. `iw`/`aw`, `ip`/`ap`, `i(`/a(, etc. */
+/** 文本对象标识。如 `iw`/`aw`、`ip`/`ap`、`i(`/`a(` 等。 */
 export type TextObject =
   | 'word' | 'sentence' | 'paragraph'
   | 'stringDouble' | 'stringSingle' | 'stringTick'
   | 'paren' | 'brace' | 'bracket' | 'angle'
 
-/** 'i' = inner (no surrounding), 'a' = outer (include delimiters). */
+/** 'i' = 内部（不含包围符号），'a' = 外部（含分隔符）。 */
 export type ObjectModifier = 'i' | 'a'
 
-/** Ex command identity. The V1 commands. */
+/** ex 命令标识。即第一版支持的命令。 */
 export type ExCmd =
   | { type: 'write' }
   | { type: 'quit' }
   | { type: 'writeQuit' }
   | { type: 'reload' }
-  // P0-X: `:e <path>` opens a file by relative path
-  // (matched against the active workspace root). This
-  // matches Typora/Vim `:e` semantics — the user types
-  // `:e foo` and the editor opens `./foo.md` (with or
-  // without the `.md` extension).
+  // `:e <路径>` 按相对路径打开文件（相对于当前活动工作区根目录）。
+  // 语义与 Vim 的 `:e` 一致——用户输入 `:e foo`，编辑器打开
+  // `./foo.md`（带或不带 `.md` 后缀均可）。
   | { type: 'edit'; path: string }
-  // P0-X: `:b<N>` switches to tab N (1-indexed). Mirrors
-  // Vim's built-in `:b[uffer]` command. `<N>0` is also
-  // accepted as a shortcut for tab 10+ (`:b10` = tab 10).
+  // `:b<N>` 切换到第 N 个标签页（从 1 开始）。
+  // 对应 Vim 的内置 `:b[uffer]` 命令。`<N>0` 也兼容，
+  // 用作第 10 个及以上标签页的快捷写法（如 `:b10` = 第 10 个）。
   | { type: 'buffer'; index: number }
 
-/** Parsed Vim command. Discriminated union. */
+/** 解析后的 Vim 命令。带判别式的联合类型。 */
 export type VimCommand =
-  // Motion (cursor move only)
+  // 移动（仅光标移动）
   | { type: 'motion'; motion: Motion; count: number; char?: string }
   // Operator + motion
   | { type: 'deleteMotion'; motion: Motion; count: number; char?: string }
   | { type: 'changeMotion'; motion: Motion; count: number; char?: string }
   | { type: 'yankMotion'; motion: Motion; count: number; char?: string }
-  // Operator + text object
+  // 操作符 + 文本对象
   | { type: 'deleteTextObject'; obj: TextObject; mod: ObjectModifier }
   | { type: 'changeTextObject'; obj: TextObject; mod: ObjectModifier }
   | { type: 'yankTextObject'; obj: TextObject; mod: ObjectModifier }
-  // Mode switches
+  // 模式切换
   | { type: 'enterInsert'; variant: 'i' | 'I' | 'a' | 'A' | 'o' | 'O' | 's' | 'S' }
   | { type: 'enterReplace' }
   | { type: 'enterVisual'; kind: 'char' | 'line' | 'block' }
   | { type: 'exitToNormal' }
-  // Line-wise operators
+  // 整行操作符
   | { type: 'deleteLine'; count: number }   // dd
   | { type: 'changeLine'; count: number }   // cc
   | { type: 'yankLine'; count: number }     // yy
-  // Standalone ops
+  // 独立操作
   | { type: 'deleteChar'; count: number }   // x
-  | { type: 'changeChar'; char: string }    // r{char}
-  | { type: 'substituteChar'; count: number } // s (substitute N chars)
+  | { type: 'changeChar'; char: string }    // r{字符}
+  | { type: 'substituteChar'; count: number } // s（替换 N 个字符）
   | { type: 'joinLines'; count: number }    // J
   | { type: 'indentLine'; count: number }   // >>
   | { type: 'dedentLine'; count: number }   // <<
   | { type: 'redo' }                        // Ctrl-R
   | { type: 'ex'; cmd: ExCmd }
-  // Sentinel: the parser accepted the keys but no command fires
-  // (e.g., `:` alone waiting for the ex text). Plugin reads the
-  // pending buffer instead.
+  // 哨兵：解析器接受了按键但没有命令触发
+  // （例如单独的 `:` 在等待 ex 命令文本）。插件改为读取待处理缓冲。
   | { type: 'noOp' }
   | { type: 'error'; message: string }
 
-/** What the parser is currently assembling. */
+/** 解析器当前正在组装的内容。 */
 export type PendingBuffer =
   | { kind: 'idle' }
-  | { kind: 'count'; digits: number }                                  // '3' in '3dw'
-  | { kind: 'operator'; op: Operator; count: number }                 // 'd' in 'dw'
-  | { kind: 'motion'; motion: Motion; count: number; op?: Operator; char?: string }  // 'w' after 'd'
-  | { kind: 'text-object-mod'; mod: ObjectModifier; op: Operator }    // 'i' in 'ciw' — waiting for the object char
-  | { kind: 'text-object'; obj: TextObject; mod: ObjectModifier; op?: Operator }    // 'iw' after 'c'
-  | { kind: 'ex'; text: string }                                       // ':w' bar
+  | { kind: 'count'; digits: number }                                  // '3dw' 中的 '3'
+  | { kind: 'operator'; op: Operator; count: number }                 // 'dw' 中的 'd'
+  | { kind: 'motion'; motion: Motion; count: number; op?: Operator; char?: string }  // 'd' 之后的 'w'
+  | { kind: 'text-object-mod'; mod: ObjectModifier; op: Operator }    // 'ciw' 中的 'i' —— 等待文本对象字符
+  | { kind: 'text-object'; obj: TextObject; mod: ObjectModifier; op?: Operator }    // 'c' 之后的 'iw'
+  | { kind: 'ex'; text: string }                                       // ':w' 命令栏
 
-/** Full plugin state. Stored in `Plugin.state`. */
+/** 完整插件状态。存放在 `Plugin.state` 中。 */
 export interface VimState {
-  /** Mirror of `AppConfig.vim_mode`. When false, plugin is dormant. */
+  /** `AppConfig.vim_mode` 的镜像。为 false 时插件休眠。 */
   enabled: boolean
-  /** Current mode. */
+  /** 当前模式。 */
   mode: VimMode
-  /** Parser buffer. Only mutated by NORMAL/VISUAL keys. */
+  /** 解析器缓冲。仅由普通 / 可视模式按键修改。 */
   pending: PendingBuffer
-  /** Yank register content. V1 populated but not consumed by `p`/`P`. */
+  /** 复制寄存器内容。第一版会写入但 `p`/`P` 不会消费它。 */
   register: string | null
-  /** The "from" position of the visual range. Null outside VISUAL modes. */
+  /** 可视范围的「起始」位置。在可视模式之外为 null。 */
   visualAnchor: number | null
-  /** Set during IME composition. */
+  /** 输入法组合输入期间为真。 */
   isComposing: boolean
-  /** Last successfully executed ex command (for `:w` repeat). V1 only. */
+  /** 最近一次成功执行的 ex 命令（用于 `:w` 重复）。仅第一版。 */
   lastEx: string | null
-  /** Decoration cache. Rebuilt on every apply. */
+  /** 装饰缓存。每次 apply 重建。 */
   decorations: DecorationSet
 }
 
-/** Transaction meta payload. */
+/** 事务 meta 载荷。 */
 export type VimMeta =
   | { type: 'setEnabled'; enabled: boolean }
   | { type: 'enterMode'; mode: VimMode }
@@ -183,16 +173,16 @@ export type VimMeta =
   | { type: 'compositionStart' }
   | { type: 'compositionEnd' }
 
-/** Cap on the count prefix (e.g. `999` in `999dw`). */
+/** 计数前缀的上限（例如 `999dw` 中的 `999`）。 */
 export const MAX_VIM_COUNT = 999
 
-/** Plugin key name. Used by the StatusBar subscriber to read mode. */
+/** 插件键名。状态栏订阅者通过它读取模式。 */
 export const VIM_PLUGIN_KEY_NAME = 'vim'
 
-/** Singleton plugin key. */
+/** 单例插件键。 */
 export const vimPluginKey = new PluginKey<VimState>(VIM_PLUGIN_KEY_NAME)
 
-/** CSS class names used by `decorations.ts`. */
+/** `decorations.ts` 使用的 CSS 类名。 */
 export const VIM_CARET_BLOCK_CLASS = 'vim-caret-block'
 export const VIM_CARET_BAR_CLASS = 'vim-caret-bar'
 export const VIM_VISUAL_LINE_CLASS = 'vim-visual-line'

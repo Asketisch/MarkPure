@@ -1,18 +1,15 @@
 /**
- * Theme editor colour palette catalogue.
+ * 主题编辑器的颜色面板目录。
  *
- * The `ColorCategories[]` array drives the `<ColorPicker>` grid
- * inside `ThemeEditor.svelte`. It's pure data — no state, no
- * callbacks — so it lives in its own file and is imported by
- * the editor component.
+ * `ColorCategories[]` 数组驱动 `ThemeEditor.svelte` 内的
+ * `<ColorPicker>` 网格。它是纯数据——无状态、无回调——因此放在
+ * 独立文件里，由编辑器组件导入。
  *
- * Adding a new colour slot:
- *   1. Add the field to `ThemeColors` in
- *      `$lib/editor/commands/types.ts`.
- *   2. Add the matching entry below. `isSize: true` marks
- *      entries that are pixel/font sizes (the editor renders
- *      them as a free-text `<input>` instead of a colour picker
- *      — same UX as the heading size fields).
+ * 新增一个颜色槽位：
+ *   1. 在 `$lib/editor/commands/types.ts` 的 `ThemeColors` 里加字段。
+ *   2. 在下面加对应条目。`isSize: true` 标记像素 / 字体大小类条目
+ *      （编辑器把它们渲染为自由文本 `<input>` 而非颜色选择器
+ *      ——与标题大小字段的交互一致）。
  */
 
 import type { ThemeColors } from '$lib/editor/commands'
@@ -21,8 +18,8 @@ export interface ColorCategoryItem {
   key: keyof ThemeColors
   label: string
   labelKey: string
-  /** When true, render a `<input type=text>` instead of a colour
-   *  picker — used for font-size / heading-size fields. */
+  /** 为 true 时渲染 `<input type=text>` 而非颜色选择器——用于
+   *  字号 / 标题大小字段。 */
   isSize?: boolean
 }
 

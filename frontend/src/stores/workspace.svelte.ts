@@ -1,24 +1,19 @@
 /**
- * Multi-root workspace store (P2-4).
+ * 多根工作区 store。
  *
- * Topic: the renderer's single source of truth for the list of
- * workspace roots, the active root, and the LRU-GC callback
- * (`evicted_doc_ids`) that comes back from the Rust side when
- * the user switches roots.
+ * 职责：渲染进程的工作区根目录列表、激活根目录，以及切换根目录时
+ * Rust 侧返回的 LRU 清理回调（`evicted_doc_ids`）的唯一数据源。
  *
- * Hydration: call `init()` once on app boot. Until that
- * resolves, the store is in "empty" state — components that
- * need an active root should treat `roots.length === 0` as
- * the "no workspace folder" empty-state.
+ * 水合：应用启动时调用一次 `init()`。在它完成之前，store 处于
+ * “空”状态——需要激活根目录的组件应把 `roots.length === 0`
+ * 当作“未打开工作区文件夹”的空状态处理。
  *
- * Switching roots:
- *  1. Caller invokes `setActive(id)`.
- *  2. Rust drops the LRU docs that don't belong to the new
- *     active root and returns the evicted ids.
- *  3. The renderer (App.svelte) reads `evicted_doc_ids` and
- *     closes the matching tabs. This store doesn't own tab
- *     state — it just exposes the eviction list as a
- *     `$state` snapshot the App can subscribe to.
+ * 切换根目录：
+ *  1. 调用方执行 `setActive(id)`。
+ *  2. Rust 丢弃不属于新激活根目录的 LRU 文档，并返回被清理的 id。
+ *  3. 渲染进程（App.svelte）读取 `evicted_doc_ids` 并关闭匹配的
+ *     标签页。本 store 不持有标签页状态——只把清理列表作为
+ *     `$state` 快照暴露出来供 App 订阅。
  */
 import { getContext, setContext } from 'svelte'
 import {
@@ -28,45 +23,42 @@ import {
   setActiveWorkspaceRoot,
   type WorkspaceRoot,
 } from '../editor/commands/workspace'
+import { watchDirectory } from '../editor/commands/file'
 
 const WORKSPACE_KEY = Symbol('workspace')
 
 class WorkspaceStore {
-  /** All workspace roots, in insertion order. */
+  /** 全部工作区根目录，按插入顺序排列。 */
   roots = $state<WorkspaceRoot[]>([])
-  /** Currently active root id, or `null` for an empty
-   *  workspace. */
+  /** 当前激活的根目录 id；空工作区时为 `null`。 */
   activeId = $state<string | null>(null)
-  /** Doc ids the Rust LRU just evicted, set by
-   *  `setActive()` after the IPC round-trip. App.svelte
-   *  reads + clears this to close matching tabs. */
+  /** Rust 的 LRU 刚清理掉的文档 id，由 `setActive()` 在一次 IPC
+   *  往返后写入。App.svelte 读取并清空它，以关闭匹配的标签页。 */
   evictedDocIds = $state<string[]>([])
-  /** Hydration is async; components can show a skeleton while
-   *  this is `false`. */
+  /** 水合是异步的；在此为 `false` 期间，组件可以显示骨架屏。 */
   initialized = $state(false)
 
-  /** The active root object, or `null`. Derived — re-reads
-   *  when `roots` or `activeId` change. */
+  /** 当前激活的根目录对象，或 `null`。派生属性——`roots` 或
+   *  `activeId` 变化时会重新读取。 */
   get activeRoot(): WorkspaceRoot | null {
     if (!this.activeId) return null
     return this.roots.find((r) => r.id === this.activeId) ?? null
   }
 
-  /** Path of the active root, or `null`. Convenience for
-   *  IPC commands that need a single string (e.g.
-   *  `load_workspace_styles`). */
+  /** 激活根目录的路径，或 `null`。为需要单个字符串的 IPC 命令
+   *  （如 `load_workspace_styles`）提供便利。 */
   get activePath(): string | null {
     return this.activeRoot?.path ?? null
   }
 
-  /** Every root path. Convenience for multi-root IPC
-   *  commands (`get_workspace_tags` / `get_backlinks` /
-   *  `search_workspace` / `load_workspace_styles`). */
+  /** 所有根目录路径。为多根 IPC 命令（`get_workspace_tags` /
+   *  `get_backlinks` / `search_workspace` / `load_workspace_styles`）
+   *  提供便利。 */
   get rootPaths(): string[] {
     return this.roots.map((r) => r.path)
   }
 
-  /** Map of root id → name for cheap lookup. */
+  /** 根目录 id → 名称的映射，便于快速查找。 */
   rootNameById(id: string): string {
     return this.roots.find((r) => r.id === id)?.name ?? '?'
   }
@@ -84,13 +76,10 @@ class WorkspaceStore {
     }
   }
 
-  /// Phase 5: warm up the file watcher for every root that
-  /// exists on disk. Roots flagged `exists === false` are
-  /// skipped (we don't want to fail startup on an
-  /// unmounted drive). Each call is best-effort — a
-  /// failure on one root doesn't block the others.
+  /// 预热磁盘上每个已存在根目录的文件监视器。`exists === false`
+  /// 的根目录被跳过（不希望因为卸载的磁盘导致启动失败）。
+  /// 每次调用都是尽力而为——某个根目录失败不影响其他根目录。
   async watchAll(): Promise<void> {
-    const { watchDirectory } = await import('../editor/commands')
     const promises = this.roots
       .filter((r) => r.exists !== false)
       .map((r) =>
@@ -105,8 +94,8 @@ class WorkspaceStore {
     try {
       const root = await addWorkspaceRoot(path)
       this.roots = [...this.roots, root]
-      // Rust sets the new root as active if there was no
-      // active id before. Mirror that on the renderer side.
+      // 若此前没有激活根目录，Rust 会把新根目录设为激活。
+      // 渲染进程侧保持一致。
       if (!this.activeId) {
         this.activeId = root.id
       }
@@ -122,28 +111,41 @@ class WorkspaceStore {
       await removeWorkspaceRoot(rootId)
       this.roots = this.roots.filter((r) => r.id !== rootId)
       if (this.activeId === rootId) {
-        this.activeId = this.roots[0]?.id ?? null
+        const newId = this.roots[0]?.id ?? null
+        this.activeId = newId
+        if (newId) {
+          // Rust 侧 remove_workspace_root 只把活动 id 回退到第一个
+          // 剩余根目录，不做内存文档的 LRU 清理。这里补一次
+          // setActive：走完整 IPC（GC 掉不属于新根的文档），
+          // evicted_doc_ids 经 evictedDocIds 状态让 App 关闭标签页。
+          await this.setActive(newId)
+        }
       }
     } catch (e) {
       console.error('[workspace] removeRoot failed', e)
     }
   }
 
+  /** 防止并发的 setActive IPC 乱序覆盖：只有最后一次切换的结果生效。 */
+  private setActiveSeq = 0
+
   async setActive(rootId: string): Promise<string[]> {
+    const seq = ++this.setActiveSeq
     try {
       const { evicted_doc_ids } = await setActiveWorkspaceRoot(rootId)
+      if (seq !== this.setActiveSeq) return []
       this.activeId = rootId
       this.evictedDocIds = evicted_doc_ids
       return evicted_doc_ids
     } catch (e) {
       console.error('[workspace] setActive failed', e)
+      // 出错时不动状态：Rust 侧活动根未变，保持两侧一致。
       return []
     }
   }
 
-  /** Acknowledge and clear the eviction list — App.svelte
-   *  calls this after closing the matching tabs so a future
-   *  switch doesn't re-fire on stale data. */
+  /** 确认并清空清理列表——App.svelte 关闭匹配标签页后调用，
+   *  避免后续切换因过期数据而重复触发。 */
   clearEvictedDocs(): void {
     this.evictedDocIds = []
   }

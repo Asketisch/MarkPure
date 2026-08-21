@@ -4,17 +4,19 @@ use regex::Regex;
 
 pub use pulldown_cmark::{Event, Tag, TagEnd, HeadingLevel};
 
-/// Pre-compiled regex for wiki-style links: `[[Page]]` or `[[Page|Alias]]`
+/// 预编译的 wiki 风格链接正则：`[[页面名]]` 或 `[[页面名|别名]]`
 static WIKILINK_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]").unwrap()
 });
 
-/// Pre-compiled regex for tags: `#tag` (not preceded by `#` or word chars)
+/// 预编译的标签正则：`#标签`。
+/// `regex` 不支持 lookbehind，「前面不能紧跟 `#` 或单词字符」的
+/// 校验改在 `extract_tags` 里按字节手动完成（见下方 filter_map）。
 static TAG_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?<![#\w])#([a-zA-Z][a-zA-Z0-9_-]*)").unwrap()
+    Regex::new(r"#([a-zA-Z][a-zA-Z0-9_-]*)").unwrap()
 });
 
-/// Parsed markdown element (simplified AST)
+/// 解析后的 Markdown 元素（简化的语法树节点）
 #[derive(Debug, Clone)]
 pub enum MarkdownNode {
     Heading { level: u8, text: String },
@@ -33,7 +35,7 @@ pub struct ListItem {
     pub content: String,
 }
 
-/// Parse markdown text into events (pulldown-cmark)
+/// 将 Markdown 文本解析为事件流（基于 pulldown-cmark）
 pub fn parse_markdown(text: &str) -> Vec<Event<'static>> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -42,11 +44,11 @@ pub fn parse_markdown(text: &str) -> Vec<Event<'static>> {
     options.insert(Options::ENABLE_TASKLISTS);
 
     let parser = Parser::new_ext(text, options);
-    // Make events static by cloning them
+    // 通过克隆把事件转换为 'static 生命周期
     parser.map(|event| event.into_static()).collect()
 }
 
-/// Extract headings from markdown text for TOC
+/// 从 Markdown 文本中提取标题，用于生成目录
 pub fn extract_headings(text: &str) -> Vec<(u8, String)> {
     let events = parse_markdown(text);
     let mut headings = Vec::new();
@@ -72,11 +74,10 @@ pub fn extract_headings(text: &str) -> Vec<(u8, String)> {
                 }
                 current_text.clear();
             }
-            Event::Text(text) | Event::Code(text) => {
-                if current_level > 0 {
+            Event::Text(text) | Event::Code(text)
+                if current_level > 0 => {
                     current_text.push_str(&text);
                 }
-            }
             _ => {}
         }
     }
@@ -84,7 +85,7 @@ pub fn extract_headings(text: &str) -> Vec<(u8, String)> {
     headings
 }
 
-/// Convert markdown text to HTML
+/// 将 Markdown 文本转换为 HTML
 pub fn to_html(text: &str) -> String {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -98,16 +99,16 @@ pub fn to_html(text: &str) -> String {
     html_output
 }
 
-/// Wiki-style link representation
+/// Wiki 风格链接的表示
 #[derive(Debug, Clone)]
 pub struct WikiLink {
-    /// The page name (e.g., "Page Name" from [[Page Name]])
+    /// 页面名（例如从 [[页面名]] 中提取的 "页面名"）
     pub page: String,
-    /// The alias (e.g., "Alias" from [[Page Name|Alias]]), None if no alias
+    /// 别名（例如从 [[页面名|别名]] 中提取的 "别名"），无别名时为 None
     pub alias: Option<String>,
 }
 
-/// Extract wiki-style links from markdown text (e.g., [[Page]] or [[Page|Alias]])
+/// 从 Markdown 文本中提取 wiki 风格链接（例如 [[页面]] 或 [[页面|别名]]）
 pub fn extract_wikilinks(text: &str) -> Vec<WikiLink> {
     WIKILINK_RE
         .captures_iter(text)
@@ -119,27 +120,41 @@ pub fn extract_wikilinks(text: &str) -> Vec<WikiLink> {
         .collect()
 }
 
-/// Tag representation (renamed to avoid conflict with pulldown_cmark::Tag)
+/// 标签的表示（重命名以避免与 pulldown_cmark::Tag 冲突）
 #[derive(Debug, Clone)]
 pub struct MarkdownTag {
-    /// The tag name without # (e.g., "tag" from #tag)
+    /// 不含 `#` 的标签名（例如从 #tag 中提取的 "tag"）
     pub name: String,
-    /// The position in the text where the tag starts
+    /// 标签在文本中的起始位置（UTF-8 字节偏移，含 `#`，
+    /// 与 SearchMatch 的列偏移约定一致——注意不是字符位置）
     pub start: usize,
-    /// The position in the text where the tag ends
+    /// 标签在文本中的结束位置（UTF-8 字节偏移，不含）
     pub end: usize,
 }
 
-/// Extract tags from markdown text (e.g., #tag)
-/// Note: Does not match tags within code blocks or URLs
+/// 从 Markdown 文本中提取标签（例如 #tag）。
+/// 注意：匹配在原始文本层面进行（正则 + 前一字节校验），不识别
+/// Markdown 结构——代码块或 URL 中的 `#tag` 也可能被报告，
+/// 需要过滤的调用方应自行按上下文判断。
 pub fn extract_tags(text: &str) -> Vec<MarkdownTag> {
+    let bytes = text.as_bytes();
     TAG_RE
         .captures_iter(text)
-        .map(|cap| {
-            let start = cap.get(0).map(|m| m.start()).unwrap_or(0);
-            let end = cap.get(0).map(|m| m.end()).unwrap_or(0);
+        .filter_map(|cap| {
+            let m = cap.get(0)?;
+            // 前置校验（等价于原 lookbehind `(?<![#\w])`）：
+            // 前一个字符是 `#`（标题 `##`）或单词字符时不算标签。
+            if let Some(&prev) = bytes.get(m.start().saturating_sub(1)) {
+                if prev == b'#' || prev.is_ascii_alphanumeric() || prev == b'_' {
+                    return None;
+                }
+            }
             let name = cap.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
-            MarkdownTag { name, start, end }
+            Some(MarkdownTag {
+                name,
+                start: m.start(),
+                end: m.end(),
+            })
         })
         .collect()
 }
@@ -165,5 +180,32 @@ mod tests {
         assert!(html.contains("<h1>Hello</h1>"));
         assert!(html.contains("<strong>bold</strong>"));
         assert!(html.contains("<em>italic</em>"));
+    }
+
+    #[test]
+    fn test_extract_tags_basic() {
+        let tags = extract_tags("我喜欢 #rust 和 #svelte 5");
+        let names: Vec<&str> = tags.iter().map(|t| t.name.as_str()).collect();
+        assert_eq!(names, vec!["rust", "svelte"]);
+        // 位置（字节偏移）包含 `#` 本身：「我喜欢 」= 9 + 1 字节
+        assert_eq!(tags[0].start, 10);
+        assert_eq!(tags[0].end, 15);
+    }
+
+    #[test]
+    fn test_extract_tags_rejects_heading_and_word_glued() {
+        // `##` 是标题不是标签；`a#tag` 前缀是单词字符也不算
+        let tags = extract_tags("## 标题\na#glued #ok");
+        let names: Vec<&str> = tags.iter().map(|t| t.name.as_str()).collect();
+        assert_eq!(names, vec!["ok"]);
+    }
+
+    #[test]
+    fn test_extract_tags_url_and_underscore_prefix() {
+        // URL 中的 fragment（前缀是 `/`，非单词字符 → 会匹配）与
+        // `_#tag`（前缀 `_` 是 \w → 拒绝）的行为边界
+        let tags = extract_tags("见 https://x.com/#frag 和 _#no");
+        let names: Vec<&str> = tags.iter().map(|t| t.name.as_str()).collect();
+        assert_eq!(names, vec!["frag"]);
     }
 }

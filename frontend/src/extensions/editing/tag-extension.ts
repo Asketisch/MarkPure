@@ -5,9 +5,8 @@ import { InputRule } from '@tiptap/core'
 export interface TagOptions {
   HTMLAttributes: Record<string, unknown>
   /**
-   * Fired when the user clicks a `#tag` mark. The host wires this
-   * to a search-pane filter (workspace search with the tag as
-   * query) or to a tag-tree navigation.
+   * 用户点击 `#tag` mark 时触发。宿主把它接到搜索面板的过滤
+   * （以标签为查询的工作区搜索）或标签树导航。
    */
   onClickTag?: (tag: string) => void
 }
@@ -85,10 +84,9 @@ export const TagExtension = Mark.create<TagOptions>({
   },
 
   /**
-   * `#foo<space>` or `#foo<enter>` becomes a tag mark over `#foo`.
-   * We require a word-boundary trigger (a non-identifier char after
-   * the name) so a `#123` in a heading or a `#` inside `## title`
-   * doesn't get a spurious tag.
+   * `#foo<空格>` 或 `#foo<回车>` 会在 `#foo` 上生成 tag mark。
+   * 我们要求一个词边界触发器（名称后跟非标识符字符），避免标题
+   * 里的 `#123` 或 `## title` 里的 `#` 被误判成标签。
    */
   addInputRules() {
     return [
@@ -97,9 +95,8 @@ export const TagExtension = Mark.create<TagOptions>({
         handler: ({ range, match, chain }) => {
           const [, full, name] = match
           if (!name) return
-          // `range.from` includes any leading whitespace; we want
-          // the mark to start at the `#`. We re-resolve by
-          // trimming the leading whitespace from the full match.
+          // `range.from` 包含前导空白；我们希望 mark 从 `#` 开始。
+          // 通过裁剪完整匹配的前导空白重新定位。
           const leadingWs = full.length - full.trimStart().length
           const hashPos = range.from + leadingWs
           chain()
@@ -114,9 +111,9 @@ export const TagExtension = Mark.create<TagOptions>({
   },
 
   /**
-   * Convert pasted `#tag` strings into real tag marks. Skips
-   * matches that immediately follow another `#` (e.g. markdown
-   * headings) so we don't tag the second `#` of `## Heading`.
+   * 把粘贴的 `#tag` 字符串转成真正的 tag mark。跳过紧跟另一个 `#`
+   * 的匹配（例如 markdown 标题），避免把 `## Heading` 的第二个 `#`
+   * 也标成标签。
    */
   addPasteRules() {
     return [
@@ -163,28 +160,3 @@ export const TagExtension = Mark.create<TagOptions>({
     return {}
   },
 })
-
-/**
- * Parse tags from markdown text
- */
-export function parseTags(text: string): { text: string; tags: Array<{ start: number; end: number; name: string }> } {
-  const tagRegex = /(^|[^#\w])(#([a-zA-Z][a-zA-Z0-9_/-]*))/g
-  const tags: Array<{ start: number; end: number; name: string }> = []
-  let match
-
-  while ((match = tagRegex.exec(text)) !== null) {
-    const [, prefix, full, name] = match
-    // Skip if preceded by another # (e.g., ## heading)
-    if (match.index > 0 && text[match.index - 1] === '#') {
-      continue
-    }
-    const start = match.index + prefix.length
-    tags.push({
-      start,
-      end: start + full.length,
-      name,
-    })
-  }
-
-  return { text, tags }
-}

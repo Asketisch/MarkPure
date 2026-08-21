@@ -1,11 +1,9 @@
-//! Shared application state and IPC plumbing.
+//! 共享应用状态与 IPC 管道。
 //!
-//! The desktop app's `main.rs` historically held everything
-//! inline: the IPC wire types, the global `AppState`, the
-//! `lock_or_recover` helper, and the `escape_for_js` utility.
-//! Splitting those out lets each topic-level handler module
-//! (`file_ops`, `editor_ops`, …) just `use super::state::*;`
-//! and stay focused on its own commands.
+//! 桌面应用的 `main.rs` 历史上把所有内容内联存放：IPC 消息类型、
+//! 全局 `AppState`、`lock_or_recover` 辅助函数，以及 `escape_for_js`
+//! 工具。拆分出来后，每个主题级处理模块（`file_ops`、`editor_ops`……）
+//! 只需 `use super::state::*;`，专注于自己的命令即可。
 
 use mt_core::document::Document;
 use mt_core::tab::{load_tabs, rebind_tabs_to_workspace_roots, WindowTabs};
@@ -16,19 +14,18 @@ use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
 use tao::event_loop::EventLoopProxy;
 
-/// Frontend-built bundle (the Vite `dist/` output) served
-/// from the wry WebView when the app runs without `--dev`.
+/// 前端构建产物（Vite `dist/` 输出）。在应用以非 `--dev` 模式运行时
+/// 由 wry WebView 提供。
 #[derive(Embed)]
 #[folder = "../../../dist/"]
 pub struct Assets;
 
-/// Maximum number of documents to keep in memory (LRU eviction).
-/// Cap from the doc_registry / LRU eviction work; see the
-/// `touch_lru` / `apply_evictions` helpers for the policy.
+/// 内存中最多保留的文档数（LRU 淘汰）。这是文档注册表 / LRU 淘汰
+/// 工作引入的上限；策略详见 `touch_lru` / `apply_evictions` 辅助函数。
 pub const MAX_DOCUMENTS: usize = 50;
 
-/// Inbound IPC envelope: every command the renderer sends
-/// follows this shape. Rust replies with [`IpcResponse`].
+/// 入站 IPC 信封：渲染器发送的每条命令都遵循此结构。
+/// Rust 端通过 [`IpcResponse`] 回复。
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IpcMessage {
     pub id: u64,
@@ -37,10 +34,8 @@ pub struct IpcMessage {
     pub params: serde_json::Value,
 }
 
-/// Outbound IPC reply. `result` and `error` are mutually
-/// exclusive in practice, but the schema allows both unset so
-/// a malformed Rust reply still serialises to `{}` rather than
-/// panicking.
+/// 出站 IPC 回复。实践中 `result` 与 `error` 互斥，但模式允许两者
+/// 均未设置，这样即使 Rust 端回复格式有误也能序列化为 `{}` 而非 panic。
 #[derive(Debug, Serialize)]
 pub struct IpcResponse {
     pub id: u64,
@@ -50,69 +45,56 @@ pub struct IpcResponse {
     pub error: Option<String>,
 }
 
-/// Events that the worker thread sends back to the UI thread
-/// via `EventLoopProxy`. The UI thread reads these in
-/// `Event::UserEvent` and dispatches to the renderer via
-/// `evaluate_script`.
+/// 工作线程通过 `EventLoopProxy` 回传给 UI 线程的事件。UI 线程在
+/// `Event::UserEvent` 中读取这些事件，并通过 `evaluate_script`
+/// 分发给渲染器。
 ///
-/// `Clone` is required by tao's `EventLoopProxy::send_event`.
-/// The `SpellCheckRequest` variant carries an
-/// `std::sync::mpsc::SyncSender` (which IS `Clone`) — but a
-/// clone of the sender just gives another handle to the same
-/// channel, so even a duplicated event still wakes the
-/// original waiter exactly once.
+/// tao 的 `EventLoopProxy::send_event` 要求 `Clone`。
+/// `SpellCheckRequest` 变体携带 `std::sync::mpsc::SyncSender`
+/// （它 IS `Clone`）——但克隆发送者只是得到指向同一通道的另一个
+/// 句柄，因此即使事件被重复投递，也能恰好唤醒一次原始等待者。
 #[derive(Debug, Clone)]
 pub enum AppEvent {
-    /// File-watcher fired; the payload is what the FS layer
-    /// produced.
+    /// 文件监听器触发；载荷是 FS 层产生的内容。
     FileChanges(Vec<fs::FileChangeEvent>),
-    /// IPC asked the main thread to run NSSpellChecker. The
-    /// `reply` sender is woken with the result; the IPC
-    /// handler is blocked on `recv()` for it.
+    /// IPC 请求主线程运行拼写检查。`reply` 发送者将携带结果被唤醒；
+    /// IPC 处理器正阻塞在 `recv()` 上等待它。
     ///
-    /// We use this event (rather than calling NSSpellChecker
-    /// inline in the IPC handler) because:
-    ///   - `NSSpellChecker::setLanguage:` / `checkString:` are
-    ///     not documented as thread-safe; the safe path is to
-    ///     always touch the checker from the main thread.
-    ///   - The IPC handler runs on the wry event-loop thread,
-    ///     which is NOT the main thread.
+    /// 我们使用此事件（而非在 IPC 处理器内联调用拼写检查器），因为：
+    ///   - `NSSpellChecker::setLanguage:` / `checkString:` 未声明为
+    ///     线程安全；安全做法是始终在主线程触碰该检查器。
+    ///   - IPC 处理器运行在 wry 事件循环线程上，而它并非主线程。
     SpellCheckRequest {
         text: String,
         lang: String,
         reply: std::sync::mpsc::SyncSender<Result<Vec<spellcheck::SpellError>, String>>,
     },
-    /// An async IPC handler has completed on a tokio worker
-    /// thread. The `js` field is the pre-serialized, escaped
-    /// response string ready for `evaluate_script`.
+    /// 异步 IPC 处理器已在 tokio 工作线程上完成。`js` 字段是
+    /// 预序列化、已转义、可供 `evaluate_script` 直接使用的回复字符串。
     IpcResponse { js: String },
 }
 
-/// Shared state. Each field is wrapped in a `Mutex` because
-/// the IPC handlers run on the wry event-loop thread while
-/// background tokio tasks (file I/O, exports) sometimes
-/// touch the same state. We use `lock_or_recover` rather
-/// than `lock().unwrap()` so a single panic doesn't poison
-/// the whole pipeline.
+/// 共享状态。每个字段都用 `Mutex` 包裹，因为 IPC 处理器运行在
+/// wry 事件循环线程上，而后台 tokio 任务（文件 I/O、导出）有时
+/// 会触碰同一状态。我们使用 `lock_or_recover` 而非 `lock().unwrap()`，
+/// 这样单次 panic 不会毒化整条管道。
 pub struct AppState {
-    /// Tokio runtime used by all the async file/export IPCs.
+    /// 所有异步文件/导出 IPC 使用的 tokio 运行时。
     pub runtime: tokio::runtime::Runtime,
     pub config: Mutex<AppConfig>,
-    /// File watcher. P2-4: holds all root watchers keyed by
-    /// workspace id (the `FileWatcher` is `Multi-root ready`
-    /// internally; we just don't `Option<>` it anymore so the
-    /// mut API can be used directly without an unwrap dance).
+    /// 文件监听器：持有按工作区 id 索引的全部根目录监听器
+    ///（内部已支持多根目录；我们不再用 `Option<>` 包裹它，
+    /// 以便直接使用变更 API，省去 unwrap 舞步）。
     pub watcher: Mutex<fs::FileWatcher>,
     pub proxy: Mutex<Option<EventLoopProxy<AppEvent>>>,
     pub tabs: Mutex<Vec<WindowTabs>>,
-    /// Document registry: tab_id → Document (Rust-owned text buffer).
-    /// P2-4: `String` so the registry key matches the frontend
-    /// tab id verbatim and survives restart round-trips.
+    /// 文档注册表：tab_id → Document（Rust 持有的文本缓冲）。
+    /// 用 `String` 使注册表键与前端标签页 id 逐字一致，并在重启往返后保留。
     pub documents: Mutex<HashMap<String, Document>>,
-    /// P2-4: doc_id → workspace_root_id so we can GC docs that
-    /// belong to a root the user has switched away from.
+    /// doc_id → workspace_root_id，便于回收属于用户已切换离开
+    /// 的根目录的文档。
     pub doc_workspace: Mutex<HashMap<String, String>>,
-    /// LRU tracking: ordered list of doc_ids (oldest first, newest last)
+    /// LRU 追踪：doc_id 的有序列表（最旧在前，最新在后）
     pub doc_order: Mutex<Vec<String>>,
 }
 
@@ -121,20 +103,17 @@ impl AppState {
         let config_path = AppConfig::config_path();
         let config = AppConfig::load(&config_path);
 
-        // Load tabs
+        // 加载标签页
         let config_dir = config_path
             .parent()
             .map(|p| p.to_path_buf())
             .unwrap_or_default();
         let loaded = load_tabs(&config_dir).unwrap_or_default();
 
-        // Phase 5: rebind each tab's `workspace_root_id` to
-        // the root that contains its `path`. Pre-P2-4
-        // `tabs.json` files have `None` here; the rebind
-        // fills in the right id based on the current
-        // workspace_roots. The result is in-memory only —
-        // we don't rewrite `tabs.json` until the user does
-        // a normal tab-saving action.
+        // 把每个标签页的 `workspace_root_id` 重新绑定到包含其 `path`
+        // 的根目录。旧版 `tabs.json` 中此处为 `None`；重绑会基于当前
+        // 的 workspace_roots 填入正确的 id。结果仅存于内存——
+        // 在用户执行正常的标签页保存动作之前，我们不重写 `tabs.json`。
         let root_paths: Vec<(String, String)> = config
             .workspace_roots()
             .iter()
@@ -157,11 +136,9 @@ impl AppState {
         }
     }
 
-    /// Persist the in-memory config to disk. Logs failures
-    /// to stderr but never panics — a failed save means
-    /// the user's settings (theme, recent files, last
-    /// workspace) won't survive a restart, but the running
-    /// session is still fine.
+    /// 将内存中的配置持久化到磁盘。失败时记录到 stderr 但绝不 panic——
+    /// 保存失败意味着用户设置（主题、最近文件、上次工作区）无法在
+    /// 重启后保留，但当前会话仍可正常使用。
     pub fn save_config(&self) {
         let config = lock_or_recover(&self.config);
         let path = AppConfig::config_path();
@@ -184,23 +161,20 @@ impl AppState {
         }
     }
 
-    /// Get a reference to the persistent tokio runtime
+    /// 获取持久化 tokio 运行时的引用
     pub fn rt(&self) -> &tokio::runtime::Runtime {
         &self.runtime
     }
 }
 
-/// Acquire a `Mutex` lock without poisoning the entire IPC pipeline
-/// if a previous holder panicked. We log the recovery (a poisoned
-/// mutex means an earlier handler panicked) and return a fresh
-/// guard over the same data.
+/// 获取 `Mutex` 锁，而不会因之前持有者 panic 毒化整条 IPC 管道。
+/// 我们会记录恢复（互斥锁被毒化说明先前某个处理器 panic 过）并
+/// 返回同一数据上的全新守卫。
 ///
-/// WHY: a single `lock().unwrap()` on a poisoned mutex used to
-/// cascade — every subsequent IPC call would `unwrap()` and
-/// panic, freezing the UI thread. Recovering is strictly better
-/// than panicking here because the alternative is a complete app
-/// freeze; the data may be inconsistent, but the user can at
-/// least see an error toast and re-save.
+/// 原因：对毒化互斥锁执行一次 `lock().unwrap()` 曾经造成级联——
+/// 后续每次 IPC 调用都会 `unwrap()` 并 panic，冻结 UI 线程。此处
+/// 恢复严格优于直接 panic，因为替代方案是整应用冻结；数据可能
+/// 不一致，但用户至少能看到错误提示并重新保存。
 pub fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     match mutex.lock() {
         Ok(g) => g,
@@ -211,15 +185,12 @@ pub fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     }
 }
 
-/// Escape a Rust string for safe interpolation into a JS
-/// string literal that the WebView will then `eval`. We
-/// pre-empt the same-character-class of bugs that
-/// `JSON.stringify` is normally used to prevent — but our
-/// host injects responses via `__mt_dispatch('{...}')`
-/// where the inner quotes are single-quoted, so we also
-/// have to escape `</script` (case-insensitive) and the
-/// U+2028 / U+2029 line terminators which JS treats as
-/// line breaks mid-string.
+/// 转义 Rust 字符串，以便安全地内插到 WebView 随后 `eval` 的
+/// JS 字符串字面量中。我们预先规避了通常由 `JSON.stringify`
+/// 防止的同类字符问题——但宿主端通过 `__mt_dispatch('{...}')`
+/// 注入回复，其中内层引号是单引号，因此还须转义 `</script`
+/// （不区分大小写）以及 JS 视为字符串中换行的 U+2028 / U+2029
+/// 行终止符。
 pub fn escape_for_js(s: &str) -> String {
     s.replace('\\', "\\\\")
         .replace('\'', "\\'")
@@ -233,15 +204,12 @@ pub fn escape_for_js(s: &str) -> String {
         .replace("</SCRIPT", "<\\/script")
 }
 
-/// Parse a `doc_id` field from IPC params, accepting either the
-/// P2-4 string form or the legacy numeric form. Returns the
-/// canonical `String` so registry keys are consistent.
+/// 从 IPC 参数中解析 `doc_id` 字段，接受 `String` 形式或旧式数字形式。
+/// 返回规范的 `String` 以保证注册表键一致。
 ///
-/// Used by every `doc_*` and `cmd_save_file`-with-`doc_id`
-/// handler. Centralizing the conversion keeps the migration
-/// backward-compatible (old renderer sending numbers still
-/// works) and means future call sites can't accidentally key the
-/// registry on a `u64`.
+/// 每个 `doc_*` 及带 `doc_id` 的 `cmd_save_file` 处理器都会用到。
+/// 集中做转换既保持迁移的向后兼容（旧渲染器发送数字仍可用），
+/// 也确保未来的调用点不会误用 `u64` 作为注册表键。
 pub fn parse_doc_id_param(params: &serde_json::Value) -> std::result::Result<String, String> {
     if let Some(s) = params["doc_id"].as_str() {
         return Ok(s.to_string());

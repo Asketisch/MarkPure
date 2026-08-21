@@ -1,33 +1,31 @@
 /**
- * Pure reducers for the Vim mode plugin (P2-7).
+ * Vim 模式插件的纯 reducer。
  *
- * The plugin's `apply(tr, prev)` is the single writer of
- * `VimState`. Each helper here:
- *   - takes the previous state + a transaction meta payload,
- *   - returns a new `VimState` (never mutates the input).
+ * 插件的 `apply(tr, prev)` 是 `VimState` 的唯一写入方。这里的每个
+ * 辅助函数：
+ *   - 接收上一份状态 + 一个事务的 meta 负载，
+ *   - 返回新的 `VimState`（绝不修改输入）。
  *
- * Splitting out these helpers lets:
- *   1. `apply` stay a small switch on `meta.type`.
- *   2. Unit tests exercise the reducer directly without booting
- *      an EditorView (see `scripts/validate-vim.ts`).
+ * 拆出这些辅助函数的好处：
+ *   1. `apply` 只是对 `meta.type` 的一小段 switch。
+ *   2. 单元测试无需启动 EditorView 即可直接测试 reducer
+ *      （见 `scripts/validate-vim.ts`）。
  *
- * Mutation strategy:
- *   - We rebuild the state as a fresh object on every transition.
- *   - We do NOT touch `state.doc`. The plugin only reads it via
- *     `getNewDoc()` (closure passed in by the plugin) when needed.
- *   - Pending buffer: the FSM in `applyVimMeta` reads the current
- *     `pending.kind` and dispatches. Operators that consume keys
- *     (d, c, y) or digits (1-9, 0) are handled by `tryParseCommand`
- *     in `key-parser.ts`, which returns a `VimCommand` for the
- *     plugin to dispatch.
+ * 变更策略：
+ *   - 每次状态迁移都重建为全新的对象。
+ *   - 不触碰 `state.doc`。插件只在需要时通过 `getNewDoc()`
+ *     （由插件传入的闭包）读取文档。
+ *   - 待处理缓冲：`applyVimMeta` 里的 FSM 读取当前 `pending.kind`
+ *     并派发。消费按键的操作符（d、c、y）与数字（1-9、0）由
+ *     `key-parser.ts` 的 `tryParseCommand` 处理，它会返回一个
+ *     `VimCommand` 供插件派发。
  *
- * Persistence:
- *   - `enabled` is the mirror of `AppConfig.vim_mode`. Set via
- *     `setEnabled` meta (which the extension dispatches on
- *     `Cmd+.` toggle and on mount).
- *   - `mode`, `pending`, `register`, `visualAnchor`, `isComposing`
- *     are session-only — a new tab or a `setEnabled(false)` resets
- *     them to defaults.
+ * 持久化：
+ *   - `enabled` 是 `AppConfig.vim_mode` 的镜像。通过 `setEnabled`
+ *     meta 设置（扩展在 `Cmd+.` 切换与挂载时派发）。
+ *   - `mode`、`pending`、`register`、`visualAnchor`、`isComposing`
+ *     仅存在于会话中——新标签页或 `setEnabled(false)` 都会把它们
+ *     重置为默认值。
  */
 
 import { DecorationSet } from '@tiptap/pm/view'
@@ -40,7 +38,7 @@ import {
   type PendingBuffer,
 } from './types'
 
-/** Empty-state factory. Used at plugin init. */
+/** 空状态工厂。插件初始化时使用。 */
 export function emptyState(): VimState {
   return {
     enabled: false,
@@ -54,12 +52,12 @@ export function emptyState(): VimState {
   }
 }
 
-/** Build the initial state with optional `enabled` flag. */
+/** 构建初始状态，可传入可选的 `enabled` 标志。 */
 export function initState(enabled = false): VimState {
   return { ...emptyState(), enabled }
 }
 
-/** Build the state after a `setEnabled` meta. */
+/** 处理 `setEnabled` meta 后构建新状态。 */
 function applySetEnabled(
   prev: VimState,
   meta: Extract<VimMeta, { type: 'setEnabled' }>,
@@ -68,11 +66,11 @@ function applySetEnabled(
   return {
     ...emptyState(),
     enabled: meta.enabled,
-    lastEx: prev.lastEx, // keep last ex for repeat
+    lastEx: prev.lastEx, // 保留上一次 ex 命令以便重复执行
   }
 }
 
-/** Build the state after an `enterMode` meta. Clears pending. */
+/** 处理 `enterMode` meta 后构建新状态。清空待处理缓冲。 */
 function applyEnterMode(
   prev: VimState,
   meta: Extract<VimMeta, { type: 'enterMode' }>,
@@ -82,14 +80,14 @@ function applyEnterMode(
     ...prev,
     mode: meta.mode,
     pending: { kind: 'idle' },
-    // visual anchor is reset on mode change; visual modes will set it
+    // 视觉锚点在模式切换时重置；视觉模式会自行设置它
     visualAnchor: meta.mode === 'visual' || meta.mode === 'visual-line' || meta.mode === 'visual-block'
       ? prev.visualAnchor
       : null,
   }
 }
 
-/** Build the state after a `setPending` meta. */
+/** 处理 `setPending` meta 后构建新状态。 */
 function applySetPending(
   prev: VimState,
   meta: Extract<VimMeta, { type: 'setPending' }>,
@@ -97,14 +95,14 @@ function applySetPending(
   return { ...prev, pending: meta.pending }
 }
 
-/** Build the state after a `resetPending` meta. */
+/** 处理 `resetPending` meta 后构建新状态。 */
 function applyResetPending(prev: VimState): VimState {
   if (prev.pending.kind === 'idle') return prev
   return { ...prev, pending: { kind: 'idle' } }
 }
 
-/** Build the state after a `setExText` meta. Also transitions to
- *  `pending: { kind: 'ex' }` if not already there. */
+/** 处理 `setExText` meta 后构建新状态。若尚未处于
+ *  `pending: { kind: 'ex' }`，同时切换到该状态。 */
 function applySetExText(
   prev: VimState,
   meta: Extract<VimMeta, { type: 'setExText' }>,
@@ -116,7 +114,7 @@ function applySetExText(
   }
 }
 
-/** Build the state after a `setRegister` meta. */
+/** 处理 `setRegister` meta 后构建新状态。 */
 function applySetRegister(
   prev: VimState,
   meta: Extract<VimMeta, { type: 'setRegister' }>,
@@ -125,7 +123,7 @@ function applySetRegister(
   return { ...prev, register: meta.content }
 }
 
-/** Build the state after a `setVisualAnchor` meta. */
+/** 处理 `setVisualAnchor` meta 后构建新状态。 */
 function applySetVisualAnchor(
   prev: VimState,
   meta: Extract<VimMeta, { type: 'setVisualAnchor' }>,
@@ -134,28 +132,26 @@ function applySetVisualAnchor(
   return { ...prev, visualAnchor: meta.anchor }
 }
 
-/** Build the state after a `compositionStart` meta. */
+/** 处理 `compositionStart` meta 后构建新状态。 */
 function applyCompositionStart(prev: VimState): VimState {
   if (prev.isComposing) return prev
   return { ...prev, isComposing: true, pending: { kind: 'idle' } }
 }
 
-/** Build the state after a `compositionEnd` meta. */
+/** 处理 `compositionEnd` meta 后构建新状态。 */
 function applyCompositionEnd(prev: VimState): VimState {
   if (!prev.isComposing) return prev
   return { ...prev, isComposing: false }
 }
 
 /**
- * Reduce a transaction's meta against the previous state.
+ * 用一笔事务的 meta 对照上一份状态做归约。
  *
- * Doc-changing transactions with no Vim meta do not affect
- * Vim state (PM's mapping already handles selection remap).
- * Selection-only transactions also pass through.
+ * 不带 Vim meta 的改档事务不会影响 Vim 状态（选区的重映射已由
+ * PM 的 mapping 完成）。纯选区事务同样直接透传。
  *
- * `getNewDoc` is a closure the plugin passes in so this module
- * stays free of `EditorState` imports — that keeps the
- * validation script light.
+ * `getNewDoc` 是插件传入的闭包，这样本模块无需导入
+ * `EditorState`，也让校验脚本保持轻量。
  */
 export function applyVimMeta(
   prev: VimState,
@@ -177,12 +173,12 @@ export function applyVimMeta(
   }
 }
 
-/** Helper for callers: read the current mode. */
+/** 供调用方使用：读取当前模式。 */
 export function getMode(state: VimState): VimMode {
   return state.mode
 }
 
-/** Helper: is the parser active (i.e., in NORMAL or VISUAL)? */
+/** 辅助判断：解析器是否处于激活状态（即 NORMAL 或 VISUAL 模式）？ */
 export function isParserActive(state: VimState): boolean {
   return (
     state.enabled

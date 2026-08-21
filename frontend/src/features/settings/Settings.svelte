@@ -1,26 +1,24 @@
 <!--
-  Settings dialog — orchestrator only.
+  设置对话框——仅负责编排。
 
-  The four sections (general / appearance / shortcuts / about)
-  each live in their own .svelte file. This component owns:
-    - The sidebar tab nav (justSaved flash, active button state)
-    - The data-loading effect (load on open)
-    - The IPC wiring (saveConfig, changeLanguage, etc.)
-    - The hidden file input for "Import Preferences"
-    - The ThemeEditor overlay mount point
+  四个分区（通用 / 外观 / 快捷键 / 关于）各自位于独立的 .svelte
+  文件中。本组件负责：
+    - 侧边栏标签导航（justSaved 闪烁、激活按钮状态）
+    - 数据加载 effect（打开时加载）
+    - IPC 接线（saveConfig、changeLanguage 等）
+    - “导入偏好设置”的隐藏文件输入
+    - ThemeEditor 遮罩的挂载点
 
-  See `./GeneralSection.svelte`, `./AppearanceSection.svelte`,
-  `./ShortcutsSection.svelte`, `./AboutSection.svelte` for
-  the per-section markup. Pure helpers (theme lookup tables,
-  accelerator formatter, config export/import I/O) live in
-  `./themes.ts`, `./keybindings.ts`, `./configIO.ts`.
+  各分区标记见 `./GeneralSection.svelte`、`./AppearanceSection.svelte`、
+  `./ShortcutsSection.svelte`、`./AboutSection.svelte`。纯辅助函数
+  （主题查找表、快捷键格式化、配置导入导出 I/O）位于
+  `./themes.ts`、`./keybindings.ts`、`./configIO.ts`。
 
-  Styles live in `./settings.css` so the orchestrator file
-  stays focused on template + script logic.
+  样式位于 `./settings.css`，让编排文件专注于模板与脚本逻辑。
 -->
 <script lang="ts">
   import './settings.css'
-  import { onMount, untrack } from 'svelte'
+  import { onMount, onDestroy, untrack } from 'svelte'
   import {
     getConfig,
     setConfig,
@@ -34,6 +32,7 @@
     resetKeybindings,
     exportConfig,
     importConfig,
+    pickThemeFile,
     type ConfigImportReport,
     type AppConfig,
     type Theme,
@@ -67,11 +66,10 @@
   let loading = $state(false)
   let themeEditorVisible = $state(false)
 
-  // P1-11: platform detection drives the spellcheck tooltip.
-  // We can't import the cargo cfg from the renderer, so we
-  // rely on `navigator.platform` for the OS the WebView is
-  // running on. The Settings copy on non-macOS reads
-  // "currently only English is checked".
+  // 平台检测驱动拼写检查的提示文案。渲染进程无法导入 cargo 的
+  // cfg，因此用 `navigator.platform` 判断 WebView 运行在哪个
+  // 操作系统上。非 macOS 平台上的设置文案显示
+  // “currently only English is checked”。
   const isMacPlatform = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
 
   async function load() {
@@ -93,29 +91,23 @@
     loading = false
   }
 
-  // P0-X: Typora-style "saved" toast. We flash a
-  // "✓ Saved" indicator in the dialog header for ~1.5s
-  // after every successful save so the user knows the
-  // change persisted (Typora / VSCode both do this; the
-  // previous implementation gave no visible feedback and
-  // the user had to assume `setConfig` succeeded).
+  // “已保存”提示。每次保存成功后，在对话框标题栏闪烁约 1.5 秒
+  // 的“✓ Saved”指示器，让用户确认改动确实已持久化（之前的实现
+  // 没有任何可见反馈，用户只能假设 `setConfig` 成功了）。
   let justSaved = $state(false)
-  // P0-X: import-report state. Set after the user picks
-  // a config file so the panel can flash a one-line
-  // summary ("Restored: 2 themes, 0 skipped, 12
-  // keybindings"). `null` hides the report.
+  // 导入报告状态。用户选定配置文件后写入，面板据此闪烁显示一行
+  // 摘要（“Restored: 2 themes, 0 skipped, 12 keybindings”）。
+  // `null` 表示不显示报告。
   let configImportReport = $state<ConfigImportReport | null>(null)
-  // P0-X: re-fetch the latest config after a successful
-  // import so the Settings UI reflects the freshly
-  // restored theme / editor prefs / keybindings without
-  // a restart.
+  // 导入成功后重新拉取最新配置，让设置界面无需重启即可反映
+  // 刚恢复的主题 / 编辑器偏好 / 快捷键。
   async function reloadAllAfterImport() {
     try {
       const [c, k] = await Promise.all([getConfig(), getKeybindings()])
       config = c
       keybindings = k
-      // Re-apply i18n + theme through the same path the
-      // user would take when changing them in Settings.
+      // 通过用户在设置里动手改时的同一条路径，重新应用
+      // i18n 与主题。
       if (c.language) {
         await i18n.changeLocale(c.language)
       }
@@ -135,10 +127,8 @@
     }
   }
   async function handleImportConfig() {
-    // Hidden `<input type=file>` is rendered at the end
-    // of the dialog; clicking it opens the native file
-    // picker scoped to `.json` (Typora / VSCode
-    // convention).
+    // 隐藏的 `<input type=file>` 渲染在对话框末尾；点击它会弹出
+    // 限定为 `.json` 的原生文件选择器（业界通用做法）。
     if (importInput) importInput.click()
   }
   async function onImportFileChange(e: Event) {
@@ -166,6 +156,10 @@
       savedTimer = null
     }, 1500)
   }
+  // 对话框关闭时若有「已保存」闪烁计时器在途，取消它。
+  onDestroy(() => {
+    if (savedTimer) clearTimeout(savedTimer)
+  })
 
   async function saveConfig(updates: Partial<AppConfig>) {
     try {
@@ -193,29 +187,24 @@
   }
 
   async function changeTheme(themeName: string) {
-    // The `<select>` value is the human-readable label; the
-    // label and the CSS class map 1:1 in this build (the
-    // legacy label→class translator lives in `./themes.ts`
-    // if the menu ever re-introduces a friendly name).
+    // `<select>` 的值是人类可读的名称；本版本中名称与 CSS class
+    // 一一对应（旧式名称→class 的转换器保留在 `./themes.ts`，
+    // 以备将来菜单再次引入友好名称）。
     await saveConfig({ theme: themeName })
   }
 
   async function handleImportTheme() {
     try {
-      // Use the native file picker (rfd via Rust) so we get
-      // an absolute path. The previous implementation used
-      // `input[type=file]` which only exposed a sandboxed
-      // filename and never persisted the imported theme to
-      // the on-disk themes directory.
-      const { pickThemeFile } = await import('$lib/editor/commands')
+      // 使用原生文件选择器（经 Rust 的 rfd），这样才能拿到绝对
+      // 路径。之前的实现用 `input[type=file]`，只能拿到沙箱化
+      // 文件名，而且从不会把导入的主题写入磁盘上的主题目录。
       const path = await pickThemeFile()
       if (!path) return  // user cancelled
       const theme = await importTheme(path)
-      // Re-pull the canonical list from Rust so the UI
-      // mirrors the on-disk truth (id may have been
-      // canonicalised by `import_theme_from_path`).
+      // 从 Rust 重新拉取规范化列表，让界面与磁盘上的实际情况同步
+      // （id 可能已被 `import_theme_from_path` 规范化）。
       themes = await getThemes()
-      void theme  // kept for future "select just-imported" UX
+      void theme  // 保留给未来“选中刚导入的主题”的交互
     } catch (e) {
       console.error('Failed to import theme:', e)
     }
@@ -316,6 +305,9 @@
             platform={navigator.platform}
             onStartRecording={startRecording}
             onKeyCapture={handleKeyCapture}
+            onStopRecording={() => {
+              recordingId = null
+            }}
             onReset={handleResetKeybindings}
           />
         {:else if activeSection === 'about'}
@@ -328,10 +320,9 @@
   </div>
 {/if}
 
-<!-- P0-X: hidden file input for the "Import Preferences"
-     button. Same shape as the image-picker input —
-     keep it offscreen but in the DOM so `input.click()`
-     works on every WebView port. -->
+<!-- “导入偏好设置”按钮使用的隐藏文件输入。与图片选择器的
+     输入同构——保持在屏幕外但留在 DOM 中，这样 `input.click()`
+     在所有 WebView 端口上都能工作。 -->
 <input
   bind:this={importInput}
   type="file"
@@ -346,8 +337,12 @@
   <div class="theme-editor-wrapper">
     <ThemeEditor
       currentThemeId={config?.theme ?? ''}
-      onThemeUpdated={(theme) => {
-        // Optionally refresh themes list
+      onThemeUpdated={() => {
+        // 编辑器保存/新建主题后，从 Rust 重新拉取列表，
+        // 让外观分区的自定义主题区与磁盘同步。
+        getThemes().then((t) => { themes = t }).catch((e) => {
+          console.error('Failed to refresh themes:', e)
+        })
       }}
     />
     <button class="close-btn" onclick={() => themeEditorVisible = false}>x</button>

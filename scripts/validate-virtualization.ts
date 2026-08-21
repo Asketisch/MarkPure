@@ -1,12 +1,10 @@
 /**
- * Lightweight sanity check for the virtualization Phase 1
- * utilities. Run with:
+ * 虚拟化工具函数的轻量校验。运行方式：
  *
  *   npx tsx scripts/validate-virtualization.ts
  *
- * Uses Node's built-in `node:test` runner (Node 18+) so no
- * extra dev dependency is required. Phase 6 will add real
- * integration tests once the plugin is wired up.
+ * 使用 Node 内置的 `node:test` 运行器（Node 18+），无需额外开发
+ * 依赖。插件接入后的真实集成测试在后续阶段补齐。
  */
 
 import test from 'node:test'
@@ -20,7 +18,7 @@ import {
   recomputeOffsets,
 } from '../frontend/src/plugins/virtualization/enumerate'
 
-/** Build a fake PMNode with just the fields the estimator uses. */
+/** 构造只含估算器所用字段的假 PMNode。 */
 function fakeNode(type: string, attrs: Record<string, unknown> = {}, text = '', children: unknown[] = []): any {
   const textChildren = text && children.length === 0
     ? [{ type: { name: 'text' }, text, textContent: text, isText: true, marks: [] }]
@@ -56,7 +54,7 @@ test('estimateBlockHeight: heading levels', () => {
     assert.ok(height > 0, `heading ${level} height > 0`)
     assert.equal(isContainer, false)
   }
-  // H1 taller than H6
+  // H1 高于 H6
   const h1 = estimateBlockHeight(fakeNode('heading', { level: 1 })).height
   const h6 = estimateBlockHeight(fakeNode('heading', { level: 6 })).height
   assert.ok(h1 > h6, 'H1 taller than H6')
@@ -66,7 +64,7 @@ test('estimateBlockHeight: paragraph scales with text', () => {
   const short = estimateBlockHeight(fakeNode('paragraph', {}, 'hello'))
   const long = estimateBlockHeight(fakeNode('paragraph', {}, 'x'.repeat(500)))
   assert.ok(long.height > short.height, 'long paragraph taller than short')
-  // Empty paragraph still has one line of height
+  // 空段落仍占一行高度
   const empty = estimateBlockHeight(fakeNode('paragraph', {}, ''))
   assert.equal(empty.height, 24, 'empty paragraph = 1 line')
 })
@@ -95,7 +93,7 @@ test('estimateBlockHeight: list/table are containers', () => {
 test('estimateBlockHeight: NodeView fallbacks', () => {
   for (const type of ['mermaid', 'toc', 'math', 'mathBlock', 'footnoteDef']) {
     const { height } = estimateBlockHeight(fakeNode(type))
-    assert.ok(height > 0, `${type} has default height`)
+    assert.ok(height > 0, `${type} has default height`) // 有默认高度
   }
 })
 
@@ -128,9 +126,8 @@ test('enumerateTopBlocks: cumulative offsetTop', () => {
 })
 
 test('enumerateTopBlocks: threshold boundary at 200', () => {
-  // 200 blocks -> small-doc fast path; 201 -> enable.
-  // We don't test the plugin's enabled flag here, but verify
-  // block count is exactly what we expect.
+  // 200 块走小文档快路径；201 时启用。这里不测插件的
+  // enabled 标志，只验证块数量与预期一致。
   const children = Array.from({ length: 201 }, () => fakeNode('paragraph', {}, 'x'))
   const doc = fakeNode('doc', {}, '', children)
   const blocks = enumerateTopBlocks(doc as any)
@@ -157,7 +154,7 @@ test('withMeasuredHeight: updates single block', () => {
   const updated = withMeasuredHeight(blocks, 1, 999)
   assert.equal(updated[1].measuredHeight, 999)
   assert.equal(updated[1].isMeasured, true)
-  // Original array is untouched (immutable update).
+  // 原数组保持不变（不可变更新）。
   assert.equal(blocks[1].measuredHeight, 0)
 })
 
@@ -170,7 +167,7 @@ test('recomputeOffsets: uses measured when available', () => {
   const measured = withMeasuredHeight(blocks, 0, 100)
   const recomputed = recomputeOffsets(measured)
   assert.equal(recomputed[0].offsetTop, 0)
-  assert.equal(recomputed[1].offsetTop, 100, 'uses measured height of block 0')
+  assert.equal(recomputed[1].offsetTop, 100, 'uses measured height of block 0') // 使用块 0 的实测高度
 })
 
 test('measureBlockHeight: disconnected element returns 0', () => {

@@ -1,11 +1,11 @@
 <script lang="ts">
   /**
-   * Status bar — bottom of the editor area.
+   * 状态栏——编辑器区域底部。
    *
-   * Extracted from App.svelte as part of P7's file-size audit
-   * (App.svelte was 1367 lines). This component is purely
-   * presentational: it receives doc stats + a `saving` flag and
-   * renders them. All translation happens via the i18n prop.
+   * 作为文件体积审计的一部分，从 App.svelte 中拆出
+   * （App.svelte 当时有 1367 行）。该组件纯粹是展示性的：
+   * 它接收文档统计 + `saving` 标志并渲染它们。所有文案翻译
+   * 都经由 i18n 属性完成。
    */
   import { useI18n } from '$lib/stores/i18n.svelte'
 
@@ -25,55 +25,44 @@
     vimEnabled = false,
     vimMode = 'normal',
     vimPending = '',
-    /** P0-X: number of characters in the active selection
-     *  (0 when nothing is selected). Drives a small
-     *  "Selected: N" chip next to the document totals so
-     *  the user gets Typora-style selection feedback. */
+    /** 当前选中区域内的字符数（未选中时为 0）。驱动
+     *  文档统计旁的「已选 N 字」小徽标，给用户即时的
+     *  选区反馈。 */
     selectionChars = 0,
-    /** P0-X: timestamp (ms since epoch) of the most recent
-     *  successful save. When `null`, we suppress the
-     *  indicator entirely so a freshly-opened tab doesn't
-     *  show "Saved just now" before the user has saved
-     *  anything. We re-read `Date.now()` once a minute
-     *  via the `savedTick` rune so the human-readable
-     *  "X minutes ago" label stays current without a
-     *  global timer. */
+    /** 最近一次成功保存的时间戳（自纪元起的毫秒数）。
+     *  为 `null` 时完全隐藏该指示器，让刚打开的新标签页
+     *  在用户保存前不显示「刚刚已保存」。我们通过 `savedTick`
+     *  rune 每分钟重新读取一次 `Date.now()`，让「X 分钟前」
+     *  这类可读标签无需全局定时器也能保持新鲜。 */
     savedAt = null as number | null,
-    /** P0-X: Typora-style word-count goal. When > 0, the
-     *  status bar renders `<current> / <goal> (<pct>%)`
-     *  so the user can track progress against a writing
-     *  target. `0` (the default) hides the indicator. */
+    /** 字数目标。当大于 0 时，状态栏渲染 `<当前> / <目标> (<百分比>%)`，
+     *  让用户能对照写作目标跟踪进度。`0`（默认值）隐藏该指示器。 */
     wordCountGoal = 0,
-    /** P0-X: Typora-style "jump to top / jump to bottom"
-     *  callbacks. Rendered as small ↑ / ↓ buttons at the
-     *  right edge of the status bar. The host wires these
-     *  to `editor.commands.focus()` + a `setTextSelection`
-     *  + `scrollIntoView` so the cursor lands at the
-     *  start / end of the document and the viewport scrolls
-     *  along. The component stays editor-agnostic — same
-     *  shape as `StatusBar`'s other host-driven actions. */
+    /** 「跳到顶部 / 跳到底部」回调。在状态栏右缘渲染成
+     *  小的 ↑ / ↓ 按钮。宿主把它们接到 `editor.commands.focus()`
+     *  + `setTextSelection` + `scrollIntoView` 上，让光标落到
+     *  文档开头 / 结尾并随之滚动视口。组件本身与编辑器解耦——
+     *  与 `StatusBar` 其他由宿主驱动的动作形态一致。 */
     onJumpTop = () => {},
     onJumpBottom = () => {},
   }: {
     stats: DocStats
     saving: boolean
-    /** Number of secondary cursors (P0-3 multi-cursor).
-     *  When > 0 the editor is in multi-cursor mode. */
+    /** 次光标数量（多光标）。大于 0 时编辑器处于多光标模式。 */
     multiCursorCount?: number
-    /** P2-3: true while the user is actively Alt+Dragging a
-     *  column-select rectangle. Drives a small chip next to
-     *  the multi-cursor count so the user knows what's happening. */
+    /** 用户正在 Alt+拖拽列选择矩形时置为 true。在多光标计数
+     *  旁渲染一个小徽标，让用户知道当前正在做什么。 */
     columnMode?: boolean
-    /** P0-8: number of nodes currently in the branching undo tree. */
+    /** 分支式撤销树中当前的节点总数。 */
     undoBranchCount?: number
-    /** P0-8: true when the current path has at least one sibling
-     *  (i.e., the tree has branched at some point). */
+    /** 当前路径至少有一个兄弟节点（即树在某处出现过分支）
+     *  时为 true。 */
     undoIsForked?: boolean
-    /** P2-7: true when Vim mode is enabled. */
+    /** Vim 模式启用时为 true。 */
     vimEnabled?: boolean
-    /** P2-7: current Vim mode. Drives the chip color + label. */
+    /** 当前 Vim 模式。决定徽标的颜色与文案。 */
     vimMode?: 'normal' | 'insert' | 'visual' | 'visual-line' | 'visual-block' | 'replace'
-    /** P2-7: transient count/operator display (e.g. "3d"). */
+    /** 待解析的计数/操作符显示（例如 "3d"）。 */
     vimPending?: string
     selectionChars?: number
     savedAt?: number | null
@@ -84,7 +73,7 @@
 
   const i18n = useI18n()
 
-  /** P2-7: render a short label per Vim mode. */
+  /** 为每种 Vim 模式渲染一个简短标签。 */
   function labelForVimMode(mode: typeof vimMode): string {
     if (mode === 'normal') return 'NORMAL'
     if (mode === 'insert') return 'INSERT'
@@ -94,12 +83,10 @@
     return 'REPLACE'
   }
 
-  // P0-X: Typora-style reading-time estimate. Average
-  // reading speed is ~250 wpm for prose; CJK readers are
-  // closer to 500 chars/min, so we mix the two heuristics
-  // based on the CJK character count already returned by
-  // `doc_get_stats` (rust-side counts each CJK ideograph
-  // as one word).
+  // 阅读时长估算。平均阅读速度约为散文 250 词/分钟；
+  // 中文读者更接近 500 字/分钟，因此根据 `doc_get_stats`
+  // 已返回的中文字符数混合两种启发式
+  // （Rust 端把每个汉字都计作一个词）。
   let readingTime = $derived.by(() => {
     const minutes = stats.words / 250
     if (minutes < 1) return '< 1 min'
@@ -109,11 +96,9 @@
     return rest > 0 ? `${hours} h ${rest} min` : `${hours} h`
   })
 
-  // P0-X: Typora-style "Saved X ago" indicator. We
-  // re-derive the humanised label every minute via a
-  // ticking rune; without that the user staring at a
-  // document for 5 minutes would still see "Saved 1m
-  // ago" until they triggered any state change.
+  // 「X 前保存」指示器。我们通过一个会跳动的 rune 每分钟
+  // 重新推导一次人性化文案；否则用户盯着文档看 5 分钟，
+  // 在触发任何状态变更前，仍会看到「1 分钟前保存」。
   let savedTick = $state(0)
   $effect(() => {
     if (savedAt == null) return
@@ -140,11 +125,9 @@
     return i18n.t('status.saved_days_ago').replace('{n}', String(d))
   })
 
-  // P0-X: Typora-style word-count progress. Rendered
-  // as `<current> / <goal> (<pct>%)` next to the doc
-  // totals; hidden when the goal is `0` (the default).
-  // We clamp the percentage at 100% so a runaway doc
-  // doesn't show a `150%` figure.
+  // 字数目标进度。在文档统计旁渲染为 `<当前> / <目标> (<百分比>%)`；
+  // 目标为 `0`（默认）时隐藏。我们把百分比钳制在 100%，
+  // 避免超长文档显示 `150%` 这样的数字。
   let wordGoalLabel = $derived.by(() => {
     if (!wordCountGoal || wordCountGoal <= 0) return null
     const pct = Math.min(100, Math.round((stats.words / wordCountGoal) * 100))
@@ -200,11 +183,9 @@
   {:else if savedLabel}
     <span class="saved-at" title={i18n.t('status.saved_at_tooltip')}>{savedLabel}</span>
   {/if}
-  <!-- P0-X: Typora-style ↑ / ↓ jump buttons. Always
-       rendered so the user has a stable visual affordance
-       (the saved-indicator slot swaps in/out, the buttons
-       never move). `margin-left: auto` keeps them glued
-       to the right edge. -->
+  <!-- ↑ / ↓ 跳转按钮。始终渲染，给用户一个稳定的视觉
+      提示（保存指示器会替换出入，按钮位置从不移动）。
+      `margin-left: auto` 让它们贴住右缘。 -->
   <div class="jump-buttons" role="group" aria-label={i18n.t('status.jump_buttons_aria')}>
     <button class="jump-btn" onclick={onJumpTop} title={i18n.t('status.jump_top_tooltip')} aria-label={i18n.t('status.jump_top_tooltip')}>↑</button>
     <button class="jump-btn" onclick={onJumpBottom} title={i18n.t('status.jump_bottom_tooltip')} aria-label={i18n.t('status.jump_bottom_tooltip')}>↓</button>
@@ -232,10 +213,9 @@
   .reading-time {
     color: var(--text-secondary);
   }
-  /* P0-X: Typora-style word-count goal chip. Rendered
-     only when the user has set a target. Color shifts
-     to the accent when the user crosses 100% so they
-     see the milestone. */
+  /* 字数目标徽标。仅在用户设置了目标时渲染。
+     越过 100% 后颜色变为强调色，让用户看到
+     这一里程碑。 */
   .word-goal {
     color: var(--text-secondary);
   }
@@ -247,7 +227,7 @@
     color: var(--accent);
     font-weight: 600;
   }
-  /* P2-7: Vim mode chip. Color-coded per mode. */
+  /* Vim 模式徽标。按模式区分颜色。 */
   .vim-mode {
     padding: 1px 6px;
     border-radius: 3px;
@@ -266,18 +246,15 @@
     color: var(--accent);
     animation: pulse 1s ease-in-out infinite;
   }
-  /* P0-X: Typora-style "Saved X ago" indicator. Sits in
-     the same right-aligned slot as the saving pulse so
-     the transition between them is seamless. */
+  /* 「X 前保存」指示器。与保存脉冲共用同一个右对齐槽位，
+     两者之间的过渡因此无缝衔接。 */
   .saved-at {
     margin-left: auto;
     color: var(--text-secondary);
     font-size: 11px;
   }
-  /* P0-X: Typora-style ↑ / ↓ jump buttons. Rendered
-     next to the saved-indicator; both rely on the parent
-     flex container's `margin-left: auto` to anchor to the
-     right edge. */
+  /* ↑ / ↓ 跳转按钮。渲染在保存指示器旁边；二者都靠父级
+     flex 容器的 `margin-left: auto` 锚定到右缘。 */
   .jump-buttons {
     margin-left: auto;
     display: flex;

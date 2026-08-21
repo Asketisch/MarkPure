@@ -1,29 +1,22 @@
 /**
- * Vim mode (P2-7) — Tiptap extension wrapper.
+ * Vim 模式 —— Tiptap 扩展包装层。
  *
- * Wraps the pure ProseMirror plugin from
- * `frontend/src/plugins/vim/` in a Tiptap `Extension` and
- * exposes typed commands under the `vim.*` namespace.
+ * 把 `frontend/src/plugins/vim/` 中的纯 ProseMirror 插件包装成
+ * Tiptap `Extension`，并在 `vim.*` 命名空间下暴露类型化命令。
  *
- * The extension is the entry point for:
- *   - `Cmd+.` toggle (handled by the editor's `handleKeyDown`
- *     shim; this extension provides `toggleVimMode` for the
- *     command palette and IPC paths).
- *   - Ex command execution — listens for the
- *     `markpure:vim-ex` `CustomEvent` dispatched by the
- *     plugin and routes to `executeEx`.
- *   - `editor.commands.vimRedo()` — invoked by the plugin's
- *     Ctrl-R parser path.
+ * 本扩展是以下功能的入口：
+ *   - `Cmd+.` 开关（由编辑器的 `handleKeyDown` 垫片处理；本扩展
+ *     为命令面板与 IPC 路径提供 `toggleVimMode`）。
+ *   - ex 命令执行——监听插件派发的 `markpure:vim-ex`
+ *     `CustomEvent`，并路由到 `executeEx`。
+ *   - `editor.commands.vimRedo()` —— 由插件的 Ctrl-R 解析路径调用。
  *
- * Relationship with existing plugins:
- *   - P0-3 multi-cursor + P2-3 column-select still register
- *     as before. Vim's `handleDOMEvents.mousedown` is the
- *     single integration point: in NORMAL mode it consumes
- *     Alt+Click / Alt+Drag so the other plugins don't fire.
- *   - P0-8 undo tree picks up Vim ops as ordinary PM
- *     transactions; the tree grows normally.
- *   - The status bar subscribes via the global `currentView`
- *     ref's plugin key — see App.svelte.
+ * 与既有插件的关系：
+ *   - 多光标与列选择插件照常注册。Vim 的 `handleDOMEvents.mousedown`
+ *     是唯一的集成点：NORMAL 模式下它消费 Alt+点击 / Alt+拖拽，
+ *     使其他插件不会触发。
+ *   - 撤销树把 Vim 操作当作普通 PM 事务接收，树正常生长。
+ *   - 状态栏通过全局 `currentView` 引用的插件 key 订阅——见 App.svelte。
  */
 
 import { Extension } from '@tiptap/core'
@@ -36,10 +29,10 @@ import {
   type ExecContext,
 } from '../../plugins/vim'
 
-/** Module-level ex context. Set by App.svelte on mount. */
+/** 模块级 ex 上下文。由 App.svelte 挂载时设置。 */
 let _exCtx: ExecContext | null = null
 
-/** Register the ex execution context. Called by App.svelte. */
+/** 注册 ex 执行上下文。由 App.svelte 调用。 */
 export function setVimExContext(ctx: ExecContext): void {
   _exCtx = ctx
 }
@@ -48,9 +41,8 @@ export const VimExtension = Extension.create({
   name: 'vim',
 
   addCommands() {
-    // Tiptap's `addCommands` registry is closed; we escape with
-    // `as unknown as Record<...>` like the multi-cursor and
-    // undo-tree extensions do.
+    // Tiptap 的 `addCommands` 注册表是封闭的；与其他扩展一样，
+    // 用 `as unknown as Record<...>` 绕过类型限制。
     return {
       toggleVimMode: () => {
         const next = !isVimEnabled()
@@ -76,10 +68,9 @@ export const VimExtension = Extension.create({
   },
 
   onCreate() {
-    // Wire the ex event listener. The plugin dispatches a
-    // `markpure:vim-ex` CustomEvent on every `:w`/`:q`/etc.;
-    // we route it to `executeEx` and surface the result via
-    // a transient status-bar message.
+    // 接好 ex 事件监听器。插件在每次 `:w`/`:q` 等命令时派发
+    // `markpure:vim-ex` CustomEvent；这里把它路由到 `executeEx`，
+    // 结果通过一条临时的状态栏消息呈现。
     if (typeof window === 'undefined') return
     window.addEventListener('markpure:vim-ex', _onVimEx as EventListener)
   },
@@ -94,8 +85,8 @@ async function _onVimEx(evt: Event): Promise<void> {
   const e = evt as CustomEvent<{ cmd: ExCmd }>
   if (!e.detail || !_exCtx) return
   const result = await executeEx(e.detail.cmd, _exCtx)
-  // Surface the result via another CustomEvent that the
-  // App.svelte status bar can pick up.
+  // 再通过另一个 CustomEvent 把结果暴露出来，供 App.svelte
+  // 的状态栏接收。
   if (typeof window === 'undefined') return
   window.dispatchEvent(new CustomEvent('markpure:vim-ex-result', { detail: result }))
 }

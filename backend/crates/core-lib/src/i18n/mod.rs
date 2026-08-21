@@ -1,22 +1,17 @@
-//! Locale + translation registry.
+//! 语言环境与翻译表注册中心。
 //!
-//! At startup the renderer asks `get_locale_codes()` for the
-//! list of supported locales and `get_translations(code)` for
-//! the actual `key → value` map. We keep a [`OnceLock`]
-//! cache so the data is built once and reused across calls.
+//! 启动时渲染器通过 `get_locale_codes()` 获取受支持的语言环境列表，
+//! 通过 `get_translations(code)` 获取实际的 `key → value` 映射表。
+//! 我们使用 [`OnceLock`] 缓存，让数据只构建一次，跨多次调用复用。
 //!
-//! The actual translation tables live in per-locale modules
-//! (one file per language) so the data is split by language
-//! rather than by topic. To add a new key:
+//! 实际的翻译表放在按语言划分的模块中（每种语言一个文件），
+//! 这样数据按语言拆分而不是按主题拆分。要新增一个键：
 //!
-//!  1. Add the (key, value) pair to all three of
-//!     [`en`], [`zh_CN`], [`ja`].
-//!  2. If the key is brand-new, also document the new key
-//!     in `i18n.md` (or wherever the design lives).
+//!  1. 把 (key, value) 键值对同时加到 [`en`]、[`zh_CN`]、[`ja`] 三个模块。
+//!  2. 若这是全新的键，还要在 `i18n.md`（或设计文档所在处）中记录该键。
 //!
-//! Splitting by language keeps each file small and lets a
-//! translator work on a single language without seeing the
-//! other two cluttering their diff.
+//! 按语言拆分能让每个文件保持小巧，翻译者可以只处理一种语言，
+//! 不必看到另外两种语言干扰自己的 diff。
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -26,7 +21,7 @@ mod en;
 mod ja;
 mod zh_cn;
 
-// ============================== Types ==============================
+// ============================== 类型 ==============================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocaleConfig {
@@ -71,11 +66,10 @@ impl Locale {
     }
 }
 
-// ============================== Public API ==============================
+// ============================== 公共 API ==============================
 
-/// Build the list of every supported locale + its full
-/// translation table. Called from the cached initialiser in
-/// `get_translations`; not typically called directly.
+/// 构建所有受支持语言环境及其完整翻译表的列表。
+/// 由 `get_translations` 中的缓存初始化器调用，通常不直接调用。
 pub fn get_all_locales() -> Vec<Locale> {
     vec![
         Locale::new("en", "English").with_translations(en::ENTRIES),
@@ -84,8 +78,8 @@ pub fn get_all_locales() -> Vec<Locale> {
     ]
 }
 
-/// Return the available locale codes + human-readable names.
-/// Used by the renderer's `get_locale` IPC.
+/// 返回可用的语言环境代码及人类可读的名称。
+/// 供渲染器的 `get_locale` IPC 使用。
 pub fn get_locale_codes() -> Vec<(String, String)> {
     get_all_locales()
         .into_iter()
@@ -93,15 +87,13 @@ pub fn get_locale_codes() -> Vec<(String, String)> {
         .collect()
 }
 
-// Lazy cache so the heavy `get_all_locales()` walk only runs
-// on first call.
+// 懒缓存：让开销较大的 `get_all_locales()` 遍历只在首次调用时运行。
 static TRANSLATIONS_CACHE: OnceLock<HashMap<String, HashMap<String, String>>> =
     OnceLock::new();
 
-/// Return the translation map for `locale`. Falls back to
-/// English if the requested locale is unknown (e.g. the user
-/// typed a typo in the language picker). Returns an empty
-/// map only if even English is missing.
+/// 返回指定 `locale` 的翻译映射表。若请求的语言环境未知
+/// （例如用户在语言选择器中打错了字），则回退到英文。
+/// 仅当连英文都不存在时才返回空映射表。
 pub fn get_translations(locale: &str) -> HashMap<String, String> {
     let cache = TRANSLATIONS_CACHE.get_or_init(|| {
         let mut m = HashMap::new();
@@ -122,11 +114,9 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    /// Guards against the P11-style bug class: someone adds a key to
-    /// `en.rs` but forgets to mirror it into `zh_cn.rs` or `ja.rs`.
-    /// The renderer then silently falls back to displaying the raw
-    /// key as text, which is the symptom this regression test exists
-    /// to prevent.
+    /// 防止此类翻译键缺失 bug：有人向 `en.rs` 添加了键，却忘记
+    /// 同步到 `zh_cn.rs` 或 `ja.rs`。此时渲染器会静默回退，把原始键
+    /// 当作文本显示——本回归测试就是为了防止出现这种症状。
     #[test]
     fn all_locales_have_same_key_set() {
         let locales = get_all_locales();

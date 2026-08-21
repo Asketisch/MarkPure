@@ -1,13 +1,12 @@
 /**
- * Tiptap commands for the undo-tree plugin.
+ * 撤销树插件的 Tiptap 命令。
  *
- * These wrap the underlying ProseMirror transaction dispatch so
- * editor.commands.undoTree.<cmd> works from anywhere a Tiptap
- * editor is available. All commands are *idempotent*: if the
- * precondition fails (unknown id, would prune root, etc.) they
- * return `false` without dispatching.
+ * 这些命令包装底层的 ProseMirror 事务派发，让
+ * editor.commands.undoTree.<cmd> 在任意持有 Tiptap 编辑器的地方
+ * 可用。所有命令*幂等*：若前置条件不满足（未知 id、会剪掉根等），
+ * 它们返回 `false` 且不发事务。
  *
- * Dispatch contract:
+ * 派发约定：
  *   - `undoToBranch(id)`     → tr.replaceWith(...) + meta {type: 'switch'}
  *   - `labelBranch(id, l)`   → meta {type: 'label'}
  *   - `pruneBranch(id)`      → meta {type: 'prune'}
@@ -15,8 +14,8 @@
  *   - `goToParent()`         → meta {type: 'switch', toId: parent}
  *   - `goToChild(idx)`       → meta {type: 'switch', toId: child[idx]}
  *
- * The plugin's `apply` reads `tr.getMeta(undoTreePluginKey)` and
- * dispatches to the matching reducer in `state.ts`.
+ * 插件的 `apply` 读取 `tr.getMeta(undoTreePluginKey)`，并派发给
+ * `state.ts` 中对应的 reducer。
  */
 
 import type { Editor } from '@tiptap/core'
@@ -27,7 +26,7 @@ type DispatchMeta = {
   [k: string]: unknown
 }
 
-/** Send a single meta-only transaction (no doc change). */
+/** 发送一条仅含 meta 的事务（不改变文档）。 */
 function dispatchMeta(editor: Editor, meta: DispatchMeta): boolean {
   const { state, dispatch } = editor.view
   if (!dispatch) return true
@@ -38,11 +37,10 @@ function dispatchMeta(editor: Editor, meta: DispatchMeta): boolean {
 }
 
 /**
- * Replace the doc with the branch's snapshot and flip the
- * `isCurrent` path to that branch.
+ * 用分支的快照替换文档，并把 `isCurrent` 路径切到该分支。
  *
- * Behaviour matches the original stub: a single `tr.replaceWith`
- * so the user can PM-undo the restore as one event.
+ * 行为与原始桩一致：单次 `tr.replaceWith`，用户可以把这次恢复
+ * 当作一个事件用 PM-undo 撤销。
  */
 export function undoToBranch(branchId: string) {
   return ({ editor, state, dispatch }: {
@@ -65,25 +63,25 @@ export function undoToBranch(branchId: string) {
   }
 }
 
-/** Set a human-readable label on a node. No-op for unknown ids. */
+/** 给节点设置人类可读的标签。未知 id 为空操作。 */
 export function labelBranch(branchId: string, label: string) {
   return ({ editor }: { editor: Editor }): boolean =>
     dispatchMeta(editor, { type: 'label', id: branchId, label })
 }
 
-/** Remove a non-current branch and all its descendants. */
+/** 移除一个非当前分支及其全部后代。 */
 export function pruneBranch(branchId: string) {
   return ({ editor }: { editor: Editor }): boolean =>
     dispatchMeta(editor, { type: 'prune', id: branchId })
 }
 
-/** Toggle the collapsed flag on a node (UI-only state). */
+/** 切换节点的折叠标记（仅 UI 状态）。 */
 export function collapseSubtree(branchId: string, collapsed: boolean) {
   return ({ editor }: { editor: Editor }): boolean =>
     dispatchMeta(editor, { type: 'collapse', id: branchId, collapsed })
 }
 
-/** Navigate to the parent of the current node. No-op at the root. */
+/** 导航到当前节点的父节点。在根节点为空操作。 */
 export function goToParent() {
   return ({ editor, state }: { editor: Editor; state: import('@tiptap/pm/state').EditorState }): boolean => {
     const tree = undoTreePluginKey.getState(state) as UndoTreeState | undefined
@@ -93,7 +91,7 @@ export function goToParent() {
   }
 }
 
-/** Navigate to the nth child of the current node. */
+/** 导航到当前节点的第 n 个子节点。 */
 export function goToChild(index: number) {
   return ({ editor, state }: { editor: Editor; state: import('@tiptap/pm/state').EditorState }): boolean => {
     const tree = undoTreePluginKey.getState(state) as UndoTreeState | undefined

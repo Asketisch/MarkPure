@@ -1,14 +1,11 @@
 <script lang="ts">
   /**
-   * The top-of-window menu bar (File / Edit / View /
-   * Settings) plus the app-title and the "+" new-tab
-   * shortcut on the right.
+   * 窗口顶部的菜单栏（文件 / 编辑 / 视图 / 设置），加上应用标题与
+   * 右侧的“+”新建标签页按钮。
    *
-   * The bar owns its own open/close state per menu (file,
-   * edit, export submenu) — that's local UI plumbing, not
-   * anything the host should care about. The host only
-   * supplies the *actions* — open, save, undo, … — and
-   * the i18n lookup function.
+   * 菜单栏自己维护每个菜单（文件、编辑、导出子菜单）的开合状态——
+   * 这是本地 UI 管线，宿主无需关心。宿主只提供*动作*——打开、保存、
+   * 撤销……——以及 i18n 查找函数。
    */
   import { useI18n } from '$lib/stores/i18n.svelte'
 
@@ -43,16 +40,14 @@
     onOpen: () => void
     onSave: () => void
     onOpenWorkspace: () => void
-    // P2-4 multi-root: extra File menu items. Optional so
-    // the host can wire them up gradually; if absent the
-    // menu just hides the corresponding entry.
+    // 多根功能：额外的“文件”菜单项。设为可选，宿主可以逐步接入；
+    // 未提供时菜单只隐藏对应条目。
     onAddWorkspaceRoot?: () => void
     onRemoveWorkspaceRoot?: () => void
     onExportHtml: () => void
     onExportPdf: () => void
     onExportWord: () => void
-    // P1-8: PNG export. Same shape as the other onExport*
-    // handlers so the host wiring stays uniform.
+    // PNG 导出。与其他 onExport* 处理器同构，保证宿主接入方式统一。
     onExportPng: () => void
     onUndo: () => void
     onRedo: () => void
@@ -60,17 +55,13 @@
     onReplace: () => void
     onGlobalSearch: () => void
     onToggleSidebar: () => void
-    // P0-X: Typora-style per-panel toggles. The menu
-    // lists Sidebar / Tab Bar / Toolbar / Status Bar /
-    // Zen Mode so the user can claim vertical space
-    // without entering full-screen zen mode.
+    // 逐面板开关。菜单列出侧边栏 / 标签栏 / 工具栏 / 状态栏 /
+    // 禅模式，让用户不必进入全屏禅模式即可争取更多纵向空间。
     onToggleTabBar: () => void
     onToggleToolbar: () => void
     onToggleStatusBar: () => void
     onToggleZenMode: () => void
-    // P0-X: Typora-style "Collapse / Expand All
-    // Headings" pair. Wire to the App-level state
-    // toggle.
+    // “全部折叠 / 全部展开标题”一对命令。接入 App 级状态开关。
     onCollapseAllHeadings: () => void
     onExpandAllHeadings: () => void
     onOpenSettings: () => void
@@ -90,8 +81,8 @@
   function hideEditMenu() { showEditMenu = false }
   function hideViewMenu() { showViewMenu = false }
 
-  /// Close any open menu on `blur`. The 200ms timeout lets the
-  /// click on a menu item register before the menu unmounts.
+  /// `blur` 时关闭所有打开的菜单。200ms 超时让菜单项点击能在
+  /// 菜单卸载前被记录。
   function deferHide(hide: () => void) {
     setTimeout(hide, 200)
   }

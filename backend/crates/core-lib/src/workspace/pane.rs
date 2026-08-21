@@ -1,39 +1,36 @@
-//! Pane model: a single split-able editor area (with orientation
-//! and child pointer). Composed into `WorkspaceState`.
+//! 面板模型：单个可拆分（带方向与子面板指针）的编辑器区域，
+//! 由 `WorkspaceState` 组合管理。
 
 use serde::{Deserialize, Serialize};
 
-/// Represents the orientation of a pane split
+/// 表示面板拆分的方向
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Orientation {
     Horizontal,
+    #[default]
     Vertical,
 }
 
-impl Default for Orientation {
-    fn default() -> Self {
-        Orientation::Vertical
-    }
-}
 
-/// Represents a single pane in the workspace
+/// 表示工作区中的单个面板
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pane {
-    /// Unique identifier for the pane
+    /// 面板的唯一标识符
     pub id: String,
-    /// Document IDs open in this pane
+    /// 在此面板中打开的文档标识符列表
     pub doc_ids: Vec<String>,
-    /// Active document ID in this pane
+    /// 此面板中当前活动的文档标识符
     pub active_doc_id: Option<String>,
-    /// Split orientation (if this pane is split)
+    /// 拆分方向（若此面板被拆分）
     pub orientation: Option<Orientation>,
-    /// Size ratio (0.0 to 1.0)
+    /// 尺寸比例（0.0 到 1.0）
     pub size_ratio: f64,
-    /// Whether this pane is a leaf (no children)
+    /// 此面板是否为叶子节点（没有子面板）
     pub is_leaf: bool,
-    /// Child pane IDs (if this pane is a split group)
+    /// 子面板标识符（若此面板是一个拆分组）
     pub children: Option<[String; 2]>,
-    /// Parent pane ID
+    /// 父面板标识符
     pub parent_id: Option<String>,
 }
 

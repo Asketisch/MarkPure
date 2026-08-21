@@ -1,36 +1,34 @@
-//! Editor-related IPC handlers.
+//! 编辑器相关的 IPC 处理器。
 //!
-//! Topic: per-document analysis (outline, wikilinks, tags), the
-//! Rust-owned document registry (LRU), and the various
-//! markdown-extension helpers (mermaid, frontmatter, table,
-//! folding, pandoc-style task lists). Spell check lives here
-//! too because it's text-content analysis rather than
-//! workspace/config plumbing.
+//! 主题：文档级分析（大纲、双链、标签）、Rust 侧的文档注册表
+//! （LRU），以及各种 Markdown 扩展辅助（mermaid、frontmatter、
+//! 表格、折叠、pandoc 风格任务列表）。拼写检查也放在这里，
+//! 因为它属于文本内容分析，而不是工作区/配置管道。
 //!
-//! # Submodules
+//! # 子模块
 //!
-//! - [`doc_registry`] — LRU document registry, the 5 `doc_*` IPC
-//!   commands, and the P2-4 root-switch GC.
-//! - [`spellcheck`]   — NSSpellChecker dispatch (macOS only path).
-//! - [`markdown_ops`] — frontmatter / table / folds / pandoc task items.
+//! - [`doc_registry`] — LRU 文档注册表、5 个 `doc_*` IPC
+//!   命令，以及根目录切换时的 GC。
+//! - [`spellcheck`]   — NSSpellChecker 分发（仅 macOS 路径）。
+//! - [`markdown_ops`] — frontmatter / 表格 / 折叠 / pandoc 任务项。
 
 pub mod doc_registry;
 pub mod spellcheck;
 pub mod markdown_ops;
 
-// ============================== Outline / wikilinks / tags ==============================
+// ============================== 大纲 / 双链 / 标签 ==============================
 //
-// These don't need `AppState`; they only see the content string
-// the renderer passes in, so they live at the module root.
+// 这些处理器不需要 `AppState`；它们只处理渲染器传入的内容字符串，
+// 因此放在模块根级别。
 
-/// Extract the heading outline from markdown content.
+/// 从 Markdown 内容中提取标题大纲。
 pub fn cmd_get_outline(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
     let content = params["content"].as_str().unwrap_or("");
     let headings = markdown::extract_headings(content);
-    Ok(serde_json::to_value(headings).map_err(|e| e.to_string())?)
+    serde_json::to_value(headings).map_err(|e| e.to_string())
 }
 
-/// Extract `[[Wiki]]` / `[[Wiki|Alias]]` links from content.
+/// 从内容中提取 `[[Wiki]]` / `[[Wiki|别名]]` 链接。
 pub fn cmd_get_wikilinks(
     params: &serde_json::Value,
 ) -> std::result::Result<serde_json::Value, String> {
@@ -40,23 +38,22 @@ pub fn cmd_get_wikilinks(
         .into_iter()
         .map(|wl| serde_json::json!({ "page": wl.page, "alias": wl.alias }))
         .collect();
-    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }
 
-/// Extract `#tag` mentions from content.
+/// 从内容中提取 `#tag` 提及。
 pub fn cmd_get_tags(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
     let content = params["content"].as_str().unwrap_or("");
-    let tags = markdown::extract_tags(&content);
+    let tags = markdown::extract_tags(content);
     let result: Vec<serde_json::Value> = tags
         .into_iter()
         .map(|t| serde_json::json!({ "name": t.name, "start": t.start, "end": t.end }))
         .collect();
-    Ok(serde_json::to_value(result).map_err(|e| e.to_string())?)
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }
 
-// Re-export every `cmd_*` so existing call sites
-// (`editor_ops::cmd_foo`, the dispatch table) keep working
-// unchanged after the split.
+// 再导出所有 `cmd_*`，让现有调用点（`editor_ops::cmd_foo`、调度表）
+// 在拆分后无需改动即可继续工作。
 pub use doc_registry::*;
 pub use spellcheck::*;
 pub use markdown_ops::*;

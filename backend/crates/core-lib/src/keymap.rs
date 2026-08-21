@@ -2,17 +2,16 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-/// Default accelerator for "Toggle Zen Mode".
-/// On macOS the bare F11 is reserved by WKWebView/macOS itself
-/// (it triggers a system fullscreen transition that races with
-/// the in-page handler), so we use the macOS-conventional
-/// "Cmd+Ctrl+F" shortcut instead. Other platforms keep F11.
+/// 「切换专注模式」的默认快捷键。
+/// macOS 上裸 F11 被 WKWebView/macOS 本身占用（它会触发系统全屏
+/// 切换，与页内处理器竞争），因此改用 macOS 惯例的
+/// 「Cmd+Ctrl+F」。其他平台保持 F11。
 #[cfg(target_os = "macos")]
 const ZEN_MODE_ACCELERATOR: &str = "Cmd+Ctrl+F";
 #[cfg(not(target_os = "macos"))]
 const ZEN_MODE_ACCELERATOR: &str = "F11";
 
-/// Keyboard shortcut definition
+/// 键盘快捷键定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyBinding {
     pub id: String,
@@ -21,10 +20,10 @@ pub struct KeyBinding {
     pub accelerator: Option<String>,
 }
 
-/// Default keybindings for the editor
+/// 编辑器的默认快捷键
 pub fn default_keybindings() -> Vec<KeyBinding> {
     vec![
-        // File operations
+        // 文件操作
         KeyBinding {
             id: "file.new".into(),
             label: "New File".into(),
@@ -50,7 +49,7 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
             label: "Close Tab".into(),
             accelerator: Some("CmdOrCtrl+W".into()),
         },
-        // Edit operations
+        // 编辑操作
         KeyBinding {
             id: "edit.undo".into(),
             label: "Undo".into(),
@@ -71,10 +70,9 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
             label: "Find and Replace".into(),
             accelerator: Some("CmdOrCtrl+H".into()),
         },
-        // P0-3: multi-cursor bindings. Mod-d is the
-        // VSCode-style "select next occurrence" / Cmd+L
-        // adds all matches. Cmd+U undoes the last cursor
-        // add. Escape clears all secondary cursors.
+        // 多光标快捷键。Cmd+D 是「选择下一处出现」，Cmd+Shift+L
+        // 选中所有匹配，Cmd+U 撤销上一次光标添加，Escape 清除全部
+        // 副光标。
         KeyBinding {
             id: "edit.select_next_match".into(),
             label: "Select Next Match".into(),
@@ -95,13 +93,13 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
             label: "Clear Multi-Cursor".into(),
             accelerator: Some("Escape".into()),
         },
-        // View operations
+        // 视图操作
         KeyBinding {
             id: "view.toggle_sidebar".into(),
             label: "Toggle Sidebar".into(),
             accelerator: Some("CmdOrCtrl+B".into()),
         },
-        // P0-8: branching undo tree. Cmd+\ opens the panel.
+        // 分支撤销树。Cmd+\ 打开面板。
         KeyBinding {
             id: "view.toggle_undo_tree".into(),
             label: "Toggle Undo Tree Panel".into(),
@@ -132,26 +130,30 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
             label: "Toggle Zen Mode".into(),
             accelerator: Some(ZEN_MODE_ACCELERATOR.into()),
         },
-        // P2-7: Vim mode toggle. CmdOrCtrl+. is the standard
-        // "period after Cmd" binding — same as the Apple Script
-        // "quit with confirmation" mnemonic, but free in the
-        // editor since we don't ship Apple Script.
+        // Vim 模式开关。CmdOrCtrl+. 是「Cmd 加句号」的常见绑定——
+        // 与 Apple Script 的「确认退出」助记一致，但本编辑器不内置
+        // Apple Script，因此该组合键空闲可用。
         KeyBinding {
             id: "view.toggle_vim_mode".into(),
             label: "Toggle Vim Mode".into(),
             accelerator: Some("CmdOrCtrl+.".into()),
         },
-        // Workspace
+        // 工作区
         KeyBinding {
             id: "workspace.search".into(),
             label: "Workspace Search".into(),
             accelerator: Some("CmdOrCtrl+Shift+F".into()),
         },
-        // Formatting
+        // 格式化。`format.bold` 故意没有快捷键：Cmd/Ctrl+B 已被
+        // `view.toggle_sidebar` 占用（前端全局键位处理器硬编码了该
+        // 行为，菜单与快捷键面板也按此展示）。若这里再写一遍
+        // `CmdOrCtrl+B`，数据层面就是双重绑定，且编辑器聚焦时
+        // Tiptap 内置的 `Mod-b` 加粗会与侧栏切换同时触发。加粗仍
+        // 可通过工具栏按钮与 `**` 输入规则完成。
         KeyBinding {
             id: "format.bold".into(),
             label: "Bold".into(),
-            accelerator: Some("CmdOrCtrl+B".into()),
+            accelerator: None,
         },
         KeyBinding {
             id: "format.italic".into(),
@@ -171,7 +173,7 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
     ]
 }
 
-/// Get the keybindings file path
+/// 获取快捷键文件的路径
 pub fn keybindings_path() -> PathBuf {
     let config_dir = dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -180,7 +182,7 @@ pub fn keybindings_path() -> PathBuf {
     config_dir.join("keybindings.json")
 }
 
-/// Load custom keybindings from disk
+/// 从磁盘加载自定义快捷键
 pub fn load_keybindings() -> Vec<KeyBinding> {
     let path = keybindings_path();
     if !path.exists() {
@@ -192,25 +194,25 @@ pub fn load_keybindings() -> Vec<KeyBinding> {
     }
 }
 
-/// Save custom keybindings to disk
+/// 把自定义快捷键保存到磁盘
 pub fn save_keybindings(keybindings: &[KeyBinding]) -> Result<(), String> {
     let path = keybindings_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let content = serde_json::to_string_pretty(keybindings).map_err(|e| e.to_string())?;
-    fs::write(&path, content).map_err(|e| e.to_string())?;
+    crate::atomic::atomic_write(&path, &content).map_err(|e| e.to_string())?;
     Ok(())
 }
 
-/// Reset keybindings to default
+/// 把快捷键重置为默认值
 pub fn reset_keybindings() -> Result<Vec<KeyBinding>, String> {
     let defaults = default_keybindings();
     save_keybindings(&defaults)?;
     Ok(defaults)
 }
 
-/// Update a single keybinding
+/// 更新单个快捷键
 pub fn update_keybinding(id: &str, accelerator: Option<String>) -> Result<Vec<KeyBinding>, String> {
     let mut keybindings = load_keybindings();
     if let Some(binding) = keybindings.iter_mut().find(|b| b.id == id) {

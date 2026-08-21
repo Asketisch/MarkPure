@@ -1,11 +1,11 @@
 use crate::state::{lock_or_recover, AppState};
 use std::time::{SystemTime, UNIX_EPOCH};
 use mt_core::tab::{save_tabs, TabState, WindowTabs};
-// ============================== Tabs ==============================
+// ============================== 标签页 ==============================
 
 pub fn cmd_get_tabs(state: &AppState) -> std::result::Result<serde_json::Value, String> {
     let tabs = lock_or_recover(&state.tabs);
-    Ok(serde_json::to_value(tabs.as_slice()).map_err(|e| e.to_string())?)
+    serde_json::to_value(tabs.as_slice()).map_err(|e| e.to_string())
 }
 
 pub fn cmd_save_tabs(
@@ -20,7 +20,7 @@ pub fn cmd_save_tabs(
         *tabs = windows;
     }
 
-    // Persist to disk
+    // 持久化到磁盘
     let config_path = mt_core::AppConfig::config_path();
     let config_dir = config_path
         .parent()
@@ -56,9 +56,9 @@ pub fn cmd_tearoff_tab(
     Ok(serde_json::json!({ "window_id": window_id }))
 }
 
-/// Generate a stable but unique ID. We mix the wall-clock
-/// nanoseconds with a hash of the same value so two consecutive
-/// calls in the same nanosecond still produce different IDs.
+/// 生成稳定且唯一的标识符。将系统时钟的纳秒数与该值的哈希
+/// 混合在一起，这样同一纳秒内的连续两次调用
+/// 也会产生不同的标识符。
 fn generate_uuid() -> String {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)

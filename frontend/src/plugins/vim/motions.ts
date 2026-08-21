@@ -1,59 +1,76 @@
 /**
- * Motion implementations for the Vim mode plugin (P2-7).
+ * Vim 模式插件的 motion 实现。
  *
- * A motion is a pure function `(state, count) → Range` where
- * `Range = { from, to, inclusive }`. The plugin turns the
- * range into a PM transaction (cursor move, operator target,
- * or visual selection).
+ * motion 是纯函数 `(state, count) → Range`，其中
+ * `Range = { from, to, inclusive }`，`from`/`to` 都是 **PM 文档位置**。
+ * 插件把 range 转成 PM 事务（光标移动、操作符目标或可视选区）。
  *
- * Conventions:
- *   - `from < to` always. The plugin's `commands.ts` flips
- *     them if the operator wants exclusive deletion.
- *   - `inclusive: true` means the character at `to` IS part
- *     of the range (e.g. `f{x}`, `$`). `inclusive: false`
- *     means the range is the gap before `to` (e.g. `w`,
- *     `b`, `}`).
- *   - When a motion would move outside the document, the
- *     result is clamped to [0, doc.content.size]. This
- *     matches Vim's behaviour at file boundaries.
+ * 约定：
+ *   - `from` 始终是运动前的光标位置（`selection.head`）。向后运动
+ *     时 `to < from`；操作器需要排他/包含语义时由 `commands.ts`
+ *     或 `operators.ts` 的 `normaliseRange` 处理。
+ *   - `inclusive: true` 表示 `to` 处的字符属于范围之内
+ *     （例如 `f{x}`、`$`）。`inclusive: false` 表示范围是
+ *     `to` 之前的空隙（例如 `w`、`b`）。
+ *   - 当 motion 会移动到文档之外时，结果被钳制在
+ *     [0, doc.content.size] 内。
  *
- * V1 motion coverage (~18 of Vim's ~30 useful motions):
+ * **位置换算（重要）**：本文件里凡是需要"扁平文本下标"的算法
+ * （w/b/W/B/e、f/t、{{/}}、%、行级 j/k）都通过 `positions.ts` 的
+ * `textIndexForPos` / `posForTextIndex` 在 PM 文档位置与
+ * `textBetween(0, size, '\n', '\n')` 的下标之间换算。二者**不是一回事**：
+ * 文档里每个嵌套层级的开/闭位置各占 1 个文档位置，但不出现在扁平
+ * 文本中，直接拿文档位置当下标会系统性偏移。
+ *
+ * V1 的 motion 覆盖（Vim 大约 30 个常用 motion 中实现了约 18 个）：
  *   h j k l · w b e · W B E · 0 $ ^ · gg G · f F t T {char} · { } ( ) · %
  *
- * Out of scope (V2):
- *   - gj / gk (visual line up/down) — requires DOM coords
- *   - ge (word end backward) — currently a no-op fallback
- *   - H M L with screen-relative coords — already returns
- *     the doc start/middle/end as a stand-in
+ * 范围之外（V2）：
+ *   - gj / gk（可视行上/下移动）——j/k 用文档行近似
+ *   - ge（向后找词尾）——当前是不做任何事的兜底
+ *   - 基于屏幕相对坐标的 H M L——当前以文档开头 / 中间 / 结尾
+ *     作为占位实现
  */
 
 import type { EditorState } from '@tiptap/pm/state'
+import type { Node as PMNode } from '@tiptap/pm/model'
 import type { Motion } from './types'
+import { flatText, textIndexForPos, posForTextIndex } from './positions'
+import {
+  motionWordForward,
+  motionWordBackward,
+  motionWORDForward,
+  motionWORDBackward,
+  motionEndForward,
+  motionEndBackward,
+  motionFindChar,
+  motionParagraph,
+  motionSentence,
+  motionMatchingBracket,
+} from './word-motions'
 
-/** A range in the document. */
+/** 文档中的一个范围。`from`/`to` 为 PM 文档位置。 */
 export interface Range {
   from: number
   to: number
-  /** true ⇔ the char at `to` is part of the range. */
+  /** true ⇔ `to` 处的字符属于该范围。 */
   inclusive: boolean
 }
 
-const EMPTY_RANGE: Range = { from: 0, to: 0, inclusive: false }
-
 /* ------------------------------------------------------------------ *
- *  Public dispatch                                                    *
+ *  对外派发                                                            *
  * ------------------------------------------------------------------ */
 
 export function motionRange(state: EditorState, motion: Motion, count: number, char?: string): Range {
   const c = Math.max(1, count)
   switch (motion) {
-    // Basic left/right (single char, respects line boundaries).
+    // 基础左右移动（单字符，尊重行边界）。
     case 'left':            return motionLeft(state, c)
     case 'right':           return motionRight(state, c)
     case 'up':              return motionUp(state, c)
     case 'down':            return motionDown(state, c)
 
-    // Word-wise (Punctuation-aware via PM's word regex).
+    // 单词级（通过 PM 的词正则感知标点）。
     case 'wordForward':     return motionWordForward(state, c)
     case 'wordBackward':    return motionWordBackward(state, c)
     case 'WORDForward':     return motionWORDForward(state, c)
@@ -61,31 +78,31 @@ export function motionRange(state: EditorState, motion: Motion, count: number, c
     case 'endForward':      return motionEndForward(state, c)
     case 'endBackward':     return motionEndBackward(state, c)
 
-    // Line-wise.
+    // 行级。
     case 'lineStart':       return motionLineStart(state)
     case 'lineEnd':         return motionLineEnd(state)
     case 'firstNonBlank':   return motionFirstNonBlank(state)
 
-    // Document-wise.
+    // 文档级。
     case 'docStart':        return motionDocStart(state)
     case 'docEnd':          return motionDocEnd(state)
 
-    // Find char.
+    // 查找字符。
     case 'findChar':        return motionFindChar(state, char ?? '', c, 'forward', true)
     case 'findCharBack':    return motionFindChar(state, char ?? '', c, 'backward', true)
     case 'toChar':          return motionFindChar(state, char ?? '', c, 'forward', false)
     case 'toCharBack':      return motionFindChar(state, char ?? '', c, 'backward', false)
 
-    // Paragraph / sentence.
+    // 段落 / 句子。
     case 'paragraphForward': return motionParagraph(state, c, 'forward')
     case 'paragraphBackward':return motionParagraph(state, c, 'backward')
     case 'sentenceForward':  return motionSentence(state, c, 'forward')
     case 'sentenceBackward': return motionSentence(state, c, 'backward')
 
-    // Matching bracket.
+    // 匹配括号。
     case 'matchingBracket': return motionMatchingBracket(state)
 
-    // Screen (V1 stand-ins: top/middle/bottom of doc).
+    // 屏幕（V1 占位：文档顶 / 中 / 底部）。
     case 'screenTop':       return motionDocStart(state)
     case 'screenMiddle':    return motionScreenMiddle(state)
     case 'screenBottom':    return motionDocEnd(state)
@@ -93,213 +110,114 @@ export function motionRange(state: EditorState, motion: Motion, count: number, c
 }
 
 /* ------------------------------------------------------------------ *
- *  Basic motions                                                       *
+ *  基础 motion                                                         *
  * ------------------------------------------------------------------ */
+
+/** 光标所在视觉行的行首文本下标（行尾处的光标仍属于当前行）。 */
+function lineStartIndexFor(text: string, ti: number): number {
+  return text.lastIndexOf('\n', ti - 1) + 1
+}
+
+/** 光标所在视觉行的行尾空隙位置（最后一个字符之后）。 */
+function lineEndPosFor(doc: PMNode, text: string, ti: number): number {
+  const start = lineStartIndexFor(text, ti)
+  const end = text.indexOf('\n', start)
+  if (end < 0) return posForTextIndex(doc, text.length)
+  if (end === start) return posForTextIndex(doc, start) // 空行
+  const last = posForTextIndex(doc, end - 1)
+  // 行尾若是内联叶子（图片），`posForTextIndex` 已落在原子之后；
+  // 普通字符则需再步进一格才到行尾空隙。
+  return doc.resolve(last).nodeAfter ? last + 1 : last
+}
 
 function motionLeft(state: EditorState, count: number): Range {
   const head = state.selection.head
-  // Clamp to the line start so we don't cross into the previous line.
-  const $head = state.doc.resolve(head)
-  const lineStart = $head.start()
+  // 用视觉行（而非 PM 块边界）钳制到行首，这样多行块
+  // （如代码块）里的 h/l 也逐行受限。
+  const text = flatText(state.doc)
+  const lineStart = posForTextIndex(state.doc, lineStartIndexFor(text, textIndexForPos(state.doc, head)))
   const to = Math.max(lineStart, head - count)
   return { from: head, to, inclusive: true }
 }
 
 function motionRight(state: EditorState, count: number): Range {
   const head = state.selection.head
-  const $head = state.doc.resolve(head)
-  const lineEnd = $head.end()
-  const to = Math.min(lineEnd, head + count)
+  // 视觉行行尾（不跨行）。
+  const text = flatText(state.doc)
+  const to = Math.min(lineEndPosFor(state.doc, text, textIndexForPos(state.doc, head)), head + count)
   return { from: head, to, inclusive: true }
 }
 
 function motionUp(state: EditorState, count: number): Range {
-  // Without visual-line info we approximate: jump up to the same
-  // column on the previous line(s), clamped to line start.
+  // 用扁平文本找真实的上一行（而非块级 start()），这样多行
+  // 代码块内的 j/k 也能逐行移动。列也按视觉行计算。
   const head = state.selection.head
-  const $head = state.doc.resolve(head)
-  const col = head - $head.start()
-  let targetLineStart = $head.start()
+  const text = flatText(state.doc)
+  const ti = textIndexForPos(state.doc, head)
+  const col = ti - lineStartIndexFor(text, ti)
+  let lineStart = lineStartIndexFor(text, ti)
   for (let i = 0; i < count; i++) {
-    if (targetLineStart === 0) break
-    // Find the start of the previous line.
-    const prevLineEnd = targetLineStart - 1 // the \n before
-    if (prevLineEnd < 0) break
-    targetLineStart = state.doc.resolve(prevLineEnd).start()
+    if (lineStart === 0) break
+    // 上一行的行首 = 当前行首之前最后一个分隔符的再前一个位置
+    // （行首字符紧跟着分隔符，所以从 lineStart - 2 处找）。
+    const prevSep = text.lastIndexOf('\n', lineStart - 2)
+    lineStart = prevSep + 1
   }
-  const lineText = state.doc.textBetween(targetLineStart, state.doc.resolve(targetLineStart).end(), '\n', '\n')
+  const nextSep = text.indexOf('\n', lineStart)
+  const lineText = text.slice(lineStart, nextSep < 0 ? text.length : nextSep)
   const newCol = Math.min(col, lineText.length)
-  return { from: head, to: targetLineStart + newCol, inclusive: true }
+  return { from: head, to: posForTextIndex(state.doc, lineStart + newCol), inclusive: true }
 }
 
 function motionDown(state: EditorState, count: number): Range {
   const head = state.selection.head
-  const $head = state.doc.resolve(head)
-  const col = head - $head.start()
-  const docSize = state.doc.content.size
-  let targetLineStart = $head.end() + 1 // start of next line
+  const text = flatText(state.doc)
+  const ti = textIndexForPos(state.doc, head)
+  const col = ti - lineStartIndexFor(text, ti)
+  let lineStart = lineStartIndexFor(text, ti)
   for (let i = 0; i < count; i++) {
-    if (targetLineStart >= docSize) {
-      targetLineStart = docSize
-      break
-    }
-    targetLineStart = state.doc.resolve(targetLineStart).start()
-    // We need to know the END of THIS line so the next iteration
-    // can step to the line after. Recompute via resolve.
+    const nextSep = text.indexOf('\n', lineStart)
+    if (nextSep < 0) break // 已在最后一行
+    lineStart = nextSep + 1
   }
-  const $target = state.doc.resolve(Math.min(targetLineStart, docSize))
-  const lineEnd = $target.end()
-  const lineText = state.doc.textBetween($target.start(), lineEnd, '\n', '\n')
+  const nextSep = text.indexOf('\n', lineStart)
+  const lineText = text.slice(lineStart, nextSep < 0 ? text.length : nextSep)
   const newCol = Math.min(col, lineText.length)
-  return { from: head, to: $target.start() + newCol, inclusive: true }
+  return { from: head, to: posForTextIndex(state.doc, lineStart + newCol), inclusive: true }
 }
 
 /* ------------------------------------------------------------------ *
- *  Word motions                                                        *
- * ------------------------------------------------------------------ */
-
-const isWordChar = (c: string) => /[\w]/.test(c)
-
-/** Word boundary: returns true if `a` and `b` are in different
- *  Vim "word" classes (word-char vs non-word-char). */
-function wordClassBoundary(a: string | undefined, b: string | undefined): boolean {
-  if (a === undefined || b === undefined) return true
-  return isWordChar(a) !== isWordChar(b)
-}
-
-function motionWordForward(state: EditorState, count: number): Range {
-  const head = state.selection.head
-  const text = state.doc.textBetween(0, state.doc.content.size, '\n', '\n')
-  // We need the head's offset within the flat text — but state.doc
-  // is a tree. We approximate by walking the flat text from pos 0
-  // and finding the position that corresponds to `head`. This is
-  // O(doc.size) per call but V1 accepts the cost.
-  const docSize = state.doc.content.size
-  let pos = head
-  let i = 0
-  for (let k = 0; k < count; k++) {
-    if (pos >= docSize) return { from: head, to: pos, inclusive: false }
-    // Skip current word-class chars.
-    const a = text[pos] ?? ''
-    if (isWordChar(a)) {
-      while (pos < docSize && isWordChar(text[pos] ?? '')) pos++
-    } else {
-      while (pos < docSize && !isWordChar(text[pos] ?? '') && (text[pos] ?? '') !== '\n') pos++
-    }
-    // Skip trailing whitespace (single line; don't cross newlines).
-    while (pos < docSize && (text[pos] ?? '') === ' ') pos++
-    i = k
-  }
-  void i
-  return { from: head, to: pos, inclusive: false }
-}
-
-function motionWordBackward(state: EditorState, count: number): Range {
-  const head = state.selection.head
-  const text = state.doc.textBetween(0, state.doc.content.size, '\n', '\n')
-  const docSize = state.doc.content.size
-  let pos = head
-  for (let k = 0; k < count; k++) {
-    if (pos <= 0) return { from: head, to: pos, inclusive: false }
-    pos-- // step off current char
-    // Skip whitespace backward.
-    while (pos > 0 && (text[pos] ?? '') === ' ') pos--
-    if (isWordChar(text[pos] ?? '')) {
-      while (pos > 0 && isWordChar(text[pos - 1] ?? '')) pos--
-    } else {
-      while (pos > 0
-        && !isWordChar(text[pos - 1] ?? '')
-        && (text[pos - 1] ?? '') !== '\n') pos--
-    }
-  }
-  return { from: head, to: pos, inclusive: false }
-}
-
-function motionWORDForward(state: EditorState, count: number): Range {
-  // WORD = whitespace-separated (no punctuation awareness).
-  const head = state.selection.head
-  const text = state.doc.textBetween(0, state.doc.content.size, '\n', '\n')
-  const docSize = state.doc.content.size
-  let pos = head
-  for (let k = 0; k < count; k++) {
-    if (pos >= docSize) return { from: head, to: pos, inclusive: false }
-    const a = text[pos] ?? ''
-    if (a !== ' ' && a !== '\n') {
-      while (pos < docSize && (text[pos] ?? '') !== ' ' && (text[pos] ?? '') !== '\n') pos++
-    }
-    while (pos < docSize && (text[pos] ?? '') === ' ') pos++
-  }
-  return { from: head, to: pos, inclusive: false }
-}
-
-function motionWORDBackward(state: EditorState, count: number): Range {
-  const head = state.selection.head
-  const text = state.doc.textBetween(0, state.doc.content.size, '\n', '\n')
-  const docSize = state.doc.content.size
-  let pos = head
-  for (let k = 0; k < count; k++) {
-    if (pos <= 0) return { from: head, to: pos, inclusive: false }
-    pos--
-    while (pos > 0 && (text[pos] ?? '') === ' ') pos--
-    while (pos > 0 && (text[pos - 1] ?? '') !== ' ' && (text[pos - 1] ?? '') !== '\n') pos--
-  }
-  return { from: head, to: pos, inclusive: false }
-}
-
-function motionEndForward(state: EditorState, count: number): Range {
-  const head = state.selection.head
-  const text = state.doc.textBetween(0, state.doc.content.size, '\n', '\n')
-  const docSize = state.doc.content.size
-  let pos = head
-  for (let k = 0; k < count; k++) {
-    if (pos >= docSize - 1) return { from: head, to: pos + 1, inclusive: true }
-    pos++
-    if (isWordChar(text[pos] ?? '')) {
-      while (pos < docSize && isWordChar(text[pos] ?? '')) pos++
-      pos-- // `e` lands ON the last char
-    } else {
-      while (pos < docSize && !isWordChar(text[pos] ?? '') && (text[pos] ?? '') !== '\n') pos++
-      pos--
-    }
-    // Skip whitespace before next word.
-    while (pos < docSize - 1 && (text[pos + 1] ?? '') === ' ') pos++
-  }
-  return { from: head, to: pos, inclusive: true }
-}
-
-function motionEndBackward(state: EditorState, count: number): Range {
-  // V1 stub: not frequently used. Returns the current position.
-  void count
-  return { from: state.selection.head, to: state.selection.head, inclusive: true }
-}
-
-/* ------------------------------------------------------------------ *
- *  Line motions                                                        *
+ *  行 motion                                                            *
  * ------------------------------------------------------------------ */
 
 function motionLineStart(state: EditorState): Range {
   const head = state.selection.head
-  const $head = state.doc.resolve(head)
-  return { from: head, to: $head.start(), inclusive: false }
+  const text = flatText(state.doc)
+  const to = posForTextIndex(state.doc, lineStartIndexFor(text, textIndexForPos(state.doc, head)))
+  return { from: head, to, inclusive: false }
 }
 
 function motionLineEnd(state: EditorState): Range {
   const head = state.selection.head
-  const $head = state.doc.resolve(head)
-  return { from: head, to: $head.end(), inclusive: true }
+  const text = flatText(state.doc)
+  const to = lineEndPosFor(state.doc, text, textIndexForPos(state.doc, head))
+  return { from: head, to, inclusive: true }
 }
 
 function motionFirstNonBlank(state: EditorState): Range {
   const head = state.selection.head
-  const $head = state.doc.resolve(head)
-  const lineText = state.doc.textBetween($head.start(), $head.end(), '\n', '\n')
-  let i = 0
-  while (i < lineText.length && (lineText[i] === ' ' || lineText[i] === '\t')) i++
-  return { from: head, to: $head.start() + i, inclusive: false }
+  const text = flatText(state.doc)
+  const ti = textIndexForPos(state.doc, head)
+  const start = lineStartIndexFor(text, ti)
+  const end = text.indexOf('\n', start)
+  const lineEnd = end < 0 ? text.length : end
+  let i = start
+  while (i < lineEnd && (text[i] === ' ' || text[i] === '\t')) i++
+  return { from: head, to: posForTextIndex(state.doc, i), inclusive: false }
 }
 
 /* ------------------------------------------------------------------ *
- *  Document motions                                                    *
+ *  文档 motion                                                          *
  * ------------------------------------------------------------------ */
 
 function motionDocStart(state: EditorState): Range {
@@ -313,116 +231,4 @@ function motionDocEnd(state: EditorState): Range {
 function motionScreenMiddle(state: EditorState): Range {
   const size = state.doc.content.size
   return { from: state.selection.head, to: Math.floor(size / 2), inclusive: false }
-}
-
-/* ------------------------------------------------------------------ *
- *  Find char                                                           *
- * ------------------------------------------------------------------ */
-
-function motionFindChar(
-  state: EditorState,
-  char: string,
-  count: number,
-  dir: 'forward' | 'backward',
-  inclusive: boolean,
-): Range {
-  if (!char) return { from: state.selection.head, to: state.selection.head, inclusive }
-  const text = state.doc.textBetween(0, state.doc.content.size, '\n', '\n')
-  const head = state.selection.head
-  const step = dir === 'forward' ? 1 : -1
-  let pos = head + step
-  let found = 0
-  while (pos >= 0 && pos < text.length) {
-    if (text[pos] === char) {
-      found++
-      if (found === count) {
-        return { from: head, to: pos, inclusive }
-      }
-    }
-    pos += step
-  }
-  return { from: head, to: head, inclusive }
-}
-
-/* ------------------------------------------------------------------ *
- *  Paragraph / sentence                                                *
- * ------------------------------------------------------------------ */
-
-function motionParagraph(state: EditorState, count: number, dir: 'forward' | 'backward'): Range {
-  // V1: a paragraph is a run of non-blank lines. We walk
-  // blank-line-separated blocks.
-  const text = state.doc.textBetween(0, state.doc.content.size, '\n', '\n')
-  const head = state.selection.head
-  const lines = text.split('\n')
-  let charPos = 0
-  let curLine = 0
-  for (let i = 0; i < lines.length; i++) {
-    const lineLen = lines[i]!.length
-    if (head < charPos + lineLen + 1) { curLine = i; break }
-    charPos += lineLen + 1
-    curLine = i
-  }
-  const step = dir === 'forward' ? 1 : -1
-  let target = curLine
-  for (let k = 0; k < count; k++) {
-    if (dir === 'forward') {
-      // Skip current paragraph.
-      while (target < lines.length && (lines[target] ?? '').trim() !== '') target++
-      // Skip blank lines.
-      while (target < lines.length && (lines[target] ?? '').trim() === '') target++
-    } else {
-      // Skip current paragraph (going backward).
-      while (target > 0 && (lines[target] ?? '').trim() !== '') target--
-      // Skip blank lines.
-      while (target > 0 && (lines[target - 1] ?? '').trim() === '') target--
-    }
-  }
-  // Convert line index to char pos.
-  let cp = 0
-  for (let i = 0; i < target && i < lines.length; i++) cp += (lines[i] ?? '').length + 1
-  return { from: head, to: Math.min(cp, text.length), inclusive: false }
-  void state
-}
-
-function motionSentence(state: EditorState, count: number, dir: 'forward' | 'backward'): Range {
-  // V1 stub: sentence = same as paragraph. Real Vim uses
-  // punctuation heuristics (. ! ? followed by whitespace).
-  return motionParagraph(state, count, dir)
-}
-
-/* ------------------------------------------------------------------ *
- *  Matching bracket                                                    *
- * ------------------------------------------------------------------ */
-
-function motionMatchingBracket(state: EditorState): Range {
-  const head = state.selection.head
-  const text = state.doc.textBetween(0, state.doc.content.size, '\n', '\n')
-  const pairs: Record<string, string> = { '(': ')', '[': ']', '{': '}', ')': '(', ']': '[', '}': '{' }
-  const start = text[head] ?? text[head - 1] ?? ''
-  let open: string
-  let close: string
-  let dir: 1 | -1
-  if (start === '(' || start === '[' || start === '{') {
-    open = start
-    close = pairs[start]!
-    dir = 1
-  } else if (start === ')' || start === ']' || start === '}') {
-    open = start
-    close = pairs[start]!
-    dir = -1
-  } else {
-    // Cursor not on a bracket: no movement.
-    return EMPTY_RANGE
-  }
-  let depth = 0
-  let pos = head
-  while (pos >= 0 && pos < text.length) {
-    if (text[pos] === open) depth++
-    if (text[pos] === close) depth--
-    if (depth === 0 && pos !== head) {
-      return { from: head, to: pos, inclusive: true }
-    }
-    pos += dir
-  }
-  return { from: head, to: head, inclusive: true }
 }

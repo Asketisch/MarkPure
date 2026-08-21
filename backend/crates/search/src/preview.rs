@@ -1,86 +1,39 @@
-//! Search result preview generation
+//! 搜索结果预览生成
 //!
-//! Provides functionality to generate previews of search results with surrounding context.
+//! 提供生成带上下文搜索结果预览的功能。
 
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::io::Read;
 use std::path::PathBuf;
 
-/// Preview context around a search match
+/// 搜索匹配周围的预览上下文
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchPreview {
-    /// Full file path
+    /// 完整文件路径
     pub file_path: String,
-    /// Line number of the match (1-indexed)
+    /// 匹配所在行号（从 1 开始）
     pub line_number: usize,
-    /// Context lines before the match
+    /// 匹配之前的上下文行
     pub context_before: Vec<String>,
-    /// The matching line itself
+    /// 匹配行本身
     pub match_line: String,
-    /// Context lines after the match
+    /// 匹配之后的上下文行
     pub context_after: Vec<String>,
-    /// Total lines in the file
+    /// 文件总行数
     pub total_lines: usize,
-    /// Column where match starts
+    /// 匹配起始列
     pub match_start: usize,
-    /// Column where match ends
+    /// 匹配结束列
     pub match_end: usize,
 }
 
-impl SearchPreview {
-    pub fn new(
-        file_path: String,
-        line_number: usize,
-        context_before: Vec<String>,
-        match_line: String,
-        context_after: Vec<String>,
-        total_lines: usize,
-        match_start: usize,
-        match_end: usize,
-    ) -> Self {
-        Self {
-            file_path,
-            line_number,
-            context_before,
-            match_line,
-            context_after,
-            total_lines,
-            match_start,
-            match_end,
-        }
-    }
-}
-
-/// Read file content with encoding detection
-fn read_file_content(path: &PathBuf) -> Result<String, std::io::Error> {
-    let mut file = fs::File::open(path)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-
-    // Try UTF-8 first
-    if let Ok(content) = String::from_utf8(bytes.clone()) {
-        return Ok(content);
-    }
-
-    // Try GBK for Chinese files
-    let (decoded, _, had_errors) = encoding_rs::GBK.decode(&bytes);
-    if !had_errors {
-        return Ok(decoded.into_owned());
-    }
-
-    // Fallback to UTF-8 with lossy conversion
-    Ok(String::from_utf8_lossy(&bytes).into_owned())
-}
-
-/// Get a preview of a search match with surrounding context
+/// 获取搜索匹配及其周围上下文的预览
 ///
-/// # Arguments
-/// * `file_path` - Path to the file
-/// * `line` - Line number of the match (1-indexed)
-/// * `match_start` - Column where match starts (0-indexed)
-/// * `match_end` - Column where match ends (0-indexed)
-/// * `context` - Number of context lines before and after to include (default 3)
+/// # 参数
+/// * `file_path` - 文件路径
+/// * `line` - 匹配所在行号（从 1 开始）
+/// * `match_start` - 匹配起始列（从 0 开始）
+/// * `match_end` - 匹配结束列（从 0 开始）
+/// * `context` - 前后各包含多少行上下文（默认 3）
 pub fn get_search_preview(
     file_path: &str,
     line: usize,
@@ -89,7 +42,9 @@ pub fn get_search_preview(
     context: usize,
 ) -> Result<SearchPreview, String> {
     let path = PathBuf::from(file_path);
-    let content = read_file_content(&path).map_err(|e| e.to_string())?;
+    // 复用 crate 根部的编码检测读取（UTF-8 → GBK → lossy UTF-8），
+    // 避免两份读取逻辑漂移。
+    let content = super::read_file_content(&path).map_err(|e| e.to_string())?;
     let lines: Vec<&str> = content.lines().collect();
     let total_lines = lines.len();
 
@@ -98,50 +53,50 @@ pub fn get_search_preview(
         return Err("Line number out of range".to_string());
     }
 
-    // Get context before
+    // 获取上文
     let start_idx = line_idx.saturating_sub(context);
     let context_before: Vec<String> = lines[start_idx..line_idx]
         .iter()
         .map(|s| s.to_string())
         .collect();
 
-    // Get context after
+    // 获取下文
     let end_idx = (line_idx + context + 1).min(total_lines);
     let context_after: Vec<String> = lines[(line_idx + 1)..end_idx]
         .iter()
         .map(|s| s.to_string())
         .collect();
 
-    Ok(SearchPreview::new(
-        file_path.to_string(),
-        line,
+    Ok(SearchPreview {
+        file_path: file_path.to_string(),
+        line_number: line,
         context_before,
-        lines[line_idx].to_string(),
+        match_line: lines[line_idx].to_string(),
         context_after,
         total_lines,
         match_start,
         match_end,
-    ))
+    })
 }
 
-/// Get previews for multiple search matches in the same file
+/// 获取同一文件中多个搜索匹配的预览
 pub fn get_file_preview(
     file_path: &str,
-    matches: &[(usize, usize)], // (line, column) pairs
+    matches: &[(usize, usize)], // (行号, 列) 对
     context: usize,
 ) -> Vec<SearchPreview> {
     let mut previews = Vec::new();
 
-    // Group matches by line to avoid duplicate file reads
+    // 按行分组匹配，避免重复读文件
     let mut line_matches: std::collections::HashMap<usize, Vec<(usize, usize)>> =
         std::collections::HashMap::new();
 
     for &(line, col_start) in matches {
-        line_matches.entry(line).or_default().push((col_start, col_start + 1)); // Simplified
+        line_matches.entry(line).or_default().push((col_start, col_start + 1)); // 简化处理
     }
 
     for (line, cols) in line_matches {
-        // Use first column for preview, but note all matches
+        // 预览用第一列，但记录所有匹配
         let match_start = cols[0].0;
         let match_end = cols.iter().map(|(_, e)| *e).max().unwrap_or(match_start + 1);
 
@@ -159,16 +114,16 @@ mod tests {
 
     #[test]
     fn test_preview_structure() {
-        let preview = SearchPreview::new(
-            "/test/file.md".to_string(),
-            5,
-            vec!["line 4".to_string()],
-            "line 5 with match".to_string(),
-            vec!["line 6".to_string()],
-            10,
-            10,
-            16,
-        );
+        let preview = SearchPreview {
+            file_path: "/test/file.md".to_string(),
+            line_number: 5,
+            context_before: vec!["line 4".to_string()],
+            match_line: "line 5 with match".to_string(),
+            context_after: vec!["line 6".to_string()],
+            total_lines: 10,
+            match_start: 10,
+            match_end: 16,
+        };
 
         assert_eq!(preview.line_number, 5);
         assert_eq!(preview.context_before.len(), 1);

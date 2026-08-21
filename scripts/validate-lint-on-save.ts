@@ -1,21 +1,18 @@
 /**
- * Manual end-to-end validation for the P0-X "lint on
- * save" feature.
+ * “保存时整理”功能的端到端人工验证。
  *
- * The script invokes the Rust `lint_markdown` IPC handler
- * via a small standalone Rust binary
- * (`backend/crates/core-lib/examples/lint_cli.rs`) that
- * takes the input as a CLI argument and prints
- * `{content, report}` as JSON to stdout. The TypeScript
- * side asserts each rule's behaviour on a known-dirty
- * input so a regression in any of the three rules
- * (trim trailing whitespace, ensure final newline,
- * collapse 3+ blank lines into 2) is caught immediately.
+ * 脚本经由一个小的独立 Rust 二进制
+ * （`backend/crates/core-lib/examples/lint_cli.rs`）调用
+ * Rust 端的 `lint_markdown` IPC 处理器。该二进制把输入作为 CLI
+ * 参数，向 stdout 打印 `{content, report}` JSON。TypeScript 侧
+ * 在已知脏输入上断言每条规则的执行结果，这样三条规则
+ * （去除行尾空白、确保以换行结尾、将连续 3+ 个空行折叠为 2 个）
+ * 中任一条回归都能立刻被发现。
  *
- * Run via:
+ * 运行方式：
  *   cargo run -p mt_core --example lint_cli --quiet -- <input>
  *
- * Or build the binary once and pipe through it from CI.
+ * 或者先构建一次该二进制，再由 CI 通过管道输入。
  */
 import { spawnSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
@@ -35,13 +32,10 @@ interface LintResult {
   report: LintReport
 }
 
-/** Run the Rust example binary with `input` and return
- *  the parsed `{content, report}` JSON. */
+/** 用 `input` 运行 Rust 示例二进制，返回解析后的 `{content, report}` JSON。 */
 function runLint(input: string): LintResult {
-  // We invoke the pre-built binary directly instead of
-  // going through `cargo run` so the script stays under
-  // a second per case (cargo run takes ~1 min to relink
-  // the example on cold cache).
+  // 直接调用预构建的二进制而非 `cargo run`，让每个用例
+  // 控制在 1 秒以内（冷缓存时 cargo run 重新链接示例约需 1 分钟）。
   const bin = resolve(
     __dirname,
     '..',
@@ -60,7 +54,7 @@ function runLint(input: string): LintResult {
   return JSON.parse(lastLine) as LintResult
 }
 
-// ---- Test cases -----------------------------------------------------------
+// ---- 测试用例 -----------------------------------------------------------
 
 function assertEq<T>(label: string, got: T, expected: T): void {
   const gotStr = JSON.stringify(got)

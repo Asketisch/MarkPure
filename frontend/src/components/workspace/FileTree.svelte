@@ -1,14 +1,11 @@
 <script lang="ts">
   /**
-   * The file-tree pane: the recursive tree rendering. The host
-   * (WorkSpace) supplies the `tree`, `expandedDirs`,
-   * `selectedPath`, and the click / context-menu callbacks.
-   * The tree is filtered in the component so the host
-   * doesn't have to re-implement the matching logic.
+   * 文件树面板：递归的树渲染。宿主（WorkSpace）提供 `tree`、
+   * `expandedDirs`、`selectedPath` 以及点击 / 右键菜单回调。
+   * 树在组件内过滤，宿主不必重新实现匹配逻辑。
    *
-   * The show/hide-hidden toggle lives in the host's header
-   * (WorkSpace.svelte) — see `.workspace-header` and the
-   * `toggleHidden()` handler.
+   * 显示 / 隐藏隐藏文件的开关在宿主的页头（WorkSpace.svelte）——
+   * 见 `.workspace-header` 与 `toggleHidden()` 处理器。
    */
   import type { FileEntry } from '$lib/editor/commands'
   import { filterTree } from '$lib/fileTreeFilters'

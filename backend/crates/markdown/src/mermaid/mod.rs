@@ -1,26 +1,19 @@
-//! Mermaid diagram parsing, validation, rendering, and
-//! autocomplete suggestions.
+//! Mermaid 图表解析、校验、渲染与自动补全建议。
 //!
-//! The pipeline used to live in a single 620-line file. It is
-//! now split into focused submodules:
+//! 该流水线过去放在单个 620 行的文件里，现已拆分为职责明确的子模块：
 //!
-//! - [`types`] — `MermaidError`, `MermaidResult` and any other
-//!   cross-module data types.
-//! - [`validate`] — `validate_mermaid`, `are_brackets_balanced`,
-//!   `DiagramType`. Pure predicates, no I/O.
-//! - [`render`] — `mmdc` spawn + SVG/PNG cache. The biggest
-//!   file by far.
-//! - [`suggestions`] — the autocomplete catalogue used by the
-//!   editor's quick-insert popup.
+//! - [`types`] —— `MermaidError`、`MermaidResult` 以及其他跨模块数据类型。
+//! - [`validate`] —— `validate_mermaid`、`are_brackets_balanced`、
+//!   `DiagramType`。纯谓词，无 I/O。
+//! - [`render`] —— `mmdc` 进程调度 + SVG/PNG 缓存。目前最大的一块。
+//! - [`suggestions`] —— 编辑器快速插入弹窗使用的自动补全目录。
 //!
-//! `extract_mermaid_blocks` and `parse_mermaid` (the markdown-
-//! aware entry points) live in this `mod.rs` because they are
-//! short glue functions that span `validate` and the markdown
-//! parser events.
+//! `extract_mermaid_blocks` 和 `parse_mermaid`（感知 Markdown 的入口）
+//! 放在本 `mod.rs` 中，因为它们是串联 `validate` 与 markdown
+//! 解析事件的简短胶水函数。
 //!
-//! Public re-exports preserve the existing API surface
-//! (`markdown::MermaidResult`, `markdown::validate_mermaid`, …).
-//! IPC callers should not need to change.
+//! 公共再导出保持了现有 API 表面（`markdown::MermaidResult`、
+//! `markdown::validate_mermaid` 等）。IPC 调用方无需改动。
 
 pub mod render;
 pub mod suggestions;
@@ -34,12 +27,11 @@ pub use suggestions::{get_mermaid_suggestions, MermaidCompletion};
 pub use types::{MermaidError, MermaidResult};
 pub use validate::{are_brackets_balanced, validate_mermaid, DiagramType};
 
-/// Extract mermaid code blocks from markdown content.
-/// Returns `(line_number, code)` pairs in document order.
+/// 从 Markdown 内容中提取 mermaid 代码块。
+/// 按文档顺序返回 `(行号, 代码)` 对。
 ///
-/// Walks the markdown line-by-line, treating any fence whose
-/// info string is `mermaid` as the start of a mermaid block.
-/// The block ends at the next unadorned ` ``` ` fence.
+/// 逐行遍历 Markdown，把信息字符串为 `mermaid` 的围栏当作
+/// mermaid 块的开始，块在下一个不带语言标识的 ` ``` ` 围栏处结束。
 pub fn extract_mermaid_blocks(content: &str) -> Vec<(usize, String)> {
     let mut blocks: Vec<(usize, String)> = Vec::new();
     let mut in_block = false;
@@ -47,8 +39,7 @@ pub fn extract_mermaid_blocks(content: &str) -> Vec<(usize, String)> {
     let mut current_language = String::new();
     let mut code_content = String::new();
 
-    // 1-indexed line numbers — the first line of the document
-    // is `1`, matching how editors and grep report findings.
+    // 行号从 1 开始——文档第一行是 `1`，与编辑器和 grep 的报告方式一致。
     let mut line_number: usize = 0;
 
     for line in content.lines() {
@@ -76,10 +67,9 @@ pub fn extract_mermaid_blocks(content: &str) -> Vec<(usize, String)> {
     blocks
 }
 
-/// Parse mermaid code and return structured information.
-/// Combines the cheap validation predicates with a final
-/// `DiagramType` classification; the renderer is responsible
-/// for the actual SVG/PNG output.
+/// 解析 mermaid 代码并返回结构化信息。
+/// 把开销低的校验谓词与最终的 `DiagramType` 分类结合；
+/// 实际的 SVG/PNG 输出由渲染器负责。
 pub fn parse_mermaid(code: &str) -> Result<DiagramType, MermaidError> {
     if code.trim().is_empty() {
         return Err(MermaidError::InvalidSyntax("Empty mermaid code".to_string()));

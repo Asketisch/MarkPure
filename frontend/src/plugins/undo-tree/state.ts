@@ -1,42 +1,39 @@
 /**
- * Pure reducers for the branching undo tree (P0-8).
+ * 分支式撤销树的纯 reducer。
  *
- * The plugin's `apply(tr, prev)` is the single writer of
- * `UndoTreeState`. Each helper here:
- *   - takes the previous state + a transaction meta payload,
- *   - returns a new `UndoTreeState` (never mutates the input).
+ * 插件的 `apply(tr, prev)` 是 `UndoTreeState` 的唯一写入者。
+ * 本文件中的每个辅助函数：
+ *   - 接收上一个状态 + 一个事务 meta 载荷，
+ *   - 返回一个新的 `UndoTreeState`（绝不修改入参）。
  *
- * Splitting out these helpers lets:
- *   1. `apply` stay a small switch on `meta.type`.
- *   2. Unit tests exercise the reducer directly without booting
- *      an EditorView (see `scripts/validate-undo-tree.ts`).
+ * 把这些辅助函数拆出来可以：
+ *   1. 让 `apply` 保持为对 `meta.type` 的小型 switch。
+ *   2. 让单元测试无需启动 EditorView 即可直接测 reducer
+ *      （见 `scripts/validate-undo-tree.ts`）。
  *
- * Mutation strategy:
- *   - We rebuild `nodes` as a fresh `Record<string, BranchNode>`
- *     whenever any node changes.
- *   - We do NOT touch `state.doc`. The plugin only reads it via
- *     `getNewDoc()` (closure passed in by the plugin) when capturing
- *     a snapshot — that keeps this file free of `EditorState`
- *     imports.
+ * 变更策略：
+ *   - 只要有节点变化，就把 `nodes` 重建为一份全新的
+ *     `Record<string, BranchNode>`。
+ *   - 不触碰 `state.doc`。插件只在抓快照时通过
+ *     `getNewDoc()`（插件传进来的闭包）读取它——这样本文件
+ *     就不需要引入 `EditorState`。
  *
- * Tree semantics:
- *   - `currentId` always points to a leaf (the node the user can
- *     keep editing on). After `append`, `currentId` advances to
- *     the new node; the chain grows in depth, not breadth.
- *   - `applyAppend` produces a parent→child edge (not a sibling),
- *     so the natural tree shape is a chain. Sibling branches are
- *     created only by `applySwitch` + `applyAppend` (or by undo in
- *     PM's history followed by a new edit).
- *   - `applySwitch` MAY target an ancestor of the current leaf —
- *     this is a "truncate the path" operation, equivalent to
- *     undoing past that point. We don't reject it.
+ * 树语义：
+ *   - `currentId` 始终指向叶子（用户当前可以继续编辑的节点）。
+ *     执行 `append` 后，`currentId` 前进到新节点；链条朝纵深
+ *     生长，而不是横向扩展。
+ *   - `applyAppend` 产生的是父→子的边（不是兄弟边），因此树的
+ *     自然形态是一条链。兄弟分支只由 `applySwitch` + `applyAppend`
+ *     （或 PM history 撤销后再进行新编辑）创建。
+ *   - `applySwitch` 可以指向当前叶子的祖先——这是一种「截断
+ *     路径」的操作，等价于撤销到该点之前。我们不拒绝这种操作。
  */
 
 import { DecorationSet } from '@tiptap/pm/view'
 import { undoTreePluginKey, THROTTLE_MS, MAX_NODES_DEFAULT, type BranchNode, type UndoTreeState, type UndoTreeMeta } from './types'
 import { collectSubtree, getNode, isAncestor, nodeTextPreview } from './tree-utils'
 
-/** Empty-state factory. Used at plugin init. */
+/** 空状态工厂。插件初始化时使用。 */
 export function emptyState(maxNodes = MAX_NODES_DEFAULT): UndoTreeState {
   return {
     nodes: {},
@@ -48,7 +45,7 @@ export function emptyState(maxNodes = MAX_NODES_DEFAULT): UndoTreeState {
   }
 }
 
-/** Build the initial state with a single root node. */
+/** 用单个根节点构建初始状态。 */
 export function initState(
   doc: {
     toJSON: () => unknown
@@ -72,21 +69,19 @@ export function initState(
     rootId: 'b0',
     currentId: 'b0',
     maxNodes,
-    // b0 is allocated; the next id we hand out is b1.
+    // b0 已占用；下一个分配的 id 是 b1。
     nextId: 1,
     decorations: DecorationSet.empty,
   }
 }
 
 /**
- * Build the set of ids on the chain root → `tailId` (inclusive),
- * walking via `parentId`. Works even when `tailId` is a brand-new
- * id not yet in `state.nodes` — the caller provides the bridge via
- * `bridgeTo` (the parent the new node should attach to).
+ * 沿 `parentId` 从根节点走到 `tailId`（含），收集路径上所有 id。
+ * 即使 `tailId` 是尚未进入 `state.nodes` 的全新 id 也能工作——
+ * 调用方通过 `bridgeTo`（新节点将要挂载的父节点）提供桥梁。
  *
- * Uses a separate `seen` set for cycle detection so that the
- * `path` set can correctly accumulate both `tailId` and every
- * ancestor.
+ * 使用独立的 `seen` 集合做环检测，这样 `path` 集合才能同时
+ * 正确累积 `tailId` 与它的所有祖先。
  */
 function buildPath(
   state: UndoTreeState,
@@ -108,26 +103,25 @@ function buildPath(
   return path
 }
 
-/** Apply an `append` meta: append a new child to the current node.
- *  Honors the throttle window. Returns the new state. */
+/** 应用 `append` meta：给当前节点追加一个新子节点。
+ *  遵循节流窗口。返回新状态。 */
 export function applyAppend(
   prev: UndoTreeState,
   meta: Extract<UndoTreeMeta, { type: 'append' }>,
 ): UndoTreeState {
   const cur = prev.nodes[prev.currentId]
-  if (!cur) return prev // degenerate; should not happen
+  if (!cur) return prev // 异常情况，理论上不应发生
   const now = meta.timestamp ?? Date.now()
 
-  // Throttle: if the most recent child of `cur` was created within
-  // THROTTLE_MS, update it in place rather than allocating a new
-  // node. This prevents a typing burst from creating one node per
-  // keystroke. We deliberately *don't* throttle when `cur` has no
-  // children — that's the case for:
-  //   - the root (b0) at editor open — must always create b1;
-  //   - a leaf reached by `applySwitch` — must create a fresh child
-  //     so the pre-switch state is preserved as a checkpoint.
-  // Both cases are "fresh leaves": the user is starting a new edit,
-  // not typing in a burst.
+  // 节流：如果 `cur` 最近的子节点是在 THROTTLE_MS 内创建的，
+  // 就原地更新它，而不是分配新节点。这样可以防止连续打字时
+  // 每敲一个键就生成一个节点。当 `cur` 没有任何子节点时，
+  // 我们有意识地*不*节流，因为那对应下面两种情况：
+  //   - 编辑器刚打开时的根节点（b0）——必须创建 b1；
+  //   - 通过 `applySwitch` 到达的叶子——必须创建全新子节点，
+  //     这样切换前的状态才能作为检查点保留下来。
+  // 两种情况都是「新叶子」：用户刚开启一段新编辑，而不是在
+  // 连续输入。
   const latestChild = cur.childIds.length > 0
     ? prev.nodes[cur.childIds[cur.childIds.length - 1]]
     : null
@@ -144,7 +138,7 @@ export function applyAppend(
     }
   }
 
-  // Otherwise allocate a new child. New id is `b${nextId}`.
+  // 否则就分配一个新子节点。新 id 是 `b${nextId}`。
   const newId = `b${prev.nextId}`
   const newNode: BranchNode = {
     id: newId,
@@ -161,8 +155,8 @@ export function applyAppend(
     childIds: [...cur.childIds, newId],
     isCurrent: true,
   }
-  // Paint the path root → cur → newId. Build it manually since
-  // newId isn't in prev yet.
+  // 把根 → cur → newId 这条路径标成当前路径。新节点还不在
+  // prev 里，所以手动构建。
   const path = buildPath(prev, newId, cur.id)
   const out: Record<string, BranchNode> = {}
   for (const [idStr, n] of Object.entries(prev.nodes)) {
@@ -179,18 +173,17 @@ export function applyAppend(
   })
 }
 
-/** Apply a `switch` meta: move the `isCurrent` path to `toId`.
- *  Note: switching does NOT modify the doc — that's done outside
- *  the reducer by `tr.replaceWith`. The reducer only updates
- *  the tree topology. */
+/** 应用 `switch` meta：把 `isCurrent` 路径移动到 `toId`。
+ *  注意：切换并不会修改文档——那由 reducer 之外的
+ *  `tr.replaceWith` 完成。reducer 只更新树的拓扑结构。 */
 export function applySwitch(
   prev: UndoTreeState,
   meta: Extract<UndoTreeMeta, { type: 'switch' }>,
 ): UndoTreeState {
   if (!prev.nodes[meta.fromId] || !prev.nodes[meta.toId]) return prev
   if (meta.fromId === meta.toId) return prev
-  // Switching to an ancestor of `fromId` is allowed: it truncates
-  // the current path, equivalent to undoing past that point.
+  // 允许切换到 `fromId` 的祖先：这会截断当前路径，
+  // 等价于撤销到该点之前。
   return {
     ...prev,
     nodes: paintCurrentPathByWalking(prev, meta.toId),
@@ -198,9 +191,9 @@ export function applySwitch(
   }
 }
 
-/** Apply a `prune` meta: remove `id` and all its descendants.
- *  Refuses to prune the root, the current node, or any ancestor
- *  of the current node (would orphan the active branch). */
+/** 应用 `prune` meta：移除 `id` 及其全部后代。
+ *  拒绝剪除根节点、当前节点或当前节点的任何祖先
+ *  （否则会让活动分支失去父节点）。 */
 export function applyPrune(
   prev: UndoTreeState,
   meta: Extract<UndoTreeMeta, { type: 'prune' }>,
@@ -224,7 +217,7 @@ export function applyPrune(
   return { ...prev, nodes: updatedNodes }
 }
 
-/** Apply a `label` meta: set a custom label on a node. */
+/** 应用 `label` meta：给节点设置自定义标签。 */
 export function applyLabel(
   prev: UndoTreeState,
   meta: Extract<UndoTreeMeta, { type: 'label' }>,
@@ -237,7 +230,7 @@ export function applyLabel(
   }
 }
 
-/** Apply a `collapse` meta: set the collapsed flag on a node. */
+/** 应用 `collapse` meta：设置节点的折叠标志。 */
 export function applyCollapse(
   prev: UndoTreeState,
   meta: Extract<UndoTreeMeta, { type: 'collapse' }>,
@@ -250,7 +243,7 @@ export function applyCollapse(
   }
 }
 
-/** Reduce a transaction's meta against the previous state. */
+/** 用事务的 meta 对上一个状态做归约。 */
 export function applyUndoTreeMeta(
   prev: UndoTreeState,
   meta: UndoTreeMeta,
@@ -265,8 +258,8 @@ export function applyUndoTreeMeta(
 }
 
 /**
- * Walk from `targetId` up to root via parentId, collecting ids.
- * Returns a Record of all nodes with isCurrent flipped to match.
+ * 从 `targetId` 沿 parentId 向上走到根节点，收集路径上的 id。
+ * 返回所有节点的 Record，并把路径上节点的 isCurrent 置为 true。
  */
 function paintCurrentPathByWalking(
   state: UndoTreeState,
@@ -282,29 +275,28 @@ function paintCurrentPathByWalking(
 }
 
 /**
- * LRU trim: while the tree exceeds `maxNodes`, drop the oldest
- * non-current leaf. Refuses to touch the root, the current path,
- * or any non-leaf node. If no safe victim is found, breaks (the
- * cap is best-effort — see note in `gcLRU` tests).
+ * LRU 修剪：当树超过 `maxNodes` 时，丢弃最旧的、非当前的叶子。
+ * 绝不触碰根节点、当前路径或任何非叶子节点。如果找不到安全的
+ * 淘汰对象就停止（上限是尽力而为——参见 `gcLRU` 测试中的说明）。
  */
 export function gcLRU(state: UndoTreeState): UndoTreeState {
   let s = state
-  let safety = s.maxNodes + 10 // upper bound on iterations
+  let safety = s.maxNodes + 10 // 迭代次数的上限
   while (Object.keys(s.nodes).length > s.maxNodes && safety-- > 0) {
     let victim: string | null = null
     let oldestTs = Infinity
     for (const id of Object.keys(s.nodes)) {
       const node = s.nodes[id]
       if (!node) continue
-      if (id === s.rootId) continue // never trim the root
-      if (node.isCurrent) continue // never trim current path
-      if (node.childIds.length > 0) continue // not a leaf
+      if (id === s.rootId) continue // 绝不移除根节点
+      if (node.isCurrent) continue // 绝不移除当前路径
+      if (node.childIds.length > 0) continue // 不是叶子
       if (node.timestamp < oldestTs) {
         oldestTs = node.timestamp
         victim = id
       }
     }
-    if (!victim) break // nothing safe to drop
+    if (!victim) break // 没有可安全移除的对象
     const node = s.nodes[victim]
     if (!node) break
     const parent = node.parentId ? s.nodes[node.parentId] : null
@@ -324,11 +316,11 @@ export function gcLRU(state: UndoTreeState): UndoTreeState {
   return s
 }
 
-/** Helper for callers: get the current node. */
+/** 供调用方使用的辅助函数：获取当前节点。 */
 export function getCurrent(state: UndoTreeState): BranchNode | null {
   return getNode(state, state.currentId)
 }
 
-// Re-export the plugin key so callers that only import from
-// `state.ts` get the singleton.
+// 重新导出插件 key，让只从 `state.ts` 导入的调用方
+// 也能拿到这个单例。
 export { undoTreePluginKey }

@@ -1,11 +1,10 @@
-# MarkPure vs MarkText / Typora 差距分析 TODO
+# MarkPure 功能差距规划记录
 
 > **维护者**：开发团队
-> **对比对象**：MarkText（开源、IDE 风格）、Typora（付费、纯写作风格），以及行业惯例
 > **MarkPure 现状定位**：基于 Rust (wry + tao) + Svelte 5 + Tiptap 3 的桌面端 WYSIWYG Markdown 编辑器
-> **本文档目的**：识别 MarkPure 相对成熟竞品的差距，列出可执行的改进 TODO，每条含背景、现状、实现要点、参考实现、优先级和复杂度
+> **本文档目的**：记录 MarkPure 从功能差距立项到落地的过程，每条含背景、现状、实现要点、参考实现、优先级和复杂度。立项时以成熟编辑器的能力为基准，逐条补齐 MarkPure 的短板。
 >
-> **已实现功能请查阅**：[docs/FEATURES.md](./FEATURES.md)（详细清单）。本文档仅记录尚未实现的延期项。
+> **已实现功能请查阅**：[docs/FEATURES.md](./FEATURES.md)（详细清单）。本文档仅记录已关闭的差距项及其历史决策。
 
 ---
 
@@ -13,11 +12,11 @@
 
 ### 1.1 MarkPure 已具备的能力（一句话）
 
-Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown↔ProseMirror 转换、7 个内置主题 + 完整自定义主题编辑器、Rust 文档注册表（rope 副本）、工作区文件树 + 文件监视、多标签 + 书签 + 拼写检查（英文 + macOS CJK）、HTML/PDF/Word/PNG 四种导出、多根工作区、反链面板、标签面板、Slash Command、Zen 模式、Per-workspace CSS、Snippets、大文档虚拟化、多光标编辑（Alt+Click + Cmd+D + Cmd+Shift+L）、列选择（Alt+Drag）。
+Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown↔ProseMirror 转换、7 个内置主题 + 完整自定义主题编辑器、Rust 文档注册表（rope 副本）、工作区文件树 + 文件监视、多标签 + 书签 + 拼写检查（英文 + macOS CJK）、HTML/PDF/Word/PNG 四种导出、多根工作区、反链面板、标签面板、Slash Command、Zen 模式、Per-workspace CSS、Snippets、大文档虚拟化、多光标编辑（Alt+Click + Cmd+D + Cmd+Shift+L）、列选择（Alt+Drag）、Vim 模式。
 
-### 1.2 缺口统计
+### 1.2 差距统计
 
-> 最近更新：2026-06-17 — P2-7 Vim 模式已实现并落地（自研 mode FSM + 59/59 单元测试通过 + 状态栏芯片 + Cmd+. 切换）。所有 P0/P1/P2 差距项均已关闭。
+> 最近更新：2026-06-17 — Vim 模式已实现并落地（自研 mode FSM + 59/59 单元测试通过 + 状态栏芯片 + Cmd+. 切换）。所有 P0/P1/P2 差距项均已关闭。
 
 | 优先级 | 数量 | 说明 |
 |--------|------|------|
@@ -29,7 +28,7 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 ### 1.3 优先级定义
 
 - **P0**：用户高频使用场景缺失、不实现则影响核心体验（必须做）
-- **P1**：竞品均有、MarkPure 用户会期望但非必需（按季度规划）
+- **P1**：成熟编辑器均有、MarkPure 用户会期望但非必需（按季度规划）
 - **P2**：高级功能/小众需求，建议后期规划（按年规划）
 
 ### 1.4 复杂度定义
@@ -41,16 +40,16 @@ Tiptap 3 + CodeMirror 6 + KaTeX + Mermaid 的现代编辑栈、双向 Markdown�
 
 ---
 
-## 2. 编辑体验差距（Editing Experience）
+## 2. 编辑体验差距
 
 ### [P0-3] 真正的多光标编辑（Multi-Cursor）✅
 
-**状态**：✅ 已实现（2026-06-14，3 个 PR 全部落地）。核心 plugin 7 文件 + Alt+Click / Cmd+D / Cmd+Shift+L / Cmd+U / Esc / 输入 fan-out / Backspace-Delete fan-out / 单行粘贴 fan-out + StatusBar 指示器 + 4 处键位注册 + 4 条 i18n key（en/zh-CN/ja）+ 15/15 单元测试通过。详见 [docs/FEATURES.md#19-真正多光标编辑-multi-cursor-vscode-风格--p0-3-2026-06-14](./FEATURES.md)、`frontend/src/plugins/multi-cursor/` 和 `scripts/validate-multi-cursor.ts`。
+**状态**：✅ 已实现（2026-06-14，3 个 PR 全部落地）。核心 plugin 7 文件 + Alt+Click / Cmd+D / Cmd+Shift+L / Cmd+U / Esc / 输入 fan-out / Backspace-Delete fan-out / 单行粘贴 fan-out + StatusBar 指示器 + 4 处键位注册 + 4 条 i18n key（en/zh-CN/ja）+ 15/15 单元测试通过。详见 [docs/FEATURES.md](./FEATURES.md)、`frontend/src/plugins/multi-cursor/` 和 `scripts/validate-multi-cursor.ts`。
 
 **优先级**：P0 &nbsp;·&nbsp; **复杂度**：XL（已实现）
 
 **背景**（历史）：
-VSCode 风格的 Alt+Click 多光标、Cmd+D 选下个匹配并多光标编辑是程序员核心诉求。MarkText 已实现。MarkPure 原 Alt+Click 实际是单光标替换（源码注释承认）。
+Alt+Click 加光标、Cmd+D 选下个匹配并多光标编辑是程序员写代码/笔记的核心诉求。MarkPure 原 Alt+Click 实际是单光标替换（源码注释承认）。
 
 **原状**（已修复）：
 - 原 `frontend/src/plugins/multi-cursor.ts:1` 注释明确写：
@@ -68,8 +67,6 @@ VSCode 风格的 Alt+Click 多光标、Cmd+D 选下个匹配并多光标编辑�
 
 **参考实现**：
 - `prosemirror-multicursor` (npm，社区方案)
-- VSCode 选择模型文档
-- MarkText 源码
 
 ---
 
@@ -80,7 +77,7 @@ VSCode 风格的 Alt+Click 多光标、Cmd+D 选下个匹配并多光标编辑�
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：L（已实现）
 
 **背景**（历史）：
-VSCode Alt+Drag 选区、Sublime Text 列编辑是处理对齐文本的利器。
+矩形列选是处理对齐文本（表格、批量标注）的利器，是编辑器的常见能力。
 
 **原状**（已修复）：
 - 仅普通选择
@@ -95,13 +92,9 @@ VSCode Alt+Drag 选区、Sublime Text 列编辑是处理对齐文本的利器。
 - 边界：表格 cell / CodeBlock / 虚拟化隐藏块 / Alt 提前释放 / 64 上限 / dedup / Esc 取消 / Tab 切换清理 / 反向拖动 全部处理
 - **测试**：`npx tsx scripts/validate-column-select.ts` 20/20 通过
 
-**参考实现**：
-- VSCode 列选
-- Sublime Text 列编辑
-
 ---
 
-## 3. 文档与工作区差距（Documents & Workspace）
+## 3. 文档与工作区差距
 
 ### [P0-8] 真正的撤销树（Branching Undo Tree）✅
 
@@ -110,7 +103,7 @@ VSCode Alt+Drag 选区、Sublime Text 列编辑是处理对齐文本的利器。
 **优先级**：P0 &nbsp;·&nbsp; **复杂度**：XL（已实现）
 
 **背景**（历史）：
-VSCode Git Time Travel、JetBrains Local History、Emacs undo-tree 都是分支式历史。允许"撤销后切到分支修改不丢失"。
+分支式撤销历史（git 式时间旅行）允许"撤销后切到分支修改不丢失"，是高级编辑器重要的历史管理能力。
 
 **现状**：
 - `frontend/src/extensions/editing/undo-tree-extension.ts` 注释承认是 **snapshot 桩**：
@@ -120,20 +113,17 @@ VSCode Git Time Travel、JetBrains Local History、Emacs undo-tree 都是分支�
 
 **实现要点**：
 - 重写 `UndoTreeExtension`：基于 ProseMirror 历史栈 + fork 节点
-- 可视化：侧边栏或浮层显示树状图（参考 VSCode Git Graph）
+- 可视化：侧边栏或浮层显示树状图（参考主流编辑器的 git 历史视图）
 - 复杂：需要改造 transaction 管线以支持分支
-- **大量测试**（undo 边界、red boundary、分支切换时的状态同步）
+- **大量测试**（undo 边界、分支切换时的状态同步）
 - 配套 UI：树状图面板
 
 **参考实现**：
-- VSCode Git Time Travel
-- JetBrains Local History
-- Emacs undo-tree
 - ProseMirror 官方 changelog 模式
 
 ---
 
-## 4. 高级功能差距（Advanced / Power Features）
+## 4. 高级功能差距
 
 ### [P2-7] Vim / Emacs 模式 ✅
 
@@ -142,7 +132,7 @@ VSCode Git Time Travel、JetBrains Local History、Emacs undo-tree 都是分支�
 **优先级**：P2 &nbsp;·&nbsp; **复杂度**：XL（已实现）
 
 **背景**（历史）：
-VSCode / MarkText / Obsidian 都支持 Vim 模式。prosemirror-vim 社区包 2018 年后未维护，与 Tiptap 3 / PM 17 不兼容（与 P0-3 多光标 自研原因相同）。
+Vim 按键模式是高级用户的硬需求，成熟编辑器普遍支持。`prosemirror-vim` 社区包 2018 年后未维护，与 Tiptap 3 / PM 17 不兼容（与 P0-3 多光标自研原因相同）。
 
 **原状**（已修复）：
 - 之前仅有 `prosemirror-vim` 集成设想，状态延期
@@ -165,42 +155,21 @@ VSCode / MarkText / Obsidian 都支持 Vim 模式。prosemirror-vim 社区包 20
 
 **参考实现**：
 - `prosemirror-vim` 仓库（已不维护）
-- MarkText vim 模式
-- Obsidian Vim 插件
-- VSCode vim 扩展
 
 ---
 
 ## 5. 附录：参考链接
 
-### 5.1 竞品官方
-
-| 名称 | 链接 | 说明 |
-|------|------|------|
-| MarkText 官网 | https://marktext.app/ | 开源、IDE 风格 |
-| MarkText GitHub | https://github.com/marktext/marktext | 源码、issue 跟踪 |
-| MarkText 文档 | https://github.com/marktext/marktext/blob/develop/docs/README.md | 架构、设计文档 |
-| MarkText 主题 | https://github.com/marktext/marktext/tree/develop/src/renderer/theme | 主题文件 |
-| Typora 官网 | https://typora.io/ | 付费、纯写作风格 |
-| Typora 支持 | https://support.typora.io/ | 完整功能文档 |
-| Typora 主题 | https://support.typora.io/About-Themes/ | 主题开发指南 |
-| Typora 导出 | https://support.typora.io/Export-Options/ | 导出选项详解 |
-
-### 5.2 关键参考实现
+### 5.1 关键参考实现
 
 | 功能 | 项目 | 链接 |
 |------|------|------|
-| 反链 / TOC | Obsidian | https://help.obsidian.md/Plugins/Backlinks |
 | 多光标 | `prosemirror-multicursor` | https://github.com/sergei-melosh/prosemirror-multicursor（社区） |
 | Vim 模式 | `prosemirror-vim` | https://github.com/jiyinyiyong/prosemirror-vim |
 | BubbleMenu | Tiptap 官方 | https://tiptap.dev/docs/editor/api/extensions/bubble-menu |
 | 全套 Tiptap 扩展 | Tiptap 官方 | https://tiptap.dev/docs/editor/extensions/overview |
-| 模板 | Obsidian Templates | https://help.obsidian.md/Plugins/Templates |
-| Per-workspace CSS | Obsidian CSS Snippets | https://help.obsidian.md/Extending+Obsidian/CSS+snippets |
-| 反链实现 | Foam | https://foambubble.github.io/foam/ |
-| Multi-root | VSCode | https://code.visualstudio.com/docs/editor/multi-root-workspaces |
 
-### 5.3 Rust 库
+### 5.2 Rust 库
 
 | 用途 | 库 | 链接 |
 |------|-----|------|
@@ -211,16 +180,15 @@ VSCode / MarkText / Obsidian 都支持 Vim 模式。prosemirror-vim 社区包 20
 | 排版引擎 | `typst-as-lib` | https://crates.io/crates/typst-as-lib |
 | CJK 分词 | `jieba-rs` | https://crates.io/crates/jieba-rs |
 
-### 5.4 规范与标准
+### 5.3 规范与标准
 
 | 标准 | 链接 | 说明 |
 |------|------|------|
 | CommonMark | https://commonmark.org/ | Markdown 基础规范 |
-| GFM | https://github.github.com/gfm/ | GitHub Flavored Markdown |
 | Pandoc | https://pandoc.org/MANUAL.html | 多功能文档转换（脚注、定义列表等扩展参考） |
-| TextMate Snippets | https://macromates.com/manual/en/snippets | VSCode Snippets 兼容的规范 |
+| TextMate Snippets | https://macromates.com/manual/en/snippets | 片段引擎兼容的规范 |
 
-### 5.5 MarkPure 内部参考
+### 5.4 MarkPure 内部参考
 
 如需研究已实现功能的代码位置，详细清单见 [docs/FEATURES.md](./FEATURES.md) 的各条目「关键文件」字段。
 

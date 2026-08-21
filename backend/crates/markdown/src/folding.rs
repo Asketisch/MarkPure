@@ -1,28 +1,28 @@
-//! Markdown heading-based folding ranges
+//! 基于 Markdown 标题的折叠范围
 //!
-//! Provides functionality to compute and manage folding ranges based on markdown heading levels.
+//! 提供根据 Markdown 标题层级计算和管理折叠范围的功能。
 
 use serde::{Deserialize, Serialize};
 use crate::parser::{parse_markdown, Event, Tag, TagEnd, HeadingLevel};
 
-/// Represents a foldable range in a markdown document
+/// 表示 Markdown 文档中可折叠的范围
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FoldRange {
-    /// Start character position in the document
+    /// 文档中的起始字符位置
     pub from: usize,
-    /// End character position in the document
+    /// 文档中的结束字符位置
     pub to: usize,
-    /// Heading level (1-6)
+    /// 标题层级（1-6）
     pub level: u8,
-    /// Whether this range is currently collapsed
+    /// 该范围当前是否折叠
     pub is_collapsed: bool,
-    /// The heading text for display
+    /// 用于显示的标题文本
     pub heading_text: String,
-    /// Line number where this heading appears
+    /// 该标题所在的行号
     pub line_number: usize,
 }
 
-/// Internal tracking structure during heading scan
+/// 标题扫描期间的内部跟踪结构
 struct HeadingInfo {
     level: u8,
     start_pos: usize,
@@ -30,12 +30,12 @@ struct HeadingInfo {
     line_number: usize,
 }
 
-/// Compute all foldable ranges based on markdown headings
+/// 根据 Markdown 标题计算所有可折叠范围
 ///
-/// The algorithm:
-/// 1. Find all headings with their positions
-/// 2. For each heading, determine its fold range (until next same-or-higher level heading)
-/// 3. Return ranges that encompass more than just the heading line
+/// 算法：
+/// 1. 找出所有标题及其位置
+/// 2. 对每个标题确定其折叠范围（直到下一个同级或更高级的标题）
+/// 3. 返回不仅包含标题行自身的范围
 pub fn compute_folding_ranges(content: &str) -> Vec<FoldRange> {
     let events: Vec<Event> = parse_markdown(content);
 
@@ -67,8 +67,8 @@ pub fn compute_folding_ranges(content: &str) -> Vec<FoldRange> {
             }
             Event::End(TagEnd::Heading(_)) => {
                 if let Some(h) = current_heading.take() {
-                    // Only add headings that have content (foldable range)
-                    if !h.text.is_empty() || true {
+                    // 只添加有内容（可折叠范围）的标题
+                    if !h.text.is_empty() {
                         headings.push(h);
                     }
                 }
@@ -78,7 +78,7 @@ pub fn compute_folding_ranges(content: &str) -> Vec<FoldRange> {
                     if !h.text.is_empty() {
                         h.text.push(' ');
                     }
-                    h.text.push_str(&text);
+                    h.text.push_str(text);
                 }
             }
             Event::SoftBreak | Event::HardBreak => {
@@ -86,45 +86,45 @@ pub fn compute_folding_ranges(content: &str) -> Vec<FoldRange> {
                 line_number += 1;
             }
             _ => {
-                // Count other events as characters for offset tracking
-                // This is approximate but sufficient for rough position tracking
+                // 其他事件也计为字符以跟踪偏移。
+                // 这是近似值，但对粗略的位置跟踪足够。
             }
         }
 
-        // Track character offset roughly based on event types
+        // 基于事件类型粗略跟踪字符偏移
         match event {
             Event::Text(_) | Event::Code(_) | Event::Html(_) => {
-                // These add to char offset but we track line-based for now
+                // 这些会增加字符偏移，但目前按行跟踪
             }
             _ => {}
         }
     }
 
-    // Now compute fold ranges - each heading folds until next same-or-higher level
+    // 现在计算折叠范围——每个标题折叠到下一个同级或更高级标题
     let mut ranges: Vec<FoldRange> = Vec::new();
     let lines: Vec<&str> = content.lines().collect();
 
     for (i, heading) in headings.iter().enumerate() {
         let mut end_pos = content.len();
 
-        // Find the next heading at same or lower level
-        for j in (i + 1)..headings.len() {
-            if headings[j].level <= heading.level {
-                // Start of next heading is our end
-                end_pos = headings[j].start_pos;
+        // 找到下一个同级或更高级的标题
+        for next in headings.iter().skip(i + 1) {
+            if next.level <= heading.level {
+                // 下一个标题的开头就是我们的结束位置
+                end_pos = next.start_pos;
                 break;
             }
         }
 
-        // Calculate line-based end position
+        // 计算按行的结束位置
         let end_line = if end_pos == content.len() {
             lines.len()
         } else {
-            // Approximate: count newlines before end_pos
+            // 近似：统计 end_pos 之前的换行数
             content[..end_pos].chars().filter(|&c| c == '\n').count() + 1
         };
 
-        // Only create fold range if there's content between headings
+        // 只有标题之间存在内容时才创建折叠范围
         if end_line > heading.line_number + 1 {
             ranges.push(FoldRange {
                 from: heading.start_pos,
@@ -140,7 +140,7 @@ pub fn compute_folding_ranges(content: &str) -> Vec<FoldRange> {
     ranges
 }
 
-/// Toggle fold state for a specific range
+/// 切换特定范围的折叠状态
 pub fn toggle_fold(ranges: &mut [FoldRange], from: usize, to: usize) -> Option<bool> {
     for range in ranges.iter_mut() {
         if range.from == from && range.to == to {
@@ -151,18 +151,18 @@ pub fn toggle_fold(ranges: &mut [FoldRange], from: usize, to: usize) -> Option<b
     None
 }
 
-/// Get the visible range for a collapsed fold (what to show when collapsed)
+/// 获取折叠状态的可见范围（折叠时显示什么）
 pub fn get_collapsed_display_range(range: &FoldRange) -> (usize, usize) {
-    // Show only the heading line + first line of content
+    // 只显示标题行 + 内容首行
     (range.from, range.to)
 }
 
-/// Check if a position falls within a foldable range
+/// 判断某位置是否落在可折叠范围内
 pub fn position_in_range(pos: usize, range: &FoldRange) -> bool {
     pos >= range.from && pos < range.to
 }
 
-/// Get the parent fold range that contains a position
+/// 获取包含某位置的父级折叠范围
 pub fn get_parent_fold(pos: usize, ranges: &[FoldRange]) -> Option<usize> {
     let mut deepest = None;
     for (i, range) in ranges.iter().enumerate() {
@@ -170,7 +170,7 @@ pub fn get_parent_fold(pos: usize, ranges: &[FoldRange]) -> Option<usize> {
             match deepest {
                 None => deepest = Some(i),
                 Some(j) => {
-                    // Prefer the smaller (deeper nested) range
+                    // 优先选更小的（嵌套更深）范围
                     if ranges[j].to - ranges[j].from > range.to - range.from {
                         deepest = Some(i);
                     }
@@ -198,7 +198,7 @@ Content under heading 2
 # Another Heading 1
 "#;
         let ranges = compute_folding_ranges(md);
-        // Should have at least one foldable range
+        // 应至少有一个可折叠范围
         assert!(!ranges.is_empty());
     }
 
@@ -206,7 +206,7 @@ Content under heading 2
     fn test_compute_folding_ranges_empty() {
         let md = "# Just a heading";
         let ranges = compute_folding_ranges(md);
-        // Single heading with no content after shouldn't be foldable
+        // 后面没有内容的单个标题不应可折叠
         assert!(ranges.is_empty() || ranges.iter().all(|r| r.to == md.len()));
     }
 

@@ -1,29 +1,22 @@
-//! Frontmatter parsing and manipulation.
+//! Frontmatter 的解析与操作。
 //!
-//! Provides functionality to parse, validate, and manipulate
-//! YAML/TOML/JSON frontmatter commonly used in Markdown files
-//! for metadata.
+//! 提供对 Markdown 文件中常用的 YAML/TOML/JSON frontmatter
+//! 进行解析、校验与操作的功能。
 //!
-//! The implementation is split across a few submodules so each
-//! stays small enough to scan in one screen:
+//! 实现拆分到若干子模块中，每个都小到一屏能看完：
 //!
-//!   - [`types`]       — data structures (`Frontmatter`,
-//!                       `FrontmatterValue`, `FrontmatterError`,
-//!                       completions).
-//!   - [`bounds`]      — locate the start/end of a frontmatter
-//!                       block at the head of a document.
-//!   - [`parse`]       — format-specific parsers (YAML, TOML,
-//!                       JSON) and the [`parse_frontmatter`]
-//!                       dispatcher.
-//!   - [`validate`]    — [`validate_frontmatter`], the strict
-//!                       version of the parser that returns
-//!                       `FrontmatterError` on bad input.
-//!   - [`completions`] — per-format autocompletion suggestions.
-//!   - [`update`]      — [`update_frontmatter_field`], the
-//!                       editor's "edit a single value" entry
-//!                       point.
-//!   - [`render`]      — emit a [`Frontmatter`] back to its
-//!                       source format (YAML/TOML/JSON).
+//! - [`types`] —— 数据结构（`Frontmatter`、`FrontmatterValue`、
+//!   `FrontmatterError`、补全）。
+//! - [`bounds`] —— 定位文档头部 frontmatter 块的起止位置。
+//! - [`parse`] —— 各格式的解析器（YAML、TOML、JSON）以及
+//!   [`parse_frontmatter`] 分发器。
+//! - [`validate`] —— [`validate_frontmatter`] 是解析器的严格版，
+//!   遇到坏输入时返回 `FrontmatterError`。
+//! - [`completions`] —— 各格式的自动补全建议。
+//! - [`update`] —— [`update_frontmatter_field`]，编辑器的
+//!   「编辑单个值」入口。
+//! - [`render`] —— 把 [`Frontmatter`] 还原为源格式
+//!   （YAML/TOML/JSON）输出。
 
 mod bounds;
 mod completions;
@@ -33,10 +26,9 @@ mod types;
 mod update;
 mod validate;
 
-// Re-export everything callers expect under the `frontmatter::`
-// path. Without these, downstream code like
-// `markdown::frontmatter::FrontmatterCompletion` wouldn't
-// resolve (the type lives in `types.rs` now).
+// 在 `frontmatter::` 命名空间下再导出调用方期望的一切。
+// 没有这些导出，下游代码如 `markdown::frontmatter::FrontmatterCompletion`
+// 就无法解析（该类型现在位于 `types.rs`）。
 pub use types::{
     CompletionKind, Frontmatter, FrontmatterBounds, FrontmatterError, FrontmatterFormat,
     FrontmatterValue, FrontmatterCompletion,

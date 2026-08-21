@@ -1,21 +1,16 @@
 <script lang="ts">
   /**
-   * Multi-root workspace tabs (P2-4).
+   * 多根工作区标签页。
    *
-   * Renders a horizontal strip with one pill per
-   * `WorkspaceRoot`. The active root is visually distinct; a
-   * click on a non-active pill invokes
-   * `workspace.setActive(id)`, which on the Rust side drops
-   * the LRU docs that don't belong to the new active root.
+   * 渲染一条水平栏，每个 `WorkspaceRoot` 一个胶囊。当前根视觉上
+   * 突出；点击非当前胶囊会调用 `workspace.setActive(id)`，Rust 侧
+   * 会丢弃不属于新激活根的 LRU 文档。
    *
-   * The + button on the right opens a directory picker and
-   * adds the chosen folder as a new root. The × on each pill
-   * (visible on hover) removes that root.
+   * 右侧的 + 按钮打开目录选择器，把选中的文件夹作为新根加入。每个
+   * 胶囊上的 ×（悬停可见）移除该根。
    *
-   * This component is "thin" — it just reads from
-   * `useWorkspace()` and dispatches via the store. The
-   * eviction effect (closing matching tabs) lives in
-   * App.svelte, not here.
+   * 本组件很“薄”——只从 `useWorkspace()` 读取，并经 store 派发。
+   * 驱逐效果（关闭匹配的标签页）在 App.svelte，不在这里。
    */
   import { useI18n } from '$lib/stores/i18n.svelte'
   import { useWorkspace } from '$lib/stores/workspace.svelte'
@@ -33,12 +28,10 @@
       const path = await pickDirectory()
       if (!path) return
       const root = await workspace.addRoot(path)
-      // The `+` button means "open this folder" — the user
-      // expects the sidebar tree to switch to it. addRoot only
-      // sets the new root active when there was none before, so
-      // we explicitly switch here for subsequent adds. The mirror
-      // $effect in App.svelte then updates `workspacePath`, which
-      // triggers WorkSpace.svelte's loadTree.
+      // “+”按钮意味着“打开这个文件夹”——用户期望侧边栏树切过去。
+      // addRoot 只会在之前没有根时把新根设为激活，所以后续新增时
+      // 在这里显式切换。App.svelte 里的镜像 $effect 随后更新
+      // `workspacePath`，触发 WorkSpace.svelte 的 loadTree。
       if (root && workspace.activeId !== root.id) {
         await workspace.setActive(root.id)
       }

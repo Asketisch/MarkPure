@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-/// Get the platform-specific configuration directory.
+/// 获取平台对应的配置目录。
 ///
-/// - macOS: `~/Library/Application Support`
-/// - Windows: `%APPDATA%`
-/// - Linux: `$XDG_CONFIG_HOME` or `~/.config`
+/// - macOS：`~/Library/Application Support`
+/// - Windows：`%APPDATA%`
+/// - Linux：`$XDG_CONFIG_HOME` 或 `~/.config`
 pub fn config_dir() -> Option<PathBuf> {
     if cfg!(target_os = "macos") {
         home_dir().map(|h| h.join("Library").join("Application Support"))
@@ -18,10 +18,10 @@ pub fn config_dir() -> Option<PathBuf> {
     }
 }
 
-/// Get the user's home directory.
+/// 获取用户的主目录。
 ///
-/// - macOS/Linux: `$HOME`
-/// - Windows: `%USERPROFILE%` or `%HOMEDRIVE%%HOMEPATH%`
+/// - macOS/Linux：`$HOME`
+/// - Windows：`%USERPROFILE%` 或 `%HOMEDRIVE%%HOMEPATH%`
 pub fn home_dir() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
@@ -41,7 +41,7 @@ pub fn home_dir() -> Option<PathBuf> {
     }
 }
 
-/// Get the application config directory (`markpure`).
+/// 获取应用配置目录（`markpure`）。
 pub fn app_config_dir() -> Option<PathBuf> {
     config_dir().map(|d| d.join("markpure"))
 }

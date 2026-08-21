@@ -1,22 +1,19 @@
 /**
- * Lightweight sanity check for the P1-8 PNG export pipeline.
+ * PNG 导出管线的轻量校验。
  *
- * Run with:
+ * 运行方式：
  *
  *   npx tsx scripts/validate-png-export.ts
  *
- * The export has three layers:
- *   - `commands/pngExport.ts` (theme serialisation, DOM snapshot)
- *   - `commands/export.ts:exportPng` (IPC wrapper)
- *   - `apps/desktop/src/export_ops.rs:cmd_export_png` (Rust sink)
+ * 导出共三层：
+ *   - `commands/pngExport.ts`（主题序列化、DOM 快照）
+ *   - `commands/export.ts:exportPng`（IPC 封装）
+ *   - `apps/desktop/src/export_ops.rs:cmd_export_png`（Rust 落盘）
  *
- * The DOM snapshot itself depends on a live browser environment
- * (Tiptap, KaTeX, Mermaid, CodeMirror), so it's exercised by the
- * manual E2E checklist in the plan rather than this script. What
- * we *can* validate here is the data-shape contract that the
- * two halves of the IPC handshake rely on: the base64 transport
- * format and the byte-level signatures that the Rust sink checks
- * for before persisting to disk.
+ * DOM 快照本身依赖真实浏览器环境（Tiptap、KaTeX、Mermaid、
+ * CodeMirror），由计划中的手工 E2E 清单覆盖，而非本脚本。
+ * 这里能验证的是 IPC 握手两侧依赖的数据形状契约：base64
+ * 传输格式，以及 Rust 落盘前检查的字节级签名。
  */
 
 import test from 'node:test'
@@ -24,17 +21,16 @@ import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { readFileSync } from 'node:fs'
 
-// ----- transport-shape checks (mirror Rust expectations) -----
+// ----- 传输形状检查（镜像 Rust 侧的预期） -----
 
 test('Rust sink accepts raw base64 without data URI prefix', () => {
-  // Build a minimal valid PNG byte stream (1×1 transparent,
-  // 67 bytes) and round-trip it through the same logic the
-  // Rust handler runs: strip `data:image/png;base64,` if
-  // present, then base64-decode.
+  // 构造一个最小的合法 PNG 字节流（1×1 透明、67 字节），
+  // 按 Rust 处理器的逻辑做往返：先剥掉 `data:image/png;base64,`
+  // 前缀（若存在），再 base64 解码。
   const png = makeTransparentPng()
   const b64 = png.toString('base64')
 
-  // Two encodings we accept on the wire:
+  // 线上两种编码都接受：
   const transportRaw = b64
   const transportPrefixed = `data:image/png;base64,${b64}`
 
@@ -44,7 +40,7 @@ test('Rust sink accepts raw base64 without data URI prefix', () => {
       : wire
     const decoded = Buffer.from(stripped, 'base64')
     assert.equal(decoded.length, png.length, 'round-trip length')
-    // PNG signature: \x89PNG\r\n\x1a\n
+    // PNG 签名：\x89PNG\r\n\x1a\n
     assert.deepEqual(
       Array.from(decoded.subarray(0, 8)),
       [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
@@ -54,10 +50,9 @@ test('Rust sink accepts raw base64 without data URI prefix', () => {
 })
 
 test('empty payload is rejected by the Rust sink', () => {
-  // The Rust side rejects payloads shorter than 8 bytes
-  // (the PNG signature itself is 8 bytes). Mirror the check
-  // here so we can be confident any frontend regression that
-  // sends an empty data URL surfaces immediately.
+  // Rust 侧拒绝短于 8 字节的负载（PNG 签名本身就是 8 字节）。
+  // 在这里镜像同一检查，确保任何发送空 data URL 的前端回归
+  // 能立即暴露。
   const truncated = Buffer.from([0x89, 0x50, 0x4e, 0x47])
   assert.ok(
     truncated.length < 8,
@@ -66,12 +61,10 @@ test('empty payload is rejected by the Rust sink', () => {
 })
 
 test('theme serialiser produces valid CSS block', () => {
-  // The active-theme serialiser emits a `:root { … }` block
-  // that downstream code concatenates into the standalone HTML
-  // export. We don't run the DOM here (no jsdom in the
-  // project) but we *do* verify the data-shape contract: the
-  // CSS variables the Rust side expects are exactly the ones
-  // declared in `app.css`.
+  // 当前主题序列化器输出 `:root { … }` 块，下游代码把它拼进
+  // 独立 HTML 导出。这里不跑 DOM（项目里没有 jsdom），
+  // 但确实验证了数据形状契约：Rust 侧期望的 CSS 变量与
+  // `app.css` 中声明的完全一致。
   const expectedVars = [
     '--bg',
     '--bg-secondary',
@@ -82,9 +75,8 @@ test('theme serialiser produces valid CSS block', () => {
     '--editor-font-family',
     '--editor-font-size',
   ]
-  // We can't import the function directly because it touches
-  // `document` at module scope; verify the contract by reading
-  // the source instead.
+  // 该函数在模块作用域触碰 `document`，无法直接导入；
+  // 改为读取源码来验证契约。
   const src = readFileSync(
     'frontend/src/editor/commands/pngExport.ts',
     'utf-8',
@@ -97,12 +89,11 @@ test('theme serialiser produces valid CSS block', () => {
   }
 })
 
-// ----- helpers -----
+// ----- 辅助函数 -----
 
 /**
- * Build a 1×1 transparent PNG byte stream. Same fixture the
- * Rust unit tests use (see `crates/export/src/png.rs`).
- * 67 bytes total.
+ * 构造 1×1 透明 PNG 字节流。与 Rust 单元测试使用同一
+ * 夹具（见 `crates/export/src/png.rs`），共 67 字节。
  */
 function makeTransparentPng(): Buffer {
   return Buffer.from([

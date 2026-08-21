@@ -1,6 +1,6 @@
 /**
- * Quick insert command definitions
- * Quick insert config
+ * 快速插入命令定义
+ * 快速插入配置
  */
 
 export interface QuickInsertItem {
@@ -18,7 +18,7 @@ const ALT = navigator.platform.includes('Mac') ? '⌥' : 'Alt'
 const SHIFT = navigator.platform.includes('Mac') ? '⇧' : 'Shift'
 
 export const quickInsertItems: QuickInsertItem[] = [
-  // Basic blocks
+  // 基础块
   {
     title: 'Paragraph',
     subtitle: 'Plain text paragraph',
@@ -38,7 +38,7 @@ export const quickInsertItems: QuickInsertItem[] = [
     action: (c) => c.setHorizontalRule(),
   },
 
-  // Headers
+  // 标题
   {
     title: 'Heading 1',
     subtitle: '# Heading',
@@ -94,7 +94,7 @@ export const quickInsertItems: QuickInsertItem[] = [
     action: (c) => c.toggleHeading({ level: 6 }),
   },
 
-  // Advanced blocks
+  // 高级块
   {
     title: 'Code Block',
     subtitle: '```language ... ```',
@@ -140,12 +140,10 @@ export const quickInsertItems: QuickInsertItem[] = [
     action: (c) => c.insertMermaid(),
   },
   {
-    // P2-8: PlantUML block. We currently insert a fenced
-    // ```plantuml code block (mirroring mermaid). A future
-    // addition is a PlantUML nodeview that previews the
-    // rendered diagram via a PlantUML server or jar; the
-    // fenced block round-trips through the markdown export
-    // pipeline unchanged.
+    // PlantUML 块。当前插入一个围栏 ```plantuml 代码块
+    // （与 mermaid 对应）。未来会新增一个 PlantUML 节点视图，
+    // 通过 PlantUML 服务器或 jar 预览渲染出的图表；围栏块仍不经
+    // 改动地从 markdown 导出管线往返。
     title: 'PlantUML Diagram',
     subtitle: '@startuml\n  A --> B\n@enduml',
     label: 'plantuml',
@@ -174,7 +172,7 @@ export const quickInsertItems: QuickInsertItem[] = [
     action: (c) => c.insertFootnoteRef?.() ?? c.insertContent('[^1]'),
   },
 
-  // Lists
+  // 列表
   {
     title: 'Bullet List',
     subtitle: '- List item',
@@ -203,32 +201,35 @@ export const quickInsertItems: QuickInsertItem[] = [
     action: (c) => c.toggleTaskList(),
   },
 
-  // Inline
+  // 行内
   {
+    // wry WebView 不实现 window.prompt（静默返回 null），所以经
+    // CustomEvent 交给宿主：图片复用工具栏的文件选择器管线
+    // （保存到工作区 + 插入图片节点，走 IPC）。
     title: 'Image',
     subtitle: '![alt](url)',
     label: 'image',
     category: 'Insert',
     icon: '🖼',
-    action: (c) => {
-      const url = window.prompt('Image URL:')
-      if (url) c.setImage({ src: url })
+    action: () => {
+      window.dispatchEvent(new CustomEvent('mt:quick-insert-image'))
     },
   },
   {
+    // 链接 URL 由宿主的应用内对话框输入（见 windowEvents.ts 的
+    // mt:quick-insert-link 监听器），确认后调用 setLink。
     title: 'Link',
     subtitle: '[text](url)',
     label: 'link',
     category: 'Insert',
     icon: '🔗',
-    action: (c) => {
-      const url = window.prompt('Link URL:')
-      if (url) c.setLink({ href: url })
+    action: () => {
+      window.dispatchEvent(new CustomEvent('mt:quick-insert-link'))
     },
   },
 ]
 
-/** Fuzzy-search items by query */
+/** 按查询模糊搜索条目 */
 export function searchQuickInsert(query: string): QuickInsertItem[] {
   if (!query) return quickInsertItems
   const q = query.toLowerCase()

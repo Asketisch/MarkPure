@@ -31,5 +31,5 @@ pub fn cmd_get_translations(
 ) -> std::result::Result<serde_json::Value, String> {
     let lang = params["lang"].as_str().unwrap_or("en");
     let translations = mt_core::i18n::get_translations(lang);
-    Ok(serde_json::to_value(translations).map_err(|e| e.to_string())?)
+    serde_json::to_value(translations).map_err(|e| e.to_string())
 }

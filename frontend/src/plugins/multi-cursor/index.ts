@@ -1,16 +1,15 @@
 /**
- * Public entry point for the multi-cursor plugin.
+ * 多光标插件的对外入口。
  *
- * Exports:
- *   - `createMultiCursorPlugin`  — the ProseMirror plugin
- *   - `multiCursorPluginKey`     — read state from outside
- *   - `createColumnSelectPlugin` — P2-3 Alt+Drag column selection
- *   - `columnSelectPluginKey`    — read drag state from outside
+ * 导出内容：
+ *   - `createMultiCursorPlugin`  — ProseMirror 插件本体
+ *   - `multiCursorPluginKey`     — 供外部读取插件状态
+ *   - `createColumnSelectPlugin` — Alt+拖拽的列选择插件
+ *   - `columnSelectPluginKey`    — 供外部读取拖拽状态
  *
- * Tiptap commands and keybindings live in
- * `extensions/editing/multi-cursor-extension.ts` (or are
- * composed at the editor.ts level) so this file stays a
- * pure PM module.
+ * Tiptap 命令与快捷键绑定放在
+ * `extensions/editing/multi-cursor-extension.ts`（或由 editor.ts
+ * 统一组装），因此本文件保持为纯粹的 PM 模块。
  */
 
 import { Plugin } from '@tiptap/pm/state'
@@ -31,24 +30,22 @@ export {
   currentNeedle,
 } from './commands'
 export { findNextOccurrence, findNextForCursors, findAllOccurrences } from './find-occurrence'
-// P2-3 column selection (Alt+Drag) — exported so editor.ts can
-// register the second plugin and App.svelte can subscribe to
-// the drag state for the StatusBar indicator.
+// 列选择插件（Alt+拖拽）在此导出，editor.ts 负责注册第二个插件，
+// App.svelte 可订阅拖拽状态以驱动状态栏的列选择指示器。
 export { createColumnSelectPlugin } from './column-select'
-// Pure helpers live alongside the plugin so unit tests can
-// exercise `flattenRectToCursors` without spinning up a DOM.
+// 纯辅助函数与插件放在一起，单元测试无需启动 DOM 就能
+// 单独验证 `flattenRectToCursors` 的行为。
 export { flattenRectToCursors, normaliseRect, estimateLineHeight, isInsideAtomicBlock } from './column-select-helpers'
 export type { FlattenOptions } from './column-select-helpers'
 export { columnSelectPluginKey } from './rect-types'
 export type { ColumnSelectState, ColumnSelectMeta, Rect, ViewportPoint } from './rect-types'
 
 /**
- * Build the multi-cursor plugin.
+ * 构建多光标插件。
  *
- * The plugin's `apply` reducer reads `tr.getMeta(multiCursorPluginKey)`
- * and re-runs the appropriate state transition. On every
- * state change we re-derive the DecorationSet (cheap — we
- * only iterate over at most MAX_CURSORS = 64 cursors).
+ * 插件的 `apply` reducer 读取 `tr.getMeta(multiCursorPluginKey)`
+ * 并执行对应的状态迁移。每次状态变化后都会重新推导
+ * DecorationSet（成本很低——最多只遍历 MAX_CURSORS = 64 个光标）。
  */
 export function createMultiCursorPlugin(): Plugin {
   return new Plugin({
@@ -75,24 +72,21 @@ export function createMultiCursorPlugin(): Plugin {
         return handleMultiCursorKeyDown(view, event)
       },
 
-      // P0-3: single-line paste fan-out. Multi-line text
-      // falls through to PM's default and clears the
-      // secondary cursors (matching VSCode).
+      // 单行文本粘贴会扇出到每个次要光标；多行文本则交回
+      // PM 的默认粘贴逻辑，同时清除次要光标（与其他主流
+      // 编辑器的行为保持一致）。
       handlePaste(view, event) {
         return handleMultiCursorPaste(view, event)
       },
 
-      // Alt+Click adds a secondary cursor at the click position.
-      // Alt+Shift+Click makes it a range cursor (anchored at the
-      // current primary head). All edge cases (table cells, code
-      // blocks, read-only, dedup, cap) are handled inside
-      // `addCursor` so this stays a 3-line shim.
+      // Alt+点击在点击位置添加一个次要光标；Alt+Shift+点击
+      // 则生成一个区间光标（锚定在当前主光标的头部）。表格单元格、
+      // 代码块、只读、去重、数量上限等边缘情况都封装在 `addCursor`
+      // 内部，这里只是一个三行的转发层。
       //
-      // P2-3: when the column-select plugin is registered AHEAD
-      // of this one, its mousedown consumes Alt+Click events
-      // first and handles the sub-threshold fallback to
-      // `addCursor` itself. This handler then becomes the
-      // sole-plugin path (when column-select is not installed).
+      // 注意：当列选择插件注册在本插件之前时，它的 mousedown 会
+      // 先消费 Alt+点击事件，并在低于阈值时自行回退到 `addCursor`。
+      // 因此这里的处理器只负责列选择未安装时的单插件路径。
       handleDOMEvents: {
         mousedown(view, event) {
           if (!event.altKey || event.button !== 0) return false
@@ -106,9 +100,8 @@ export function createMultiCursorPlugin(): Plugin {
     },
 
     view(view: EditorView) {
-      // The blink timer is a side-effect of the view; it
-      // ticks once a second and dispatches a `preserve` meta
-      // so the cursor widgets re-render with the new class.
+      // 闪烁计时器是视图的副作用：它每秒触发一次并派发
+      // `preserve` meta，让光标 widget 以新的 class 重新渲染。
       const teardown = attachInputHandlers(view, () =>
         multiCursorPluginKey.getState(view.state) as MultiCursorState | undefined,
       )

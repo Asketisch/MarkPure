@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use std::path::PathBuf;
-// ============================== File drop ==============================
+// ============================== 拖放文件 ==============================
 
 pub fn cmd_open_dropped_files(
     params: &serde_json::Value,
@@ -14,7 +14,7 @@ pub fn cmd_open_dropped_files(
     for path_str in paths {
         let path = PathBuf::from(&path_str);
 
-        // Only process text files (markdown, text, etc.)
+        // 只处理文本文件（markdown、纯文本等）
         let is_text_file = matches!(
             path.extension().and_then(|e| e.to_str()),
             Some("md") | Some("markdown") | Some("txt") | Some("mdown") | Some("text")
@@ -33,11 +33,11 @@ pub fn cmd_open_dropped_files(
                 }));
             }
             Err(e) => {
-                // Log error but continue processing other files
+                // 记录错误，但继续处理其他文件
                 eprintln!("[open_dropped_files] Failed to read '{}': {}", path_str, e);
             }
         }
     }
 
-    Ok(serde_json::to_value(results).map_err(|e| e.to_string())?)
+    serde_json::to_value(results).map_err(|e| e.to_string())
 }

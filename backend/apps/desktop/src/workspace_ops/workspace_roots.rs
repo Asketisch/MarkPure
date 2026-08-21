@@ -1,16 +1,15 @@
 use crate::state::{lock_or_recover, AppState};
 use crate::editor_ops::doc_registry::gc_docs_outside_root;
-// ============================== Multi-root workspace (P2-4) ==============================
+// ============================== 多根目录工作区 ==============================
 //
-// Five IPC commands that own the multi-root workspace state. They are
-// all fast (config-mutation only; no I/O) so they live in the inline
-// dispatch table; the heavy lifting (file tree, watch, search) is
-// handled in `file_ops` / `export_ops` and keyed by the workspace
-// ids these commands hand out.
+// 五个拥有多根目录工作区状态的 IPC 命令。它们都是快速命令
+//（仅变更配置，无 I/O），因此位于内联分发表中；繁重工作
+//（文件树、监听、搜索）由 `file_ops` / `export_ops` 处理，
+// 并以这些命令分发的工作区 id 为键。
 
-/// `add_workspace_root { path }` → returns the freshly-created
-/// [`WorkspaceRoot`] (or an error if the path is empty / a duplicate).
-/// Persists config and updates the active id if this is the first root.
+/// `add_workspace_root { path }` → 返回新建的 [`WorkspaceRoot`]
+/// （路径为空或重复时返回错误）。持久化配置，且若这是首个根目录
+/// 则更新活动 id。
 pub fn cmd_add_workspace_root(
     params: &serde_json::Value,
     state: &AppState,
@@ -18,23 +17,20 @@ pub fn cmd_add_workspace_root(
     let path = params["path"]
         .as_str()
         .ok_or("Missing 'path' parameter")?;
-    // Mutate under the lock, then release BEFORE calling
-    // `state.save_config()` — the latter re-locks `state.config`
-    // to read the snapshot it serialises, and `std::sync::Mutex`
-    // is NOT reentrant, so keeping the guard alive across the
-    // second lock would self-deadlock this thread. The block
-    // scope on `config` ensures the guard is dropped here.
+    // 在锁内变更，然后在调用 `state.save_config()` *之前*释放——
+    // 后者会重新加锁 `state.config` 以读取其序列化的快照，而
+    // `std::sync::Mutex` 不可重入，若第二次加锁时守卫仍存活，
+    // 本线程将自锁死。`config` 的花括号作用域确保守卫在此释放。
     let root = {
         let mut config = lock_or_recover(&state.config);
         config.add_workspace_root(path)?
     };
     state.save_config();
-    Ok(serde_json::to_value(&root).map_err(|e| e.to_string())?)
+    serde_json::to_value(&root).map_err(|e| e.to_string())
 }
 
-/// `remove_workspace_root { root_id }` → drops the root, its expanded
-/// dirs, and re-points `active_workspace_root_id` at the next
-/// remaining root (or `None`).
+/// `remove_workspace_root { root_id }` → 移除该根目录及其展开目录，
+/// 并将 `active_workspace_root_id` 重新指向下一个剩余根目录（或 `None`）。
 pub fn cmd_remove_workspace_root(
     params: &serde_json::Value,
     state: &AppState,
@@ -42,8 +38,8 @@ pub fn cmd_remove_workspace_root(
     let root_id = params["root_id"]
         .as_str()
         .ok_or("Missing 'root_id' parameter")?;
-    // Release the config lock before save_config (see
-    // `cmd_add_workspace_root` for the deadlock rationale).
+    // 在 save_config 之前释放配置锁（死锁原因见
+    // `cmd_add_workspace_root`）。
     {
         let mut config = lock_or_recover(&state.config);
         if !config.remove_workspace_root(root_id) {
@@ -55,18 +51,15 @@ pub fn cmd_remove_workspace_root(
 }
 
 /// `list_workspace_roots` →
-///   `{ roots: [{id, path, name, added_at, exists}], active_id }`.
+///   `{ roots: [{id, path, name, added_at, exists}], active_id }`。
 ///
-/// P2-4 phase 5: each root carries a live `exists` boolean
-/// (computed via `WorkspaceRoot::exists()` at IPC time).
-/// The renderer uses this to show a `⚠️ missing` badge
-/// for unmounted external drives / moved folders. We do
-/// NOT remove the missing root from the config — the user
-/// may have just unplugged a drive and we don't want to
-/// silently lose their workspace layout. Removal is
-/// explicit via `remove_workspace_root` (the × on the
-/// pill) or the new `cmd_remove_missing_workspace_roots`
-/// batch command.
+/// 每个根目录携带实时的 `exists` 布尔值（在 IPC 时通过
+/// `WorkspaceRoot::exists()` 计算）。渲染器据此为未挂载的外部
+/// 驱动器 / 被移动的文件夹显示「⚠️ 缺失」徽标。我们*不*从配置中
+/// 移除缺失的根目录——用户可能只是拔掉了驱动器，我们不愿静默
+/// 丢失其工作区布局。移除操作需显式执行：通过
+/// `remove_workspace_root`（胶囊上的 ×）或新的
+/// `cmd_remove_missing_workspace_roots` 批量命令。
 pub fn cmd_list_workspace_roots(
     state: &AppState,
 ) -> std::result::Result<serde_json::Value, String> {
@@ -90,11 +83,10 @@ pub fn cmd_list_workspace_roots(
     }))
 }
 
-/// `remove_missing_workspace_roots` → drops every root
-/// whose `path` no longer exists on disk. Returns the
-/// list of removed ids so the renderer can update its
-/// tab close list. Use sparingly — this is the explicit
-/// "yes, I know my drive is gone" action.
+/// `remove_missing_workspace_roots` → 移除所有 `path` 在磁盘上
+/// 已不存在的根目录。返回被移除的 id 列表，供渲染器更新其
+/// 标签页关闭列表。请谨慎使用——这是「是的，我知道我的驱动器
+/// 没了」的显式操作。
 pub fn cmd_remove_missing_workspace_roots(
     state: &AppState,
 ) -> std::result::Result<serde_json::Value, String> {
@@ -106,7 +98,7 @@ pub fn cmd_remove_missing_workspace_roots(
                 removed.push(r.id.clone());
             }
         }
-        // Re-acquire the lock mutably for the removals.
+        // 为执行移除操作重新获取可变锁。
         drop(config);
         let mut config = lock_or_recover(&state.config);
         for id in &removed {
@@ -120,15 +112,13 @@ pub fn cmd_remove_missing_workspace_roots(
     Ok(serde_json::json!({ "removed_root_ids": removed }))
 }
 
-/// `set_active_workspace_root { root_id }` → switches the active
-/// root. The renderer must tear down the file-tree fetch and rebuild
-/// it for the new root on success.
+/// `set_active_workspace_root { root_id }` → 切换活动根目录。
+/// 成功时渲染器必须拆除旧文件树请求，并为新根目录重建。
 ///
-/// P2-4: also drops every in-memory document that doesn't belong
-/// to the new active root (LRU GC on root switch). The returned
-/// payload's `evicted_doc_ids` lets the renderer close the
-/// matching tabs in lockstep — the renderer is the source of
-/// truth for tab state, so Rust can only tell it what to drop.
+/// 同时丢弃所有不属于新活动根目录的内存中文档（根目录切换时
+/// 的 LRU 回收）。返回载荷中的 `evicted_doc_ids` 让渲染器同步
+/// 关闭对应标签页——渲染器是标签页状态的唯一事实来源，因此
+/// Rust 只能告诉它要丢弃哪些。
 pub fn cmd_set_active_workspace_root(
     params: &serde_json::Value,
     state: &AppState,
@@ -147,11 +137,10 @@ pub fn cmd_set_active_workspace_root(
     Ok(serde_json::json!({ "evicted_doc_ids": evicted }))
 }
 
-/// Multi-root variant of `get_expanded_dirs`.
+/// `get_expanded_dirs` 的多根目录版本。
 ///
-/// Accepts either `root_id` (preferred) or the legacy implicit form
-/// (no `root_id`, falls back to the active root). Returns
-/// `{ expanded_dirs: [String] }` for the requested root.
+/// 接受 `root_id`（首选）或旧式隐式形式（无 `root_id`，回退到
+/// 活动根目录）。为请求的根目录返回 `{ expanded_dirs: [String] }`。
 pub fn cmd_get_expanded_dirs_v2(
     params: &serde_json::Value,
     state: &AppState,
@@ -168,11 +157,10 @@ pub fn cmd_get_expanded_dirs_v2(
     Ok(serde_json::json!({ "expanded_dirs": dirs }))
 }
 
-/// Multi-root variant of `set_expanded_dirs`.
+/// `set_expanded_dirs` 的多根目录版本。
 ///
-/// Accepts `{ root_id?, expanded_dirs: [String] }`. The renderer MUST
-/// pass `root_id` for forward-compat — the implicit fallback is for
-/// legacy single-root callers only.
+/// 接受 `{ root_id?, expanded_dirs: [String] }`。为向前兼容，渲染器
+/// 必须传 `root_id`——隐式回退仅供旧式单根目录调用方使用。
 pub fn cmd_set_expanded_dirs_v2(
     params: &serde_json::Value,
     state: &AppState,
@@ -183,9 +171,9 @@ pub fn cmd_set_expanded_dirs_v2(
         .iter()
         .filter_map(|v| v.as_str().map(String::from))
         .collect();
-    // Resolve the root_id and apply the mutation under the config
-    // lock, then release BEFORE `state.save_config()` re-locks the
-    // same `std::sync::Mutex` (see cmd_add_workspace_root).
+    // 在配置锁下解析 root_id 并执行变更，然后在
+    // `state.save_config()` 重新加锁同一 `std::sync::Mutex` 之前
+    // 释放（见 cmd_add_workspace_root）。
     {
         let mut config = lock_or_recover(&state.config);
         let root_id = match params["root_id"].as_str() {
@@ -208,16 +196,13 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
-    /// Race the cmd against a wall-clock watchdog. If the call
-    /// deadlocks on the `state.config` mutex (the bug that this
-    /// commit fixes), the worker thread never returns and the
-    /// test panics with a "did not return within" message —
-    /// which is exactly what we want, because the previous
-    /// behaviour was a silent UI freeze with no diagnostic.
+    /// 用墙钟看门狗对命令进行计时。若调用在 `state.config` 互斥锁上
+    /// 死锁（本次修复的 bug），工作线程将永不返回，测试以
+    /// 「did not return within」消息 panic——这正是我们想要的，
+    /// 因为旧行为是无诊断的静默 UI 冻结。
     ///
-    /// We point `app_config_dir()` at a temp dir by overriding
-    /// `$HOME` for the duration of the test so the real user
-    /// config is never touched.
+    /// 我们通过在整个测试期间覆盖 `$HOME` 把 `app_config_dir()`
+    /// 指向临时目录，从而绝不触碰用户的真实配置。
     #[test]
     fn add_workspace_root_does_not_deadlock_on_config_lock() {
         let tmp = std::env::temp_dir().join(format!(
@@ -227,23 +212,20 @@ mod tests {
         ));
         std::fs::create_dir_all(&tmp).expect("create temp dir");
 
-        // Save the real HOME so we can restore it.
+        // 保存真实的 HOME，以便恢复。
         let saved_home = std::env::var("HOME").ok();
 
-        // SAFETY: no other threads in this test observe $HOME.
-        // (We're a single-threaded test process when this runs.)
-        // SAFETY: setting an env var is safe in a test.
-        // We use std::env::set_var which is safe for single-threaded
-        // test execution.
+        // 此测试执行时是单线程测试进程，没有其他线程观察 $HOME。
+        // std::env::set_var 对单线程测试执行是安全的。
         std::env::set_var("HOME", &tmp);
-        // APPDATA on Windows takes precedence — clear it.
+        // Windows 上 APPDATA 优先——清掉它。
         std::env::remove_var("APPDATA");
         std::env::remove_var("XDG_CONFIG_HOME");
 
         let result = std::panic::catch_unwind(|| {
-            // Build AppState against the temp config dir.
+            // 基于临时配置目录构建 AppState。
             let state = AppState::new();
-            // Add a real path the user almost certainly has.
+            // 添加一个用户几乎肯定存在的真实路径。
             let params = serde_json::json!({ "path": "/tmp" });
             let t0 = Instant::now();
             let res = cmd_add_workspace_root(&params, &state);
@@ -251,39 +233,36 @@ mod tests {
             (res, elapsed)
         });
 
-        // Restore env even on panic.
+        // 即使 panic 也恢复环境变量。
         if let Some(h) = saved_home {
             std::env::set_var("HOME", h);
         } else {
             std::env::remove_var("HOME");
         }
-        // Best-effort cleanup.
+        // 尽力清理。
         let _ = std::fs::remove_dir_all(&tmp);
 
         let (res, elapsed) = result.expect("test panicked");
-        // A deadlocked handler would hang the test indefinitely;
-        // 5 seconds is more than enough for a successful round-trip.
+        // 死锁的处理程序会使测试无限挂起；成功往返 5 秒绰绰有余。
         assert!(
             elapsed < Duration::from_secs(5),
             "cmd_add_workspace_root took {elapsed:?} — likely self-deadlocked on state.config mutex"
         );
-        // It must succeed (or fail with a domain error, but not
-        // a lock-related one). "/tmp" is a real dir on every Unix
-        // and almost every macOS dev machine, so success is the
-        // expected outcome.
+        // 它必须成功（或失败于领域错误，而非与锁相关）。
+        // "/tmp" 在每个 Unix 及几乎每台 macOS 开发机上都是真实目录，
+        // 因此成功是预期结果。
         let value = res.expect("cmd_add_workspace_root returned Err");
-        // The returned JSON must carry the new root's id, name,
-        // and canonical path.
+        // 返回的 JSON 必须携带新根目录的 id、name 和规范路径。
         assert!(value.get("id").is_some(), "missing id in {value:?}");
         assert_eq!(value["name"], "tmp");
-        // Path is canonicalized on macOS to /private/tmp; on Linux
-        // it stays as /tmp. Just check the suffix.
+        // macOS 上路径会被规范化为 /private/tmp；Linux 上保持 /tmp。
+        // 只检查后缀。
         let p = value["path"].as_str().expect("path is string");
         assert!(p.ends_with("/tmp"), "unexpected path {p}");
     }
 
-    /// Companion test for `cmd_remove_workspace_root` — same
-    /// deadlock pattern, same fix shape.
+    /// `cmd_remove_workspace_root` 的配套测试——相同的死锁模式，
+    /// 相同的修复形态。
     #[test]
     fn remove_workspace_root_does_not_deadlock_on_config_lock() {
         let tmp = std::env::temp_dir().join(format!(
@@ -326,8 +305,7 @@ mod tests {
         res.expect("cmd_remove_workspace_root returned Err");
     }
 
-    // Suppress unused-import warning when the test module is
-    // compiled without all the helpers below being referenced.
+    // 当测试模块未引用下方全部辅助函数编译时，抑制未使用导入警告。
     #[allow(dead_code)]
     fn _silence_unused(_: &Arc<Mutex<PathBuf>>) {}
 }

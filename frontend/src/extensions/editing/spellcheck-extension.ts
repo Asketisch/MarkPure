@@ -1,10 +1,9 @@
 /**
- * Tiptap wrapper for the spell-check ProseMirror plugin.
+ * 拼写检查 ProseMirror 插件的 Tiptap 包装。
  *
- * Mirrors the thin wrapper pattern used by
- * `wikilink-extension.ts`: the plugin lives in `plugins/`,
- * this file just exposes it as a Tiptap extension so it can
- * be added to the editor's `extensions` array.
+ * 复刻 `wikilink-extension.ts` 使用的薄包装模式：插件本体在
+ * `plugins/` 下，本文件只把它暴露为 Tiptap 扩展，便于加入编辑器的
+ * `extensions` 数组。
  */
 import { Extension } from '@tiptap/core'
 import { createSpellcheckPlugin, forceSpellcheckRecheck } from '../../plugins/spellcheck'
@@ -12,8 +11,8 @@ import { createSpellcheckPlugin, forceSpellcheckRecheck } from '../../plugins/sp
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     spellcheck: {
-      /** Force an immediate re-check of the current document.
-       *  Wired to the command palette's `tools.spellcheck`. */
+      /** 强制立即重新检查当前文档。接到命令面板的
+       *  `tools.spellcheck`。 */
       recheckSpelling: () => ReturnType
     }
   }

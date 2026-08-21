@@ -1,17 +1,13 @@
-//! Mermaid autocomplete suggestions.
+//! Mermaid 自动补全建议。
 //!
-//! Extracted from `mermaid.rs` (where this used to be the
-//! second half of a 620-line monolith) so the suggestion
-//! catalogue can be iterated on without scrolling through
-//! the SVG-rendering / cache logic. The completions are
-//! intentionally hard-coded rather than generated from a
-//! schema — the catalogue is small, the labels are part of
-//! the user-facing UX, and we'd rather review them by hand
-//! than chase a code-gen dep.
+//! 从 `mermaid.rs`（曾是 620 行单体文件的另一半）抽出，这样迭代
+//! 建议目录时不必翻找 SVG 渲染 / 缓存逻辑。补全刻意写死而不是从
+//! schema 生成——目录很小，标签属于面向用户的体验内容，我们宁愿
+//! 手工审阅，也不想去追代码生成依赖。
 
 use serde::{Deserialize, Serialize};
 
-/// Autocomplete suggestion for mermaid.
+/// Mermaid 的自动补全建议。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MermaidCompletion {
     pub label: String,
@@ -19,14 +15,12 @@ pub struct MermaidCompletion {
     pub insert_text: String,
 }
 
-/// Return the catalogue of completions whose `label` or
-/// `description` matches `partial`. An empty `partial` returns
-/// the full catalogue so a freshly-opened popup has something
-/// to show.
+/// 返回 `label` 或 `description` 与 `partial` 匹配的补全目录。
+/// 空 `partial` 返回完整目录，让刚打开的弹窗有内容可展示。
 pub fn get_mermaid_suggestions(partial: &str) -> Vec<MermaidCompletion> {
     let mut completions = Vec::new();
 
-    // Flowchart suggestions
+    // 流程图建议
     if partial.is_empty() || partial.contains("graph") || partial.contains("flowchart") {
         completions.push(MermaidCompletion {
             label: "graph TD".to_string(),
@@ -50,7 +44,7 @@ pub fn get_mermaid_suggestions(partial: &str) -> Vec<MermaidCompletion> {
         });
     }
 
-    // Other diagram types
+    // 其他图表类型
     if partial.is_empty() || partial.starts_with("sequence") {
         completions.push(MermaidCompletion {
             label: "sequenceDiagram".to_string(),
@@ -129,15 +123,15 @@ mod tests {
     #[test]
     fn empty_partial_returns_full_catalogue() {
         let all = get_mermaid_suggestions("");
-        // 4 flowchart variants + sequence + class + state + er + gantt
-        // + pie + timeline + mindmap = 10 entries.
+        // 4 个流程图变体 + 时序图 + 类图 + 状态图 + ER 图 + 甘特图
+        // + 饼图 + 时间线 + 思维导图 = 10 条。
         assert!(all.len() >= 10, "got {} completions", all.len());
     }
 
     #[test]
     fn partial_filters_to_matching_entries() {
         let graph_only = get_mermaid_suggestions("graph");
-        // All four `graph X*` labels should remain.
+        // 四个 `graph X*` 标签都应保留。
         assert_eq!(graph_only.len(), 4);
         assert!(graph_only.iter().all(|c| c.label.starts_with("graph")));
     }

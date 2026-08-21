@@ -1,6 +1,6 @@
 /**
- * CodeMirror 6 NodeView for code blocks in mark-web
- * Simplified from milkup's CodeBlockView
+ * 代码块的 CodeMirror 6 NodeView
+ * 简化自 milkup 的 CodeBlockView 实现
  */
 
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -24,7 +24,7 @@ import { xml } from '@codemirror/lang-xml'
 import { yaml as yamlLang } from '@codemirror/lang-yaml'
 import { createThemeExtension, detectDarkTheme } from '../extensions/blocks/cm-theme'
 
-/** Language extension map */
+/** 语言扩展映射表 */
 const languageExtensions: Record<string, () => any> = {
   javascript, js: javascript,
   typescript: () => javascript({ typescript: true }),
@@ -41,13 +41,11 @@ const languageExtensions: Record<string, () => any> = {
   sql: sqlLang,
   xml,
   yaml: yamlLang, yml: yamlLang,
-  // P0-X: extra languages the picker offers. Without a
-  // matching CM extension we still want the language
-  // label to appear (so a fenced ```shell block
-  // round-trips as ```shell) but the syntax highlighting
-  // degrades to plain monospace. `getLanguageExtension`
-  // returns `[]` for unknown languages so this is a
-  // no-op at the highlighting layer.
+  // 选择器中额外提供的语言。即使没有对应的 CM 扩展，
+  // 我们也希望语言标签能出现（让 ```shell 围栏块以 ```shell
+  // 往返转换），但语法高亮会退化为纯等宽字体。
+  // `getLanguageExtension` 对未知语言返回 `[]`，因此高亮层
+  // 上这只是一个空操作。
   shell: () => [],
   ruby: () => [],
   lua: () => [],
@@ -74,11 +72,10 @@ export class CodeBlockView implements NodeView {
   node: PMNode
   view: PMView
   getPos: () => number | undefined
-  // Generation counter for "we are mid PM→CM sync". See `onCMUpdate`
-  // for why this is a number rather than a boolean. The host
-  // increments at the start of a PM→CM dispatch and decrements
-  // inside a microtask so the flag stays set across one round of
-  // CM's async update listener callbacks.
+  // 「PM→CM 同步进行中」的代数计数器。为何用数字而非布尔值，
+  // 见 `onCMUpdate`。宿主在 PM→CM 派发开始时递增，在微任务里
+  // 递减，让该标志在 CM 异步 update 监听器回调的整个回合内
+  // 都保持置位。
   private updating = 0
   languageCompartment: Compartment
   themeCompartment: Compartment
@@ -92,26 +89,21 @@ export class CodeBlockView implements NodeView {
 
     const lang = normalizeLanguage(node.attrs.language ?? '')
 
-    // Container
+    // 容器
     this.dom = document.createElement('div')
     this.dom.className = 'mw-code-block'
 
-    // Header with language label
+    // 带语言标签的头部
     const header = document.createElement('div')
     header.className = 'mw-code-block-header'
 
     const langSelect = document.createElement('select')
     langSelect.className = 'mw-code-block-lang'
-    // P0-X: Typora-style language picker. Each entry
-    // has a human-readable display label (e.g.
-    // "TypeScript" instead of "typescript") and a
-    // `<optgroup>` structure that mirrors the
-    // Markdown-spec loose categories (Web / Systems /
-    // Data / Scripting / Markup). Typora's picker is
-    // plain (`javascript`, `typescript`, …) but uses the
-    // readable labels; we go one step further with
-    // optgroups so the picker stays short even as we
-    // add more languages.
+    // 语言选择器。每个条目都有人类可读的显示标签（例如
+    // "TypeScript" 而非 "typescript"），并用 `<optgroup>`
+    // 结构按 Markdown 规范的松散分类（Web / Systems /
+    // Data / Scripting）组织。选项组让选择器在语言不断增多
+    // 时依然保持简洁。
     const langGroups: Array<{ label: string; entries: Array<[string, string]> }> = [
       {
         label: 'Web',
@@ -154,8 +146,8 @@ export class CodeBlockView implements NodeView {
         ],
       },
     ]
-    // Default "plain text" sits at the top, outside any
-    // group, so the user can clear the language.
+    // 默认的「纯文本」选项放在顶部、任何分组之外，
+    // 方便用户清空语言。
     const plainOpt = document.createElement('option')
     plainOpt.value = ''
     plainOpt.textContent = 'plain text'
@@ -187,11 +179,10 @@ export class CodeBlockView implements NodeView {
     })
     header.appendChild(langSelect)
 
-    // Copy button. We use the legacy `execCommand('copy')` path
-    // because the modern Clipboard API is async + permission-
-    // gated, and code blocks are frequently read by external
-    // paste targets that don't prompt for permission. The
-    // hidden-textarea trick below is the standard fallback.
+    // 复制按钮。我们使用遗留的 `execCommand('copy')` 路径，
+    // 因为现代剪贴板 API 是异步且受权限控制的，而代码块常被
+    // 粘贴到不会弹权限提示的外部目标。下面的隐藏 textarea
+    // 技巧是标准回退方案。
     const copyBtn = document.createElement('button')
     copyBtn.className = 'mw-code-block-copy'
     copyBtn.type = 'button'
@@ -225,7 +216,7 @@ export class CodeBlockView implements NodeView {
     header.appendChild(copyBtn)
     this.dom.appendChild(header)
 
-    // CM container
+    // CM 容器
     const editorWrap = document.createElement('div')
     editorWrap.className = 'mw-code-block-editor'
     this.dom.appendChild(editorWrap)
@@ -288,22 +279,21 @@ export class CodeBlockView implements NodeView {
   }
 
   private onCMUpdate(update: any): void {
-    // `updating` is a *generation counter* rather than a boolean.
-    // ProseMirror's `update(node)` is called synchronously, but
-    // CodeMirror's `updateListener` fires asynchronously on the
-    // next microtask. A boolean set to `true` then `false` around
-    // `cm.dispatch` is racy: a second PM `update` call can land
-    // after `updating = false` but before our CM listener runs,
-    // and the listener then echoes stale content back into PM,
-    // which can loop. The counter — incremented at the start of
-    // PM→CM sync and checked at CM→PM sync — closes that hole.
+    // `updating` 是*代数计数器*而非布尔值。ProseMirror 的
+    // `update(node)` 是同步调用的，但 CodeMirror 的
+    // `updateListener` 在下一个微任务里异步触发。围绕
+    // `cm.dispatch` 把布尔值设 true 再设 false 存在竞态：
+    // 第二次 PM `update` 调用可能落在 `updating = false` 之后、
+    // 而我们的 CM 监听器还没运行，监听器随后把过期内容回灌进
+    // PM，可能引发循环。计数器——在 PM→CM 同步开始时递增、
+    // 在 CM→PM 同步时检查——堵住了这个漏洞。
     if (this.updating !== 0) return
     if (!update.docChanged) return
 
     const pos = this.getPos()
     if (pos === undefined) return
 
-    // Get the current node from the updated document instead of cached this.node
+    // 从更新后的文档取当前节点，而不是缓存的 this.node
     const currentNode = update.state.doc.nodeAt(pos)
     if (!currentNode) return
 
@@ -312,7 +302,7 @@ export class CodeBlockView implements NodeView {
       ...currentNode.attrs,
     })
 
-    // Use current node's content size instead of cached this.node
+    // 使用当前节点的内容大小，而非缓存的 this.node
     const start = pos + 1
     const end = start + currentNode.content.size
     if (content) {
@@ -359,15 +349,13 @@ export class CodeBlockView implements NodeView {
         changes: { from: 0, to: this.cm.state.doc.length, insert: content },
       })
     }
-    // Update language if changed
+    // 语言变化时更新高亮
     const lang = normalizeLanguage(node.attrs.language ?? '')
     this.languageCompartment.reconfigure(getLanguageExtension(lang))
-    // Defer decrementing `updating` to a microtask so any
-    // synchronous PM→CM dispatches that ran above have their
-    // CM listener fire *after* we drop the flag, but the queued
-    // microtask still holds the flag for the current call stack.
-    // This eliminates the "stale echo" loop the previous
-    // synchronous set/clear had.
+    // 把 `updating` 的递减推迟到微任务，让上面发生的同步
+    // PM→CM 派发所触发的 CM 监听器在标志被清零*之后*才运行，
+    // 而排队的微任务在当前调用栈内仍然持有该标志。
+    // 这消除了原先同步置位/清除所导致的「陈旧回灌」循环。
     queueMicrotask(() => { this.updating = Math.max(0, this.updating - 1) })
     return true
   }

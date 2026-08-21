@@ -3,33 +3,27 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import type { NodeView } from '@tiptap/pm/view'
 
 /**
- * P1-3: extended Image node with `align` and `width`
- * attributes. The base Tiptap image extension only supports
- * `src`, `alt`, `title`. We add a small set of attributes
- * for the floating image toolbar to write into.
+ * 扩展后的 Image 节点，带 `align` 与 `width` 属性。底层的
+ * Tiptap 图片扩展只支持 `src`、`alt`、`title`。我们为浮动
+ * 图片工具栏补充了一小组可写入的属性。
  *
- * `align` is one of 'left' | 'center' | 'right' (default
- * 'inline' = no wrap alignment). The markdown round-trip
- * is handled by `@tiptap/markdown` via the
- * `![alt](url){width=300 align=center}` extension syntax
- * (the same shape VS Code's markdown-all-in-one uses).
+ * `align` 取值为 'left' | 'center' | 'right'（默认为
+ * 'inline'，即不做环绕对齐）。markdown 往返转换由
+ * `@tiptap/markdown` 经由 `![alt](url){width=300 align=center}`
+ * 这样的扩展语法处理。
  *
- * Rendered as a `<figure>` with a class so CSS can pick up
- * the alignment.
+ * 渲染为带 class 的 `<figure>`，CSS 据此拾取对齐方式。
  */
 
 /**
- * P0-X: Typora-style image NodeView. Renders a `<figure>`
- * wrapper with three resize handles (bottom-right corner +
- * bottom + right edges) that the user drags to set the
- * `width` attribute. Without this NodeView the user had no
- * way to resize an inserted image except by editing the
- * markdown by hand.
+ * 图片 NodeView。渲染一个带三个缩放手柄（右下角 + 底部 +
+ * 右缘）的 `<figure>` 包装器，用户拖拽手柄即可设置 `width`
+ * 属性。没有这个 NodeView，用户只能手改 markdown 才能
+ * 调整插入图片的大小。
  *
- * We intentionally avoid React's `NodeViewWrapper` so we
- * don't pull React into the bundle — a vanilla
- * `ProseMirror.NodeView` is enough for this single use
- * case.
+ * 我们刻意不用 React 的 `NodeViewWrapper`，避免把 React 拉进
+ * 打包产物——一个原生 `ProseMirror.NodeView` 对这一个使用
+ * 场景已经足够。
  */
 class ImageFigureView implements NodeView {
   dom: HTMLElement
@@ -53,14 +47,9 @@ class ImageFigureView implements NodeView {
     this.dom = figure
     this.img = img
 
-    // P0-X: Typora-style "alt text" caption. Renders a
-    // small `<input>` under the image that's only
-    // visible when the figure is selected
-    // (`ProseMirror-selectednode`) or hovered. Typora
-    // shows the alt text as plain text by default and
-    // turns it editable when the user clicks; we show
-    // it as an input so the existing text is editable
-    // in-place without a popup.
+    // 「替代文本」标题输入框。在图片下方渲染一个小 `<input>`，
+    // 只在图片被选中（`ProseMirror-selectednode`）或悬停时可见。
+    // 我们把它做成输入框，让已有文本无需弹窗即可就地编辑。
     const caption = document.createElement('input')
     caption.type = 'text'
     caption.className = 'image-caption-input'
@@ -68,12 +57,10 @@ class ImageFigureView implements NodeView {
     caption.value = alt ?? ''
     caption.contentEditable = 'false'
     caption.addEventListener('input', () => {
-      // Persist alt text via a window event; the host
-      // (App.svelte) writes the value to `node.attrs.alt`
-      // via the Tiptap command bus. We update the
-      // underlying `<img alt>` immediately so screen
-      // readers pick up the new value even before PM
-      // re-renders.
+      // 通过 window 事件持久化替代文本；宿主（App.svelte）
+      // 经 Tiptap 命令总线把值写入 `node.attrs.alt`。我们
+      // 立即更新底层的 `<img alt>`，让屏幕阅读器在 PM
+      // 重新渲染之前就能读到新值。
       this.img.alt = caption.value
       window.dispatchEvent(
         new CustomEvent('mt:image-alt-edit', {
@@ -81,17 +68,15 @@ class ImageFigureView implements NodeView {
         }),
       )
     })
-    // Stop keyboard events propagating to ProseMirror
-    // — otherwise typing in the caption would also type
-    // into the document, producing doubled text.
+    // 阻止键盘事件传播到 ProseMirror——否则在标题框里打字
+    // 也会同时打进文档，产生重复文本。
     caption.addEventListener('keydown', (e) => e.stopPropagation())
     caption.addEventListener('mousedown', (e) => e.stopPropagation())
     figure.appendChild(caption)
     this.caption = caption
 
-    // Three resize handles — corner, right edge, bottom
-    // edge. Each handle is positioned absolutely on the
-    // figure; the user drags it to set the new width.
+    // 三个缩放手柄——角、右缘、底缘。每个手柄绝对定位在
+    // 图片上；用户拖拽即可设置新宽度。
     const handlePositions = ['corner', 'right', 'bottom'] as const
     for (const pos of handlePositions) {
       const handle = document.createElement('div')
@@ -121,10 +106,9 @@ class ImageFigureView implements NodeView {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       const finalWidth = parseInt(this.dom.style.width, 10)
-      // Persist via a custom event; the host (App.svelte)
-      // writes the value to `node.attrs.width` via the
-      // Tiptap command bus. Without this dispatch the width
-      // reverts on the next render.
+      // 通过自定义事件持久化；宿主（App.svelte）经 Tiptap
+      // 命令总线把值写入 `node.attrs.width`。没有这次派发，
+      // 宽度会在下次渲染时还原。
       window.dispatchEvent(
         new CustomEvent('mt:image-resize', {
           detail: { dom: this.dom, width: finalWidth },
@@ -140,11 +124,9 @@ class ImageFigureView implements NodeView {
     if (this.img.src !== src) this.img.src = src
     if (this.img.alt !== alt) this.img.alt = alt ?? ''
     if (this.img.title !== title) this.img.title = title ?? ''
-    // P0-X: keep the caption input in sync with the
-    // node attrs (e.g. when the host's restore handler
-    // updates alt via `mt:image-alt-edit`). We only
-    // overwrite when the values actually differ to
-    // avoid clobbering the user's mid-typing input.
+    // 让标题输入框与节点属性保持同步（例如宿主的恢复处理器
+    // 通过 `mt:image-alt-edit` 更新 alt 时）。只在值确有差异时
+    // 才覆盖，避免抹掉用户正在输入的内容。
     if (this.caption.value !== (alt ?? '')) {
       this.caption.value = alt ?? ''
     }
@@ -199,10 +181,9 @@ export const ImageWithAlign = Image.extend({
     ]
   },
 
-  // P0-X: register the NodeView so the resize handles render.
-  // The HTML fallback above (`renderHTML`) is still used for
-  // Markdown round-trip (paste / export) where ProseMirror
-  // isn't driving rendering.
+  // 注册 NodeView，让缩放手柄得以渲染。上面的 HTML 回退
+  // （`renderHTML`）仍用于 markdown 往返转换（粘贴 / 导出）
+  // 这种不由 ProseMirror 驱动渲染的场景。
   addNodeView() {
     return (node) => new ImageFigureView(node)
   },

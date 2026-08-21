@@ -1,31 +1,26 @@
-//! Inline image extraction and loading for the PDF export.
+//! PDF 导出的行内图片提取与加载。
 //!
-//! The markdown line loop hands every `![alt](path)` it
-//! encounters to `extract_inline_images`, then `load_image_bytes`
-//! turns each path into a PNG/JPG byte vector that the main
-//! orchestrator can embed. Lives in its own module so future
-//! image-format support (WebP, AVIF) and SSRF-style guard rails
-//! (reject remote URLs, sandbox relative paths) can be added
-//! without bloating `pdf.rs`.
+//! Markdown 行循环把遇到的每个 `![alt](path)` 交给
+//! `extract_inline_images`，再由 `load_image_bytes` 把每个路径
+//! 变成主编排器可嵌入的 PNG/JPG 字节向量。单独放一个模块，让未来的
+//! 图片格式支持（WebP、AVIF）和 SSRF 式护栏（拒绝远程 URL、
+//! 限制相对路径）可以在不撑大 `pdf.rs` 的前提下添加。
 
 use std::path::{Path, PathBuf};
 
-/// Pull every inline `![alt](path)` out of a single line of
-/// markdown. Returns `(path, alt)` pairs in source order so the
-/// caller can dedupe by line+index when building substitution
-/// markers.
+/// 从单行 Markdown 中提取所有行内 `![alt](path)`。按源顺序返回
+/// `(path, alt)` 对，调用方在构建替换标记时可按行+索引去重。
 ///
-/// Hand-rolled character loop — keeps the export crate free
-/// of a `regex` dependency (which lives in `markdown` only).
-/// No escaping support, matching the CommonMark subset we
-/// support elsewhere.
+/// 手写的字符循环——让 export crate 不引入 `regex` 依赖
+/// （该依赖只在 `markdown` 中）。不支持转义，与我们其他地方支持的
+/// CommonMark 子集一致。
 pub fn extract_inline_images(line: &str) -> Vec<(String, String)> {
     let bytes = line.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;
     while i + 4 < bytes.len() {
         if bytes[i] == b'!' && bytes[i + 1] == b'[' {
-            // Scan alt until `]`
+            // 扫描 alt，直到 `]`
             let alt_start = i + 2;
             let mut j = alt_start;
             while j < bytes.len() && bytes[j] != b']' {
@@ -33,7 +28,7 @@ pub fn extract_inline_images(line: &str) -> Vec<(String, String)> {
             }
             if j < bytes.len() && j + 1 < bytes.len() && bytes[j + 1] == b'(' {
                 let alt = line[alt_start..j].to_string();
-                // Scan path until `)`
+                // 扫描路径，直到 `)`
                 let path_start = j + 2;
                 let mut k = path_start;
                 while k < bytes.len() && bytes[k] != b')' {
@@ -52,12 +47,11 @@ pub fn extract_inline_images(line: &str) -> Vec<(String, String)> {
     out
 }
 
-/// Read an image from `path` if it's a local file we can open.
-/// Remote URLs (http/https/data:) are rejected. Relative paths
-/// are resolved against the source markdown's directory so
-/// `![](./img.png)` works when the document is exported.
+/// 若 `path` 是本地文件则读取该图片。远程 URL（http/https/data:）
+/// 被拒绝。相对路径以源 Markdown 所在目录为基准解析，这样导出文档时
+/// `![](./img.png)` 也能正常工作。
 pub fn load_image_bytes(path: &str, source_path: Option<&str>) -> Option<Vec<u8>> {
-    // Reject remote / inline-embedded sources outright.
+    // 直接拒绝远程 / 内嵌来源。
     if path.starts_with("http://")
         || path.starts_with("https://")
         || path.starts_with("data:")

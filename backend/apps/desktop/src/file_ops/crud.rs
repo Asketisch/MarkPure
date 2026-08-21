@@ -62,9 +62,9 @@ pub fn cmd_rename_file(
         .ok_or("Missing 'new_name' parameter")?;
     let path = PathBuf::from(path_str);
     let roots = active_workspace_roots(state);
-    // Validate the *source* path is in-workspace. `fs::rename_file`
-    // already checks the new name stays within `old_path.parent()`,
-    // which inherits the source's workspace membership.
+    // 校验源路径位于工作区内。`fs::rename_file`
+    // 已负责确认新名称仍位于 `old_path.parent()` 之内，
+    // 而该目录沿用源路径的工作区归属。
     ensure_path_in_workspace(&path, &roots)?;
 
     let new_path = state
@@ -84,7 +84,7 @@ pub fn cmd_reveal_in_finder(
     let path_str = params["path"].as_str().ok_or("Missing 'path' parameter")?;
     let path = PathBuf::from(path_str);
 
-    // Use macOS open command with -R flag to reveal in Finder
+    // 使用 macOS 的 open 命令配合 -R 参数在访达中显示
     let output = Command::new("open")
         .args(["-R", &path.to_string_lossy()])
         .output()

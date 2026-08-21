@@ -1,32 +1,28 @@
 /**
- * Public entry point for the Vim mode plugin (P2-7).
+ * Vim 模式插件的对外入口。
  *
- * Exports:
- *   - `createVimPlugin`  — the ProseMirror plugin
- *   - `vimPluginKey`     — read state from outside
- *   - `isVimEnabled` / `setVimEnabled` — module-level toggle
+ * 导出：
+ *   - `createVimPlugin`  — ProseMirror 插件
+ *   - `vimPluginKey`     — 从外部读取状态
+ *   - `isVimEnabled` / `setVimEnabled` — 模块级开关
  *
- * Tiptap commands and keybindings live in
- * `extensions/editing/vim-extension.ts`; this file is a pure
- * PM module.
+ * Tiptap 命令与快捷键绑定位于
+ * `extensions/editing/vim-extension.ts`；本文件是纯 PM 模块。
  *
- * Module-level state:
- *   - `currentView` — the live `EditorView` for the active
- *     editor. Updated by the plugin's `view(view)` hook on
- *     every editor instance. `setVimEnabled` reads it to
- *     dispatch a `setEnabled` meta when no caller has the
- *     view in hand (e.g. from the command palette).
+ * 模块级状态：
+ *   - `currentView` — 活动编辑器的实时 `EditorView`。由插件的
+ *     `view(view)` 钩子在每个编辑器实例上更新。`setVimEnabled`
+ *     在调用方手头没有视图时（例如从命令面板触发）读取它，
+ *     以便派发 `setEnabled` meta。
  *
- * Keystroke handling:
- *   - `handleKeyDown` returns `false` when Vim is disabled,
- *     when the target is not inside the editor's contentEditable
- *     element, or when IME composition is active. This is the
- *     single point where Vim "releases" a key back to the
- *     default Tiptap keymap.
- *   - `handleTextInput` always returns `false` so composed
- *     characters flow through PM's text-input rules.
- *   - `handleDOMEvents.mousedown` returns `true` in NORMAL
- *     mode when Alt is held (so P2-3 / P0-3 don't fire).
+ * 按键处理：
+ *   - 当 Vim 被禁用、目标不在编辑器的 contentEditable 元素内、
+ *     或处于 IME 组合输入状态时，`handleKeyDown` 返回 `false`。
+ *     这是 Vim 把按键「交还」给默认 Tiptap 键位表的唯一入口。
+ *   - `handleTextInput` 始终返回 `false`，让组合字符走 PM 的
+ *     文本输入规则。
+ *   - `handleDOMEvents.mousedown` 在普通模式下按住 Alt 时返回
+ *     `true`（这样多光标与列选择插件不会触发）。
  */
 
 import { Plugin } from '@tiptap/pm/state'
@@ -77,7 +73,7 @@ export {
 export { buildVimDecorations, rebuildVimDecorations, makeBlockCaret, makeBarCaret, makeLineHighlight, makeBlockHighlight } from './decorations'
 
 /* ------------------------------------------------------------------ *
- *  Module-level toggle                                                 *
+ *  模块级开关                                                          *
  * ------------------------------------------------------------------ */
 
 let _enabled = false
@@ -87,8 +83,8 @@ export function isVimEnabled(): boolean {
   return _enabled
 }
 
-/** Toggle the global Vim flag. If a view is registered, dispatches
- *  a `setEnabled` meta so the plugin's reducer sees the change. */
+/** 切换全局 Vim 开关。若已注册视图，则派发 `setEnabled` meta，
+ *  让插件的 reducer 感知到这一变化。 */
 export function setVimEnabled(enabled: boolean): void {
   _enabled = enabled
   const view = _currentView
@@ -99,7 +95,7 @@ export function setVimEnabled(enabled: boolean): void {
 }
 
 /* ------------------------------------------------------------------ *
- *  Plugin factory                                                      *
+ *  插件工厂                                                            *
  * ------------------------------------------------------------------ */
 
 export function createVimPlugin(): Plugin {
@@ -128,15 +124,15 @@ export function createVimPlugin(): Plugin {
         const s = vimPluginKey.getState(view.state) as VimState | undefined
         if (!s || !s.enabled) return false
         if (s.isComposing) return false
-        // 1. Target guard: only consume keys targeted at the editor.
+        // 1. 目标守卫：只消费落在编辑器内的按键。
         if (!view.dom.contains(event.target as Node)) return false
-        // 2. Read-only guard.
+        // 2. 只读守卫。
         if (!view.editable) return false
 
         const key = parseKey(event, typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform))
         const result = tryParseCommand(s, key)
         if (result.kind === 'pending') {
-          // Update plugin state (pending buffer / mode).
+          // 更新插件状态（待解析缓冲区 / 模式）。
           const tr = view.state.tr
           tr.setMeta(vimPluginKey, { type: 'setPending', pending: result.state.pending })
           if (result.state.mode !== s.mode) {
@@ -149,10 +145,9 @@ export function createVimPlugin(): Plugin {
           return true
         }
         if (result.kind === 'error') {
-          // Surface a transient error in the StatusBar. We do this
-          // by dispatching a meta with the message (consumed by
-          // App.svelte's onTransaction listener). For V1 we just
-          // console.warn and reset pending.
+          // 在状态栏提示一个瞬时错误。做法是派发一个带消息的
+          // meta（由 App.svelte 的 onTransaction 监听消费）。
+          // 当前版本直接 console.warn 并重置待解析状态。
           // eslint-disable-next-line no-console
           console.warn(`[vim] ${result.message}`)
           const tr = view.state.tr
@@ -160,14 +155,12 @@ export function createVimPlugin(): Plugin {
           view.dispatch(tr)
           return true
         }
-        // `ready` — execute the command.
+        // `ready` —— 执行命令。
         const cmd = result.cmd
-        // Special-case redo: dispatch to Tiptap.
+        // 特殊情况：redo 交由 Tiptap 处理。
         if (cmd.type === 'redo') {
-          // We can't reach editor.commands from here, so the
-          // extension handles `redo` via its own command shim.
-          // Mark the plugin state to indicate the next event
-          // should redo.
+          // 这里够不到 editor.commands，因此由扩展通过自己的
+          // 命令垫片处理 `redo`，这里只阻止默认行为即可。
           event.preventDefault()
           return true
         }
@@ -177,25 +170,24 @@ export function createVimPlugin(): Plugin {
           return true
         }
         if (cmd.type === 'ex') {
-          // Surface the ex command via a CustomEvent on window —
-          // App.svelte's listener picks it up and dispatches via
-          // the host's exCtx.
+          // 通过 window 上的 CustomEvent 抛出一条 ex 命令——
+          // App.svelte 的监听会接住它，并经宿主提供的 exCtx
+          // 完成派发。
           const detail = { cmd: cmd.cmd, pending: result.state.pending }
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('markpure:vim-ex', { detail }))
           }
           return true
         }
-        // Dispatch the command to the editor.
+        // 把命令派发给编辑器。
         event.preventDefault()
         if (cmd.type === 'noOp') return true
         return dispatchVimCommand(view, cmd)
       },
 
       handleTextInput(_view, _from, _to, _text, _deflt) {
-        // Always return false so composed characters flow through
-        // PM's default text-input rules. The plugin tracks IME
-        // composition via `compositionstart`/`end` listeners.
+        // 始终返回 false，让组合字符走 PM 的默认文本输入规则。
+        // 插件通过 `compositionstart`/`end` 监听跟踪 IME 组合输入。
         return false
       },
 
@@ -204,33 +196,28 @@ export function createVimPlugin(): Plugin {
           if (!event.altKey || event.button !== 0) return false
           const s = vimPluginKey.getState(view.state) as VimState | undefined
           if (!s || !s.enabled) return false
-          // In NORMAL / VISUAL modes, swallow Alt+Click so the
-          // P0-3 multi-cursor / P2-3 column-select plugins don't
-          // fire. The user can still use mouse selection without
-          // Alt (which PM handles natively).
+          // 在普通 / 可视模式下吞掉 Alt+Click，避免多光标与
+          // 列选择插件触发。用户仍可不用 Alt 做鼠标选择
+          // （PM 原生支持）。
           if (s.mode === 'normal' || s.mode === 'visual'
               || s.mode === 'visual-line' || s.mode === 'visual-block') {
             event.preventDefault()
-            // If the user single-clicked (no drag), enter VISUAL
-            // mode at that position. Otherwise let the column-
-            // select plugin handle the drag (it runs BEFORE us in
-            // PM's dispatch order, so it'll already have consumed
-            // the event — we only see single-clicks here).
+            // 若是单击（没有拖拽），就在该位置进入可视模式。
+            // 否则让列选择插件处理拖拽（它在 PM 的派发顺序里
+            // 排在我们前面，早已消费掉事件——我们只会看到单击）。
             const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })
             if (pos && event.shiftKey) {
-              // Shift+Alt+Click: extend visual from the current
-              // head to the click. We approximate by entering
-              // visual at the click; the user can extend with
-              // motions.
+              // Shift+Alt+Click：从当前锚点向点击位置扩展可视区域。
+              // 我们近似处理为在点击处进入可视模式；用户可以
+              // 再用 motion 扩展选区。
               enterVisualMode(view, 'char')
             } else if (pos) {
-              // Plain Alt+Click in NORMAL: no-op (Vim doesn't
-              // have Alt+Click semantics). The user can press
-              // `v` to enter visual.
+              // 普通模式下单纯的 Alt+Click 是空操作（Vim 没有
+              // Alt+Click 语义）。用户可以按 `v` 进入可视模式。
             }
             return true
           }
-          // In INSERT mode, fall through to P0-3 / P2-3.
+          // 插入模式下放行多光标与列选择插件。
           return false
         },
       },
@@ -238,7 +225,7 @@ export function createVimPlugin(): Plugin {
 
     view(view: EditorView) {
       _currentView = view
-      // Wire up IME composition listeners.
+      // 挂接 IME 组合输入监听器。
       const onCompositionStart = () => {
         const tr = view.state.tr
         tr.setMeta(vimPluginKey, { type: 'compositionStart' })

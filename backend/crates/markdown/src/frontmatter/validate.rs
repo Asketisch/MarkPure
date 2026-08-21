@@ -1,17 +1,15 @@
-//! Strict frontmatter validation. [`validate_frontmatter`]
-//! returns `Result<Frontmatter, FrontmatterError>` whereas
-//! [`crate::frontmatter::parse_frontmatter`] returns `Option`;
-//! use validate when an editor is about to save a file and
-//! must surface bad-input feedback to the user.
+//! 严格的 frontmatter 校验。与返回 `Option` 的
+//! [`crate::frontmatter::parse_frontmatter`] 不同，
+//! [`validate_frontmatter`] 返回 `Result<Frontmatter, FrontmatterError>`；
+//! 当编辑器即将保存文件、需要向用户反馈非法输入时，请使用该校验函数。
 
 use super::bounds::find_frontmatter;
 use super::parse::parse_frontmatter;
 use super::types::{Frontmatter, FrontmatterError, FrontmatterFormat};
 
-/// Parse + sanity-check a frontmatter block. Returns the
-/// same `Frontmatter` as [`parse_frontmatter`] when the
-/// input is well-formed, or a `FrontmatterError` describing
-/// what went wrong.
+/// 解析并检查 frontmatter 块。当输入格式正确时，
+/// 返回与 [`parse_frontmatter`] 相同的 `Frontmatter`，
+/// 否则返回描述问题的 `FrontmatterError`。
 pub fn validate_frontmatter(content: &str) -> Result<Frontmatter, FrontmatterError> {
     match find_frontmatter(content) {
         Some(bounds) => {
@@ -30,7 +28,7 @@ pub fn validate_frontmatter(content: &str) -> Result<Frontmatter, FrontmatterErr
                 });
             };
 
-            // Basic validation based on format
+            // 根据格式进行基础校验
             match format {
                 FrontmatterFormat::Yaml => {
                     if !fm_content.trim().ends_with("---") {
@@ -51,7 +49,7 @@ pub fn validate_frontmatter(content: &str) -> Result<Frontmatter, FrontmatterErr
                     }
                 }
                 FrontmatterFormat::Json => {
-                    // Check for balanced braces
+                    // 检查花括号是否配对
                     let count = fm_content.matches('{').count();
                     let close_count = fm_content.matches('}').count();
                     if count != close_count {

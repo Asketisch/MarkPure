@@ -1,12 +1,10 @@
 /**
- * Shared types for the App-level handlers.
+ * App 级处理器共用的类型。
  *
- * The `Tab` interface is the renderer's source of truth for an
- * open document. The id is a monotonically-increasing `number`
- * (kept on the renderer for the lifetime of the running app;
- * the Rust doc registry now stores it as a `String` for P2-4
- * cross-restart persistence). The path is `null` for unsaved
- * (Untitled) tabs.
+ * `Tab` 接口是渲染进程对已打开文档的事实来源。id 是单调递增的
+ * `number`（应用运行期间保存在渲染进程；Rust 文档注册表现在以
+ * `String` 存储它，用于跨重启持久化）。未保存（未命名）标签页的
+ * `path` 为 `null`。
  */
 export interface Tab {
   id: number
@@ -14,19 +12,17 @@ export interface Tab {
   name: string
   dirty: boolean
   content: string
-  /** true = preview tab (the Welcome "open file" flow). Closed
-   *  when another file is opened so it doesn't stick around. */
+  /** true = 预览标签页（欢迎页“打开文件”流程）。打开其他文件时
+   *  关闭，避免残留。 */
   preview?: boolean
-  /** File modification time when opened (unix-seconds float).
-   *  Used by the reload-from-disk prompt (P0-4) to detect
-   *  external changes. */
+  /** 打开时的文件修改时间（unix 秒，浮点）。用于从磁盘重新加载的
+   *  提示，以检测外部改动。 */
   mtime: number | null
 }
 
-/** A single root-switch eviction: Rust tells the renderer
- *  "drop these doc ids" after a `set_active_workspace_root`
- *  IPC completes. The App reads `evictedDocIds` from the
- *  workspace store and closes the matching tabs. */
+/** 一次根切换的驱逐：`set_active_workspace_root` IPC 完成后，
+ *  Rust 告诉渲染进程“丢弃这些 doc id”。App 从工作区 store 读取
+ *  `evictedDocIds` 并关闭匹配的标签页。 */
 export interface DocEviction {
   docIds: string[]
 }

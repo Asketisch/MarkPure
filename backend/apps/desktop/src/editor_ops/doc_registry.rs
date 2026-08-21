@@ -1,30 +1,24 @@
-//! Document registry: per-tab text buffers held in Rust, with LRU
-//! eviction and P2-4 multi-root GC.
+//! 文档注册表：存在 Rust 中的按标签页文本缓冲区，带 LRU
+//! 淘汰与多根 GC。
 //!
-//! P2-4 changes:
-//! - `doc_id` is now `String` (was `u64`) so it matches the frontend
-//!   tab id and survives restart round-trips.
-//! - IPC accepts `{ doc_id: String | number }` — old `u64` is
-//!   still accepted to keep the call sites' older client code
-//!   working during the migration.
-//! - On root switch (`gc_docs_outside_root`) all docs whose
-//!   `doc_workspace` is not the new active root are dropped from
-//!   the in-memory registry.
+//! 多根相关的改动：
+//! - `doc_id` 现在为 `String`（原来是 `u64`），与前端标签页 id
+//!   一致，并能在重启往返中幸存。
+//! - IPC 接受 `{ doc_id: String | number }`——仍接受旧的 `u64`，
+//!   让迁移期间调用方的旧客户端代码继续工作。
+//! - 切换根时（`gc_docs_outside_root`），所有 `doc_workspace`
+//!   不属于新活动根的文档都会从内存注册表中移除。
 
 use crate::state::{lock_or_recover, parse_doc_id_param, AppState, MAX_DOCUMENTS};
 use mt_core::document::{Document, Encoding};
-#[cfg(test)]
-use std::collections::HashMap;
 
-/// Touch the LRU order for `doc_id`, returning the IDs of documents
-/// that must be evicted to keep within `MAX_DOCUMENTS`.
+/// 更新 `doc_id` 的 LRU 顺序，返回为保持在 `MAX_DOCUMENTS`
+/// 之内而必须淘汰的文档 id 列表。
 ///
-/// IMPORTANT: this helper is the single point that holds the
-/// `doc_order` lock while looking at candidate evictions. Callers
-/// MUST drop the returned `Vec<String>` of evictee IDs and release
-/// this lock before acquiring `state.documents`, otherwise we
-/// re-introduce a nested-lock deadlock (we previously had exactly
-/// this bug).
+/// 重要：该辅助函数是检查候选淘汰项时唯一持有
+/// `doc_order` 锁的地方。调用方必须在获取 `state.documents` 之前
+/// 丢弃返回的淘汰 id `Vec<String>` 并释放这把锁，否则会重新引入
+/// 嵌套锁死锁（我们以前正好出过这个 bug）。
 fn touch_lru(state: &AppState, doc_id: &str) -> Vec<String> {
     let mut doc_order = lock_or_recover(&state.doc_order);
     let to_evict: Vec<String> = if doc_order.len() + 1 > MAX_DOCUMENTS {
@@ -40,9 +34,8 @@ fn touch_lru(state: &AppState, doc_id: &str) -> Vec<String> {
     to_evict
 }
 
-/// Apply previously computed eviction list. Caller MUST NOT hold
-/// `state.doc_order` when calling this — see `touch_lru` for the
-/// deadlock rationale.
+/// 应用先前算出的淘汰列表。调用此函数时绝不能持有
+/// `state.doc_order`——死锁原因见 `touch_lru`。
 fn apply_evictions(state: &AppState, evict_ids: &[String]) {
     if evict_ids.is_empty() {
         return;
@@ -58,8 +51,8 @@ fn apply_evictions(state: &AppState, evict_ids: &[String]) {
 }
 
 /// `doc_open { doc_id, content, workspace_root_id? }` →
-/// register a document. Optional `workspace_root_id` ties the
-/// doc to a multi-root workspace for LRU GC on root switch.
+/// 注册一个文档。可选的 `workspace_root_id` 把文档绑定到
+/// 多根工作区，供切换根时的 LRU 回收使用。
 pub fn cmd_doc_open(
     params: &serde_json::Value,
     state: &AppState,
@@ -81,8 +74,7 @@ pub fn cmd_doc_open(
     Ok(serde_json::Value::Null)
 }
 
-/// `doc_close { doc_id }` → drop the document and its
-/// workspace mapping.
+/// `doc_close { doc_id }` → 丢弃该文档及其工作区映射。
 pub fn cmd_doc_close(
     params: &serde_json::Value,
     state: &AppState,
@@ -104,10 +96,9 @@ pub fn cmd_doc_close(
 }
 
 /// `doc_set_content { doc_id, content, workspace_root_id? }` →
-/// replace the document text. The `workspace_root_id` is
-/// remembered if supplied (first-open semantics; later updates
-/// do not change the binding — the renderer should always pass
-/// it on `doc_open`).
+/// 替换文档文本。若提供了 `workspace_root_id` 则记住它
+/// （首次打开语义；后续更新不改变绑定——渲染器应始终在
+/// `doc_open` 时传入它）。
 pub fn cmd_doc_set_content(
     params: &serde_json::Value,
     state: &AppState,
@@ -138,7 +129,7 @@ pub fn cmd_doc_set_content(
     Ok(serde_json::Value::Null)
 }
 
-/// `doc_get_stats { doc_id }` → { words, characters, lines }.
+/// `doc_get_stats { doc_id }` → { words, characters, lines }。
 pub fn cmd_doc_get_stats(
     params: &serde_json::Value,
     state: &AppState,
@@ -156,7 +147,7 @@ pub fn cmd_doc_get_stats(
 }
 
 /// `doc_search { doc_id, query, case_sensitive?, whole_word?, use_regex? }`
-/// → list of `{from, to}` character offsets.
+/// → `{from, to}` 字符偏移列表。
 pub fn cmd_doc_search(
     params: &serde_json::Value,
     state: &AppState,
@@ -179,14 +170,13 @@ pub fn cmd_doc_search(
     Ok(serde_json::Value::Array(result))
 }
 
-/// P2-4: drop every document that doesn't belong to `active_root_id`.
+/// 丢弃所有不属于 `active_root_id` 的文档。
 ///
-/// Called from `cmd_set_active_workspace_root` after the config
-/// has been updated, so the renderer's "active root" tree and the
-/// in-memory document registry stay aligned. Returns the list of
-/// evicted `doc_id`s so the caller can tell the renderer which
-/// tabs to close (the renderer is the source of truth for tab
-/// state — Rust can't push a "close tab" command to it).
+/// 在 `cmd_set_active_workspace_root` 更新配置后调用，让渲染器的
+/// 「活动根」树与内存中的文档注册表保持一致。返回被淘汰的
+/// `doc_id` 列表，便于调用方告知渲染器要关闭哪些标签页
+/// （标签页状态的事实来源是渲染器——Rust 无法向它推送「关闭
+/// 标签页」命令）。
 pub fn gc_docs_outside_root(state: &AppState, active_root_id: &str) -> Vec<String> {
     let mut doc_workspace = lock_or_recover(&state.doc_workspace);
     let victims: Vec<String> = doc_workspace
@@ -215,20 +205,6 @@ pub fn gc_docs_outside_root(state: &AppState, active_root_id: &str) -> Vec<Strin
     victims
 }
 
-/// Diagnostic: snapshot the registry (test-only).
-#[cfg(test)]
-pub fn registry_snapshot(
-    state: &AppState,
-) -> (HashMap<String, String>, Vec<String>, Vec<String>) {
-    let docs = lock_or_recover(&state.documents);
-    let doc_workspace = lock_or_recover(&state.doc_workspace);
-    let doc_order = lock_or_recover(&state.doc_order);
-    let map: HashMap<String, String> = doc_workspace.clone();
-    let order: Vec<String> = doc_order.clone();
-    let keys: Vec<String> = docs.keys().cloned().collect();
-    (map, order, keys)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,9 +216,8 @@ mod tests {
 
     #[test]
     fn legacy_numeric_doc_id_is_accepted() {
-        // Pre-P2-4 clients sent `doc_id: 1` (number). The new
-        // string contract must still accept the number, with
-        // the registry keyed on the canonical decimal string.
+        // 早期客户端发送 `doc_id: 1`（数字）。新的字符串契约
+        // 仍须接受数字，注册表以规范十进制字符串为键。
         let state = make_state();
         cmd_doc_open(&serde_json::json!({ "doc_id": 1, "content": "hi" }), &state).unwrap();
         let docs = lock_or_recover(&state.documents);

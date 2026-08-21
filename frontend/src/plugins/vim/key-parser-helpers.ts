@@ -1,13 +1,11 @@
 /**
- * Pure command-construction helpers for the Vim key parser.
+ * Vim 键解析器的纯命令构造助手。
  *
- * Extracted from `key-parser.ts` (where these used to sit in a
- * "Helpers" trailer after the FSM state handlers) so the FSM
- * transitions stay the only thing in `key-parser.ts` and these
- * stateless, easily-unit-tested pure functions live next to
- * their types. No function here touches DOM or plugin state
- * — they turn parsed tokens into `VimCommand` / `ParseResult`
- * payloads.
+ * 从 `key-parser.ts` 中拆出（这些函数原本在 FSM 状态处理器之后的
+ * “Helpers”尾部），让 `key-parser.ts` 只保留 FSM 转移，而这些
+ * 无状态、易于单元测试的纯函数与它们的类型放在一起。这里的任何
+ * 函数都不触碰 DOM 或插件状态——它们把解析出的 token 转成
+ * `VimCommand` / `ParseResult` 负载。
  */
 
 import type {
@@ -19,12 +17,10 @@ import type {
 } from './types'
 import type { ParseResult } from './key-parser'
 
-// `_prev` is kept for signature parity with the historical
-// inline definition so the ~40 call sites in `key-parser.ts`
-// didn't need a mechanical 3→2 arg edit when this was split
-// out. New code may prefer passing `next` positionally as the
-// second arg (the older convention of `ready(cmd, prev, next)`
-// remains valid).
+// `_prev` 保留，是为了与历史上内联定义时的签名保持一致，这样
+// 拆出时 `key-parser.ts` 里约 40 处调用点无需机械地做 3→2 参数
+// 的修改。新代码可把 `next` 当作第二个位置参数传入（旧约定
+// `ready(cmd, prev, next)` 依然有效）。
 export function ready(cmd: VimCommand, _prev: VimState, next: VimState): ParseResult {
   return { kind: 'ready', cmd, state: next }
 }
@@ -37,9 +33,9 @@ export function isDigit(k: string): boolean {
   return k >= '0' && k <= '9'
 }
 
-/** Map a find-char key to its motion: `f` = findForward, `F` =
- *  findBackward, `t` = to-forward, `T` = to-backward (the
- *  parser's default for any other key). */
+/** 把查找字符的按键映射为 motion：`f` = 向前查找、`F` =
+ *  向后查找、`t` = 移动到字符前、`T` = 移动到字符后（其他键是
+ *  解析器的默认值）。 */
 export function findCharToMotion(key: string): Motion {
   if (key === 'f') return 'findChar'
   if (key === 'F') return 'findCharBack'
@@ -47,9 +43,9 @@ export function findCharToMotion(key: string): Motion {
   return 'toCharBack'
 }
 
-/** Turn `d3f{char}`-style tokens into a `deleteMotion` /
- *  `changeMotion` / `yankMotion` command. The optional `char`
- *  (find-char target) is attached only when present. */
+/** 把 `d3f{char}` 形式的 token 转成 `deleteMotion` /
+ *  `changeMotion` / `yankMotion` 命令。可选的 `char`（查找字符
+ *  目标）仅在存在时附加。 */
 export function opToMotionCmd(
   op: Operator,
   motion: Motion,
@@ -62,7 +58,7 @@ export function opToMotionCmd(
   return { type, motion, count, ...(char ? { char } : {}) } as VimCommand
 }
 
-/** `dd` / `cc` / `yy` linewise operators. */
+/** `dd` / `cc` / `yy` 行级操作符。 */
 export function opToLinewise(op: Operator, count: number): VimCommand {
   const type = op === 'delete' ? 'deleteLine'
     : op === 'change' ? 'changeLine'
@@ -70,9 +66,8 @@ export function opToLinewise(op: Operator, count: number): VimCommand {
   return { type, count }
 }
 
-/** Serialise a `PendingBuffer` back to the visible key string
- *  the status bar shows while the user is mid-command
- *  (e.g. `3d?` after typing `3d`). */
+/** 把 `PendingBuffer` 序列化回状态栏在命令输入中显示的按键
+ *  字符串（例如输入 `3d` 后显示 `3d?`）。 */
 export function serializeBuffer(p: PendingBuffer): string {
   switch (p.kind) {
     case 'idle':        return ''

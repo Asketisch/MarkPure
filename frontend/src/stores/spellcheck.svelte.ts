@@ -1,22 +1,18 @@
 /**
- * Spell-check store (Svelte 5 runes singleton).
+ * 拼写检查 store（Svelte 5 runes 单例）。
  *
- * Holds three pieces of state shared between:
- *   - the ProseMirror `spellcheck` plugin (consumes `enabled`
- *     + `language` to decide whether to fire IPC and how)
- *   - the right-click `SpellcheckMenu` overlay (consumes
- *     `latestErrors` to look up the suggestions for the
- *     clicked range)
- *   - the Settings panel (reads + writes `enabled` and
- *     `languageOverride`)
+ * 持有三份在三处共享的状态：
+ *   - ProseMirror `spellcheck` 插件（消费 `enabled` + `language`
+ *     决定是否发起 IPC 以及如何发起）
+ *   - 右键 `SpellcheckMenu` 浮层（消费 `latestErrors` 查询
+ *     点击区间对应的建议）
+ *   - 设置面板（读写 `enabled` 与 `languageOverride`）
  *
- * Modelled after `stores/i18n.svelte.ts` — a single instance
- * created at the App root via `createSpellcheck()` and read
- * elsewhere via `useSpellcheck()` through Svelte context. The
- * plugin can't go through context (it's instantiated outside
- * the Svelte component tree), so the App root assigns the
- * instance to a module-scoped fallback `_globalInstance`
- * that the plugin reads via `getSpellcheckStore()`.
+ * 参照 `stores/i18n.svelte.ts` 的做法——在 App 根部通过
+ * `createSpellcheck()` 创建单一实例，其他地方通过 Svelte context
+ * 的 `useSpellcheck()` 读取。插件无法走 context（它在 Svelte
+ * 组件树之外实例化），因此 App 根部把实例赋给模块级回退变量
+ * `_globalInstance`，插件经 `getSpellcheckStore()` 读取。
  */
 import { getContext, setContext } from 'svelte'
 
@@ -30,15 +26,12 @@ export interface SpellError {
 }
 
 /**
- * Lightweight, in-memory cache of the most recent
- * `checkSpelling` reply for the active document. The
- * spellcheck plugin writes here every time its IPC resolves;
- * the right-click overlay reads here to find the error at
- * the clicked position.
+ * 对激活文档最近一次 `checkSpelling` 应答的轻量内存缓存。
+ * 拼写检查插件每次 IPC 返回时都会写入这里；右键浮层从这里
+ * 读取点击位置对应的错误。
  *
- * Keyed by ProseMirror absolute positions (`from` / `to`)
- * rather than UTF-8 byte offsets so callers can hit the map
- * with `view.posAtCoords` output directly.
+ * 以 ProseMirror 绝对位置（`from` / `to`）为键而非 UTF-8 字节
+ * 偏移，调用方可直接用 `view.posAtCoords` 的输出命中映射。
  */
 export interface ErrorRange {
   from: number
@@ -48,33 +41,30 @@ export interface ErrorRange {
 }
 
 class SpellcheckStore {
-  /** User-controlled master switch. Defaults match the
-   *  Rust-side `default_spellcheck_enabled` (true on macOS). */
+  /** 用户控制的总开关。默认值与 Rust 侧的
+   *  `default_spellcheck_enabled` 一致（macOS 上为 true）。 */
   enabled = $state(false)
-  /** Language code to pass to the IPC. `null` means follow
-   *  the UI language; the plugin substitutes `fallbackLanguage`
-   *  at call time. */
+  /** 传给 IPC 的语言代码。`null` 表示跟随界面语言；插件在调用时
+   *  用 `fallbackLanguage` 替代。 */
   languageOverride = $state<string | null>(null)
-  /** UI language code. App.svelte syncs this from the i18n
-   *  store so the plugin can fall back to it when the user
-   *  hasn't pinned an override. */
+  /** 界面语言代码。App.svelte 从 i18n store 同步过来，用户未
+   *  固定覆盖语言时，插件回退到它。 */
   fallbackLanguage = $state<string>('en')
-  /** Most recent IPC reply mapped into ProseMirror coordinate
-   *  space. The ProseMirror plugin owns the byte-offset →
-   *  PM-position translation. */
+  /** 最近一次 IPC 应答映射到 ProseMirror 坐标空间后的结果。
+   *  字节偏移 → PM 位置的翻译由 ProseMirror 插件负责。 */
   latestErrors = $state<ErrorRange[]>([])
-
+  
   setEnabled(v: boolean) { this.enabled = v }
   setLanguage(lang: string | null) { this.languageOverride = lang }
   setFallbackLanguage(lang: string) { this.fallbackLanguage = lang }
   setErrors(errors: ErrorRange[]) { this.latestErrors = errors }
 
-  /** The language to actually use for the next IPC call. */
+  /** 下一次 IPC 调用实际使用的语言。 */
   effectiveLanguage(): string {
     return this.languageOverride ?? this.fallbackLanguage
   }
 
-  /** Find the error covering `pos` (PM absolute), if any. */
+  /** 查找覆盖 `pos`（PM 绝对位置）的错误，若存在的话。 */
   errorAt(pos: number): ErrorRange | null {
     for (const e of this.latestErrors) {
       if (pos >= e.from && pos <= e.to) return e
@@ -83,10 +73,9 @@ class SpellcheckStore {
   }
 }
 
-// Module-scoped fallback so non-Svelte code (the ProseMirror
-// plugin) can reach the store without context plumbing. The
-// App root sets this in `createSpellcheck`. Only one app
-// instance ever runs in the WebView, so the singleton is safe.
+// 模块级回退，让非 Svelte 代码（ProseMirror 插件）无需 context
+// 管道即可访问 store。App 根部在 `createSpellcheck` 里设置它。
+// WebView 中同一时刻只有一个应用实例，因此单例是安全的。
 let _globalInstance: SpellcheckStore | null = null
 
 export function createSpellcheck(): SpellcheckStore {
@@ -100,7 +89,7 @@ export function useSpellcheck(): SpellcheckStore {
   return getContext<SpellcheckStore>(SPELL_KEY)
 }
 
-/** Plugin-side accessor. Returns null until App root mounts. */
+/** 插件侧访问器。App 根部挂载前返回 null。 */
 export function getSpellcheckStore(): SpellcheckStore | null {
   return _globalInstance
 }

@@ -1,18 +1,17 @@
 /**
- * Stateless helpers shared across App.svelte handlers.
+ * App.svelte 各处理器共用的无状态助手。
  *
- * Topic: small string/path utilities that the various
- * handlers need. Pulled out so App.svelte doesn't have to
- * carry a couple of dozen lines of pure-function noise.
+ * 主题：各处理器需要的小型字符串 / 路径工具。单独抽出，让
+ * App.svelte 不必背着一二十行纯函数噪音。
  */
 
-/** Extract a friendly page name from a file path.
+/** 从文件路径中提取友好的页面名。
  *
- *  Examples:
+ *  示例：
  *    "/Users/x/notes/welcome.md"  → "welcome"
  *    "/Users/x/notes/welcome"     → "welcome"
- *    null                          → fallback ("Untitled")
- *    ""                            → fallback ("Untitled")
+ *    null                          → 回退（"Untitled"）
+ *    ""                            → 回退（"Untitled"）
  */
 export function pageNameFromPath(
   path: string | null,

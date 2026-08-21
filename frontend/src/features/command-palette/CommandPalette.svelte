@@ -1,21 +1,18 @@
 <script lang="ts">
   /**
-   * Command palette — Cmd+Shift+P.
+   * 命令面板 —— Cmd+Shift+P。
    *
-   * A simple fuzzy-finder over a static list of commands. We
-   * don't pull in `fuse.js` for the palette: a hand-rolled
-   * subsequence scorer is fast, has zero dependencies, and is
-   * good enough for 30+ entries. The fuzzy logic is the same
-   * shape VSCode uses for "fuzzysort" (subsequence match with
-   * consecutive-run and start-of-word bonuses).
+   * 在一个静态命令列表上做简单模糊查找。面板不引入 `fuse.js`：
+   * 手写的子序列打分器速度快、零依赖，对 30 多条命令足够用。
+   * 模糊逻辑与主流命令面板一致（子序列匹配，带连续命中与
+   * 词首加分）。
    *
-   * Each command has an `id`, `title`, optional `category`,
-   * optional `keywords`, and a `run` callback. The host passes
-   * those callbacks in as props (file ops, theme cycle, etc.)
-   * because the palette shouldn't import editor/commands
-   * directly — it stays a pure presentational component.
+   * 每个命令有 `id`、`title`、可选的 `category`、可选的
+   * `keywords` 和 `run` 回调。宿主通过 props 传入这些回调
+   * （文件操作、主题循环等），因为面板不应直接 import
+   * editor/commands——它保持为纯展示组件。
    */
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount } from 'svelte'
   import { useI18n } from '$lib/stores/i18n.svelte'
 
   export interface Command {
@@ -40,33 +37,31 @@
   let activeIndex = $state(0)
   let inputEl: HTMLInputElement | null = $state(null)
 
-  /** Score a single command against the query. Higher = better.
-   *  Returns -1 if no match. */
+  /** 对单个命令按查询打分。越高越好。无匹配返回 -1。 */
   function score(cmd: Command, q: string): number {
-    if (!q) return 1 // empty query → everything is a candidate
+    if (!q) return 1 // 空查询 → 所有命令都是候选
     const needle = q.toLowerCase()
     const haystack = (cmd.title + ' ' + (cmd.keywords ?? []).join(' ') + ' ' + (cmd.category ?? '')).toLowerCase()
-    // Subsequence match. Each character of `needle` must appear
-    // in `haystack` in order. We reward consecutive runs and
-    // word-boundary hits.
+    // 子序列匹配：`needle` 的每个字符都必须按顺序出现在
+    // `haystack` 中。连续命中与词首命中会加分。
     let hi = 0
     let ni = 0
     let s = 0
     let prevHit = -1
     while (hi < haystack.length && ni < needle.length) {
       if (haystack[hi] === needle[ni]) {
-        // Word-boundary bonus: start of string, or preceded by a
-        // non-letter (so 'f' in "find_file" gets a bonus).
+        // 词首加分：字符串开头，或前一个字符非字母
+        // （所以 "find_file" 里的 'f' 会加分）。
         const atWordStart = hi === 0 || !/[a-z0-9]/.test(haystack[hi - 1])
         s += atWordStart ? 5 : 1
-        if (prevHit === hi - 1) s += 3 // consecutive run
+        if (prevHit === hi - 1) s += 3 // 连续命中
         prevHit = hi
         ni += 1
       }
       hi += 1
     }
     if (ni < needle.length) return -1
-    // Shorter titles win on tie.
+    // 分数相同时标题更短者胜出。
     return s * 1000 - cmd.title.length
   }
 
@@ -80,14 +75,14 @@
   })
 
   $effect(() => {
-    // Reset selection whenever the filter result changes.
+    // 筛选结果变化时重置选中项。
     if (activeIndex >= filtered.length) activeIndex = 0
   })
 
   $effect(() => {
     if (visible) {
-      // Defer focus until the input is mounted.
-      queueMicrotask(() => inputEl?.focus())
+    // 把聚焦推迟到输入框挂载完成之后。
+    queueMicrotask(() => inputEl?.focus())
     } else {
       query = ''
       activeIndex = 0
@@ -95,21 +90,36 @@
   })
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      visible = false
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      activeIndex = Math.min(filtered.length - 1, activeIndex + 1)
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      activeIndex = Math.max(0, activeIndex - 1)
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      const cmd = filtered[activeIndex]
-      if (cmd) {
+    // 该 handler 同时绑在 backdrop / 容器 / 输入框三层：处理过的
+    // 按键必须 stopPropagation，否则事件冒泡会让外层重复 handler
+    // 再次执行（Enter 把命令 run() 最多执行 3 次、方向键一次移动
+    // 3 格）。未处理的按键（如 Cmd+Shift+P）不拦截，保证冒泡到
+    // window 监听器仍能唤起/关闭面板。
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault()
+        e.stopPropagation()
         visible = false
-        void cmd.run()
+        break
+      case 'ArrowDown':
+        e.preventDefault()
+        e.stopPropagation()
+        activeIndex = Math.min(filtered.length - 1, activeIndex + 1)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        e.stopPropagation()
+        activeIndex = Math.max(0, activeIndex - 1)
+        break
+      case 'Enter': {
+        e.preventDefault()
+        e.stopPropagation()
+        const cmd = filtered[activeIndex]
+        if (cmd) {
+          visible = false
+          void cmd.run()
+        }
+        break
       }
     }
   }
@@ -119,9 +129,8 @@
   }
 
   onMount(() => {
-    // Global hotkey: Cmd+Shift+P / Ctrl+Shift+P toggles the palette.
-    // The host also wires it; we listen defensively so a forgotten
-    // host binding doesn't make the palette unreachable.
+    // 全局快捷键：Cmd+Shift+P / Ctrl+Shift+P 开合面板。宿主也会
+    // 绑定；这里防御性地监听，避免宿主绑定遗漏导致面板无法唤起。
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault()
@@ -132,7 +141,7 @@
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  // Group by category for the sectioned view.
+  // 按类别分组，用于分区视图。
   let grouped = $derived.by(() => {
     const groups = new Map<string, Command[]>()
     for (const c of filtered) {

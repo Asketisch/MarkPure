@@ -1,21 +1,18 @@
-//! Mermaid rendering pipeline — spawns `mmdc`, caches SVG/PNG
-//! results in a process-wide LRU, and exposes both cached and
-//! uncached entry points to the rest of the crate.
+//! Mermaid 渲染管线——启动 `mmdc`，在进程级 LRU 中缓存 SVG/PNG
+//! 结果，并向 crate 其余部分暴露带缓存与不带缓存的入口。
 //!
-//! Extracted from `mermaid.rs` so the `Command::new("mmdc")` +
-//! temp-file dance and the per-format cache lives in one file
-//! instead of being interleaved with validation, suggestions
-//! and parsing logic.
+//! 从 `mermaid.rs` 中抽取，使 `Command::new("mmdc")` + 临时文件
+//! 操作与按格式的缓存集中在单个文件中，而不是与校验、建议和解析
+//! 逻辑交织在一起。
 //!
-//! Two caches live here:
-//! - `SVG_CACHE` keyed on the diagram source → `MermaidResult`
-//!   (used by the editor's live preview and the HTML export).
-//! - `PNG_CACHE` keyed on the diagram source → raw PNG bytes
-//!   (used by the PDF and DOCX export pipelines).
+//! 此处有两个缓存：
+//! - `SVG_CACHE`：以图表源码为键 → `MermaidResult`
+//!   （供编辑器实时预览与 HTML 导出使用）。
+//! - `PNG_CACHE`：以图表源码为键 → 原始 PNG 字节
+//!   （供 PDF 与 DOCX 导出管线使用）。
 //!
-//! We deliberately *don't* cache the "mmdc not installed"
-//! fallback result in `SVG_CACHE` — see `render_mermaid_to_svg_cached`
-//! for the rationale.
+//! 我们刻意*不*把「mmdc 未安装」的回退结果存入 `SVG_CACHE`——
+//! 理由见 `render_mermaid_to_svg_cached`。
 
 use lru::LruCache;
 use std::num::NonZeroUsize;
@@ -24,40 +21,53 @@ use std::sync::Mutex;
 
 use super::validate::validate_mermaid;
 
-/// Maximum number of diagrams kept in the LRU cache. 64 is plenty for
-/// a typical document; the cache is process-global so we use a smaller
-/// number than per-document caches.
+/// LRU 缓存中最多保留的图表数。对典型文档而言 64 绰绰有余；
+/// 该缓存为进程级，因此比按文档缓存使用更小的数字。
 pub(super) const CACHE_CAPACITY: usize = 64;
 
-/// Process-wide LRU cache for SVG render results. The cache key is the
-/// raw diagram source; the value is the `MermaidResult` (which carries
-/// the SVG string, an optional error message, and the validity flag).
+/// SVG 渲染结果的进程级 LRU 缓存。缓存键是原始图表源码；
+/// 值是 `MermaidResult`（携带 SVG 字符串、可选错误消息与有效性标志）。
 pub(super) static SVG_CACHE: once_cell::sync::Lazy<Mutex<LruCache<String, MermaidResult>>> =
     once_cell::sync::Lazy::new(|| {
         Mutex::new(LruCache::new(NonZeroUsize::new(CACHE_CAPACITY).unwrap()))
     });
 
-/// Process-wide LRU cache for PNG render results (raw byte payload).
+/// PNG 渲染结果的进程级 LRU 缓存（原始字节载荷）。
 pub(super) static PNG_CACHE: once_cell::sync::Lazy<Mutex<LruCache<String, Vec<u8>>>> =
     once_cell::sync::Lazy::new(|| {
         Mutex::new(LruCache::new(NonZeroUsize::new(CACHE_CAPACITY).unwrap()))
     });
 
-/// Re-export the result type so callers can `use mermaid::render::*`
-/// without reaching into the parent module.
+/// 重导出结果类型，使调用方可用 `use mermaid::render::*`
+/// 而无需深入父模块。
 pub(super) use super::types::MermaidResult;
 
-/// Returns `true` if the `mmdc` CLI is installed and the user has not
-/// explicitly disabled it via the `MMDC_DISABLED` environment variable.
-/// The env var is honoured in tests so we can force the fallback path
-/// without actually invoking the CLI.
+/// 临时文件名的进程内序号。慢速命令在各自专用 OS 线程上并发运行
+/// （两个文档同时导出、或同一图表的 SVG/PNG 缓存同时 miss），
+/// 固定文件名会让两个 mmdc 进程互相覆盖对方的输入/输出文件。
+/// pid + 单调序号保证进程内与跨进程都不碰撞。
+static TMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// 分配一对唯一的临时输入/输出路径（`out_ext` 为 `svg` 或 `png`）。
+fn unique_tmp_paths(out_ext: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+    let seq = TMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp_dir = std::env::temp_dir().join(format!("markpure-mmd-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    (
+        tmp_dir.join(format!("diagram-{seq}.mmd")),
+        tmp_dir.join(format!("diagram-{seq}.{out_ext}")),
+    )
+}
+
+/// 若已安装 `mmdc` CLI 且用户未通过 `MMDC_DISABLED` 环境变量显式
+/// 禁用，返回 `true`。测试中遵守该环境变量，使我们无需真正调用
+/// CLI 即可强制走回退路径。
 pub(super) fn mmdc_available() -> bool {
     if std::env::var_os("MMDC_DISABLED").is_some() {
         return false;
     }
-    // `which` is not a crate dependency; do a PATH lookup ourselves for
-    // the few common install locations. We don't need exhaustive coverage
-    // — if mmdc is on PATH elsewhere, the actual Command spawn will succeed.
+    // `which` 不是一个 crate 依赖；我们自行对少数常见安装位置做 PATH 查找。
+    // 无需穷举——若 mmdc 在其他 PATH 上，真正的 Command 启动会成功。
     let candidates: &[&str] = if cfg!(target_os = "windows") {
         &["mmdc.cmd", "mmdc.exe", "mmdc"]
     } else {
@@ -74,20 +84,19 @@ pub(super) fn mmdc_available() -> bool {
             }
         }
     }
-    // Fall back: try spawn with no path; if it succeeds, mmdc is on PATH
+    // 兜底：尝试不指定路径启动；若成功，说明 mmdc 在 PATH 上
     Command::new("mmdc").arg("--version").output().is_ok()
 }
 
-/// Inner (uncached) implementation that calls `mmdc` to produce an SVG.
-/// This is the function that actually shells out to the Mermaid CLI.
+/// 内部（不带缓存）实现：调用 `mmdc` 生成 SVG。
+/// 这是真正 shell 到 Mermaid CLI 的函数。
 ///
-/// `mmdc` doesn't read from stdin; it requires a real input file. We
-/// write the diagram to a temp file, point `mmdc` at it, and read the
-/// SVG output. If `mmdc` isn't installed (no executable in PATH), we
-/// gracefully fall back to validation-only so the caller can still
-/// show the original code block.
+/// `mmdc` 不读 stdin；它需要一个真实的输入文件。我们把图表写入临时
+/// 文件，让 `mmdc` 指向它，再读取 SVG 输出。若 `mmdc` 未安装
+///（PATH 中无该可执行文件），我们优雅地回退到仅校验，使调用方
+/// 仍能展示原始代码块。
 pub(super) fn render_mermaid_to_svg_inner(code: &str) -> MermaidResult {
-    // First validate
+    // 先校验
     if !validate_mermaid(code) {
         return MermaidResult {
             svg: None,
@@ -107,10 +116,7 @@ pub(super) fn render_mermaid_to_svg_inner(code: &str) -> MermaidResult {
         };
     }
 
-    let tmp_dir = std::env::temp_dir().join(format!("markpure-mmd-{}", std::process::id()));
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let in_path = tmp_dir.join("diagram.mmd");
-    let out_path = tmp_dir.join("diagram.svg");
+    let (in_path, out_path) = unique_tmp_paths("svg");
 
     if let Err(e) = std::fs::write(&in_path, code) {
         return MermaidResult {
@@ -165,11 +171,9 @@ pub(super) fn render_mermaid_to_svg_inner(code: &str) -> MermaidResult {
             }
         }
         Err(_) => {
-            // CLI not installed. We deliberately treat this as a
-            // soft failure (is_valid: true) so the editor can
-            // show the original mermaid source instead of an
-            // error — installing mmdc is a *user choice*, not a
-            // code bug.
+            // CLI 未安装。我们刻意将其视为软失败（is_valid: true），
+            // 使编辑器能展示原始 mermaid 源码而非一条错误——安装 mmdc
+            // 是*用户的选择*，而非代码缺陷。
             MermaidResult {
                 svg: None,
                 error: Some(
@@ -182,24 +186,19 @@ pub(super) fn render_mermaid_to_svg_inner(code: &str) -> MermaidResult {
     }
 }
 
-/// Cached SVG render. Identical source returns the same `MermaidResult`
-/// without re-invoking `mmdc`. Used by the HTML export pipeline and the
-/// editor's live rendering IPC.
+/// 带缓存的 SVG 渲染。相同源码返回相同 `MermaidResult`，无需再次
+/// 调用 `mmdc`。供 HTML 导出管线与编辑器的实时渲染 IPC 使用。
 ///
-/// We only cache successful renders (`svg.is_some()`) and validation
-/// failures (`is_valid == false`). The "mmdc not installed" fallback
-/// is intentionally NOT cached: if the user installs `mmdc` after the
-/// app is already running, every cached "not available" entry would
-/// otherwise pin the failure for the rest of the process lifetime.
-/// Skipping the cache for that specific `MermaidResult` shape means
-/// the next call re-checks `mmdc_available()` and can recover
-/// without a restart.
+/// 我们只缓存成功渲染（`svg.is_some()`）与校验失败（`is_valid == false`）
+/// 的结果。「mmdc 未安装」的回退结果刻意*不*缓存：若用户应用运行后
+/// 安装了 `mmdc`，否则每个缓存的「不可用」条目都会在进程剩余生命周期内
+/// 钉死该失败。对该特定 `MermaidResult` 形态跳过缓存，意味着下次调用
+/// 会重新检查 `mmdc_available()` 并在不重启的情况下恢复。
 pub fn render_mermaid_to_svg_cached(code: &str) -> MermaidResult {
     if let Ok(mut cache) = SVG_CACHE.lock() {
         if let Some(cached) = cache.get(code) {
-            // Skip the cache for the "soft fallback" result shape.
-            // The renderer marks this with `is_valid: true` and no SVG,
-            // which is uniquely the mmdc-not-available path.
+            // 对「软回退」结果形态跳过缓存。渲染器以 `is_valid: true`
+            // 且无 SVG 标记它，这是 mmdc 不可用路径独有的特征。
             if cached.svg.is_some() || !cached.is_valid {
                 return cached.clone();
             }
@@ -217,8 +216,7 @@ pub fn render_mermaid_to_svg_cached(code: &str) -> MermaidResult {
     result
 }
 
-/// Inner (uncached) implementation that calls `mmdc` to produce a PNG
-/// by passing the `-e png` (extension) flag.
+/// 内部（不带缓存）实现：通过 `-e png`（扩展名）标志调用 `mmdc` 生成 PNG。
 pub(super) fn render_mermaid_to_png_inner(code: &str) -> Result<Vec<u8>, String> {
     if !validate_mermaid(code) {
         return Err("Invalid Mermaid syntax".to_string());
@@ -231,10 +229,7 @@ pub(super) fn render_mermaid_to_png_inner(code: &str) -> Result<Vec<u8>, String>
         );
     }
 
-    let tmp_dir = std::env::temp_dir().join(format!("markpure-mmd-png-{}", std::process::id()));
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let in_path = tmp_dir.join("diagram.mmd");
-    let out_path = tmp_dir.join("diagram.png");
+    let (in_path, out_path) = unique_tmp_paths("png");
 
     if let Err(e) = std::fs::write(&in_path, code) {
         return Err(format!("failed to write temp input: {}", e));
@@ -281,8 +276,8 @@ pub(super) fn render_mermaid_to_png_inner(code: &str) -> Result<Vec<u8>, String>
     }
 }
 
-/// Cached PNG render. Returns PNG bytes suitable for embedding in
-/// PDF and DOCX. Used by the PDF and DOCX export pipelines.
+/// 带缓存的 PNG 渲染。返回适合嵌入 PDF 与 DOCX 的 PNG 字节。
+/// 供 PDF 与 DOCX 导出管线使用。
 pub fn render_mermaid_to_png_cached(code: &str) -> Result<Vec<u8>, String> {
     if let Ok(mut cache) = PNG_CACHE.lock() {
         if let Some(cached) = cache.get(code) {
@@ -299,9 +294,8 @@ pub fn render_mermaid_to_png_cached(code: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// Backward-compatible entry point used by the editor's IPC
-/// (`cmd_render_mermaid`). Delegates to the cached SVG variant so the
-/// editor and exports share the same LRU.
+/// 编辑器 IPC（`cmd_render_mermaid`）使用的向后兼容入口。
+/// 委托给带缓存的 SVG 变体，使编辑器与导出共享同一 LRU。
 pub fn render_mermaid_with_cli(code: &str) -> MermaidResult {
     render_mermaid_to_svg_cached(code)
 }
@@ -311,11 +305,10 @@ mod tests {
 
     #[test]
     fn test_render_mermaid_unavailable_returns_soft_error() {
-        // Force the fallback path without touching the host's
-        // actual `mmdc` install.
+        // 不触碰宿主真实的 `mmdc` 安装即强制回退路径。
         std::env::set_var("MMDC_DISABLED", "1");
         let result = render_mermaid_to_svg_cached("graph TD\n    A --> B");
-        // Soft failure: code was valid but mmdc is missing.
+        // 软失败：代码有效但 mmdc 缺失。
         assert!(result.svg.is_none());
         assert!(result.is_valid);
         assert!(result.error.is_some());
@@ -325,9 +318,8 @@ mod tests {
     #[test]
     fn test_render_mermaid_invalid_syntax_is_hard_error() {
         std::env::set_var("MMDC_DISABLED", "1");
-        // Unbalanced bracket → validate_mermaid returns false →
-        // the renderer must surface a hard error, not the
-        // soft "mmdc missing" path.
+        // 括号不平衡 → validate_mermaid 返回 false →
+        // 渲染器须呈现硬错误，而非软「mmdc 缺失」路径。
         let result = render_mermaid_to_svg_cached("graph TD\n    A[ --> B");
         assert!(result.svg.is_none());
         assert!(!result.is_valid);

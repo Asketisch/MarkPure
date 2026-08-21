@@ -1,26 +1,21 @@
-//! Application configuration: per-user settings that survive
-//! across launches. Stored as TOML at the OS-appropriate path
-//! returned by [`AppConfig::config_path`].
+//! 应用配置：跨启动保留的每用户设置。以 TOML 形式存放在
+//! [`AppConfig::config_path`] 返回的 OS 适当地路径上。
 //!
-//! The 530-line monolith used to live in `config.rs`. It is now
-//! split into:
+//! 原来 530 行的单体文件在 `config.rs`。现已拆分为：
 //!
-//! - [`legacy`] — the `AppConfig` struct itself plus the
-//!   load/save/migrate machinery and the per-field CRUD
-//!   (recent files, language, theme, editor prefs).
-//! - [`workspace_roots`] — the multi-root workspace helpers
-//!   (`add_workspace_root`, `remove_workspace_root`,
-//!   `set_active_workspace_root`, per-root expanded dirs).
+//! - [`legacy`] —— `AppConfig` 结构体本身，加上加载/保存/迁移机制
+//!   以及逐字段 CRUD（最近文件、语言、主题、编辑器偏好）。
+//! - [`workspace_roots`] —— 多根目录工作区辅助
+//!   （`add_workspace_root`、`remove_workspace_root`、
+//!   `set_active_workspace_root`、按根目录展开的目录记忆）。
 //!
-//! Both files declare `impl AppConfig` blocks so the public API
-//! is unchanged — callers see the same method set, the split
-//! is purely an implementation detail.
+//! 两个文件都声明 `impl AppConfig` 块，公共 API 保持不变——调用方
+//! 看到的方法集相同，拆分纯粹是实现细节。
 
 mod legacy;
 mod workspace_roots;
 
-// `legacy.rs` already declares `pub struct AppConfig` plus its
-// inherent methods; we re-export the type here so the public
-// path stays `mt_core::AppConfig`. The `workspace_roots` mod
-// adds more inherent methods via its own `impl AppConfig` block.
+// `legacy.rs` 已声明 `pub struct AppConfig` 及其固有方法；我们在这里
+// 再导出该类型，让公共路径保持 `mt_core::AppConfig`。`workspace_roots`
+// 模块通过自己的 `impl AppConfig` 块添加更多固有方法。
 pub use legacy::AppConfig;

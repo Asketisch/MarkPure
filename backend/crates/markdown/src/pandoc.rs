@@ -1,53 +1,47 @@
-//! Pandoc-style Markdown extensions (non-footnote parts).
+//! Pandoc 风格的 Markdown 扩展（非脚注部分）。
 //!
-//! Footnote parsing/rendering lives in `footnote.rs` and is driven
-//! by the pulldown-cmark event stream (with `ENABLE_FOOTNOTES`),
-//! so it stays consistent with the round-trip HTML we emit from
-//! `to_html`.
+//! 脚注的解析/渲染在 `footnote.rs` 中，由 pulldown-cmark 事件流驱动
+//! （启用 `ENABLE_FOOTNOTES`），与 `to_html` 产出的往返 HTML 保持一致。
 //!
-//! This module retains the parts that are still useful:
-//!   - Definition lists (Pandoc's term + indented definition form)
-//!   - Task list items with `[/!!/!!!]` priority markers
-//!   - Example numbering markers
-//!   - Raw HTML block detection (used by tools like the asset
-//!     rewriter that need to know which blocks to leave alone).
+//! 本模块保留仍然有用的部分：
+//!   - 定义列表（Pandoc 的术语 + 缩进定义形式）
+//!   - 带 `[/!!/!!!]` 优先级标记的任务列表项
+//!   - 示例编号标记
+//!   - 原始 HTML 块检测（供资源重写器等需要知道哪些块
+//!     应保持原样的工具使用）。
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// A definition list item
+/// 定义列表项
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefinitionItem {
-    /// The term being defined
+    /// 被定义的术语
     pub term: String,
-    /// The definitions (can be multiple)
+    /// 定义内容（可以有多个）
     pub definitions: Vec<String>,
-    /// Position in document
+    /// 在文档中的位置
     pub position: usize,
-    /// Line number
+    /// 行号
     pub line_number: usize,
 }
 
-/// Cell alignment for tables (extended with PipesPlus)
+/// 表格单元格对齐（PipesPlus 扩展）
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ExtendedCellAlign {
     Left,
     Center,
     Right,
+    #[default]
     Default,
 }
 
-impl Default for ExtendedCellAlign {
-    fn default() -> Self {
-        ExtendedCellAlign::Default
-    }
-}
 
-/// Parsed extensions result. Kept for API compatibility — the
-/// footnote field is now always empty (footnote parsing lives in
-/// `footnote.rs`); callers should use `footnote::render_footnote_section`
-/// instead.
+/// 解析扩展特性的结果。为 API 兼容保留——footnotes 字段现在
+/// 始终为空（脚注解析在 `footnote.rs`）；调用方应改用
+/// `footnote::render_footnote_section`。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ParsedExtensions {
     #[serde(default)]
@@ -56,7 +50,7 @@ pub struct ParsedExtensions {
     pub task_items: Vec<TaskItem>,
 }
 
-/// A task list item with priority
+/// 带优先级的任务列表项
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskItem {
     pub text: String,
@@ -66,7 +60,7 @@ pub struct TaskItem {
     pub line_number: usize,
 }
 
-/// Task priority levels
+/// 任务优先级级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskPriority {
     #[serde(rename = "!")]
@@ -77,7 +71,7 @@ pub enum TaskPriority {
     Medium,
 }
 
-/// Example numbering marker
+/// 示例编号标记
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExampleItem {
     pub marker: String,
@@ -86,7 +80,7 @@ pub struct ExampleItem {
     pub position: usize,
 }
 
-/// Raw HTML block
+/// 原始 HTML 块
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawHtmlBlock {
     pub content: String,
@@ -94,12 +88,12 @@ pub struct RawHtmlBlock {
     pub line_number: usize,
 }
 
-/// Parse definition lists
+/// 解析定义列表
 pub fn parse_definition_list(content: &str) -> Vec<DefinitionItem> {
     let mut items: Vec<DefinitionItem> = Vec::new();
 
-    // Definition list pattern: term followed by newline and indented definition
-    // Lines starting without bullet/number are terms, following indented lines are definitions
+    // 定义列表模式：术语后跟换行与缩进的定义。
+    // 不以列表符/数字开头的行是术语，紧随其后的缩进行是定义。
     let lines: Vec<&str> = content.lines().collect();
 
     let mut i = 0;
@@ -107,7 +101,7 @@ pub fn parse_definition_list(content: &str) -> Vec<DefinitionItem> {
         let line = lines[i];
         let trimmed = line.trim();
 
-        // Check if this looks like a definition term (not starting with bullet/number)
+        // 判断是否像是定义术语（不以列表符/数字开头）
         if !trimmed.is_empty()
             && !trimmed.starts_with('-')
             && !trimmed.starts_with('*')
@@ -116,13 +110,13 @@ pub fn parse_definition_list(content: &str) -> Vec<DefinitionItem> {
             && !trimmed.starts_with('#')
             && !trimmed.starts_with('>')
             && !trimmed.starts_with('|')
-            && !trimmed.contains(':') // Not a pipe table
+            && !trimmed.contains(": ") // 形如 `key: value` 的键值行不是定义术语
         {
             let term = trimmed.to_string();
             let position = content.lines().take(i).map(|l| l.len() + 1).sum::<usize>();
             let line_number = i + 1;
 
-            // Gather definitions (following indented lines)
+            // 收集定义（随后的缩进行）
             let mut definitions: Vec<String> = Vec::new();
             let mut j = i + 1;
 
@@ -130,15 +124,15 @@ pub fn parse_definition_list(content: &str) -> Vec<DefinitionItem> {
                 let next_line = lines[j];
                 let next_trimmed = next_line.trim();
 
-                // Definition is indented with space/tab
+                // 定义以空格/制表符缩进
                 if !next_trimmed.is_empty() && (next_line.starts_with(' ') || next_line.starts_with('\t')) {
                     definitions.push(next_trimmed.to_string());
                     j += 1;
                 } else if next_trimmed.is_empty() {
-                    // Empty line might separate
+                    // 空行可能起分隔作用
                     j += 1;
                     if j < lines.len() && (lines[j].starts_with(' ') || lines[j].starts_with('\t')) {
-                        // Continue with definition
+                        // 继续收集定义
                         definitions.push(lines[j].trim().to_string());
                         j += 1;
                     }
@@ -166,11 +160,11 @@ pub fn parse_definition_list(content: &str) -> Vec<DefinitionItem> {
     items
 }
 
-/// Parse task list items with priority markers
+/// 解析带优先级标记的任务列表项
 pub fn parse_task_items(content: &str) -> Vec<TaskItem> {
     let mut items: Vec<TaskItem> = Vec::new();
 
-    // Task list pattern: - [ ] or - [x] or - [!] etc.
+    // 任务列表模式：- [ ] 或 - [x] 或 - [!] 等
     let task_regex = Regex::new(r"^(\s*)-\s*\[([ xX!])\]\s*(.*)$").unwrap();
 
     for (line_idx, line) in content.lines().enumerate() {
@@ -179,7 +173,7 @@ pub fn parse_task_items(content: &str) -> Vec<TaskItem> {
             let text = caps.get(3).map(|m| m.as_str().trim().to_string()).unwrap_or_default();
             let position = content.lines().take(line_idx).map(|l| l.len() + 1).sum::<usize>();
 
-            // Check for priority markers: [!], [!p], [!TODO]
+            // 检查优先级标记：[:!], [!p], [!TODO]
             let priority = if text.starts_with("[!]") || text.starts_with("[!p]") || text.starts_with("[!TODO]") {
                 Some(TaskPriority::Highest)
             } else if text.starts_with("[!!]") {
@@ -203,16 +197,16 @@ pub fn parse_task_items(content: &str) -> Vec<TaskItem> {
     items
 }
 
-/// Parse example numbering (@)
+/// 解析示例编号（@）
 pub fn parse_example_numbers(content: &str) -> Vec<ExampleItem> {
     let mut items: Vec<ExampleItem> = Vec::new();
 
-    // Example pattern: @ for auto-numbering
+    // 示例模式：@ 用于自动编号
     let example_regex = Regex::new(r"(@\w+)").unwrap();
 
     let mut counter: HashMap<String, usize> = HashMap::new();
 
-    for (_line_idx, line) in content.lines().enumerate() {
+    for line in content.lines() {
         for m in example_regex.find_iter(line) {
             let marker = m.as_str().to_string();
             let count = counter.entry(marker.clone()).or_insert(1);
@@ -232,12 +226,12 @@ pub fn parse_example_numbers(content: &str) -> Vec<ExampleItem> {
     items
 }
 
-/// Parse raw HTML blocks
+/// 解析原始 HTML 块
 pub fn parse_raw_html_blocks(content: &str) -> Vec<RawHtmlBlock> {
     let mut blocks: Vec<RawHtmlBlock> = Vec::new();
 
-    // HTML block patterns (Pandoc-style)
-    // Block-level HTML tags
+    // HTML 块模式（Pandoc 风格）
+    // 块级 HTML 标签
     let block_tags = [
         "address", "article", "aside", "blockquote", "center", "dd", "details",
         "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer",
@@ -252,7 +246,7 @@ pub fn parse_raw_html_blocks(content: &str) -> Vec<RawHtmlBlock> {
     while i < lines.len() {
         let line = lines[i].trim();
 
-        // Check if line looks like a block-level HTML tag
+        // 判断行是否像是块级 HTML 标签
         let is_html_block = block_tags.iter().any(|tag| {
             line.starts_with(&format!("<{}", tag))
                 || line.starts_with(&format!("</{}", tag))
@@ -266,7 +260,7 @@ pub fn parse_raw_html_blocks(content: &str) -> Vec<RawHtmlBlock> {
             let start_line = i;
             i += 1;
 
-            // Continue until closing tag or blank line
+            // 持续读取直到闭合标签或空行
             while i < lines.len() {
                 let next_line = lines[i];
                 if next_line.trim().is_empty() {
@@ -296,7 +290,7 @@ pub fn parse_raw_html_blocks(content: &str) -> Vec<RawHtmlBlock> {
     blocks
 }
 
-/// Parse all extended Markdown features
+/// 解析所有扩展的 Markdown 特性
 pub fn parse_markdown_extensions(content: &str) -> ParsedExtensions {
     ParsedExtensions {
         footnotes: HashMap::new(),
@@ -305,7 +299,7 @@ pub fn parse_markdown_extensions(content: &str) -> ParsedExtensions {
     }
 }
 
-/// Render definition list as HTML
+/// 把定义列表渲染为 HTML
 pub fn render_definition_list_html(items: &[DefinitionItem]) -> String {
     let mut html = String::from("<dl>\n");
 
@@ -320,7 +314,7 @@ pub fn render_definition_list_html(items: &[DefinitionItem]) -> String {
     html
 }
 
-/// Escape HTML special characters
+/// 转义 HTML 特殊字符
 fn escape_html(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -334,12 +328,25 @@ mod tests {
 
     #[test]
     fn test_parse_definition_list() {
-        // Properly indented definition list (3 spaces before :)
+        // 正确缩进的定义列表（: 前有 3 个空格）
         let content = "Term 1\n   : Definition 1\n\nTerm 2\n   : Definition 2";
         let items = parse_definition_list(content);
-        // Note: This might be empty depending on parsing rules
-        // Just verify it doesn't panic
+        // 注意：根据解析规则，结果可能为空。
+        // 这里只验证不会 panic。
         let _ = items.len();
+    }
+
+    #[test]
+    fn test_parse_definition_list_term_with_colon() {
+        // 术语以冒号结尾仍是定义术语（旧版 contains(':') 整行误杀）
+        let content = "CRLF:\n   Definition of CRLF\n";
+        let items = parse_definition_list(content);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].term, "CRLF:");
+
+        // 形如 `key: value` 的键值行仍不算术语
+        let kv = "title: A Report\n   body text\n";
+        assert!(parse_definition_list(kv).is_empty());
     }
 
     #[test]

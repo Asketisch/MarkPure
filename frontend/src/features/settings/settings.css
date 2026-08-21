@@ -38,9 +38,8 @@
   align-items: center;
   gap: 8px;
 }
-/* P0-X: Typora-style "saved" toast that flashes for
-   ~1.5s after a successful `setConfig` IPC. Sits next
-   to the "Settings" sidebar header. */
+/* 「已保存」提示。`setConfig` IPC 成功后闪烁约 1.5 秒，
+   显示在「设置」侧边栏标题旁。 */
 .settings-saved-flash {
   font-size: 11px;
   color: var(--accent);

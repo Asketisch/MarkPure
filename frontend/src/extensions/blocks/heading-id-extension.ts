@@ -1,17 +1,15 @@
 /**
- * Heading id extension.
+ * 标题 id 扩展。
  *
- * Extends Tiptap's `StarterKit` heading with an `id` attribute. On
- * every doc change, an `appendTransaction` hook walks all headings
- * and assigns an auto-generated id to any heading that is missing
- * one. The id is derived from the heading's text content via the
- * shared `slugify` helper, with a counter to disambiguate duplicate
- * titles.
+ * 给 Tiptap `StarterKit` 的标题加上 `id` 属性。每次文档变化时，
+ * 一个 `appendTransaction` 钩子遍历所有标题，为缺少 id 的标题
+ * 分配自动生成的 id。id 通过共用的 `slugify` 助手从标题文本派生，
+ * 用计数器区分重复标题。
  *
- * The id is consumed by:
- *   - The outline panel (clickable jump to heading)
- *   - The TOC node view (clickable list)
- *   - The HTML export (anchor target in the exported `<h1 id="…">`)
+ * 该 id 的消费方：
+ *   - 大纲面板（可点击跳到标题）
+ *   - TOC 节点视图（可点击列表）
+ *   - HTML 导出（导出 `<h1 id="…">` 中的锚点目标）
  */
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
@@ -43,14 +41,11 @@ export const HeadingIdExtension = Extension.create({
       new Plugin({
         key: new PluginKey('headingId'),
         appendTransaction: (transactions, _oldState, newState) => {
-          // Only run when the doc actually changed (filter out
-          // selection-only transactions).
+          // 仅在文档真正变化时运行（滤掉只改选区的事务）。
           if (!transactions.some((tr) => tr.docChanged)) return null
 
-          // Map every heading in the new doc. Track which slugs
-          // are already used so a duplicate heading title gets a
-          // disambiguating suffix on the first pass, and we don't
-          // re-write ids that are still valid.
+          // 遍历新文档中的每个标题。记录已用过的 slug，让重复的
+          // 标题标题在首轮拿到消歧后缀，且不重写仍然有效的 id。
           const seenSlugs = new Map<string, number>()
           const tr = newState.tr
           let modified = false
@@ -61,21 +56,23 @@ export const HeadingIdExtension = Extension.create({
             const base = slugifyBase(text)
             const existing = (node.attrs as { id?: string | null }).id
 
-            // If the existing id still matches the current text,
-            // keep it. Otherwise we need to re-derive.
-            if (existing && existing.startsWith(base)) {
-              seenSlugs.set(base, (seenSlugs.get(base) ?? 0) + 1)
+            // 现有 id 只有在精确等于「按当前文本派生出的值」（base 或
+            // base-N 去重后缀）时才算仍有效。用 startsWith 判断太松：
+            // 标题 "Hello World"（id "hello-world"）改名为 "Hello" 后
+            // base 变成 "hello"，"hello-world".startsWith("hello") 为真，
+            // 会错误地保留失效的旧 id。
+            const count = seenSlugs.get(base) ?? 0
+            const derived = count === 0 ? base : `${base}-${count}`
+
+            if (existing === derived) {
+              seenSlugs.set(base, count + 1)
               return
             }
 
-            // Pick the next available suffix for this base slug.
-            const count = seenSlugs.get(base) ?? 0
-            const newId = count === 0 ? base : `${base}-${count}`
             seenSlugs.set(base, count + 1)
-
             tr.setNodeMarkup(pos, undefined, {
               ...node.attrs,
-              id: newId,
+              id: derived,
             })
             modified = true
           })

@@ -1,15 +1,14 @@
 /**
- * Per-document-content IPC wrappers.
+ * 面向文档内容的 IPC 包装。
  *
- * Topic: outline / wikilinks / tags, document registry, and
- * the various markdown-extension helpers (mermaid, frontmatter,
- * table, folding, pandoc task items). Spell check lives here
- * too because it's text-content analysis, not app-state.
+ * 主题：大纲 / wikilink / 标签、文档注册表，以及各类 markdown
+ * 扩展助手（mermaid、frontmatter、表格、折叠、pandoc 任务项）。
+ * 拼写检查也在这里，因为它属于文本内容分析而非应用状态。
  */
 import { ipc } from './ipc'
 import type { FileInfo, OutlineItem } from './types'
 
-// ============================== Outline / wikilinks / tags ==============================
+// ============================== 大纲 / wikilinks / 标签 ==============================
 
 export interface WikiLink {
   page: string
@@ -34,19 +33,17 @@ export async function getTags(content: string): Promise<Tag[]> {
   return (await ipc('get_tags', { content })) ?? []
 }
 
-/** Open a file by absolute path (no dialog). Useful for
- *  wikilink clicks and "open recent" flows. */
+/** 按绝对路径打开文件（不弹对话框）。适用于 wikilink 点击与
+ *  “最近打开”流程。 */
 export async function openFileByPath(path: string): Promise<FileInfo> {
   return await ipc('open_file', { path })
 }
 
-// ============================== Document registry ==============================
+// ============================== 文档注册表 ==============================
 
-/** Register a document in the Rust-owned registry (with LRU
- *  eviction at MAX_DOCUMENTS). The renderer always calls
- *  this on every doc open so the Rust stats/search IPCs can
- *  read from one canonical buffer instead of round-tripping
- *  the entire content. */
+/** 在 Rust 持有的注册表中登记文档（达到 MAX_DOCUMENTS 时按 LRU
+ *  驱逐）。渲染进程每次打开文档都会调用，让 Rust 的统计 / 搜索
+ *  IPC 从一个规范缓冲区读取，而不必来回传递整个内容。 */
 export async function docOpen(docId: number, content: string): Promise<void> {
   await ipc('doc_open', { doc_id: docId, content })
 }
@@ -120,7 +117,7 @@ export async function updateFrontmatterField(
   return (await ipc('update_frontmatter_field', { content, key, value })) ?? { content }
 }
 
-// ============================== Table ==============================
+// ============================== 表格 ==============================
 
 export interface TableOp {
   type: string
@@ -156,7 +153,7 @@ export async function tableToCsv(
   return (await ipc('table_to_csv', { content, start, end })) ?? { csv: '' }
 }
 
-// ============================== Folding ==============================
+// ============================== 折叠 ==============================
 
 export interface FoldRange {
   from: number
@@ -169,7 +166,7 @@ export async function computeFolds(content: string): Promise<FoldRange[]> {
   return (await ipc('compute_folds', { content })) ?? []
 }
 
-// ============================== Pandoc task items ==============================
+// ============================== Pandoc 任务项 ==============================
 
 export type TaskPriority = 'highest' | 'high' | 'medium' | 'low' | null
 
@@ -184,7 +181,7 @@ export async function parseTaskItems(content: string): Promise<TaskItem[]> {
   return (await ipc('parse_task_items', { content })) ?? []
 }
 
-// ============================== Spell check ==============================
+// ============================== 拼写检查 ==============================
 
 export interface SpellError {
   word: string

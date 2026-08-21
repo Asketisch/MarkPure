@@ -1,26 +1,21 @@
 /**
- * Pixel-height estimation for top-level ProseMirror nodes.
+ * 顶层 ProseMirror 节点的像素高度估算。
  *
- * The estimator is intentionally approximate: it trades a small
- * layout-thrash risk for cheap, O(node-size) computation. The
- * `virtualization` plugin refines these numbers with real DOM
- * measurements once the block is on-screen, so the initial
- * estimate only needs to be "in the right ballpark".
+ * 该估算刻意保持近似：用小的布局抖动风险换取便宜的
+ * O(节点大小) 计算。块进入屏幕后，`virtualization` 插件会用真实
+ * DOM 测量修正这些数值，因此初始估算只需要“量级正确”。
  *
- * Estimation strategy per type:
- *   - leaf blocks (heading, paragraph, codeBlock, image,
- *     horizontalRule, blockquote): use content metrics
- *   - container blocks (list, taskList, table, codeBlock-with-
- *     children): use a fixed default; their internal layout is
- *     not virtualized
- *   - NodeView blocks (mermaid, toc, math): assume a default
- *     height; NodeView is responsible for reporting a more
- *     accurate number via the DOM measurement path
+ * 各类型的估算策略：
+ *   - 叶子块（标题、段落、代码块、图片、分隔线、引用块）：使用内容度量
+ *   - 容器块（列表、任务列表、表格、带子节点的代码块）：使用固定默认值；
+ *     其内部布局不做虚拟化
+ *   - NodeView 块（mermaid、toc、math）：假定一个默认高度；
+ *     NodeView 负责通过 DOM 测量路径回报更精确的数值
  */
 
 import type { Node as PMNode } from '@tiptap/pm/model'
 
-/** Conservative defaults used by the estimator. */
+/** 估算器使用的保守默认值。 */
 const LINE_HEIGHT_PX = 24
 const HEADING_HEIGHTS: Record<number, number> = {
   1: 40,
@@ -37,7 +32,7 @@ const HR_HEIGHT_PX = 24
 const TABLE_ROW_PX = 30
 const LIST_ITEM_PX = 28
 const IMAGE_MIN_PX = 32
-/** NodeView default heights when no measurement is available. */
+/** 没有测量数据时 NodeView 的默认高度。 */
 const NODEVIEW_DEFAULTS_PX: Record<string, number> = {
   mermaid: 320,
   toc: 240,
@@ -46,10 +41,10 @@ const NODEVIEW_DEFAULTS_PX: Record<string, number> = {
   footnoteDef: 60,
 }
 
-/** Number of text-wrapping lines for a paragraph or blockquote. */
+/** 段落或引用块的文本换行行数。 */
 function wrappedLineCount(text: string, charsPerLine = CHARS_PER_LINE): number {
   if (text.length === 0) return 1
-  // Count explicit newlines plus wrapped chunks.
+  // 统计显式换行数加上自动换行产生的片段。
   const explicitLines = text.split('\n')
   let total = 0
   for (const line of explicitLines) {
@@ -58,7 +53,7 @@ function wrappedLineCount(text: string, charsPerLine = CHARS_PER_LINE): number {
   return total
 }
 
-/** Number of physical lines in a code block based on text content. */
+/** 根据文本内容计算代码块的物理行数。 */
 function codeBlockLineCount(node: PMNode): number {
   if (node.childCount === 0) return 1
   let max = 1
@@ -72,7 +67,7 @@ function codeBlockLineCount(node: PMNode): number {
   return max
 }
 
-/** Approximate image height from width + aspect-ratio attr. */
+/** 根据宽度 + 宽高比属性近似图片高度。 */
 function imageHeight(node: PMNode): number {
   const width = Number(node.attrs.width) || 600
   const aspect = Number(node.attrs.aspectRatio) || 0.5
@@ -80,12 +75,11 @@ function imageHeight(node: PMNode): number {
 }
 
 /**
- * Estimate a top-level block's pixel height.
+ * 估算顶层块的像素高度。
  *
- * Returns `{ height, isContainer }`. `isContainer` is `true` for
- * blocks whose internals are not virtualized (list/table) — the
- * plugin will keep their full subtree rendered even when the
- * block itself is off-screen.
+ * 返回 `{ height, isContainer }`。内部不做虚拟化的块（列表/表格）
+ * 的 `isContainer` 为 `true`——即使块本身在屏幕外，插件也会保持
+ * 其完整子树处于渲染状态。
  */
 export interface BlockHeightEstimate {
   height: number
@@ -107,10 +101,9 @@ export function estimateBlockHeight(node: PMNode): BlockHeightEstimate {
     }
 
     case 'codeBlock': {
-      // Treat empty codeBlock and codeBlock with text content
-      // the same way: lines come from text. Container only
-      // matters if it has child block nodes (uncommon in
-      // markdown-derived codeBlock, but possible).
+      // 空代码块与含文本的代码块同样处理：行数都来自文本。
+      // 只有当它包含子块节点时才按容器处理（markdown 生成的
+      // 代码块中不常见，但有可能）。
       if (node.childCount > 0 && !node.firstChild!.isText) {
         return { height: 240, isContainer: true }
       }
@@ -137,15 +130,15 @@ export function estimateBlockHeight(node: PMNode): BlockHeightEstimate {
     }
 
     case 'table': {
-      // First child is the header row; remaining are body rows.
+      // 第一个子节点是表头行，其余是表体行。
       const rowCount = node.childCount
       return { height: Math.max(1, rowCount) * TABLE_ROW_PX, isContainer: true }
     }
 
     default: {
-      // NodeView-driven blocks (mermaid, toc, math, footnoteDef, ...)
-      // fall back to a per-type default. The plugin refines with
-      // ResizeObserver as soon as DOM is available.
+      // NodeView 驱动的块（mermaid、toc、math、footnoteDef……）
+      // 回退到按类型区分的默认高度。DOM 就绪后，插件会通过
+      // ResizeObserver 修正。
       const defaultHeight = NODEVIEW_DEFAULTS_PX[type] ?? 120
       return { height: defaultHeight, isContainer: false }
     }
@@ -153,9 +146,8 @@ export function estimateBlockHeight(node: PMNode): BlockHeightEstimate {
 }
 
 /**
- * Measure a rendered block's actual pixel height via
- * `getBoundingClientRect`. Returns 0 if the element is not
- * attached to the document.
+ * 通过 `getBoundingClientRect` 测量已渲染块的实际像素高度。
+ * 元素未挂载到文档时返回 0。
  */
 export function measureBlockHeight(domEl: HTMLElement | null | undefined): number {
   if (!domEl || !domEl.isConnected) return 0

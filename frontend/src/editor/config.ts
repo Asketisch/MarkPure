@@ -1,14 +1,12 @@
 /**
- * Editor configuration contracts + host-CSS application.
+ * 编辑器配置契约 + 宿主 CSS 应用。
  *
- * `EditorOptions` is the public contract of `createEditor`;
- * `applyEditorPrefs` pushes the runtime-tunable preferences
- * (tab size, soft tabs, word wrap, line numbers) onto the
- * host element via CSS variables + classes so both the
- * WYSIWYG editor and the CodeMirror source mirror read the
- * same values. Split out of `editor.ts` (which stayed at the
- * 400-line limit) so the big `createEditor` assembly stays
- * readable and config concerns live in one file.
+ * `EditorOptions` 是 `createEditor` 的对外契约；`applyEditorPrefs`
+ * 把可运行时调节的偏好（制表符宽度、软制表符、自动换行、行号）
+ * 通过 CSS 变量与类写到宿主元素上，这样所见即所得编辑器和
+ * CodeMirror 源码镜像能读到相同的值。从 `editor.ts` 中拆出
+ * （后者保持在 400 行以内），让庞大的 `createEditor` 组装保持
+ * 可读，且配置相关的问题集中在一个文件里。
  */
 
 export interface EditorOptions {
@@ -19,28 +17,24 @@ export interface EditorOptions {
   onFilesDropped?: (files: File[]) => void
   onImagesDropped?: (images: { file: File; base64: string }[]) => void
   /**
-   * Fired when the user clicks a `[[Page]]` wikilink mark. The
-   * host is expected to resolve the page to a file path and
-   * open it (or create-and-open it if it doesn't exist).
+   * 用户点击 `[[Page]]` wikilink 标记时触发。宿主需要把页面
+   * 解析为文件路径并打开它（文件不存在时创建并打开）。
    */
   onWikiLinkClick?: (page: string) => void
   /**
-   * Fired when the user clicks a `#tag` mark. Typical hosts
-   * open the workspace search pre-filled with the tag name.
+   * 用户点击 `#tag` 标记时触发。典型宿主会打开预填标签名的
+   * 工作区搜索。
    */
   onTagClick?: (tag: string) => void
-  /** Fired when Vim mode is toggled via Cmd+. inside the editor. */
+  /** 在编辑器内通过 Cmd+. 切换 Vim 模式时触发。 */
   onVimModeChange?: (enabled: boolean) => void
   /**
-   * Typora-style editor preferences read from Settings. The
-   * host passes the current values on every `createEditor`
-   * call so a tab switch doesn't reset them. `tab_size` is
-   * injected as a CSS variable so downstream code (the
-   * SourceEditor / CodeMirror mirror) can read it without a
-   * separate IPC. `word_wrap` toggles ProseMirror's
-   * wrapping behaviour via a CSS class; `line_numbers` does
-   * the same. `soft_tabs` is read by CodeMirror's keymap
-   * via `--editor-tab-size` + indentWithTab.
+   * 从设置页读取的编辑器偏好。宿主在每次 `createEditor` 调用时
+   * 传入当前值，这样切换标签页不会重置它们。`tab_size` 以 CSS
+   * 变量注入，下游代码（SourceEditor / CodeMirror 镜像）无需
+   * 单独的 IPC 即可读取。`word_wrap` 通过 CSS 类切换 ProseMirror
+   * 的换行行为；`line_numbers` 同理。`soft_tabs` 由 CodeMirror
+   * 的 keymap 通过 `--editor-tab-size` + indentWithTab 读取。
    */
   editorPrefs?: {
     tab_size?: number
@@ -50,16 +44,14 @@ export interface EditorOptions {
   }
 }
 
-/** Apply editor preferences to the ProseMirror host element
- *  via CSS classes + variables. SourceEditor (CodeMirror)
- *  reads the same CSS variables so WYSIWYG and source
- *  views stay in sync.
+/** 通过 CSS 类与变量把编辑器偏好应用到 ProseMirror 宿主元素上。
+ *  SourceEditor（CodeMirror）读取相同的 CSS 变量，因此所见即所得
+ *  与源码视图保持同步。
  *
- *  Reading directly off `document.documentElement` is
- *  intentional: `applyEditorConfig` in App.svelte already
- *  writes `--editor-font-family` / `--editor-font-size`
- *  there, so we extend the same convention for tab size
- *  and the two toggleable boolean prefs.
+ *  直接读取 `document.documentElement` 是有意为之：App.svelte 的
+ *  `applyEditorConfig` 已经把 `--editor-font-family` /
+ *  `--editor-font-size` 写在那里，我们对制表符宽度与两个可切换
+ *  的布尔偏好沿用同样的约定。
  */
 export function applyEditorPrefs(
   parent: HTMLElement,
@@ -72,11 +64,10 @@ export function applyEditorPrefs(
   if (prefs?.soft_tabs !== undefined) {
     root.style.setProperty('--editor-soft-tabs', prefs.soft_tabs ? '1' : '0')
   }
-  // `word_wrap` toggles a CSS class on the editor host so
-  // existing global CSS can target `.prose-editor.no-wrap`
-  // with `white-space: pre`. Line numbers toggle a separate
-  // class — the gutter itself is rendered by the existing
-  // starter-kit setup only when the class is present.
+  // `word_wrap` 在编辑器宿主上切换 CSS 类，既有的全局 CSS 就能
+  // 用 `white-space: pre` 针对 `.prose-editor.no-wrap` 设置样式。
+  // 行号切换另一个独立类——序号栏本体只在类存在时才由既有的
+  // starter-kit 配置渲染。
   const host = parent
   if (prefs?.word_wrap === false) {
     host.classList.add('no-wrap')

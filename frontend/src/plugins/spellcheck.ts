@@ -1,26 +1,21 @@
 /**
- * ProseMirror spell-check plugin.
+ * ProseMirror 拼写检查插件。
  *
- * On every doc change we:
- *   1. Try to remap existing error decorations via tr.mapping
- *      (the same fast-path used by search.ts). Edits inside
- *      an error range collapse to width 0 → dropped; edits
- *      outside slide the ranges correctly.
- *   2. Schedule a debounced (500ms) IPC `checkSpelling` call
- *      to refresh the error list.
+ * 每次文档变化时我们：
+ *   1. 尝试通过 tr.mapping 重新映射既有错误装饰
+ *      （与 search.ts 使用的快速路径相同）。错误范围内的编辑
+ *      会收缩到宽度 0 → 被丢弃；范围外的编辑则正确滑动区间。
+ *   2. 安排一次防抖（500ms）的 IPC `checkSpelling` 调用
+ *      来刷新错误列表。
  *
- * The plugin owns the *positions*; the right-click overlay
- * reads the same positions from the shared
- * `spellcheck.svelte.ts` store so we don't need to walk the
- * decoration set when the user right-clicks.
+ * 插件持有*位置*；右键浮层从共享的 `spellcheck.svelte.ts`
+ * store 读取同样的位置，这样用户右键时我们无需遍历装饰集。
  *
- * Why a separate plugin (rather than the search plugin):
- *   - different debounce semantics (search is interactive,
- *     spell-check is background)
- *   - different decoration class
- *   - search's fast path remaps to *literal* matches; spell
- *     errors don't have a query to match against, so we
- *     can't re-derive them — we wait for IPC.
+ * 为什么用独立插件（而不是并入 search 插件）：
+ *   - 防抖语义不同（搜索是交互式的，拼写检查是后台的）
+ *   - 装饰类名不同
+ *   - 搜索的快速路径按*字面*匹配重映射；拼写错误没有可匹配的
+ *     查询词，无法重新推导——只能等待 IPC 返回。
  */
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
@@ -30,7 +25,7 @@ import { checkSpelling, type SpellError as IpcSpellError } from '../editor/comma
 import { getSpellcheckStore, type ErrorRange } from '../stores/spellcheck.svelte'
 
 const DEBOUNCE_MS = 500
-const MAX_DOC_BYTES = 200_000 // skip docs > ~200KB; NSSpellChecker handles them but rendering 1000+ decorations chokes
+const MAX_DOC_BYTES = 200_000 // 跳过约 200KB 以上的文档；NSSpellChecker 能处理它们，但渲染上千条装饰会卡住
 
 export interface SpellState {
   errors: ErrorRange[]
@@ -41,22 +36,19 @@ export interface SpellState {
 export const spellPluginKey = new PluginKey<SpellState>('markpure-spellcheck')
 
 /**
- * Build a textBetween projection AND a position map that lets
- * us go from a UTF-8 byte offset (what the Rust IPC returns)
- * back to an absolute ProseMirror position.
+ * 构建一份 textBetween 投影和一份位置映射，
+ * 让我们能把 UTF-8 字节偏移（Rust IPC 返回的）
+ * 还原为绝对的 ProseMirror 位置。
  *
- * The Rust side counts in UTF-8 bytes; ProseMirror counts in
- * code points (well, document indices). For each character in
- * the projection we record:
+ * Rust 侧按 UTF-8 字节计数；ProseMirror 按码点（即文档索引）计数。
+ * 对投影中的每个字符，我们记录：
  *   - `byteToPos[byteIndex] = pmPos`
- *   - and for every byte inside a multi-byte char we point at
- *     the same pmPos so an offset landing mid-char doesn't
- *     drop.
+ *   - 对于多字节字符内的每一个字节，都指向同一个 pmPos，
+ *     这样落在字符中间的偏移也不会丢失。
  *
- * Block boundaries get a `\n` in the text AND a single byte
- * in the map pointing at the position just after the leaving
- * node — matches what `doc.textBetween(_, _, '\n')` would
- * yield.
+ * 块边界处会在文本中插入一个 `\n`，并在映射中记录一个单字节，
+ * 指向离开节点之后紧邻的位置——与 `doc.textBetween(_, _, '\n')`
+ * 的结果一致。
  */
 function projectDoc(doc: PMNode): { text: string; byteToPos: number[] } {
   let text = ''
@@ -64,8 +56,7 @@ function projectDoc(doc: PMNode): { text: string; byteToPos: number[] } {
 
   doc.descendants((node, pos) => {
     if (node.isText && node.text) {
-      // Each char's UTF-8 byte length determines how many
-      // map entries it contributes.
+      // 每个字符的 UTF-8 字节长度决定它贡献多少项映射。
       let charIdx = 0
       for (const ch of node.text) {
         const pmPos = pos + charIdx
@@ -74,23 +65,21 @@ function projectDoc(doc: PMNode): { text: string; byteToPos: number[] } {
           byteToPos.push(pmPos)
         }
         text += ch
-        charIdx += ch.length // JS string indices are UTF-16 code units
+        charIdx += ch.length // JS 字符串索引是 UTF-16 码元
       }
-      return false // text nodes are leaves
+      return false // 文本节点是叶子节点
     }
     if (node.isBlock && text.length > 0 && !text.endsWith('\n')) {
-      // Mirror the textBetween('\n') separator. The pmPos we
-      // record is the position right at the block boundary;
-      // a spell error never spans a block boundary so this
-      // entry is never actually consulted, but we record it
-      // for consistency.
+      // 镜像 textBetween('\n') 的分隔符。我们记录的 pmPos
+      // 恰在块边界处；拼写错误永远不会跨越块边界，
+      // 所以这项映射其实永不会被查询，但为了保持一致仍记录它。
       text += '\n'
       byteToPos.push(pos)
     }
     return true
   })
 
-  // Sentinel for end-of-document.
+  // 文档结尾的哨兵项。
   byteToPos.push(doc.content.size)
   return { text, byteToPos }
 }
@@ -103,29 +92,32 @@ function byteLen(ch: string): number {
   return 4
 }
 
-// --- projectDoc cache (P1-2) ---
-// Avoid rebuilding the full text projection + byteToPos array
-// when the document hasn't changed since the last check.
-let cachedDocSize = -1
+// --- projectDoc 缓存 ---
+// 当文档自上次检查以来没有变化时，
+// 避免重建整份文本投影与 byteToPos 数组。
+// 缓存以 doc 对象身份为键（不能只按 size——两个大小恰好
+// 相同的文档，如多编辑器/分栏场景，会互相拿到对方的
+// 字节→位置映射，把错误标在错误位置）。
+let cachedDoc: PMNode | null = null
 let cachedProjection: { text: string; byteToPos: number[] } | null = null
 
 function projectDocCached(doc: PMNode): { text: string; byteToPos: number[] } {
-  if (doc.content.size === cachedDocSize && cachedProjection) {
+  if (cachedDoc === doc && cachedProjection) {
     return cachedProjection
   }
   cachedProjection = projectDoc(doc)
-  cachedDocSize = doc.content.size
+  cachedDoc = doc
   return cachedProjection
 }
 
-/** Invalidate the projectDoc cache (called on doc changes). */
+/** 使 projectDoc 缓存失效（文档变化时调用）。 */
 function invalidateProjectionCache() {
+  cachedDoc = null
   cachedProjection = null
-  cachedDocSize = -1
 }
 
-/** Try to remap existing errors through a transaction's
- *  mapping. Anything that collapses gets dropped. */
+/** 尝试通过事务的映射重新定位既有错误。
+ *  任何收缩为空的项都会被丢弃。 */
 function remapErrors(tr: any, prev: ErrorRange[]): ErrorRange[] {
   const out: ErrorRange[] = []
   for (const e of prev) {
@@ -147,9 +139,9 @@ function buildDecorations(doc: PMNode, errors: ErrorRange[]): DecorationSet {
 }
 
 /**
- * Schedule a debounced refresh. Cancels any previous pending
- * call. The IPC reply is applied via a fresh transaction
- * (meta = { type: 'setErrors', errors }).
+ * 安排一次防抖刷新。会取消上一次未执行的调用。
+ * IPC 返回结果通过一个新事务应用
+ * （meta = { type: 'setErrors', errors }）。
  */
 function scheduleRefresh(view: EditorView, prevTimer: number | null): number {
   if (prevTimer !== null) clearTimeout(prevTimer)
@@ -157,6 +149,11 @@ function scheduleRefresh(view: EditorView, prevTimer: number | null): number {
     void runCheck(view)
   }, DEBOUNCE_MS) as unknown as number
 }
+
+// 每个编辑器实例一个递增检查序号：防抖检查、forceSpellcheckRecheck、
+// 应用建议后的复查可能重叠，晚到的旧 IPC 应答会覆盖新结果，
+// 因此应答时必须校验序号（与 WorkspaceSearch 的 searchSeq 同模式）。
+const checkSeq = new WeakMap<EditorView, number>()
 
 async function runCheck(view: EditorView): Promise<void> {
   const store = getSpellcheckStore()
@@ -169,10 +166,9 @@ async function runCheck(view: EditorView): Promise<void> {
     return
   }
   if (docSize > MAX_DOC_BYTES) {
-    // Skip very large docs — NSSpellChecker handles them fine
-    // but rendering thousands of inline decorations chokes
-    // ProseMirror and the right-click overlay becomes
-    // unusable. Clear any stale state.
+    // 跳过超大文档——NSSpellChecker 处理它们没问题，
+    // 但渲染数千条行内装饰会拖垮 ProseMirror，
+    // 右键浮层也会变得不可用。清除任何过期状态。
     pushErrors(view, [])
     return
   }
@@ -183,10 +179,12 @@ async function runCheck(view: EditorView): Promise<void> {
     return
   }
 
-  // The store owns the effective language (override or UI
-  // locale fallback). App.svelte keeps `fallbackLanguage` in
-  // sync with i18n.
+  // 实际生效的语言由 store 决定（用户覆盖值或 UI 语言环境的回退值）。
+  // App.svelte 让 `fallbackLanguage` 与 i18n 保持同步。
   const lang = store.effectiveLanguage()
+
+  const seq = (checkSeq.get(view) ?? 0) + 1
+  checkSeq.set(view, seq)
 
   let result: { errors: IpcSpellError[] } | null = null
   try {
@@ -196,7 +194,11 @@ async function runCheck(view: EditorView): Promise<void> {
     return
   }
 
-  // Translate UTF-8 byte offsets → PM positions.
+  // 过期应答：期间发起了更新的检查，或文档已变化
+  // （doc 对象会被替换）。两种情况下 byteToPos 都已失效。
+  if (checkSeq.get(view) !== seq || view.state.doc !== doc) return
+
+  // 把 UTF-8 字节偏移转换为 PM 位置。
   const errs: ErrorRange[] = []
   for (const err of result.errors ?? []) {
     const from = byteToPos[err.start]
@@ -240,9 +242,7 @@ export function createSpellcheckPlugin(): Plugin {
           | undefined
 
         if (meta?.type === 'setErrors') {
-          // Cache in the shared store so the right-click
-          // overlay can read it without walking the
-          // decoration set.
+          // 缓存到共享 store 中，右键浮层无需遍历装饰集即可读取。
           getSpellcheckStore()?.setErrors(meta.errors)
           return {
             ...prev,
@@ -256,15 +256,15 @@ export function createSpellcheckPlugin(): Plugin {
         }
 
         if (tr.docChanged) {
-          // Skip expensive work for heading-id appendTransactions:
-          // they only modify heading `id` attributes, not text content.
+          // 跳过 heading-id 追加事务的昂贵处理：它们只修改标题的
+          // `id` 属性，而不改动文本内容。
           if (tr.getMeta('headingId')) return prev
-          // Invalidate the projectDoc cache since the doc changed
+          // 文档已变化，使 projectDoc 缓存失效
           invalidateProjectionCache()
-          // Fast path: remap existing error positions through the
-          // transaction mapping, and use DecorationSet.map (O(changes))
-          // instead of rebuilding all decorations (O(doc)). The
-          // IPC response will arrive later with precise positions.
+          // 快速路径：通过事务映射重定位既有错误位置，
+          // 并用 DecorationSet.map（复杂度 O(变化量)）
+          // 取代重建全部装饰（复杂度 O(文档)）。
+          // 精确位置稍后由 IPC 响应带回。
           const remapped = remapErrors(tr, prev.errors)
           getSpellcheckStore()?.setErrors(remapped)
           return {
@@ -279,20 +279,19 @@ export function createSpellcheckPlugin(): Plugin {
     },
 
     view(view) {
-      // Initial check + per-edit debounced refresh.
+      // 初始检查 + 每次编辑后的防抖刷新。
       let timer: number | null = null
       const tick = () => {
         timer = scheduleRefresh(view, timer)
       }
-      // Run once on mount so an already-loaded document shows
-      // errors immediately. Wait a frame so the doc is fully
-      // attached.
+      // 挂载后立即执行一次，让已加载的文档立刻显示错误。
+      // 等一帧，确保文档已完全挂接。
       requestAnimationFrame(() => tick())
 
       return {
         update(_view, _prevState) {
-          // Only re-trigger if the doc actually changed in
-          // the last tx (apply() above already remapped).
+          // 只有当上一条事务确实改变了文档时才重新触发
+          // （上面的 apply() 已经完成重映射）。
           tick()
         },
         destroy() {
@@ -309,15 +308,14 @@ export function createSpellcheckPlugin(): Plugin {
   })
 }
 
-/** Imperative trigger — used by the command palette
- *  "tools.spellcheck" entry to force an immediate recheck. */
+/** 命令式触发——供命令面板的「tools.spellcheck」条目
+ *  强制立即重新检查。 */
 export function forceSpellcheckRecheck(view: EditorView): void {
   void runCheck(view)
 }
 
-/** Replace `[from..to]` with `replacement` and immediately
- *  recheck so the red underline either vanishes (correct
- *  fix) or shifts (still wrong). */
+/** 用 `replacement` 替换 `[from..to]`，并立即重新检查，
+ *  使红色下划线的消失（修正正确）或移位（仍不正确）。 */
 export function applySpellSuggestion(
   view: EditorView,
   from: number,
@@ -326,6 +324,6 @@ export function applySpellSuggestion(
 ): void {
   const tr = view.state.tr.insertText(replacement, from, to)
   view.dispatch(tr)
-  // Recheck on next frame so the IPC sees the new text.
+  // 在下一帧重新检查，让 IPC 看到新文本。
   requestAnimationFrame(() => runCheck(view))
 }

@@ -1,16 +1,14 @@
 /**
- * Ambient declarations for globals injected by the Rust WebView
- * host (see `backend/apps/desktop/src/main.rs`).
+ * 由 Rust WebView 宿主注入的全局量的环境声明
+ * （见 `backend/apps/desktop/src/main.rs`）。
  *
- * The wry host calls `webview.evaluate_script` to push
- * `window.__mt_dispatch(json)` responses back into the
- * renderer, and the renderer pushes requests via
- * `window.ipc.postMessage(json)`. We declare them here so
- * callers don't have to write `(window as any).ipc` /
- * `(window as any).__mt_dispatch` etc.
+ * wry 宿主通过 `webview.evaluate_script` 把
+ * `window.__mt_dispatch(json)` 响应推回渲染进程，渲染进程则通过
+ * `window.ipc.postMessage(json)` 推送请求。在此声明，调用方就
+ * 不必写 `(window as any).ipc` / `(window as any).__mt_dispatch`
+ * 之类的类型断言。
  *
- * Keep this file in sync with `main.rs` whenever a new
- * `__mt_*` global is added.
+ * 每当新增 `__mt_*` 全局量时，请保持本文件与 `main.rs` 同步。
  */
 
 import type { FileChangeEvent } from './editor/commands/types'
@@ -19,32 +17,29 @@ export {}
 
 declare global {
   interface Window {
-    /** Outbound IPC. Pushed by the frontend, dispatched to
-     *  Rust via `wry::WebView::evaluate_script`. */
+    /** 出站 IPC。由前端推送，经 `wry::WebView::evaluate_script`
+     *  派发给 Rust。 */
     ipc: {
       postMessage: (json: string) => void
     }
-    /** Inbound IPC. Pushed by Rust when a command response
-     *  is ready; the renderer parses the JSON and resolves
-     *  the matching pending Promise. */
+    /** 入站 IPC。Rust 在命令响应就绪时推送；渲染进程解析 JSON
+     *  并 resolve 匹配的待处理 Promise。 */
     __mt_dispatch: (json: string) => void
-    /** Set when the renderer wants Rust to start pushing
-     *  file-watcher events. Rust invokes this with the
-     *  change event payload. */
+    /** 渲染进程希望 Rust 开始推送文件监视事件时设置。Rust 以变更
+     *  事件负载调用它。 */
     __mt_on_file_changes: ((events: FileChangeEvent[]) => void) | null
-    /** Quick-insert popup runtime (Tiptap suggestion). Not
-     *  strictly part of the IPC bridge but injected by
-     *  the editor's QuickInsert extension. */
+    /** 快速插入弹出层运行时（Tiptap suggestion）。严格来说不属于
+     *  IPC 桥的一部分，但由编辑器的 QuickInsert 扩展注入。 */
     __qi_props?: unknown
     __qi_active?: number
   }
 
   interface ImportMetaEnv {
-    /** True when running through Vite's dev server. */
+    /** 是否运行在 Vite 的开发服务器下。 */
     readonly DEV: boolean
-    /** True for production builds. */
+    /** 是否为生产构建。 */
     readonly PROD: boolean
-    /** True for SSR — always false in our (client-only) app. */
+    /** 是否为 SSR——在我们的纯客户端应用里恒为 false。 */
     readonly SSR: boolean
   }
 }

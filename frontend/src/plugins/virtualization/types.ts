@@ -1,58 +1,53 @@
 /**
- * Shared types for the virtualization plugin.
+ * 虚拟化插件共用的类型。
  *
- * Top-block virtualization treats each direct child of the
- * ProseMirror document as a virtualizable unit. Blocks outside the
- * viewport (plus a buffer) are wrapped in a `display: none`
- * decoration so the browser skips layout/paint for them.
- *
- * @see /Users/admin/Code/CNB/MarkPure/docs/COMPETITOR_TODO.md P2-6
+ * 顶层块虚拟化把 ProseMirror 文档的每个直接子节点当作一个可
+ * 虚拟化的单元。视口外（加上缓冲）的块被包进 `display: none`
+ * 的装饰里，让浏览器跳过它们的布局与绘制。
  */
 
-/** Per-block metadata maintained by the plugin. */
+/** 插件维护的每个块元数据。 */
 export interface TopBlockMeta {
-  /** Index among the document's direct children (0-based). */
+  /** 在文档直接子节点中的下标（从 0 开始）。 */
   index: number
-  /** ProseMirror start position of the block. */
+  /** 块的 ProseMirror 起始位置。 */
   from: number
-  /** ProseMirror end position (exclusive). */
+  /** 块的 ProseMirror 结束位置（不含）。 */
   to: number
-  /** Node type name (`paragraph`, `heading`, `codeBlock`, ...). */
+  /** 节点类型名（`paragraph`、`heading`、`codeBlock`……）。 */
   type: string
-  /** Pixel height from the type-specific estimator. */
+  /** 由类型专属估算器给出的像素高度。 */
   estimatedHeight: number
   /**
-   * Pixel height measured by a `ResizeObserver` on the rendered
-   * DOM. `0` until the first measurement arrives.
+   * 由渲染 DOM 上的 `ResizeObserver` 测得的像素高度。
+   * 首次测量到达前为 `0`。
    */
   measuredHeight: number
-  /** Cumulative offset from the top of the editor. */
+  /** 距编辑器顶部的累计偏移。 */
   offsetTop: number
-  /** True after at least one `ResizeObserver` measurement. */
+  /** 至少收到一次 `ResizeObserver` 测量后为 true。 */
   isMeasured: boolean
   /**
-   * Container blocks (list/table/codeBlock with children) are
-   * never virtualized: their internal structure stays rendered
-   * even when off-screen, so users don't lose nested-block
-   * interactions.
+   * 容器块（含子节点的列表 / 表格 / 代码块）永不虚拟化：即使
+   * 在屏幕外，其内部结构也保持渲染，用户不会丢失嵌套块交互。
    */
   isContainer: boolean
 }
 
-/** Plugin-level configuration with sensible defaults. */
+/** 带合理默认值的插件级配置。 */
 export interface VirtualizationConfig {
-  /** Top-level block count above which virtualization is active. */
+  /** 超过该顶层块数量后启用虚拟化。 */
   threshold: number
-  /** Extra blocks rendered above and below the viewport. */
+  /** 视口上下额外渲染的块数。 */
   bufferSize: number
   /**
-   * HTML class added to blocks that should not be painted.
-   * Defaults to `pm-virtual-hidden`. Tests may override.
+   * 加在无需绘制的块上的 HTML 类。默认 `pm-virtual-hidden`，
+   * 测试可覆盖。
    */
   hiddenClass: string
 }
 
-/** Default configuration values. */
+/** 默认配置值。 */
 export const DEFAULT_VIRTUALIZATION_CONFIG: VirtualizationConfig = {
   threshold: 200,
   bufferSize: 5,

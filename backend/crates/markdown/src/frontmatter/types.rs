@@ -1,43 +1,40 @@
-//! Public data structures for the frontmatter pipeline.
+//! frontmatter 流水线的公共数据结构。
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Frontmatter format types
+/// frontmatter 的格式类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum FrontmatterFormat {
+    #[default]
     Yaml,
     Toml,
     Json,
 }
 
-impl Default for FrontmatterFormat {
-    fn default() -> Self {
-        FrontmatterFormat::Yaml
-    }
-}
 
-/// Represents parsed frontmatter
+/// 表示解析后的 frontmatter
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Frontmatter {
-    /// The format of the frontmatter
+    /// frontmatter 的格式
     pub format: FrontmatterFormat,
-    /// Raw content string
+    /// 原始内容字符串
     pub content: String,
-    /// Parsed key-value pairs
+    /// 解析后的键值对
     pub fields: HashMap<String, FrontmatterValue>,
-    /// Character range in the original document
+    /// 在原始文档中的字符范围
     pub bounds: FrontmatterBounds,
 }
 
-/// Bounds of frontmatter in the document
+/// frontmatter 在文档中的边界
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct FrontmatterBounds {
     pub start: usize,
     pub end: usize,
 }
 
-/// Frontmatter value types
+/// frontmatter 值的类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum FrontmatterValue {
@@ -78,7 +75,7 @@ impl FrontmatterValue {
     }
 }
 
-/// Frontmatter validation error
+/// frontmatter 校验错误
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrontmatterError {
     pub message: String,
@@ -86,7 +83,7 @@ pub struct FrontmatterError {
     pub column: Option<usize>,
 }
 
-/// Autocomplete suggestion for frontmatter
+/// frontmatter 的自动补全建议
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrontmatterCompletion {
     pub label: String,

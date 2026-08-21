@@ -1,18 +1,15 @@
 /**
- * Re-export everything from the topic-specific modules so the
- * public path `import ... from '$lib/editor/commands'` keeps
- * working. New code is encouraged to import from the topic
- * module directly:
+ * 重新导出各主题模块的一切，让公共路径
+ * `import ... from '$lib/editor/commands'` 继续可用。新代码建议
+ * 直接从主题模块导入：
  *
  *   import { openFile } from '$lib/editor/commands/file'
  *   import { getOutline } from '$lib/editor/commands/editor'
  *
- * but the flat re-export here means existing callers don't
- * need a sweeping refactor.
+ * 但这里的扁平重新导出意味着现有调用方无需大规模重构。
  *
- * The IPC plumbing (the `ipc()` function and `__mt_dispatch`
- * handler) is intentionally NOT re-exported — it's an
- * internal implementation detail of these topic modules.
+ * IPC 通信层（`ipc()` 函数与 `__mt_dispatch` 处理器）刻意**不**
+ * 重新导出——它是这些主题模块的内部实现细节。
  */
 
 export * from './types'
@@ -21,9 +18,8 @@ export * from './editor'
 export * from './workspace'
 export * from './export'
 
-// Internal — these are not part of the public surface but a
-// few callers (the file-watcher helper) still reach for the
-// ambient window globals. Re-export them so an existing
+// 内部——它们不属于公共表面，但少数调用方（文件监视助手）仍需要
+// 触达环境的 window 全局量。重新导出它们，让既有的
 // `import { _resetIpcForTests } from '$lib/editor/commands'`
-// keeps working. (The actual public functions are above.)
+// 继续可用（真正的公共函数见上）。
 export { _resetIpcForTests } from './ipc'

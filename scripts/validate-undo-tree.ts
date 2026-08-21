@@ -1,25 +1,23 @@
 /**
- * Lightweight sanity check for the branching undo tree
- * (P0-8). Run with:
+ * 分支撤销树（P0-8）的轻量校验。运行方式：
  *
  *   npx tsx scripts/validate-undo-tree.ts
  *
- * Uses Node's built-in `node:test` runner (Node 18+) so no
- * extra dev dependency is required.
+ * 使用 Node 内置的 `node:test` 运行器（Node 18+），无需额外开发
+ * 依赖。
  *
- * Tests avoid `EditorView` (which needs a DOM). They cover
- * the pure pieces — `emptyState`, `initState`, the reducers in
- * `state.ts`, the tree-traversal helpers in `tree-utils.ts`,
- * and the LRU GC policy — with hand-built `fakeDoc` /
- * `fakeMeta` helpers.
+ * 测试避开 `EditorView`（它需要 DOM）。覆盖纯逻辑部分——
+ * `emptyState`、`initState`、`state.ts` 中的 reducers、
+ * `tree-utils.ts` 中的树遍历助手，以及 LRU 的 GC 策略——这些
+ * 用手写的 `fakeDoc` / `fakeMeta` 助手来驱动。
  *
- * Tree semantics under test (matches state.ts comments):
- *   - `currentId` always points to a leaf.
- *   - `applyAppend` advances `currentId` to the new child, so
- *     successive appends form a chain (root → b1 → b2 → …).
- *   - Sibling branches are only created by `applySwitch` to a
- *     non-ancestor followed by `applyAppend`.
- *   - `applySwitch` MAY target an ancestor (path truncation).
+ * 被测的树语义（与 state.ts 注释一致）：
+ *   - `currentId` 总是指向叶子。
+ *   - `applyAppend` 把 `currentId` 推进到新子节点，因此连续
+ *     append 会形成一条链（root → b1 → b2 → …）。
+ *   - 兄弟分支只能由先 `applySwitch` 到非祖先、再 `applyAppend`
+ *     创建。
+ *   - `applySwitch` 也可以指向祖先（路径截断）。
  */
 
 import test from 'node:test'
@@ -52,11 +50,10 @@ import {
 } from '../frontend/src/plugins/undo-tree/tree-utils'
 import { undoTreePluginKey, THROTTLE_MS, MAX_NODES_DEFAULT } from '../frontend/src/plugins/undo-tree/types'
 
-// --- fakeDoc: minimal PMNode stand-in ---
+// --- fakeDoc：最小的 PMNode 替身 ---
 
-/** Build a tiny doc that satisfies `toJSON()` + `textBetween()` +
- *  `content.size`. The stand-in matches the surface state.ts and
- *  tree-utils.ts read. */
+/** 构造一个满足 `toJSON()` + `textBetween()` + `content.size`
+ *  的小型 doc。该替身匹配 state.ts 与 tree-utils.ts 读取的接口面。 */
 function fakeDoc(text: string): any {
   return {
     toJSON() {
@@ -89,7 +86,7 @@ test('initState: creates b0 as root, isCurrent, with doc snapshot', () => {
   const s = initState(fakeDoc('hello'))
   assert.equal(s.rootId, 'b0')
   assert.equal(s.currentId, 'b0')
-  // b0 is allocated, next id to hand out is b1.
+  // 已分配了 b0，下一个可用的 id 是 b1。
   assert.equal(s.nextId, 1)
   const root = s.nodes.b0
   assert.ok(root)
@@ -99,23 +96,23 @@ test('initState: creates b0 as root, isCurrent, with doc snapshot', () => {
   assert.equal(root.label, 'hello')
 })
 
-// --- applyAppend: chain semantics ---
+// --- applyAppend：链式语义 ---
 
 test('applyAppend: appends a child and advances currentId', () => {
   const s0 = initState(fakeDoc('hello'))
   const s1 = applyAppend(s0, { type: 'append', doc: fakeDoc('hello world'), timestamp: s0.nodes.b0.timestamp + 5000 })
-  // currentId advanced to the new leaf.
+  // currentId 前进到新的叶子节点。
   assert.notEqual(s1.currentId, s0.currentId)
   assert.equal(s1.currentId, s1.nodes.b0.childIds[0])
-  // The new node is the only child of b0.
+  // 新节点是 b0 唯一的子节点。
   assert.equal(s1.nodes.b0.childIds.length, 1)
   const child = s1.nodes[s1.currentId]
   assert.ok(child)
   assert.equal(child.parentId, 'b0')
   assert.equal(child.isCurrent, true)
-  // b0 is still on the current path.
+  // b0 仍在当前路径上。
   assert.equal(s1.nodes.b0.isCurrent, true)
-  // next id is 2 (we allocated b1, next would be b2).
+  // 下一个 id 是 2（已分配 b1，下一个将是 b2）。
   assert.equal(s1.nextId, 2)
 })
 
@@ -125,7 +122,7 @@ test('applyAppend: successive appends form a chain', () => {
   const b1 = s.currentId
   s = applyAppend(s, { type: 'append', doc: fakeDoc('c'), timestamp: 2000 })
   const b2 = s.currentId
-  // b0 has only one child (b1), and b1 has only one child (b2).
+  // b0 只有一个子节点（b1），b1 也只有一个子节点（b2）。
   assert.equal(s.nodes.b0.childIds.length, 1)
   assert.equal(s.nodes.b0.childIds[0], b1)
   assert.equal(s.nodes[b1].childIds.length, 1)
@@ -134,17 +131,16 @@ test('applyAppend: successive appends form a chain', () => {
 })
 
 test('applyAppend: throttle window updates the latest child in place', () => {
-  // Build a chain of length 2 so cur has a child to throttle.
+  // 先构建一条长度为 2 的链，让 cur 有子节点可供合并。
   let s = initState(fakeDoc('a'))
   s = applyAppend(s, { type: 'append', doc: fakeDoc('ab'), timestamp: 1000 })
-  // s.currentId = b1, b1 is a fresh leaf with no children → no throttle.
-  // Append within throttle window → cur=b1, latestChild=null → no throttle.
-  // To actually trigger throttle, we need b1 to have a child first.
+  // s.currentId = b1，b1 是刚创建的叶子、没有子节点 → 不触发合并。
+  // 在合并窗口内继续追加 → cur=b1，latestChild=null → 仍不触发合并。
+  // 要真正触发合并，得先让 b1 拥有子节点。
   s = applyAppend(s, { type: 'append', doc: fakeDoc('abc'), timestamp: 5000 })
-  // s.currentId = b2.
-  // Now edit b2 within 1s → b2 is the leaf, but it's a fresh leaf with no children.
-  // Throttle ONLY applies to non-root leaves with children. So no throttle,
-  // create b3.
+  // s.currentId = b2。
+  // 现在 1 秒内编辑 b2 → b2 是叶子，但它是没有子节点的新叶子。
+  // 合并只作用于“有子节点的非根叶子”，因此不触发合并，新建 b3。
   const t = s.nodes[s.currentId].timestamp
   const s2 = applyAppend(s, { type: 'append', doc: fakeDoc('abcd'), timestamp: t + 500 })
   assert.notEqual(s2.currentId, s.currentId) // new node created
@@ -154,7 +150,7 @@ test('applyAppend: past throttle window creates a new child', () => {
   const s0 = initState(fakeDoc('a'))
   const t0 = s0.nodes.b0.timestamp
   const s1 = applyAppend(s0, { type: 'append', doc: fakeDoc('ab'), timestamp: t0 + THROTTLE_MS + 100 })
-  // New child created, currentId moved.
+  // 创建了新子节点，currentId 随之移动。
   assert.notEqual(s1.currentId, 'b0')
   assert.equal(s1.nodes.b0.childIds.length, 1)
 })
@@ -165,16 +161,16 @@ test('applySwitch: flips isCurrent path to a sibling branch', () => {
   let s = initState(fakeDoc('a'))
   s = applyAppend(s, { type: 'append', doc: fakeDoc('b'), timestamp: 1000 })
   s = applyAppend(s, { type: 'append', doc: fakeDoc('c'), timestamp: 2000 })
-  // Switch back to b1, then append → creates b3 as sibling of b2.
+  // 先切回 b1，再追加 → 生成 b2 的兄弟节点 b3。
   const b1 = s.nodes.b0.childIds[0]
   s = applySwitch(s, { type: 'switch', fromId: s.currentId, toId: b1 })
   assert.equal(s.currentId, b1)
   assert.equal(s.nodes.b0.isCurrent, true)
   assert.equal(s.nodes[b1].isCurrent, true)
-  // b2 was the previous leaf; no longer current.
+  // b2 是此前的叶子，现在不再是当前节点。
   const b2 = s.nodes[b1].childIds[0]
   assert.equal(s.nodes[b2].isCurrent, false)
-  // Append → new sibling of b2.
+  // 追加 → 生成 b2 的兄弟节点。
   s = applyAppend(s, { type: 'append', doc: fakeDoc('c-branch'), timestamp: 3000 })
   const b3 = s.currentId
   assert.notEqual(b3, b2)
@@ -189,7 +185,7 @@ test('applySwitch: targeting an ancestor truncates the current path', () => {
   s = applyAppend(s, { type: 'append', doc: fakeDoc('c'), timestamp: 2000 })
   const b2 = s.currentId
   const b1 = s.nodes.b0.childIds[0]
-  // Switch from b2 → b0 (ancestor). This is a valid truncation.
+  // 从 b2 切到 b0（祖先）——一条合法的路径截断。
   const s2 = applySwitch(s, { type: 'switch', fromId: b2, toId: 'b0' })
   assert.equal(s2.currentId, 'b0')
   assert.equal(s2.nodes.b0.isCurrent, true)
@@ -219,15 +215,15 @@ test('applyPrune: removes a non-current sibling branch', () => {
   s = applyAppend(s, { type: 'append', doc: fakeDoc('c'), timestamp: 2000 })
   const b1 = s.nodes.b0.childIds[0]
   const b2 = s.nodes[b1].childIds[0]
-  // Switch to b1, append → creates sibling of b2.
+  // 切到 b1 后追加 → 生成 b2 的兄弟节点。
   s = applySwitch(s, { type: 'switch', fromId: s.currentId, toId: b1 })
   s = applyAppend(s, { type: 'append', doc: fakeDoc('c-branch'), timestamp: 3000 })
   const b3 = s.currentId
-  // Tree: b0 → b1 → [b2 (not current), b3 (current)]
-  // Prune b2 (non-current sibling of current).
+  // 树结构：b0 → b1 → [b2（非当前）、b3（当前）]
+  // 剪除 b2（当前节点的非当前兄弟）。
   const s2 = applyPrune(s, { type: 'prune', id: b2 })
   assert.equal(s2.nodes[b2], undefined)
-  // b3 still current, b1.childIds shrinks to just b3.
+  // b3 仍是当前节点，b1.childIds 缩减为只剩 b3。
   assert.equal(s2.currentId, b3)
   assert.equal(s2.nodes[b1].childIds.length, 1)
   assert.equal(s2.nodes[b1].childIds[0], b3)
@@ -251,7 +247,7 @@ test('applyPrune: refuses to prune an ancestor of the current node', () => {
   let s = initState(fakeDoc('a'))
   s = applyAppend(s, { type: 'append', doc: fakeDoc('b'), timestamp: 1000 })
   s = applyAppend(s, { type: 'append', doc: fakeDoc('c'), timestamp: 2000 })
-  // b2 is current. Try to prune b0.
+  // b2 是当前节点。尝试剪除 b0。
   const before = s
   const after = applyPrune(s, { type: 'prune', id: 'b0' })
   assert.equal(after, before)
@@ -285,7 +281,7 @@ test('applyLabel / applyCollapse: unknown id is a no-op', () => {
   assert.equal(applyCollapse(s0, { type: 'collapse', id: 'b999', collapsed: true }), s0)
 })
 
-// --- applyUndoTreeMeta dispatcher ---
+// --- applyUndoTreeMeta 分发器 ---
 
 test('applyUndoTreeMeta: dispatches by type', () => {
   const s0 = initState(fakeDoc('a'))
@@ -298,27 +294,27 @@ test('applyUndoTreeMeta: dispatches by type', () => {
 // --- gcLRU ---
 
 test('gcLRU: trims the oldest non-current leaf first', () => {
-  // Build a tree at a generous cap, then drop the cap and GC.
+  // 先用宽松的上限建树，再调低上限触发 GC。
   let s = initState(fakeDoc('a'))
   s = { ...s, maxNodes: 100 }
-  // Build chain: b0 → b1 → b2 → b3 (4 nodes)
+  // 构建链：b0 → b1 → b2 → b3（4 个节点）
   for (let i = 1; i <= 3; i++) {
     s = applyAppend(s, { type: 'append', doc: fakeDoc('a' + i), timestamp: i * 1000 })
   }
-  // Switch back to b1, append → creates sibling of b2 (5 nodes total)
+  // 切回 b1 后追加 → 生成 b2 的兄弟节点（共 5 个节点）
   const b1 = s.nodes.b0.childIds[0]
   s = applySwitch(s, { type: 'switch', fromId: s.currentId, toId: b1 })
   s = applyAppend(s, { type: 'append', doc: fakeDoc('fork'), timestamp: 5000 })
   assert.equal(countNodes(s), 5)
-  // Now GC with a tight cap.
-  //   - b0 → [b1 (current)]; b2 is parent of b3; b4 is current leaf.
-  //   - Non-current leaves: b3 (timestamp=3000). b2 is NOT a leaf.
-  //   - The only non-current leaf is b3; it must be trimmed.
+  // 现在用收紧后的上限执行 GC。
+  //   - b0 → [b1（当前）]；b2 是 b3 的父节点；b4 是当前叶子。
+  //   - 非当前叶子：b3（timestamp=3000）。b2 不是叶子。
+  //   - 唯一可剪的非当前叶子是 b3，必须被剪除。
   const capped: typeof s = { ...s, maxNodes: 4 }
   const trimmed = gcLRU(capped)
   assert.equal(countNodes(trimmed), 4)
   assert.equal(trimmed.nodes.b3, undefined)
-  // b2 (parent) stays even though it is non-current — only leaves get trimmed.
+  // b2（父节点）即使非当前也保留——只有叶子会被剪除。
   assert.ok(trimmed.nodes.b2)
 })
 
@@ -328,9 +324,9 @@ test('gcLRU: never trims the root or current-path nodes', () => {
   for (let i = 1; i <= 3; i++) {
     s = applyAppend(s, { type: 'append', doc: fakeDoc('a' + i), timestamp: i * 1000 })
   }
-  // b0 is the root → must survive.
+  // b0 是根 → 必须存活。
   assert.ok(s.nodes.b0)
-  // Even if GC breaks (no safe victim), the root is still there.
+  // 即使 GC 找不到安全目标，根节点也仍然存在。
   const trimmed = gcLRU(s)
   assert.ok(trimmed.nodes.b0)
 })
@@ -390,7 +386,7 @@ test('findLCA: returns lowest common ancestor', () => {
   s = applySwitch(s, { type: 'switch', fromId: s.currentId, toId: 'b0' })
   s = applyAppend(s, { type: 'append', doc: fakeDoc('d'), timestamp: 3000 })
   const b2b = s.currentId // sibling of b1
-  // Both b2a and b2b share root b0 as LCA.
+  // b2a 与 b2b 的最低公共祖先都是根 b0。
   assert.equal(findLCA(s, b2a, b2b), 'b0')
 })
 
@@ -436,7 +432,7 @@ test('nodeTextPreview: empty doc → "(empty)"', () => {
   assert.equal(nodeTextPreview({ textBetween: () => '   ', content: { size: 3 } }, 32), '(empty)')
 })
 
-// --- plugin key ---
+// --- 插件键 ---
 
 test('undoTreePluginKey: has the expected name', () => {
   assert.ok(
@@ -445,28 +441,28 @@ test('undoTreePluginKey: has the expected name', () => {
   )
 })
 
-// --- reducer integration: append → switch → append ---
+// --- reducer 集成：append → switch → append ---
 
 test('integration: edit, switch back, fork a sibling', () => {
   let s = initState(fakeDoc('hello'))
-  // Edit 1 → b1 (current)
+  // 第 1 次编辑 → b1（当前）
   s = applyAppend(s, { type: 'append', doc: fakeDoc('hello world'), timestamp: 1000 })
   const b1 = s.currentId
-  // Edit 2 → b2 (current, child of b1)
+  // 第 2 次编辑 → b2（当前，b1 的子节点）
   s = applyAppend(s, { type: 'append', doc: fakeDoc('hello world!'), timestamp: 3000 })
   const b2 = s.currentId
-  // Switch back to b0 (path truncation)
+  // 切回 b0（路径截断）
   s = applySwitch(s, { type: 'switch', fromId: b2, toId: 'b0' })
-  // Edit 3 → b3 (current, child of b0 — sibling of b1)
+  // 第 3 次编辑 → b3（当前，b0 的子节点——b1 的兄弟）
   s = applyAppend(s, { type: 'append', doc: fakeDoc('hello there'), timestamp: 5000 })
   const b3 = s.currentId
   assert.notEqual(b3, b1)
-  // Tree: b0 → [b1 → b2 (not current), b3 (current)]
+  // 树结构：b0 → [b1 → b2（非当前）、b3（当前）]
   assert.equal(s.nodes[b1].isCurrent, false)
   assert.equal(s.nodes[b2].isCurrent, false)
   assert.equal(s.nodes[b3].isCurrent, true)
   assert.equal(s.currentId, b3)
-  // LCA of b2 and b3 is b0.
+  // b2 与 b3 的最低公共祖先是 b0。
   assert.equal(findLCA(s, b2, b3), 'b0')
 })
 
@@ -474,16 +470,16 @@ test('integration: prune a sibling branch leaves the other intact', () => {
   let s = initState(fakeDoc('hello'))
   s = applyAppend(s, { type: 'append', doc: fakeDoc('hello world'), timestamp: 1000 })
   const b1 = s.currentId
-  // Switch back to b0, fork.
+  // 切回 b0 后分叉。
   s = applySwitch(s, { type: 'switch', fromId: s.currentId, toId: 'b0' })
   s = applyAppend(s, { type: 'append', doc: fakeDoc('hello there'), timestamp: 3000 })
-  // Tree: b0 → [b1 (not current), b2 (current)]
+  // 树结构：b0 → [b1（非当前）、b2（当前）]
   const b2 = s.currentId
-  // Prune b1 (non-current branch). b2 remains, currentId unchanged.
+  // 剪除 b1（非当前分支）。b2 保留，currentId 不变。
   const pruned = applyPrune(s, { type: 'prune', id: b1 })
   assert.equal(pruned.nodes[b1], undefined)
   assert.ok(pruned.nodes[b2])
-  // b0.childIds now has only b2.
+  // b0.childIds 现在只剩 b2。
   assert.equal(pruned.nodes.b0.childIds.length, 1)
   assert.equal(pruned.nodes.b0.childIds[0], b2)
   assert.equal(pruned.currentId, b2)

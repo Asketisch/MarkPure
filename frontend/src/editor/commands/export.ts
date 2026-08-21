@@ -1,16 +1,14 @@
 /**
- * Export + asset + workspace-search IPC wrappers.
+ * 导出 + 资产 + 工作区搜索的 IPC 包装。
  *
- * Topic: turning a document into HTML/PDF/Word, the
- * workspace-level file-search, and image-paste / image-upload
- * helpers. The save dialog for exports is driven by the Rust
- * host (rfd), so each export returns the destination path
- * the user picked.
+ * 主题：把文档转成 HTML/PDF/Word、工作区级文件搜索，以及图片
+ * 粘贴 / 图片上传助手。导出的保存对话框由 Rust 宿主（rfd）驱动，
+ * 因此每个导出都返回用户选择的落盘路径。
  */
 import { ipc } from './ipc'
 import type { SearchMatch, WorkspaceSearchResult } from './types'
 
-// ============================== Export ==============================
+// ============================== 导出 ==============================
 
 export async function exportHtml(
   content: string,
@@ -20,10 +18,9 @@ export async function exportHtml(
   return await ipc('export_html', {
     content,
     title,
-    // P1-8: pass through the active editor theme so the
-    // standalone HTML mirrors the live palette. Older callers
-    // (or callers that don't import `pngExport`) pass nothing
-    // and the Rust side falls back to the built-in light CSS.
+    // 透传当前编辑器主题，让独立 HTML 与实时配色一致。旧调用方
+    // （或不导入 `pngExport` 的调用方）不传，Rust 侧回退到内置
+    // 的浅色 CSS。
     theme_css: themeCss ?? null,
   })
 }
@@ -44,12 +41,10 @@ export async function exportWord(
 }
 
 /**
- * P1-8: persist a PNG byte stream that the caller has already
- * rasterised. The frontend pipeline (see `commands/pngExport.ts`)
- * renders the document into a hidden DOM node via `html-to-image`,
- * then sends the resulting `data:image/png;base64,…` URL through
- * this wrapper. The Rust host validates the bytes and writes them
- * to a user-chosen path.
+ * 持久化调用方已栅格化的 PNG 字节流。前端管线（见
+ * `commands/pngExport.ts`）用 `html-to-image` 把文档渲染进一个
+ * 隐藏 DOM 节点，然后把得到的 `data:image/png;base64,…` URL 经
+ * 本包装发送。Rust 宿主校验字节并写入用户选择的路径。
  */
 export async function exportPng(
   dataUrl: string,
@@ -58,7 +53,7 @@ export async function exportPng(
   return await ipc('export_png', { bytes_b64: dataUrl, title })
 }
 
-// ============================== Workspace search ==============================
+// ============================== 工作区搜索 ==============================
 
 export interface WorkspaceSearchOptions {
   case_sensitive: boolean
@@ -72,9 +67,8 @@ export async function searchWorkspace(
   query: string,
   options: WorkspaceSearchOptions,
 ): Promise<WorkspaceSearchResult> {
-  // P2-4 multi-root: pass `paths` (plural) when the caller
-  // supplies an array; fall back to legacy `path: string` for
-  // single-root callers. Rust merges the results internally.
+  // 多根：调用方传入数组时传 `paths`（复数）；单根调用方回退到
+  // 旧的 `path: string`。Rust 内部合并结果。
   const pathOrPaths = Array.isArray(path)
     ? { paths: path }
     : { path }
@@ -83,7 +77,7 @@ export async function searchWorkspace(
   })
 }
 
-// ============================== Assets (images) ==============================
+// ============================== 资产（图片） ==============================
 
 export interface SavedImage {
   path: string

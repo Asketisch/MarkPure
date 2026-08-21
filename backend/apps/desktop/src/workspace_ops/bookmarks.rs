@@ -1,8 +1,8 @@
-// ============================== Bookmarks ==============================
+// ============================== 书签 ==============================
 
 pub fn cmd_get_bookmarks() -> std::result::Result<serde_json::Value, String> {
     let list = bookmark::load_bookmarks().map_err(|e| e.to_string())?;
-    Ok(serde_json::to_value(list).map_err(|e| e.to_string())?)
+    serde_json::to_value(list).map_err(|e| e.to_string())
 }
 
 pub fn cmd_add_bookmark(
@@ -18,13 +18,12 @@ pub fn cmd_add_bookmark(
                 .collect()
         })
         .unwrap_or_default();
-    // P2-4: optional multi-root binding. Old callers that
-    // don't supply the field get `None` — the bookmark is
-    // treated as "untagged / unknown root" by the renderer.
+    // 可选的根目录绑定。未提供该字段的旧调用方会得到 `None`——
+    // 渲染器会把这样的书签视为「未归属 / 未知根目录」。
     let workspace_root_id = params["workspace_root_id"].as_str();
     let bm = bookmark::add_bookmark(path, title, tags, workspace_root_id)
         .map_err(|e| e.to_string())?;
-    Ok(serde_json::to_value(bm).map_err(|e| e.to_string())?)
+    serde_json::to_value(bm).map_err(|e| e.to_string())
 }
 
 pub fn cmd_update_bookmark(
@@ -40,7 +39,7 @@ pub fn cmd_update_bookmark(
     });
     let bm = bookmark::update_bookmark(id, title, description, tags)
         .map_err(|e| e.to_string())?;
-    Ok(serde_json::to_value(bm).map_err(|e| e.to_string())?)
+    serde_json::to_value(bm).map_err(|e| e.to_string())
 }
 
 pub fn cmd_remove_bookmark(

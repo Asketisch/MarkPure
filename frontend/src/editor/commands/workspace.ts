@@ -1,10 +1,9 @@
 /**
- * App-wide (non-document) IPC wrappers.
+ * 应用级（非文档级）IPC 封装。
  *
- * Topic: tab persistence, config get/set, recent files,
- * bookmarks, themes, keybindings, i18n, app info, file-watcher
- * events, clipboard. Anything that's "what does the app
- * look like" rather than "what does this document contain".
+ * 职责范围：标签页持久化、配置读写、最近文件、书签、主题、
+ * 快捷键、i18n、应用信息、文件监听事件、剪贴板。
+ * 也就是一切「应用长什么样」而非「这篇文档包含什么」的事。
  */
 import { ipc } from './ipc'
 import type {
@@ -17,12 +16,10 @@ import type {
 } from './types'
 
 export type { Theme, ThemeColors }
-// Data contracts for the app-wide wrappers live in
-// `workspaceTypes.ts` so this IPC-file stays under the 400-line
-// window and the types can be audited next to their consumers.
-// We import them here (for use in function signatures) and
-// re-export (so existing `import { Bookmark } from './commands'`
-// call sites keep working).
+// 应用级封装的数据契约位于 `workspaceTypes.ts`，使本 IPC 文件
+// 保持在 400 行以内，且类型可以与使用方就近审查。
+// 这里引入它们（用于函数签名）并重新导出
+// （让既有 `import { Bookmark } from './commands'` 调用点继续正常工作）。
 import type {
   Bookmark,
   KeyBinding,
@@ -52,7 +49,7 @@ export type {
   Snippet,
 } from './workspaceTypes'
 
-// ============================== Tabs ==============================
+// ============================== 标签页 ==============================
 
 export async function getTabs(): Promise<WindowTabs[]> {
   return await ipc('get_tabs')
@@ -66,7 +63,7 @@ export async function tearoffTab(tab: TabState): Promise<{ window_id: string }> 
   return await ipc('tearoff_tab', tab)
 }
 
-// ============================== Config ==============================
+// ============================== 配置 ==============================
 
 export async function getConfig(): Promise<AppConfig> {
   return await ipc('get_config')
@@ -76,7 +73,7 @@ export async function setConfig(config: Partial<AppConfig>): Promise<void> {
   await ipc('set_config', config)
 }
 
-// Expanded directories (workspace tree persistence)
+// 已展开目录（工作区文件树的持久化）
 export async function getExpandedDirs(): Promise<string[]> {
   const result = await ipc<{ expanded_dirs?: string[] }>('get_expanded_dirs')
   return result.expanded_dirs || []
@@ -86,21 +83,20 @@ export async function setExpandedDirs(dirs: string[]): Promise<void> {
   await ipc('set_expanded_dirs', { expanded_dirs: dirs })
 }
 
-// ============================== Recent files ==============================
+// ============================== 最近文件 ==============================
 
-/** Return the most recently opened files, newest first. Up to 10
- *  entries — the cap is enforced server-side in `AppConfig`. */
+/** 返回最近打开的文件列表，最新的排在前面。最多 10 条——
+ *  上限由服务端在 `AppConfig` 中强制。 */
 export async function getRecentFiles(): Promise<string[]> {
   return (await ipc('get_recent_files')) ?? []
 }
 
-/** Clear the recent-files list. The Welcome page wires a "Clear"
- *  button to this. */
+/** 清空最近文件列表。欢迎页的「清除」按钮会调用它。 */
 export async function clearRecentFiles(): Promise<void> {
   await ipc('clear_recent_files')
 }
 
-// ============================== Bookmarks ==============================
+// ============================== 书签 ==============================
 
 export async function getBookmarks(): Promise<Bookmark[]> {
   return (await ipc('get_bookmarks')) ?? []
@@ -131,25 +127,23 @@ export async function removeBookmark(id: string): Promise<void> {
   await ipc('remove_bookmark', { id })
 }
 
-// ============================== Themes ==============================
+// ============================== 主题 ==============================
 
 export async function getThemes(): Promise<Theme[]> {
   return await ipc('get_themes')
 }
 
 /**
- * Typora-style native theme picker. The WebView's
- * `input[type=file]` cannot expose an absolute path, so we
- * route through the Rust host which uses `rfd` to surface
- * one. Returns the selected path or `null` if the user
- * cancelled.
+ * 原生主题选择器。WebView 的 `input[type=file]` 无法提供绝对路径，
+ * 因此我们经由 Rust 宿主（使用 `rfd`）弹出原生选择框。
+ * 返回选中的路径；用户取消时返回 `null`。
  */
 export async function pickThemeFile(): Promise<string | null> {
   try {
     return (await ipc('pick_theme_file')) as string
   } catch (e) {
-    // "Cancelled" is a normal flow from the Rust dialog and
-    // shouldn't be surfaced as an error to the user.
+    // 「Cancelled」是 Rust 对话框的常规返回流程，
+    // 不应作为错误呈现给用户。
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.toLowerCase().includes('cancel')) return null
     throw e
@@ -172,7 +166,7 @@ export async function saveCustomTheme(theme: Theme): Promise<Theme> {
   return await ipc('save_theme', theme)
 }
 
-// ============================== Keybindings ==============================
+// ============================== 快捷键 ==============================
 
 export async function getKeybindings(): Promise<KeyBinding[]> {
   return await ipc('get_keybindings')
@@ -193,16 +187,13 @@ export async function updateKeybinding(
   return await ipc('update_keybinding', { id, accelerator })
 }
 
-// ============================== Config export / import ==============================
+// ============================== 配置导出 / 导入 ==============================
 //
-// P0-X: Typora-style "Export Preferences" / "Import
-// Preferences". The Rust host snapshots the entire
-// AppConfig + keybindings + custom themes into a
-// versioned JSON payload (see `cmd_export_config`); we
-// hand that to the host's file picker for backup. The
-// inverse path takes the file the user picked and
-// forwards the payload to `cmd_import_config` which
-// restores each piece with a best-effort report.
+// 「导出偏好设置」/「导入偏好设置」。Rust 宿主把整个
+// AppConfig + 快捷键 + 自定义主题快照为一份带版本号的
+// JSON 载荷（见 `cmd_export_config`）；我们把它交给宿主的
+// 文件选择器做备份。反向路径则读取用户选中的文件，
+// 把载荷转发给 `cmd_import_config`，由它逐项恢复并返回尽力而为的报告。
 
 export async function exportConfig(): Promise<ConfigExportPayload> {
   return await ipc('export_config')
@@ -226,13 +217,13 @@ export async function getTranslations(lang: string): Promise<Record<string, stri
   return await ipc('get_translations', { lang })
 }
 
-// ============================== App info ==============================
+// ============================== 应用信息 ==============================
 
 export async function getAppInfo(): Promise<AppInfo> {
   return await ipc('get_app_info')
 }
 
-// ============================== File watcher events ==============================
+// ============================== 文件监听事件 ==============================
 
 export type { FileChangeEvent }
 
@@ -244,24 +235,23 @@ export function offFileChanges(): void {
   window.__mt_on_file_changes = null
 }
 
-// ============================== Multi-root workspace (P2-4) ==============================
+// ============================== 多根工作区 ==============================
 
-/** Add a folder to the current workspace. Returns the freshly
- *  created root (with its server-assigned id). */
+/** 向当前工作区添加一个文件夹。返回新建的根目录
+ * （带服务端分配的标识符）。 */
 export async function addWorkspaceRoot(path: string): Promise<WorkspaceRoot> {
   return await ipc<WorkspaceRoot>('add_workspace_root', { path })
 }
 
-/** Remove a root from the workspace (also unwatches and clears
- *  its expanded-dirs entry). The active id is re-pointed at
- *  the next remaining root, or `null` if the workspace is
- *  now empty. */
+/** 从工作区移除一个根目录（同时停止监听并清空它的展开目录记录）。
+ *  活动根标识符会指向下一个剩余根目录；
+ *  若工作区已空则为 `null`。 */
 export async function removeWorkspaceRoot(rootId: string): Promise<void> {
   await ipc('remove_workspace_root', { root_id: rootId })
 }
 
-/** Fetch the current set of roots + the active id. Called on
- *  app boot to hydrate the workspace store. */
+/** 获取当前根目录集合 + 活动根标识符。应用启动时调用，
+ *  用于填充工作区 store。 */
 export async function listWorkspaceRoots(): Promise<WorkspaceRoots> {
   return (await ipc<WorkspaceRoots>('list_workspace_roots')) ?? {
     roots: [],
@@ -269,10 +259,9 @@ export async function listWorkspaceRoots(): Promise<WorkspaceRoots> {
   }
 }
 
-/** Switch the active root. Rust's LRU document registry
- *  drops every doc that doesn't belong to the new active
- *  root; the returned `evicted_doc_ids` lets the renderer
- *  close the matching tabs in lockstep. */
+/** 切换活动根目录。Rust 的 LRU 文档注册表会丢弃所有
+ *  不属于新活动根的文档；返回的 `evicted_doc_ids` 让渲染端
+ *  同步关闭对应的标签页。 */
 export async function setActiveWorkspaceRoot(
   rootId: string,
 ): Promise<{ evicted_doc_ids: string[] }> {
@@ -283,11 +272,10 @@ export async function setActiveWorkspaceRoot(
   )
 }
 
-/** Phase 5: drop every root whose `path` no longer exists
- *  on disk. Returns the list of removed ids so the caller
- *  can close tabs whose `workspace_root_id` matches. The
- *  renderer should still show a confirm dialog before
- *  invoking this — removal is permanent. */
+/** 丢弃所有在磁盘上已不存在的根目录（其 `path` 失效）。
+ *  返回被移除的标识符列表，供调用方关闭 `workspace_root_id`
+ *  匹配的标签页。渲染端在调用前仍应弹出确认对话框——
+ *  该移除是不可逆的。 */
 export async function removeMissingWorkspaceRoots(): Promise<{
   removed_root_ids: string[]
 }> {
@@ -298,13 +286,11 @@ export async function removeMissingWorkspaceRoots(): Promise<{
   )
 }
 
-// ============================== Workspace tag index (P0-7) ==============================
+// ============================== 工作区标签索引 ==============================
 
-/** Aggregate every `#tag` across `path` into a flat
- *  `WorkspaceTag[]` (alphabetical by name). Scans `.md` /
- *  `.markdown` / `.mdx` files only. P2-4 multi-root: pass
- *  `paths` (plural) to merge across multiple roots in a
- *  single call. */
+/** 把 `path` 下的全部 `#标签` 汇总为扁平的 `WorkspaceTag[]`
+ *  （按名称字母序）。只扫描 `.md` / `.markdown` / `.mdx` 文件。
+ *  多根工作区：传入 `paths`（复数）即可在单次调用中跨多个根目录合并。 */
 export async function getWorkspaceTags(
   path: string | string[],
   maxDepth = 10,
@@ -318,12 +304,11 @@ export async function getWorkspaceTags(
   return result?.tags ?? []
 }
 
-// ============================== Backlinks (P0-6) ==============================
+// ============================== 反链 ==============================
 
-/** Return every workspace document that links to `page` via
- *  `[[page]]` or `[[page|alias]]` (alias ignored for matching).
- *  Case-insensitive exact-name match. P2-4 multi-root: pass
- *  `paths` to scan across multiple roots. */
+/** 返回所有通过 `[[页面]]` 或 `[[页面|别名]]` 链接到 `page` 的
+ *  工作区文档（匹配时忽略别名）。不区分大小写的精确名称匹配。
+ *  多根工作区：传入 `paths` 即可跨多个根目录扫描。 */
 export async function getBacklinks(
   page: string,
   path: string | string[],
@@ -338,13 +323,11 @@ export async function getBacklinks(
   return result?.backlinks ?? []
 }
 
-// ============================== Per-workspace CSS (P1-7) ==============================
+// ============================== 工作区自定义 CSS ==============================
 
-/** Read every `*.css` under `<workspace>/.markpure/styles/`
- *  and return the concatenated text plus the list of file
- *  names. P2-4 multi-root: pass `paths` to merge across roots
- *  (active root's CSS is concatenated last so it wins the
- *  cascade). */
+/** 读取 `<workspace>/.markpure/styles/` 下的所有 `*.css`，
+ *  返回拼接后的文本与文件名列表。多根工作区：传入 `paths`
+ *  即可跨根目录合并（活动根的 CSS 最后拼接，因此在层叠中优先级最高）。 */
 export async function loadWorkspaceStyles(
   path: string | string[],
   activeRootPath?: string,
@@ -357,22 +340,11 @@ export async function loadWorkspaceStyles(
   return result ?? { css: '', files: [] }
 }
 
-// ============================== Snippets (P2-5) ==============================
+// ============================== 代码片段 ==============================
 
-/** List all user-defined snippets stored under
- *  `~/.config/markpure/snippets/`. Each `.md` file becomes
- *  one snippet (filename minus `.md` is the shortcode). */
+/** 列出存储在 `~/.config/markpure/snippets/` 下的全部用户自定义片段。
+ *  每个 `.md` 文件对应一个片段（去掉 `.md` 后缀的文件名即是简码）。 */
 export async function listSnippets(): Promise<Snippet[]> {
   const result = await ipc<{ snippets: Snippet[] }>('list_snippets')
   return result?.snippets ?? []
-}
-
-// ============================== Clipboard ==============================
-
-/** Copy plain text to the OS clipboard. There's no Rust
- *  handler for this yet — the renderer uses the modern
- *  Clipboard API directly and this wrapper is here for
- *  symmetry with other file-system helpers. */
-export async function copyToClipboard(text: string): Promise<void> {
-  await ipc('copy_to_clipboard', { text })
 }

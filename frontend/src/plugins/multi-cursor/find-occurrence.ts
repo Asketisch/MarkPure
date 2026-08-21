@@ -1,19 +1,17 @@
 /**
- * Reusable text-occurrence search.
+ * 可复用的文本出现处搜索。
  *
- * Extracted from the legacy `select-same-word-extension.ts` so
- * the multi-cursor plugin and the same-word extension share
- * one algorithm. Returns PM positions, NOT character offsets,
- * so it's safe to use directly on `state.doc`.
+ * 从旧版 `select-same-word-extension.ts` 中拆出，让多光标插件与
+ * 同词选中扩展共用同一套算法。返回 PM 位置而非字符偏移，因此
+ * 可直接安全地用于 `state.doc`。
  *
- * Two flavours:
+ * 两种风格：
  *   - findNextOccurrence(doc, needle, startAfter)
- *       used by `SelectSameWordExtension` for the "no
- *       multi-cursor" fallback path (kept in the extension).
+ *       供 `SelectSameWordExtension` 的“无多光标”回退路径使用
+ *       （保留在扩展内）。
  *   - findNextForCursors(doc, needle, startAfter, taken)
- *       used by the multi-cursor `selectNextMatch` command.
- *       Skips ranges already occupied by an existing cursor
- *       so back-to-back Cmd+D always picks a NEW match.
+ *       供多光标的 `selectNextMatch` 命令使用。跳过已被现有光标
+ *       占据的范围，连续按 Cmd+D 总能选到**新**匹配。
  */
 
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -24,8 +22,8 @@ export interface Occurrence {
 }
 
 /**
- * Walk the document, return the first text-leaf range that
- * contains `needle` strictly after `startAfter`.
+ * 遍历文档，返回严格位于 `startAfter` 之后、包含 `needle` 的
+ * 第一个文本叶子范围。
  */
 export function findNextOccurrence(
   doc: PMNode,
@@ -59,12 +57,11 @@ export function findNextOccurrence(
 }
 
 /**
- * Like `findNextOccurrence` but skips any match whose `from`
- * or `to` is in the `taken` set. Used by Cmd+D to ensure
- * repeated presses always select a new occurrence.
+ * 同 `findNextOccurrence`，但跳过 `from` 或 `to` 落在 `taken`
+ * 集合里的匹配。Cmd+D 用它保证连续按下时始终选中新出现处。
  *
- * If the only matches remaining are in `taken`, returns null —
- * the caller is expected to wrap around to position 0 first.
+ * 若剩余匹配全在 `taken` 中，返回 null——调用方应先回绕到
+ * 位置 0。
  */
 export function findNextForCursors(
   doc: PMNode,
@@ -109,11 +106,10 @@ export function findNextForCursors(
 }
 
 /**
- * Collect every occurrence of `needle` in document order.
- * Used by `selectAllMatches` (Cmd+Shift+L).
+ * 按文档顺序收集 `needle` 的每一处出现。供 `selectAllMatches`
+ * （Cmd+Shift+L）使用。
  *
- * The returned array is sorted by `from` and contains no
- * overlaps (we use indexOf and skip past each match).
+ * 返回的数组按 `from` 排序且无重叠（用 indexOf 并跳过每个匹配）。
  */
 export function findAllOccurrences(doc: PMNode, needle: string): Occurrence[] {
   if (!needle) return []

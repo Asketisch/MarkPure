@@ -1,13 +1,13 @@
 /**
- * CodeMirror 6 theme and language registry for mark-web code blocks
- * Simplified from milkup's code-block.ts
+ * 用于 markdown 代码块的 CodeMirror 6 主题与语言注册表
+ * 参考 milkup 的 code-block.ts 简化而来
  */
 
 import { EditorView } from '@codemirror/view'
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import type { Extension } from '@codemirror/state'
 
-/** Detect dark theme from app CSS class */
+/** 从应用的 CSS 类检测深色主题 */
 export function detectDarkTheme(): boolean {
   const el = document.querySelector('.app-root')
   if (!el) return false
@@ -15,7 +15,7 @@ export function detectDarkTheme(): boolean {
   return cls.some(c => c.includes('dark'))
 }
 
-/** Create CM theme extension matching app CSS variables */
+/** 创建与应用 CSS 变量匹配的 CM 主题扩展 */
 export function createThemeExtension(isDark: boolean): Extension[] {
   const baseTheme = EditorView.theme({
     '&': {
@@ -47,41 +47,4 @@ export function createThemeExtension(isDark: boolean): Extension[] {
   }, { dark: isDark })
 
   return [baseTheme, syntaxHighlighting(defaultHighlightStyle)]
-}
-
-/**
- * Watch the app root for theme class changes and re-evaluate
- * `detectDarkTheme()` on every active CodeMirror view. We can't
- * rebuild the entire editor (that would lose undo history and
- * scroll position), but we can reconfigure the theme compartment
- * if the host wired it up. The default CodeMirror theme uses
- * `var(--text)` etc., so most colors update automatically; the
- * one bit that doesn't is CodeMirror's own "dark" flag (which
- * flips a few internal defaults like selection tint).
- *
- * The companion `reconfigureTheme` is exposed for callers that
- * want to call into `compartment.reconfigure(...)`.
- */
-let observer: MutationObserver | null = null
-const reconfigureListeners = new Set<(isDark: boolean) => void>()
-
-export function onThemeChange(cb: (isDark: boolean) => void): () => void {
-  reconfigureListeners.add(cb)
-  // Fire once with the current value so callers can sync up
-  // immediately.
-  cb(detectDarkTheme())
-  return () => reconfigureListeners.delete(cb)
-}
-
-export function watchAppTheme(): () => void {
-  if (typeof document === 'undefined') return () => {}
-  if (observer) return () => observer!.disconnect()
-
-  observer = new MutationObserver(() => {
-    const isDark = detectDarkTheme()
-    for (const cb of reconfigureListeners) cb(isDark)
-  })
-  const target = document.querySelector('.app-root') ?? document.body
-  observer.observe(target, { attributes: true, attributeFilter: ['class'] })
-  return () => observer?.disconnect()
 }

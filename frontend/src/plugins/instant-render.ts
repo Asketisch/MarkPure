@@ -1,13 +1,11 @@
 /**
- * Typora-style Instant Render plugin for ProseMirror
+ * MarkPure 即时渲染插件（ProseMirror）
  *
- * Uses WidgetDecoration to show/hide Markdown syntax markers
- * based on cursor proximity. When cursor is near a formatted element,
- * syntax markers are visible; when cursor is away, they are hidden.
+ * 使用 WidgetDecoration 根据光标远近显示/隐藏 Markdown 语法标记。
+ * 当光标靠近某个被格式化的元素时，语法标记可见；光标移开后隐藏。
  *
- * Performance: decorations are cached in plugin state and only recomputed
- * when the cursor moves or the document changes. On cursor-only changes,
- * only affected regions are updated (not the full document).
+ * 性能设计：装饰全部缓存在插件状态中，只在光标移动或文档变化时重新计算。
+ * 纯光标变化时只更新受影响的区域，而不是整个文档。
  */
 
 import { Plugin, PluginKey } from '@tiptap/pm/state'
@@ -15,7 +13,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { Node as PMNode, Mark } from '@tiptap/pm/model'
 import type { EditorView } from '@tiptap/pm/view'
 
-// WidgetDecorationSpec is not exported from @tiptap/pm/view in all versions
+// WidgetDecorationSpec 并非所有版本的 @tiptap/pm/view 都会导出
 interface WidgetDecorationSpec {
   side?: number
   widget?: HTMLElement
@@ -29,12 +27,12 @@ export interface InstantRenderState {
 
 export const instantRenderPluginKey = new PluginKey<InstantRenderState>('markpure-instant-render')
 
-/** Check if a position is "near" a range (within threshold characters) */
+/** 判断某个位置是否“靠近”某个区间（在阈值字符数以内） */
 function isNearCursor(from: number, to: number, cursorPos: number, threshold = 2): boolean {
   return cursorPos >= from - threshold && cursorPos <= to + threshold
 }
 
-/** Create a syntax marker widget */
+/** 创建一个语法标记 widget */
 function createMarkerWidget(
   pos: number,
   text: string,
@@ -51,9 +49,9 @@ function createMarkerWidget(
   }, { side } as WidgetDecorationSpec)
 }
 
-/** Collect decorations for a single node at the given position */
+/** 为给定位置的单个节点收集装饰 */
 function decorateNode(node: PMNode, pos: number, cursorPos: number, decorations: Decoration[]): void {
-  // Headings: show # prefix
+  // 标题：显示 # 前缀
   if (node.type.name === 'heading') {
     const level = node.attrs.level as number
     const near = isNearCursor(pos, pos + node.content.size + 1, cursorPos)
@@ -65,7 +63,7 @@ function decorateNode(node: PMNode, pos: number, cursorPos: number, decorations:
     )
   }
 
-  // Blockquote: show > prefix on each line
+  // 引用块：在每行显示 > 前缀
   if (node.type.name === 'blockquote') {
     const near = isNearCursor(pos, pos + node.nodeSize, cursorPos)
     decorations.push(
@@ -75,7 +73,7 @@ function decorateNode(node: PMNode, pos: number, cursorPos: number, decorations:
     )
   }
 
-  // Inline marks on text nodes
+  // 文本节点上的行内标记
   if (node.isText && node.marks.length > 0) {
     for (const mark of node.marks) {
       const from = pos
@@ -107,7 +105,7 @@ function decorateNode(node: PMNode, pos: number, cursorPos: number, decorations:
   }
 }
 
-/** Compute all syntax decorations for the document (full rebuild) */
+/** 计算整个文档的语法装饰（全量重建） */
 function computeSyntaxDecorations(doc: PMNode, cursorPos: number): DecorationSet {
   const decorations: Decoration[] = []
   doc.descendants((node, pos) => {
@@ -117,8 +115,8 @@ function computeSyntaxDecorations(doc: PMNode, cursorPos: number): DecorationSet
 }
 
 /**
- * Find the top-level node range that contains a position.
- * Returns [from, to] covering the node, or null if not found.
+ * 查找包含某个位置的最顶层节点区间。
+ * 返回覆盖该节点的 [from, to]，找不到时返回 null。
  */
 function findAffectedRange(doc: PMNode, cursorPos: number, threshold = 2): { from: number; to: number } | null {
   let result: { from: number; to: number } | null = null
@@ -132,7 +130,7 @@ function findAffectedRange(doc: PMNode, cursorPos: number, threshold = 2): { fro
   return result
 }
 
-/** Create the instant render plugin */
+/** 创建即时渲染插件 */
 export function createInstantRenderPlugin(): Plugin {
   return new Plugin({
     key: instantRenderPluginKey,
@@ -149,14 +147,13 @@ export function createInstantRenderPlugin(): Plugin {
         const newCursorPos = tr.selection.from
         const cursorMoved = newCursorPos !== prev.cursorPos
 
-        // Document changed: incremental update. Map existing
-        // decorations through the transaction, then recompute only
-        // for the changed regions. This avoids a full doc.descendants
-        // walk on every keystroke (O(changes) instead of O(doc)).
+        // 文档发生变化：增量更新。先把现有装饰通过事务映射过去，
+        // 然后只对变化的区域重新计算。这样每次按键都无需完整遍历
+        // doc.descendants（复杂度从 O(doc) 降为 O(changes)）。
         if (tr.docChanged) {
           let mapped = prev.decorations.map(tr.mapping, newState.doc)
 
-          // Collect changed ranges from the transaction's mapping
+          // 从事务映射中收集发生变化的区间
           const changedRanges: { from: number; to: number }[] = []
           for (const map of tr.mapping.maps) {
             map.forEach((_oldFrom, _oldTo, newFrom, newTo) => {
@@ -164,7 +161,7 @@ export function createInstantRenderPlugin(): Plugin {
             })
           }
 
-          // Remove decorations in changed ranges and recompute
+          // 移除变化区间内的装饰并重新计算
           if (changedRanges.length > 0) {
             for (const range of changedRanges) {
               mapped = mapped.remove(mapped.find(range.from, range.to))
@@ -189,19 +186,19 @@ export function createInstantRenderPlugin(): Plugin {
           }
         }
 
-        // Cursor moved without doc change: incremental update
+        // 光标移动但文档未变化：增量更新
         if (cursorMoved) {
-          // Rebuild decorations only for the regions affected by old and new cursor positions.
-          // We remove decorations in the old+new cursor neighborhoods and re-add them.
+          // 只重建旧光标位置和新光标位置所影响的区域的装饰：
+          // 移除旧、新光标邻域内的装饰后重新添加。
           const oldRange = findAffectedRange(newState.doc, prev.cursorPos)
           const newRange = findAffectedRange(newState.doc, newCursorPos)
 
-          // If both cursors are in the same top-level block, the affected area is small.
-          // Collect all ranges that need updating.
+          // 如果两个光标位于同一个顶层块内，受影响面就很小。
+          // 收集所有需要更新的区间。
           const rangesToUpdate: Array<{ from: number; to: number }> = []
           if (oldRange) rangesToUpdate.push(oldRange)
           if (newRange) {
-            // Avoid duplicate if same range
+            // 若为同一区间则避免重复加入
             if (!oldRange || newRange.from !== oldRange.from || newRange.to !== oldRange.to) {
               rangesToUpdate.push(newRange)
             }
@@ -211,7 +208,7 @@ export function createInstantRenderPlugin(): Plugin {
             return { ...prev, cursorPos: newCursorPos }
           }
 
-          // Remove old decorations in affected ranges, then re-add with new cursor position
+          // 移除受影响区间内的旧装饰，再按新光标位置重新添加
           let decos = prev.decorations
           for (const range of rangesToUpdate) {
             decos = decos.remove(
@@ -219,7 +216,7 @@ export function createInstantRenderPlugin(): Plugin {
             )
           }
 
-          // Recompute decorations for affected ranges
+          // 重新计算受影响区间的装饰
           const newDecorations: Decoration[] = []
           for (const range of rangesToUpdate) {
             newState.doc.nodesBetween(range.from, range.to, (node, pos) => {

@@ -1,8 +1,8 @@
-// ============================== Themes ==============================
+// ============================== 主题 ==============================
 
 pub fn cmd_get_themes() -> std::result::Result<serde_json::Value, String> {
     let themes = mt_core::load_custom_themes();
-    Ok(serde_json::to_value(themes).map_err(|e| e.to_string())?)
+    serde_json::to_value(themes).map_err(|e| e.to_string())
 }
 
 pub fn cmd_import_theme(
@@ -12,7 +12,7 @@ pub fn cmd_import_theme(
         .as_str()
         .ok_or("Missing 'path' parameter")?;
     let theme = mt_core::import_theme_from_path(file_path).map_err(|e| e.to_string())?;
-    Ok(serde_json::to_value(theme).map_err(|e| e.to_string())?)
+    serde_json::to_value(theme).map_err(|e| e.to_string())
 }
 
 pub fn cmd_export_theme(
@@ -38,5 +38,5 @@ pub fn cmd_save_theme(params: &serde_json::Value) -> std::result::Result<serde_j
     let theme = serde_json::from_value::<mt_core::Theme>(params.clone())
         .map_err(|e| e.to_string())?;
     mt_core::save_custom_theme(&theme).map_err(|e| e.to_string())?;
-    Ok(serde_json::to_value(theme).map_err(|e| e.to_string())?)
+    serde_json::to_value(theme).map_err(|e| e.to_string())
 }

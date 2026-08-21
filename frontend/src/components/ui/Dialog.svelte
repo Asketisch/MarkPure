@@ -19,10 +19,8 @@
     confirmText?: string
     cancelText?: string
     /**
-     * Optional middle action for `type === 'unsaved'`
-     * (e.g. "Don't Save"). Wired to `onSecondary` so the
-     * caller can decide what "discard" means in its
-     * context.
+     * `type === 'unsaved'` 时的中间操作按钮（例如“不保存”）。
+     * 通过 `onSecondary` 触发，具体“放弃”的含义由调用方决定。
      */
     secondaryText?: string
     inputPlaceholder?: string

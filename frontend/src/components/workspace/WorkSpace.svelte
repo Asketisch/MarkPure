@@ -1,24 +1,21 @@
 <script lang="ts">
   import './workspace.css'
   /**
-   * Workspace sidebar — assemble layer.
+   * 工作区侧边栏——组装层。
    *
-   * P13 split: this component used to be a 471-line god
-   * component. It's now a thin shell that owns the
-   * workspace-tree state (which is shared across the
-   * filter input, tree view, and context menu) and wires
-   * the three sub-components together:
+   * 拆分重构后，这个组件不再是原本 471 行的巨型组件，
+   * 而是变为一个薄壳：它持有工作区文件树的状态
+   * （供过滤器输入框、文件树视图与右键菜单共享），
+   * 并把三个子组件/模块串联起来：
    *
-   *   - `<FileTree>` — the recursive file tree
-   *   - `<FileContextMenu>` — right-click actions
-   *   - `$lib/fileTreeFilters` — pure path / filter helpers
+   *   - `<FileTree>` —— 递归文件树
+   *   - `<FileContextMenu>` —— 右键操作菜单
+   *   - `$lib/fileTreeFilters` —— 纯路径 / 过滤器辅助函数
    *
-   * P13a: file/folder CRUD is now in `workspaceActions.ts`
-   * so this file stays focused on rendering + state
-   * orchestration. The actions take a context-menu
-   * snapshot and return a structured `ActionOutcome` so
-   * we never have to inline 100+ lines of prompt /
-   * create / reload-tree glue here.
+   * 文件 / 文件夹的增删改查已迁至 `workspaceActions.ts`，
+   * 本文件只负责渲染与状态编排。这些操作接收一份右键菜单快照，
+   * 并返回结构化的 `ActionOutcome`，
+   * 我们再也不必在这里内联上百行「弹窗 / 新建 / 重载文件树」的胶水代码。
    */
   import { untrack } from 'svelte'
   import {
@@ -42,24 +39,22 @@
     onOpenFile?: (path: string) => void
     onPinTab?: (path: string) => void
     onWorkspaceChange?: (path: string) => void
-    // P0-5: invoked once on mount (and again when the workspace
-    // changes) with this component's `loadTree`. The host stores
-    // it and calls it from `handleFileChanges` whenever the file
-    // watcher reports disk activity, replacing the old "toggle
-    // workspacePath to remount the sidebar" hack.
+    // 挂载时（以及工作区切换时）以本组件的 `loadTree` 为参数调用。
+    // 宿主保存该函数，并在文件监听器报告磁盘变动时从
+    // `handleFileChanges` 中调用它，取代旧的「切换 workspacePath
+    // 以重新挂载侧边栏」的做法。
     onRegisterRefresh?: (refresh: () => void) => void
   }
 
   let { workspacePath = null, onOpenFile, onPinTab, onWorkspaceChange, onRegisterRefresh }: Props = $props()
 
   const i18n = useI18n()
-  // P2-4 multi-root store. The sidebar's "Open Folder" button
-  // registers the picked folder here so it shows up in the
-  // root-pill strip alongside folders added from other entry
-  // points (MenuBar, EmptyState, WorkspaceRootTabs +).
+  // 多根工作区 store。侧边栏的「打开文件夹」按钮把选中的文件夹
+  // 注册到这里，使其与从其他入口（菜单栏、空状态页、根标签栏等）
+  // 添加的文件夹一起出现在根目录胶囊条中。
   const workspace = useWorkspace()
 
-  // ----- State (shared across the sub-components) -----
+  // ----- 状态（各子组件共享）-----
 
   let tree = $state<FileEntry[]>([])
   let loading = $state(false)
@@ -69,11 +64,11 @@
   let selectedPath = $state<string | null>(null)
   let contextMenu = $state<{ x: number; y: number; path: string; isDir: boolean } | null>(null)
 
-  // ----- In-app dialog (replaces native window.confirm/prompt,
-  //       which wry's WebView silently no-ops) -----
+  // ----- 应用内对话框（取代原生 window.confirm/prompt，
+  //       因为 wry 的 WebView 会静默忽略它们）-----
   let dialog = $state<DialogState | null>(null)
 
-  // ----- Inline error banner (side-bar top) -----
+  // ----- 顶部内联错误横幅 -----
   let actionError = $state<string | null>(null)
   let errorTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -98,18 +93,17 @@
       errorTimer = null
     }
   }
-  // Teardown: clear the dismiss timer when the component unmounts
+  // 清理：组件卸载时清除关闭定时器
   $effect(() => () => {
     if (errorTimer) clearTimeout(errorTimer)
   })
 
-  // ----- Workspace / tree management -----
+  // ----- 工作区 / 文件树管理 -----
 
-  // Re-entrancy guard. The sidebar button funnels through
-  // here; the EmptyState and MenuBar paths are separate but
-  // share the underlying `pickDirectory` IPC, so two stacked
-  // pickers used to be possible if the user clicked the
-  // sidebar button while a previous picker was still up.
+  // 重入保护。侧边栏按钮的操作都汇聚到这里；空状态页与菜单栏
+  // 的路径虽然各自独立，但共享底层同一个 `pickDirectory` IPC，
+  // 因此若前一个选择器还开着时用户又点了侧边栏按钮，
+  // 之前可能叠加弹出两个选择器。
   let openWorkspaceBusy = $state(false)
   async function openWorkspace() {
     if (openWorkspaceBusy) return
@@ -117,14 +111,12 @@
     try {
       const path = await pickDirectory()
       if (!path) return
-      // Register the picked folder in the P2-4 store so it
-      // appears in the root-pill strip and survives a config
-      // round-trip. Then switch the active root to it — the
-      // sidebar "Open / Change Folder" button has open-and-show
-      // semantics, so we explicitly switch (addRoot alone only
-      // activates the *first* root). The mirror $effect in
-      // App.svelte then updates `workspacePath`, which triggers
-      // the tree-load $effect below.
+      // 把选中的文件夹注册进多根 store，使它出现在根目录胶囊条中，
+      // 并能在配置往返后继续保留。随后把活动根切换到它——
+      // 侧边栏「打开 / 更换文件夹」按钮的语义是打开即显示，
+      // 所以这里要显式切换（仅 addRoot 只会激活*第一个*根）。
+      // App.svelte 中对应的 $effect 随后会更新 `workspacePath`，
+      // 从而触发下方加载文件树的 $effect。
       const root = await workspace.addRoot(path)
       if (root && workspace.activeId !== root.id) {
         await workspace.setActive(root.id)
@@ -135,32 +127,26 @@
     }
   }
 
-  // Sequence counter for loadTree() so concurrent calls don't
-  // clobber each other out of order. Module-scoped `let`, NOT
-  // `$state` — we don't want Svelte to react to it.
+  // loadTree() 的序号计数器，避免并发调用互相覆盖、乱序返回。
+  // 使用模块级 `let`，而不是 `$state`——我们不想让 Svelte 对它响应式。
   let loadSeq = 0
 
   async function loadTree() {
     if (!workspacePath) return
-    // P0-5 flicker fix: only flash the "Loading…" overlay on
-    // the *initial* load when the tree is empty. Background
-    // refreshes from the file watcher keep the existing tree
-    // on screen until the new tree is in hand, eliminating the
-    // 1-3 Hz "Loading…" / real-tree swap the user was seeing
-    // as constant flicker. `isInitial` is captured once at
-    // entry so an await that races a workspace close doesn't
-    // flip the loading state.
+    // 闪烁修复：只在*首次*加载（文件树为空）时显示「加载中…」遮罩。
+    // 来自文件监听器的后台刷新会保留现有文件树，直到新文件树就绪，
+    // 从而消除此前用户看到的 1-3Hz「加载中…」与实际文件树的
+    // 反复交替闪烁。`isInitial` 在进入时一次性捕获，
+    // 这样与工作区关闭竞争的 await 不会意外翻转加载状态。
     const isInitial = tree.length === 0
     if (isInitial) loading = true
     const seq = ++loadSeq
     try {
-      // P1-10: depth bumped from 5 → 15. Five was the pre-fix
-      // ceiling; 15 covers the common "year/month/day/title"
-      // note-organising pattern plus a few extra levels. A
-      // future improvement is lazy-load on expand (see
-      // COMPETITOR_TODO P1-10).
+      // 目录树深度从 5 提升到 15。5 是修复前的上限；
+      // 15 足以覆盖常见的「年/月/日/标题」笔记组织模式，
+      // 并留出少量余量。未来的改进方向是展开时懒加载。
       const next = await getDirectoryTree(workspacePath, 15, showHidden)
-      if (seq !== loadSeq) return  // a newer call superseded us
+      if (seq !== loadSeq) return  // 已有更新的调用取代了我们
       tree = next
       const dirs = await getExpandedDirs()
       if (seq !== loadSeq) return
@@ -210,27 +196,23 @@
     }
   }
 
-  // ----- Context-menu actions (CRUD) -----
+  // ----- 右键菜单操作（增删改查）-----
   //
-  // Each handler snapshots the target path/values *before*
-  // `hideContextMenu()` (which clears `contextMenu`), then pops
-  // an in-app `Dialog.svelte`. We avoid `window.confirm/prompt`
-  // because wry's WebView does not implement them — they
-  // return undefined/false and the operation is silently
-  // skipped, which is the bug this rewrite fixes.
+  // 每个处理器都会在 `hideContextMenu()`（它会清空 `contextMenu`）
+  // *之前*快照目标路径 / 值，然后弹出应用内 `Dialog.svelte`。
+  // 我们刻意避开 `window.confirm/prompt`，因为 wry 的 WebView
+  // 没有实现它们——它们会返回 undefined/false，操作被静默跳过，
+  // 这正是本次重写要修复的缺陷。
   //
-  // The handlers themselves are defined in `workspaceHandlers.ts`
-  // (a `createSidebarHandlers` factory that takes the dialog
-  // state + side-effect callbacks, so the component file stays
-  // a thin shell). IPC errors are surfaced via the inline error
-  // banner at the top of the sidebar.
+  // 处理器本身定义在 `workspaceHandlers.ts` 中
+  // （一个接收对话框状态 + 副作用回调的 `createSidebarHandlers`
+  // 工厂函数，让组件文件保持薄壳形态）。IPC 错误通过侧边栏顶部的
+  // 内联错误横幅呈现。
 
-  // Instantiate the eight context-menu handlers. `contextMenu`,
-  // `workspacePath` and `showHidden` are all `$state` cells, so
-  // we build the handlers in a `$derived` — the factory re-runs
-  // whenever any of them change, giving every handler a fresh
-  // closure over the *current* target instead of a stale snapshot
-  // from the last render.
+  // 实例化八个右键菜单处理器。`contextMenu`、`workspacePath`
+  // 和 `showHidden` 都是 `$state` 单元，因此我们在 `$derived` 中
+  // 构建处理器——任一变化都会触发工厂函数重新执行，
+  // 让每个处理器都能闭包到*当前*目标，而不是上次渲染留下的过期快照。
   const sidebarHandlers = $derived(createSidebarHandlers(
     {
       contextMenu,
@@ -245,23 +227,20 @@
   ))
 
   $effect(() => {
-    // Track both dependencies explicitly so the effect re-runs
-    // when the workspace is opened/closed OR when the hidden-files
-    // toggle flips. The `untrack` wrapper prevents the effect from
-    // re-tracking the reactive reads inside `loadTree()`, which
-    // would otherwise cause two IPC round-trips per click.
+    // 显式追踪这两个依赖，使效果在工作区打开 / 关闭
+    // 或隐藏文件开关翻转时重新运行。`untrack` 包裹层防止效果
+    // 重复追踪 `loadTree()` 内部的响应式读取，
+    // 否则每次点击都会多出两次 IPC 往返。
     const _path = workspacePath
     const _show = showHidden
     if (_path) {
       untrack(() => loadTree())
-      // P0-5: re-register the refresh callback whenever the
-      // workspace changes so the host always holds a `loadTree`
-      // bound to the current `workspacePath`.
+      // 工作区变化时重新注册刷新回调，
+      // 确保宿主始终持有绑定到当前 `workspacePath` 的 `loadTree`。
       onRegisterRefresh?.(() => loadTree())
     } else {
-      // Workspace was closed: clear the visible tree and any
-      // remembered expansion state so a later open of a *different*
-      // workspace doesn't show stale entries.
+      // 工作区已关闭：清空可见的文件树与记住的展开状态，
+      // 这样稍后打开*另一个*工作区时不会显示过期的条目。
       untrack(() => {
         tree = []
         expandedDirs = new Set()
@@ -351,10 +330,9 @@
   {/if}
 </div>
 
-<!-- In-app confirm/input dialog (replaces native window.confirm/prompt,
-     which wry's WebView silently no-ops). Rendered outside the flex
-     `.workspace` so the dialog's `position: fixed` backdrop is not
-     trapped by the sidebar's layout. -->
+<!-- 应用内确认/输入对话框（取代原生 window.confirm/prompt，
+     因为 wry 的 WebView 会静默忽略它们）。渲染在 flex `.workspace`
+     之外，避免对话框 `position: fixed` 的遮罩被侧边栏布局困住。 -->
 {#if dialog}
   <Dialog
     type={dialog.type}
@@ -364,9 +342,8 @@
     cancelText={dialog.cancelText}
     bind:inputValue={dialog.inputValue}
     onConfirm={() => {
-      // Capture + close BEFORE invoking the callback, so a
-      // synchronous reopen from inside the callback (e.g. an
-      // error path) doesn't see stale state.
+      // 在调用回调*之前*先捕获并关闭，这样回调内部
+      //（例如错误路径）的同步重开不会看到过期的状态。
       const cb = dialog?.onConfirm
       const value = dialog?.inputValue
       closeDialog()

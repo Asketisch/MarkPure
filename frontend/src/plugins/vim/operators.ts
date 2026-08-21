@@ -1,24 +1,22 @@
 /**
- * Operator implementations for the Vim mode plugin (P2-7).
+ * Vim 模式插件的操作符实现。
  *
- * An operator mutates the document: delete, change, yank, and
- * a few standalone ops (x, r, J, >>, <<). Each operator
- * returns an `ApplyResult` that the plugin turns into a PM
- * transaction.
+ * 操作符会修改文档：删除、修改、复制，以及几个独立操作符
+ * （x、r、J、>>、<<）。每个操作符返回一个 `ApplyResult`，由插件
+ * 转成 PM 事务。
  *
- * Conventions:
- *   - `nextMode` is set only for `change` (transitions to
- *     INSERT) and `enterInsert`-style ops.
- *   - `cursorPos` is the post-op position. Omitted for ops
- *     that preserve the cursor (e.g., yank).
- *   - `registerUpdate` carries the yanked text. V1 stores it
- *     in plugin state but does not wire it to `p`/`P` (V2).
- *   - Operators never throw on invalid input — they return a
- *     no-op `tr` and `cursorPos: undefined`.
+ * 约定：
+ *   - `nextMode` 只为 `change`（切到 INSERT）以及
+ *     `enterInsert` 类操作符设置。
+ *   - `cursorPos` 是操作后的光标位置。保持光标不变的操作符
+ *     （如 yank）不提供它。
+ *   - `registerUpdate` 携带复制到的文本。当前版本把它存在插件
+ *     状态里，但尚未接到 `p`/`P` 上（留待后续版本）。
+ *   - 操作符对无效输入从不抛异常——它们返回空操作的 `tr` 与
+ *     `cursorPos: undefined`。
  *
- * The actual `Transaction` building is light: most ops are
- * `tr.delete(from, to)` plus optional `tr.insertText`. The
- * linewise ops use `tr.delete` from line-start to line-end.
+ * 实际构建 `Transaction` 的逻辑很轻：多数操作是 `tr.delete(from, to)`
+ * 加上可选的 `tr.insertText`。行级操作从行首到行尾使用 `tr.delete`。
  */
 
 import type { EditorView } from '@tiptap/pm/view'
@@ -26,21 +24,21 @@ import type { EditorState, Transaction } from '@tiptap/pm/state'
 import type { Range } from './motions'
 
 export interface ApplyResult {
-  /** Optional mode transition (e.g., 'insert' for c). */
+  /** 可选的模式切换（例如 c 会切到 'insert'）。 */
   nextMode?: 'normal' | 'insert' | 'visual' | 'visual-line' | 'visual-block' | 'replace'
-  /** Post-op cursor position. */
+  /** 操作后的光标位置。 */
   cursorPos?: number
-  /** Yank register update. */
+  /** 复制到的寄存器内容。 */
   registerUpdate?: string
-  /** The transaction to dispatch. */
+  /** 要派发的事务。 */
   tr: Transaction
 }
 
 /* ------------------------------------------------------------------ *
- *  Range-based operators                                               *
+ *  基于区间的操作符                                                     *
  * ------------------------------------------------------------------ */
 
-/** Delete the chars in `range`. Cursor lands at `from`. */
+/** 删除 `range` 内的字符。光标落在 `from`。 */
 export function applyDelete(
   view: EditorView,
   range: Range,
@@ -49,9 +47,8 @@ export function applyDelete(
   const tr = view.state.tr
   const { from, to } = normaliseRange(view.state, range)
   if (from === to) return { tr }
-  // Capture the text BEFORE dispatching tr.delete, so the
-  // yank register carries the deleted text rather than the
-  // post-mutation empty slice.
+  // 必须在派发 tr.delete 之前抓取文本，这样寄存器携带的是被删除
+  // 的文本，而不是删除后的空切片。
   const yanked = view.state.doc.textBetween(from, to)
   tr.delete(from, to)
   return {
@@ -61,7 +58,7 @@ export function applyDelete(
   }
 }
 
-/** Delete the range, then enter INSERT mode. Cursor lands at `from`. */
+/** 删除区间，然后进入 INSERT 模式。光标落在 `from`。 */
 export function applyChange(
   view: EditorView,
   range: Range,
@@ -79,7 +76,7 @@ export function applyChange(
   }
 }
 
-/** Yank the range into the register, leave the doc untouched. */
+/** 把区间复制到寄存器，不修改文档。 */
 export function applyYank(
   view: EditorView,
   range: Range,
@@ -93,10 +90,10 @@ export function applyYank(
 }
 
 /* ------------------------------------------------------------------ *
- *  Standalone operators                                                *
+ *  独立操作符                                                           *
  * ------------------------------------------------------------------ */
 
-/** x / X: delete `count` chars starting at the cursor. */
+/** x / X：从光标处开始删除 `count` 个字符。 */
 export function applyDeleteChar(view: EditorView, count: number): ApplyResult {
   const tr = view.state.tr
   const head = view.state.selection.head
@@ -112,7 +109,7 @@ export function applyDeleteChar(view: EditorView, count: number): ApplyResult {
   }
 }
 
-/** r{char}: replace the char at the cursor with `char`. */
+/** r{char}：把光标处的字符替换为 `char`。 */
 export function applyChangeChar(view: EditorView, char: string): ApplyResult {
   const tr = view.state.tr
   const head = view.state.selection.head
@@ -123,7 +120,7 @@ export function applyChangeChar(view: EditorView, char: string): ApplyResult {
   return { tr, cursorPos: head }
 }
 
-/** s: substitute `count` chars at the cursor, then INSERT. */
+/** s：替换光标处的 `count` 个字符，然后进入 INSERT。 */
 export function applySubstituteChar(view: EditorView, count: number): ApplyResult {
   const tr = view.state.tr
   const head = view.state.selection.head
@@ -133,7 +130,7 @@ export function applySubstituteChar(view: EditorView, count: number): ApplyResul
   return { tr, nextMode: 'insert', cursorPos: head }
 }
 
-/** J: join `count` lines (default 2) into one. */
+/** J：把 `count` 行（默认 2 行）合并为一行。 */
 export function applyJoinLines(view: EditorView, count: number): ApplyResult {
   const tr = view.state.tr
   const $head = view.state.doc.resolve(view.state.selection.head)
@@ -148,7 +145,7 @@ export function applyJoinLines(view: EditorView, count: number): ApplyResult {
   return { tr, cursorPos: lineEnd }
 }
 
-/** >>: indent the current line (and `count - 1` lines below). */
+/** >>：缩进当前行（以及下方的 `count - 1` 行）。 */
 export function applyIndentLine(view: EditorView, count: number): ApplyResult {
   const tr = view.state.tr
   const $head = view.state.doc.resolve(view.state.selection.head)
@@ -158,8 +155,8 @@ export function applyIndentLine(view: EditorView, count: number): ApplyResult {
     if (lineEnd + 1 >= view.state.doc.content.size) break
     lineEnd = view.state.doc.resolve(lineEnd + 1).end()
   }
-  // V1: insert 2 spaces at the start of each line in the range.
-  // Iterate forward so the first insert doesn't shift later ones.
+  // 当前版本：在区间内每行行首插入 2 个空格。
+  // 从前向后迭代，这样第一次插入不会位移后面的行。
   let offset = 0
   let curStart = lineStart
   for (let k = 0; k < count; k++) {
@@ -172,13 +169,13 @@ export function applyIndentLine(view: EditorView, count: number): ApplyResult {
   return { tr, cursorPos: lineStart + 2 }
 }
 
-/** <<: dedent the current line (and `count - 1` lines below). */
+/** <<：减少当前行缩进（以及下方的 `count - 1` 行）。 */
 export function applyDedentLine(view: EditorView, count: number): ApplyResult {
   const tr = view.state.tr
   const $head = view.state.doc.resolve(view.state.selection.head)
   const lineStart = $head.start()
-  // V1: only remove leading spaces (no tabs). We use 2-space
-  // indentation to match `applyIndentLine`.
+  // 当前版本：只移除行首空格（不支持制表符）。与 `applyIndentLine`
+  // 一致采用 2 空格缩进。
   let curStart = lineStart
   for (let k = 0; k < count; k++) {
     if (curStart >= view.state.doc.content.size) break
@@ -197,10 +194,10 @@ export function applyDedentLine(view: EditorView, count: number): ApplyResult {
 }
 
 /* ------------------------------------------------------------------ *
- *  Linewise operators                                                  *
+ *  行级操作符                                                           *
  * ------------------------------------------------------------------ */
 
-/** dd: delete `count` lines starting at the cursor. */
+/** dd：从光标所在行开始删除 `count` 行。 */
 export function applyDeleteLine(view: EditorView, count: number): ApplyResult {
   const tr = view.state.tr
   const $head = view.state.doc.resolve(view.state.selection.head)
@@ -210,7 +207,7 @@ export function applyDeleteLine(view: EditorView, count: number): ApplyResult {
     if (lineEnd + 1 >= view.state.doc.content.size) break
     lineEnd = view.state.doc.resolve(lineEnd + 1).end()
   }
-  // Include the trailing newline (Vim convention).
+  // 连同行尾换行符一起删除（Vim 惯例）。
   const to = Math.min(view.state.doc.content.size, lineEnd + 1)
   const yanked = view.state.doc.textBetween(lineStart, to)
   tr.delete(lineStart, to)
@@ -221,7 +218,7 @@ export function applyDeleteLine(view: EditorView, count: number): ApplyResult {
   }
 }
 
-/** cc: change `count` lines starting at the cursor, then INSERT. */
+/** cc：修改光标所在行起的 `count` 行，然后进入 INSERT。 */
 export function applyChangeLine(view: EditorView, count: number): ApplyResult {
   const tr = view.state.tr
   const $head = view.state.doc.resolve(view.state.selection.head)
@@ -237,7 +234,7 @@ export function applyChangeLine(view: EditorView, count: number): ApplyResult {
   return { tr, nextMode: 'insert', cursorPos: lineStart, registerUpdate: yanked }
 }
 
-/** yy: yank `count` lines starting at the cursor. */
+/** yy：复制光标所在行起的 `count` 行。 */
 export function applyYankLine(view: EditorView, count: number): ApplyResult {
   const $head = view.state.doc.resolve(view.state.selection.head)
   const lineStart = $head.start()
@@ -254,7 +251,7 @@ export function applyYankLine(view: EditorView, count: number): ApplyResult {
 }
 
 /* ------------------------------------------------------------------ *
- *  Helpers                                                             *
+ *  辅助函数                                                             *
  * ------------------------------------------------------------------ */
 
 function normaliseRange(state: EditorState, range: Range): { from: number; to: number } {

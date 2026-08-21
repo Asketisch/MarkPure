@@ -1,12 +1,10 @@
 /**
- * Markdown content helpers for a Tiptap editor.
+ * Tiptap 编辑器的 Markdown 内容助手。
  *
- * `getMarkdown` reads the current doc back out; `setContent`
- * feeds a markdown string in. Both are thin but fiddly — the
- * `@tiptap/markdown` API has moved between releases and the
- * fallback chain lives here so `editor.ts` stays focused on
- * assembly. Split out of `editor.ts` (which was at the
- * 400-line limit).
+ * `getMarkdown` 把当前文档读回字符串；`setContent` 把 markdown
+ * 字符串喂进去。两者都很薄但容易出错——`@tiptap/markdown` 的 API
+ * 在不同版本间有变动，回退链放在这里，让 `editor.ts` 专注于组装。
+ * 从 `editor.ts`（体量过大）中拆出。
  */
 
 import type { Editor } from '@tiptap/core'
@@ -16,18 +14,17 @@ export function getMarkdown(editor: Editor): string {
 }
 
 export function setContent(editor: Editor, markdown: string): void {
-  // The `@tiptap/markdown` v3 API has bounced between
-  // `editor.markdown.parse(md)` and
-  // `editor.storage.markdown.parser.parse(md)`. Try the documented
-  // shape first, fall back to the storage path, and finally to
-  // `commands.setContent` which the editor will treat as HTML —
-  // not what we want for markdown, but at least non-empty.
+  // `@tiptap/markdown` v3 的 API 一直在
+  // `editor.markdown.parse(md)` 与
+  // `editor.storage.markdown.parser.parse(md)` 之间摇摆。先试文档
+  // 中的形态，再回退到 storage 路径，最后落到 `commands.setContent`
+  // ——编辑器会把它当 HTML 处理，虽不是 markdown 想要的结果，
+  // 但至少不为空。
   try {
-    // `??` chains a series of fallbacks; `?:` only enters the
-    // picture at the very end as the final `undefined` fallback.
-    // Wrapping the inner chain in parens keeps precedence obvious
-    // and prevents a future refactor from accidentally converting
-    // the chain into a ternary check on `editor.storage.markdown`.
+    // `??` 串联一串回退；`?:` 只在整个链条末尾作为最终的
+    // `undefined` 兜底出现。用括号包住内层链，让优先级一目了然，
+    // 也防止未来重构时不小心把链改成对 `editor.storage.markdown`
+    // 的三元判断。
     const storageParser = (
       editor.storage as { markdown?: { parser?: { parse?: (md: string) => unknown } } }
     )?.markdown?.parser?.parse
@@ -44,13 +41,13 @@ export function setContent(editor: Editor, markdown: string): void {
       return
     }
   } catch (err) {
-    // Fall through to last-resort path below. We log so a missing
-    // or moved parser doesn't silently degrade to HTML rendering.
+    // 落到下面的最后兜底路径。记日志是为了让缺失或被改名的解析器
+    // 不会悄无声息地退化成 HTML 渲染。
     console.error('[editor] markdown parse failed, falling back:', err)
   }
-  // Last resort: hand the markdown string to `setContent`. Tiptap
-  // will parse it as HTML — wrong, but the editor stays open and
-  // the user can correct manually. Better than a blank screen.
+  // 最后的兜底：把 markdown 字符串交给 `setContent`。Tiptap 会
+  // 当作 HTML 解析——不对，但编辑器保持可用，用户可手动纠正。
+  // 总比白屏好。
   console.warn('[editor] no markdown parser found; treating content as HTML')
   editor.commands.setContent(markdown)
 }

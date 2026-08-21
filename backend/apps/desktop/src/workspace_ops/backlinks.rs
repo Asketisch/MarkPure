@@ -1,17 +1,15 @@
-// ============================== Backlinks (P0-6) ==============================
+// ============================== 反链 ==============================
 
 use super::workspace_scans::{extract_root_paths, is_hidden};
 use std::path::Path;
 use walkdir::WalkDir;
 
-/// P0-6: scan the workspace for `[[Page]]` mentions that point at
-/// `page`, grouped by source file. The renderer uses this to
-/// populate the Backlinks panel.
+/// 扫描工作区中指向 `page` 的 `[[页面]]` 引用，并按来源文件分组。
+/// 渲染器用它来填充反链面板。
 ///
-/// P2-4 multi-root: accepts `paths: Vec<String>` and runs the
-/// scan once per root; hits are merged by `source_path` so a
-/// file referenced from two roots is grouped once. The
-/// (legacy) `path: String` form is still accepted.
+/// 多根工作区支持：接受 `paths: Vec<String>` 参数，并为每个根目录
+/// 各执行一次扫描；命中结果按 `source_path` 合并，因此从两个根目录
+/// 引用到的同一文件只会被分组一次。旧的 `path: String` 形式仍然兼容。
 pub fn cmd_get_backlinks(
     params: &serde_json::Value,
 ) -> std::result::Result<serde_json::Value, String> {
@@ -23,7 +21,7 @@ pub fn cmd_get_backlinks(
     let max_depth = params["max_depth"].as_u64().unwrap_or(10) as usize;
     let show_hidden = params["show_hidden"].as_bool().unwrap_or(false);
 
-    // source_path -> Vec<{line, snippet}>
+    // 来源路径 -> 命中列表（行号与片段）
     let mut by_source: std::collections::BTreeMap<String, Vec<serde_json::Value>> =
         std::collections::BTreeMap::new();
 
@@ -87,8 +85,8 @@ pub fn cmd_get_backlinks(
     Ok(serde_json::json!({ "backlinks": hits }))
 }
 
-/// True if `line` contains a `[[page]]` or `[[page|alias]]` wikilink
-/// whose target matches `page` (case-insensitive exact match).
+/// 判断 `line` 中是否包含目标与 `page` 匹配的
+/// `[[页面]]` 或 `[[页面|别名]]` wiki 链接（不区分大小写的精确匹配）。
 fn backlink_mentions(line: &str, page: &str) -> bool {
     let lower_page = page.to_ascii_lowercase();
     let mut rest = line;

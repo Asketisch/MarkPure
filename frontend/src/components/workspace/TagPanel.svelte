@@ -1,13 +1,11 @@
 <script lang="ts">
   /**
-   * Tag Pane (P0-7) — right-side panel listing every `#tag`
-   * found across the current workspace. Clicking a tag routes
-   * the user to a workspace search pre-filtered to `#tagname`.
+   * 标签面板 —— 右侧面板，列出当前工作区里找到的所有 `#tag`。
+   * 点击标签会把用户带到预过滤为 `#tagname` 的工作区搜索。
    *
-   * Pattern: thin host for the tree view, mirroring
-   * `OutlinePanel.svelte`. Data is fetched on mount + on
-   * `onFileChanges` events (debounced 300ms) so the index
-   * stays roughly in sync with disk edits.
+   * 模式：作为树视图的薄宿主，与 `OutlinePanel.svelte` 一致。数据在
+   * 挂载时 + `onFileChanges` 事件时拉取（防抖 300ms），让索引与磁盘
+   * 编辑大致保持同步。
    */
   import { onMount } from 'svelte'
   import { getWorkspaceTags, type WorkspaceTag } from '$lib/editor/commands'
@@ -28,9 +26,11 @@
   let error = $state<string | null>(null)
   let searchQuery = $state('')
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
+  // 单调递增序号：快速连续触发时丢弃过期响应（与 BacklinksPanel 一致）。
+  let requestSeq = 0
 
-  // Filtered view: case-insensitive substring on the tag name.
-  // Kept simple; tag names are short, fuzzy matching is overkill.
+  // 过滤视图：对标签名做大小写不敏感的子串匹配。保持简单；
+  // 标签名很短，模糊匹配是过度设计。
   let visibleTags = $derived(
     searchQuery.trim().length > 0
       ? tags.filter(t => t.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
@@ -42,14 +42,18 @@
       tags = []
       return
     }
+    const seq = ++requestSeq
     loading = true
     error = null
     try {
-      tags = await getWorkspaceTags(workspacePath)
+      const out = await getWorkspaceTags(workspacePath)
+      if (seq !== requestSeq) return
+      tags = out
     } catch (e) {
+      if (seq !== requestSeq) return
       error = String(e)
     } finally {
-      loading = false
+      if (seq === requestSeq) loading = false
     }
   }
 
@@ -60,14 +64,16 @@
     }, 300)
   }
 
+  // 首次加载由下方 $effect 触发；这里只做卸载清理（含递增 seq，
+  // 让卸载后在途请求的 resolve 全部变成空操作）。
   onMount(() => {
-    void loadTags()
     return () => {
+      requestSeq++
       if (refreshTimer) clearTimeout(refreshTimer)
     }
   })
 
-  // Re-load when the workspace changes.
+  // 工作区变化时重新加载。
   $effect(() => {
     if (workspacePath) {
       void loadTags()
@@ -76,8 +82,8 @@
     }
   })
 
-  // Public hook for App.svelte to trigger a refresh on file
-  // changes. Wired via a prop below.
+  // 供 App.svelte 在文件变化时触发刷新的公共钩子。
+  // 通过下方 prop 接入。
   export function refresh() {
     debouncedLoad()
   }

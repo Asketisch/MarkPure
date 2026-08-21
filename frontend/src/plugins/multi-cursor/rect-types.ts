@@ -1,27 +1,24 @@
 /**
- * Types and plugin key for the column-select sub-plugin (P2-3).
+ * 列选择子插件的类型与插件键。
  *
- * Column selection is a "rectangular" selection mode: the user
- * Alt+Drags a box, and the resulting rectangle is flattened to
- * N linear range cursors that are then handed off to the
- * existing multi-cursor plugin (see `multiCursorPluginKey`).
+ * 列选择是一种“矩形”选区模式：用户按住 Alt 拖出一个方框，
+ * 所得矩形被拍平为 N 个线性区间光标，然后交给既有的多光标插件
+ * （见 `multiCursorPluginKey`）。
  *
- * This file deliberately stays tiny — it only holds the types
- * the drag state machine reads/writes. The actual algorithm
- * lives in `column-select.ts`.
+ * 本文件刻意保持精简——只存放拖拽状态机读写的类型。真正的算法
+ * 在 `column-select.ts` 里。
  *
- * Why a separate PluginKey rather than extending
- * `MultiCursorState`:
- *   - The linear plugin's `apply` reducer + 15 unit tests stay
- *     untouched (no regression risk).
- *   - The rectangle is transient (lives only during drag) while
- *     `cursors[]` is the persistent committed state.
- *   - StatusBar can read just `dragging: boolean` cheaply.
+ * 为什么单独开一个 PluginKey 而不是扩展 `MultiCursorState`：
+ *   - 线性插件的 `apply` reducer 与 15 个单元测试保持原样
+ *     （无回归风险）。
+ *   - 矩形是瞬态的（只在拖拽期间存在），而 `cursors[]` 是持久的
+ *     已提交状态。
+ *   - StatusBar 只需廉价地读取 `dragging: boolean`。
  */
 
 import { PluginKey } from '@tiptap/pm/state'
 
-/** Viewport-relative pixel rectangle. */
+/** 相对视口的像素矩形。 */
 export interface Rect {
   left: number
   top: number
@@ -29,28 +26,28 @@ export interface Rect {
   bottom: number
 }
 
-/** Mouse-event coordinates relative to the viewport. */
+/** 相对视口的鼠标事件坐标。 */
 export interface ViewportPoint {
   x: number
   y: number
 }
 
-/** Transient drag state owned by the column-select plugin. */
+/** 列选择插件持有的瞬态拖拽状态。 */
 export interface ColumnSelectState {
-  /** True while the user is actively dragging an Alt+Drag box. */
+  /** 用户是否正在拖拽 Alt+拖拽方框。 */
   dragging: boolean
-  /** Current rectangle in viewport pixels; null when not dragging. */
+  /** 视口像素下的当前矩形；未拖拽时为 null。 */
   rect: Rect | null
 }
 
-/** Meta payload used to drive `apply()`. */
+/** 用于驱动 `apply()` 的 meta 负载。 */
 export type ColumnSelectMeta =
   | { type: 'start'; rect: Rect }
   | { type: 'update'; rect: Rect }
   | { type: 'end' }
 
-/** Singleton plugin key. Imported by the StatusBar subscriber. */
+/** 单例插件键。由 StatusBar 订阅者导入。 */
 export const columnSelectPluginKey = new PluginKey<ColumnSelectState>('columnSelect')
 
-/** Pixel threshold below which a drag is treated as a single click. */
+/** 像素阈值：低于它时拖拽被当作单击。 */
 export const DRAG_THRESHOLD_PX = 3

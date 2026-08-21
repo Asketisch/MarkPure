@@ -1,21 +1,19 @@
 /**
- * TOC extension.
+ * 目录（TOC）扩展。
  *
- * A block-level node that represents a table of contents in the
- * document. The node is round-tripped through markdown as an HTML
- * comment (`<!-- TOC -->`) so that opening a markdown file written
- * outside MarkPure still surfaces the TOC block in the editor.
+ * 一个块级节点，表示文档中的目录。该节点通过 HTML 注释
+ * （`<!-- TOC -->`）与 Markdown 相互往返，因此用 MarkPure 之外
+ * 的工具编写、且内含该注释的 Markdown 文件，打开后仍能在编辑器中
+ * 显示出 TOC 块。
  *
- * The actual heading list is rendered by `TocNodeView` at runtime
- * by walking the editor's ProseMirror document — same approach as
- * the outline side panel.
+ * 实际的标题列表由 `TocNodeView` 在运行时遍历编辑器的 ProseMirror
+ * 文档渲染而成——与大纲侧边栏的实现方式一致。
  */
 import { Node, mergeAttributes } from '@tiptap/core'
 import { TocNodeView } from '../../nodeviews/toc-view'
 
-/// Markdown round-trip marker. We use the VSCode / markdown-all-in-one
-/// convention so users hand-writing a TOC can opt in by typing
-/// `<!-- TOC -->` on its own line.
+/// Markdown 往返标记。沿用业界常见的写法，手写目录的用户
+/// 只需在单独一行输入 `<!-- TOC -->` 即可启用自动目录。
 const TOC_MARKER = '<!-- TOC -->'
 const TOC_MARKER_RE = /^[ \t]*<!--\s*TOC\s*-->[ \t]*$/m
 
@@ -38,9 +36,9 @@ export const TocExtension = Node.create({
     return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'toc', class: 'toc-block' })]
   },
 
-  // ---- Markdown round-trip hooks ----
-  // We own a dedicated `toc` token name so we don't race with any
-  // block-level extension that might also process HTML comments.
+  // ---- Markdown 往返钩子 ----
+  // 独占一个 `toc` token 名，避免与其他同样处理 HTML 注释的
+  // 块级扩展产生竞争。
   markdownTokenName: 'toc',
 
   markdownTokenizer: {
@@ -69,7 +67,7 @@ export const TocExtension = Node.create({
   renderMarkdown: (_node, _helpers) => {
     return TOC_MARKER
   },
-  // ---- end markdown round-trip hooks ----
+  // ---- 结束：Markdown 往返钩子 ----
 
   addNodeView() {
     return (props) => {

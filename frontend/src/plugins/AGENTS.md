@@ -4,7 +4,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `instant-render.ts` | Typora 风格即时渲染 |
+| `instant-render.ts` | 即时渲染（光标附近显示语法标记，远离时隐藏） |
 | `search.ts` | 搜索高亮 + 位置映射 |
 | `multi-cursor.ts` | ~~Alt+Click 多光标编辑（已重构为目录）~~ |
 | `multi-cursor/` | 真正多光标编辑（COMPETITOR_TODO P0-3）：Alt+Click 加光标、Cmd+D 加下个匹配、Cmd+Shift+L 全选、Cmd+U 撤销、Esc 清空 |

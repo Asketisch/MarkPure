@@ -1,15 +1,11 @@
 <script lang="ts">
   /**
-   * Backlinks Pane (P0-6) — right-side panel listing every
-   * workspace document that links *to* the current page via
-   * `[[Page]]` syntax. The query page is derived from the
-   * active tab's filename (sans `.md`); the list is fetched
-   * on every tab change.
+   * 反向链接面板 —— 右侧面板，列出所有通过 `[[Page]]` 语法链接
+   * *到*当前页面的工作区文档。查询页面由当前标签页的文件名（去掉
+   * `.md`）推导；每次标签切换都重新拉取列表。
    *
-   * Pattern: mirrors `TagPanel.svelte`. No in-memory
-   * caching for the first version — the Rust scan is fast
-   * (single-threaded walkdir) and the user only sees this
-   * pane on demand.
+   * 模式：与 `TagPanel.svelte` 一致。第一版不做内存缓存——Rust
+   * 扫描很快（单线程 walkdir），用户也只在需要时打开这个面板。
    */
   import { onMount } from 'svelte'
   import { getBacklinks, type Backlink } from '$lib/editor/commands'
@@ -60,9 +56,9 @@
   }
 
   $effect(() => {
-    // Track `currentPage` so the list re-fetches on tab switch.
-    // `workspacePath` is also tracked — closing the workspace
-    // clears the list. Debounced to avoid rapid-fire queries.
+    // 追踪 `currentPage` 让列表在标签切换时重新拉取。`workspacePath`
+    // 也在追踪范围内——关闭工作区会清空列表。做了防抖，避免
+    // 快速连续查询。
     void currentPage
     void workspacePath
     debouncedLoad()
@@ -70,15 +66,14 @@
 
   onMount(() => {
     return () => {
-      // Bump seq so any in-flight request's resolution is a
-      // no-op after unmount.
+      // 递增 seq，让卸载后任何在途请求的 resolve 都变成空操作。
       requestSeq++
       if (refreshTimer) clearTimeout(refreshTimer)
     }
   })
 
-  // P0-6: public hook for App.svelte to trigger a refresh on
-  // file change events. Wired via bind:this.
+  // 供 App.svelte 在文件变更事件时触发刷新的公共钩子。
+  // 通过 bind:this 接入。
   export function refresh() {
     debouncedLoad()
   }

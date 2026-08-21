@@ -1,15 +1,12 @@
-//! Mermaid syntax validation: cheap, no-`mmdc` heuristics
-//! for the editor to decide whether to ship a diagram to the
-//! renderer.
+//! Mermaid 语法校验：廉价的、不依赖 `mmdc` 的启发式判断，
+//! 供编辑器决定是否把图表交给渲染器。
 //!
-//! Extracted from `mermaid.rs` so the predicates (`is_table_row`,
-//! `are_brackets_balanced`, `DiagramType::from_code`) live in one
-//! place and can be unit-tested without dragging in the
-//! `Command::spawn` rendering pipeline.
+//! 从 `mermaid.rs` 中抽出，让这些谓词（`is_table_row`、
+//! `are_brackets_balanced`、`DiagramType::from_code`）集中在
+//! 一处，可以单元测试，而不必拖入 `Command::spawn` 渲染管线。
 
-/// Mermaid diagram type. The `Unknown` variant is the catch-all
-/// for code we can't classify — typically prose accidentally
-/// typed inside a `\`\`\`mermaid` fence.
+/// Mermaid 图表类型。`Unknown` 变体是兜底值，用于我们无法分类的
+/// 代码——通常是误在 `\`\`\`mermaid` 围栏里输入的普通文本。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DiagramType {
     Flowchart,
@@ -51,19 +48,15 @@ impl DiagramType {
     }
 }
 
-/// Conservative heuristic — we only reject what we can prove wrong
-/// without a full parser pass:
-///   - Empty input is invalid (nothing to render).
-///   - Unbalanced brackets are invalid.
-///   - A non-empty body that doesn't start with any recognised
-///     diagram-type keyword is suspicious and rejected. Empty
-///     body is already rejected by the first check.
+/// 保守的启发式判断——只拒绝无需完整解析即可证明错误的情况：
+///   - 空输入无效（没有可渲染的内容）。
+///   - 括号不配对无效。
+///   - 非空内容不以任何已识别的图表类型关键字开头，可疑且被拒绝。
+///     空内容已由第一条检查拒绝。
 ///
-/// We deliberately do *not* try to validate the diagram body
-/// itself — that's `mmdc`'s job. False positives (rejecting a
-/// block that mmdc would have rendered) are far less surprising
-/// than false negatives (silently passing `""` or `some prose`
-/// to mmdc and getting back a generic syntax error).
+/// 我们刻意*不*尝试校验图表主体本身——那是 `mmdc` 的职责。
+/// 误报（拒绝了一个 mmdc 本来能渲染的块）远比漏报（把 `""` 或
+/// 普通文字悄悄丢给 mmdc，只得到一句笼统的语法错误）更不容易让人困惑。
 pub fn validate_mermaid(code: &str) -> bool {
     let trimmed = code.trim();
 
@@ -82,9 +75,8 @@ pub fn validate_mermaid(code: &str) -> bool {
     true
 }
 
-/// Check if brackets are balanced in a string. Used by
-/// `validate_mermaid` to catch the most common syntax error
-/// before shelling out to `mmdc`.
+/// 检查字符串中的括号是否配对。供 `validate_mermaid` 在把内容交给
+/// `mmdc` 之前捕获最常见的语法错误。
 pub fn are_brackets_balanced(s: &str) -> bool {
     let mut stack: Vec<char> = Vec::new();
 
@@ -101,12 +93,11 @@ pub fn are_brackets_balanced(s: &str) -> bool {
                     return false;
                 }
             }
-            '}' => {
-                if stack.pop() != Some('{') {
+            '}'
+                if stack.pop() != Some('{') => {
                     return false;
                 }
-            }
-            // Note: '<' and '>' are NOT balanced in mermaid - they're used in arrows like -->
+            // 注意：mermaid 中 '<' 和 '>' 不参与配对——它们用于 --> 之类的箭头
             _ => {}
         }
     }
@@ -146,16 +137,16 @@ mod tests {
         let valid = "graph TD\n    A[Start] --> B[End]";
         assert!(validate_mermaid(valid));
 
-        let invalid = "graph TD\n    A[Start --> B[End]"; // Missing ]
+        let invalid = "graph TD\n    A[Start --> B[End]"; // 缺少 ]
         assert!(!validate_mermaid(invalid));
 
-        // Empty code is invalid (nothing to render).
+        // 空代码无效（没有可渲染的内容）。
         assert!(!validate_mermaid(""));
 
-        // Whitespace-only is invalid.
+        // 仅有空白字符无效。
         assert!(!validate_mermaid("   \n\t  "));
 
-        // Unknown diagram type is invalid.
+        // 未知的图表类型无效。
         assert!(!validate_mermaid("just some prose without a diagram type"));
     }
 }

@@ -1,20 +1,18 @@
 /**
- * Footnote reference mark.
+ * 脚注引用 mark。
  *
- * Recognises inline `[^id]` text in the document and renders it as
- * a styled `<sup class="footnote-ref">` chip. Markdown round-trips
- * losslessly: the editor preserves the literal `[^id]` text on
- * save, and `markdown::to_html_with_diagrams_and_footnotes` (in
- * the Rust backend) re-numbers and links the references on export.
+ * 识别文档中的行内 `[^id]` 文本，渲染为带样式的
+ * `<sup class="footnote-ref">` 角标。Markdown 往返无损：保存时
+ * 编辑器保留字面 `[^id]` 文本，导出时 Rust 后端的
+ * `markdown::to_html_with_diagrams_and_footnotes` 重新编号并
+ * 加链接。
  *
- * The mark carries a `label` attribute (the `id` portion: `1`,
- * `note-1`, `i0` for inline, etc.). It does NOT need to track the
- * document-order number — that's computed at render time.
+ * mark 携带 `label` 属性（即 `id` 部分：`1`、`note-1`、行内用的
+ * `i0` 等）。它**不需要**跟踪文档顺序编号——那在渲染时计算。
  *
- * The companion block-level definition (`[^id]: content`) is left
- * as plain text on purpose: pulldown-cmark's `ENABLE_FOOTNOTES`
- * recognises it natively, so the export pipeline picks it up
- * without us needing a custom ProseMirror node.
+ * 配套的块级定义（`[^id]: content`）故意保留为纯文本：
+ * pulldown-cmark 的 `ENABLE_FOOTNOTES` 原生识别它，导出管线
+ * 直接拾取，我们无需自定义 ProseMirror 节点。
  */
 import { Mark, mergeAttributes, InputRule } from '@tiptap/core'
 
@@ -32,19 +30,18 @@ declare module '@tiptap/core' {
   }
 }
 
-/// Pattern that matches a complete `[^id]` reference at the
-/// cursor. Used by the input rule that fires on the closing `]`.
+/// 匹配光标处完整 `[^id]` 引用的模式。供关闭 `]` 时触发的
+/// 输入规则使用。
 const FOOTNOTE_REF_INPUT_RE = /\[\^([^\[\]\s]+)\]$/
 
-/// Pattern that scans an entire text for `[^id]` occurrences.
-/// Used by the paste rule that re-marks pasted text.
+/// 扫描整段文本中 `[^id]` 出现的模式。供重新标记粘贴文本的
+/// 粘贴规则使用。
 const FOOTNOTE_REF_GLOBAL_RE = /\[\^([^\[\]\s]+)\]/g
 
 let nextLabelCounter = 0
 function nextAutoLabel(): string {
-  // Simple monotonic counter; the export pipeline renumbers in
-  // document order, so the on-disk label is purely cosmetic
-  // until the markdown is regenerated.
+  // 简单的单调递增计数器；导出管线按文档顺序重新编号，因此
+  // 磁盘上的标签在 markdown 重新生成之前只是装饰性的。
   nextLabelCounter += 1
   return String(nextLabelCounter)
 }
@@ -72,9 +69,8 @@ export const FootnoteRefExtension = Mark.create<FootnoteRefOptions>({
   parseHTML() {
     return [
       { tag: 'sup[data-footnoteref]' },
-      // Also accept the `[^id]` raw text the backend emits when
-      // round-tripping — this keeps editor→html→editor lossless
-      // when the user pastes an exported HTML block back in.
+      // 也接受后端往返时输出的 `[^id]` 原始文本——这样用户把导出的
+      // HTML 块粘贴回来时，编辑器→HTML→编辑器保持无损。
       { tag: 'sup.footnote-ref' },
     ]
   },
@@ -115,8 +111,8 @@ export const FootnoteRefExtension = Mark.create<FootnoteRefOptions>({
     }
   },
 
-  /// Convert `[^N]` to a marked footnote reference as the user
-  /// types the closing `]`. Mirrors the wikilink input rule.
+  /// 用户输入闭合 `]` 时把 `[^N]` 转成带标记的脚注引用。
+  /// 与 wikilink 输入规则对应。
   addInputRules() {
     return [
       new InputRule({
@@ -131,7 +127,7 @@ export const FootnoteRefExtension = Mark.create<FootnoteRefOptions>({
                 marks: [{ type: this.name, attrs: { label } }],
               },
             ])
-            // Cursor lands right after the inserted reference.
+            // 光标落在插入的引用之后。
             .setTextSelection(range.from + label.length + 3)
             .run()
         },
@@ -139,7 +135,7 @@ export const FootnoteRefExtension = Mark.create<FootnoteRefOptions>({
     ]
   },
 
-  /// Re-mark pasted `[^id]` text so it isn't just plain text.
+  /// 重新标记粘贴的 `[^id]` 文本，避免它沦为纯文本。
   addPasteRules() {
     return [
       {

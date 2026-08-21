@@ -2,38 +2,30 @@ import { Extension } from '@tiptap/core'
 import { InputRule } from '@tiptap/core'
 
 /**
- * P0-X: Typora-style emoji shortcode expansion. Typing
- * `:smile:` and pressing Space / Enter / Tab
- * automatically rewrites the literal `smile` to `😄`. The
- * rule fires only on a word boundary so a URL like
- * `https://example.com/:1234` is left alone.
+ * emoji 短代码展开。输入 `:smile:` 后按空格 / 回车 / Tab，
+ * 会自动把字面 `smile` 改写成 `😄`。规则只在词边界触发，
+ * 因此 `https://example.com/:1234` 这样的 URL 不会被碰。
  *
- * The shortcode table is a small, conservative subset
- * (~80 entries) — enough to cover the common
- * GitHub/Slack/Discord shortcodes that users expect to
- * work, without bundling the full `node-emoji` data set
- * (which would add ~50KB to the renderer bundle). Users
- * who want more can extend the table via the
- * `additionalShortcodes` extension option.
+ * 短代码表是一份小而保守的子集（约 80 条）——足以覆盖用户
+ * 在各主流平台常见的写法，又不必把完整的 `node-emoji` 数据集
+ * 打进渲染包（那会额外增加约 50KB）。想用更多短代码的用户
+ * 可以通过 `additionalShortcodes` 扩展选项扩充这张表。
  */
 
 export interface EmojiOptions {
-  /** Extra shortcodes merged into the built-in table.
-   *  Last-write-wins on duplicate keys. */
+  /** 合并进内置表的额外短代码。重复键以后写入者为准。 */
   additionalShortcodes?: Record<string, string>
 }
 
-/** Built-in shortcode table. Keep this list conservative
- *  — only widely-recognised shortcodes that users
- *  actually type. The full GitHub emoji list is 1800+
- *  entries; we'd rather ship 80 the right way than 1800
- *  most of which nobody will ever type.
+/** 内置短代码表。这份清单保持保守——只收录用户真正会打、
+ *  被广泛认可的短代码。完整的 emoji 列表有 1800+ 条；我们
+ *  宁愿把 80 条做对，也不愿把那 1800 条里多数没人会用的全
+ *  带上。
  *
- * Exported so the `validate-emoji-shortcode.ts` script
- * can assert the regex stays in sync with the actual
- * table. */
+ * 导出它，让 `validate-emoji-shortcode.ts` 脚本可以断言
+ * 正则与实际表保持同步。 */
 export const DEFAULT_SHORTCODES: Record<string, string> = {
-  // Smileys
+  // 表情
   smile: '😄',
   grinning: '😀',
   laugh: '😆',
@@ -59,7 +51,7 @@ export const DEFAULT_SHORTCODES: Record<string, string> = {
   sleepy: '😪',
   sleepy_face: '😴',
   mask: '😷',
-  // Hands
+  // 手势
   wave: '👋',
   raised_hand: '✋',
   ok_hand: '👌',
@@ -67,7 +59,7 @@ export const DEFAULT_SHORTCODES: Record<string, string> = {
   thumbsdown: '👎',
   clap: '👏',
   pray: '🙏',
-  // Hearts / symbols
+  // 爱心 / 符号
   heart: '❤️',
   broken_heart: '💔',
   sparkles: '✨',
@@ -77,13 +69,13 @@ export const DEFAULT_SHORTCODES: Record<string, string> = {
   boom: '💥',
   tada: '🎉',
   confetti_ball: '🎊',
-  // Status
+  // 状态
   rocket: '🚀',
   warning: '⚠️',
   x: '❌',
   white_check_mark: '✅',
   no_entry: '⛔',
-  // Common
+  // 常用
   coffee: '☕',
   tea: '🍵',
   pizza: '🍕',
@@ -93,15 +85,14 @@ export const DEFAULT_SHORTCODES: Record<string, string> = {
   apple: '🍎',
   banana: '🍌',
   cherry: '🍒',
-  // Arrows / pointers
+  // 箭头 / 指针
   point_right: '👉',
   point_left: '👈',
   point_up: '👆',
   point_down: '👇',
 }
 
-/** Compose the lookup table from the built-in set plus
- *  any `additionalShortcodes` the host injected. */
+/** 由内置表加上宿主注入的 `additionalShortcodes` 合成查找表。 */
 function buildTable(opts: EmojiOptions): Record<string, string> {
   const out = { ...DEFAULT_SHORTCODES }
   if (opts.additionalShortcodes) {
@@ -110,10 +101,9 @@ function buildTable(opts: EmojiOptions): Record<string, string> {
   return out
 }
 
-/** Escape a shortcode for use in a regex character class.
- *  None of our shortcodes contain regex meta-characters
- *  in practice, but defending against an `additionalShortcodes`
- *  override keeps the rule safe. */
+/** 转义短代码，使其可用于正则字符类。实际上我们的短代码
+ *  都不含正则元字符，但防御住 `additionalShortcodes` 的覆盖
+ *  能保证规则安全。 */
 function escapeForRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -130,17 +120,14 @@ export const EmojiShortcodeExtension = Extension.create<EmojiOptions>({
   addInputRules() {
     const table = buildTable(this.options)
     const shortcodes = Object.keys(table)
-      .sort((a, b) => b.length - a.length) // longest first so `:point_right:` wins over `:point:`
-    // Build a single combined regex that matches any known
-    // shortcode. The capture group at index 1 is the
-    // shortcode name (without the colons) so the handler
-    // can look it up in `table`.
+      .sort((a, b) => b.length - a.length) // 长的在前，让 `:point_right:` 优先生效而非 `:point:`
+    // 构建一个能匹配任意已知短代码的合并正则。下标 1 的捕获组
+    // 是短代码名（不含冒号），处理器据此在 `table` 中查找。
     const alternation = shortcodes.map(escapeForRegex).join('|')
-    // We anchor the rule on a word boundary to the left so
-    // URLs like `https://example.com/:smile:` aren't matched
-    // (the `:` is mid-identifier). The trailing `\s` (typed
-    // by the user pressing Space) and `[\n\t]` (Enter / Tab)
-    // are the trigger characters Typora supports.
+    // 规则左侧锚定在词边界上，这样 `https://example.com/:smile:`
+    // 这类 URL 不会被匹配（那里的 `:` 处于标识符中间）。尾部
+    // 的 `\s`（用户按空格产生）与 `[\n\t]`（回车 / Tab）
+    // 是触发字符。
     const pattern = new RegExp(
       `(?:^|[^\\w]):(${alternation}):[\\s\\n\\t]$`,
     )
@@ -151,16 +138,15 @@ export const EmojiShortcodeExtension = Extension.create<EmojiOptions>({
           const name = match[1]
           const emoji = table[name]
           if (!emoji) return
-          // Replace the whole `:name:` with the emoji glyph.
-          // We trim the trailing whitespace the user just
-          // typed (Space / Enter) so the caret lands cleanly
-          // after the emoji.
+          // 把整个 `:name:` 替换为 emoji 字形。我们裁掉用户
+          // 刚打出的尾部空白（空格 / 回车），让光标干净地落在
+          // emoji 之后。
           chain()
             .insertContentAt(
               { from: range.from, to: range.to - 1 },
               emoji,
             )
-            // Place the cursor right after the inserted emoji.
+            // 把光标放在插入的 emoji 正后方。
             .setTextSelection(range.from + emoji.length)
             .run()
         },

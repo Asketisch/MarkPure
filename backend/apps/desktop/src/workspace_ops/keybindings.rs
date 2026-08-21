@@ -1,8 +1,8 @@
-// ============================== Keybindings ==============================
+// ============================== 快捷键 ==============================
 
 pub fn cmd_get_keybindings() -> std::result::Result<serde_json::Value, String> {
     let keybindings = mt_core::load_keybindings();
-    Ok(serde_json::to_value(keybindings).map_err(|e| e.to_string())?)
+    serde_json::to_value(keybindings).map_err(|e| e.to_string())
 }
 
 pub fn cmd_set_keybindings(
@@ -16,7 +16,7 @@ pub fn cmd_set_keybindings(
 
 pub fn cmd_reset_keybindings() -> std::result::Result<serde_json::Value, String> {
     let keybindings = mt_core::reset_keybindings().map_err(|e| e.to_string())?;
-    Ok(serde_json::to_value(keybindings).map_err(|e| e.to_string())?)
+    serde_json::to_value(keybindings).map_err(|e| e.to_string())
 }
 
 pub fn cmd_update_keybinding(
@@ -29,5 +29,5 @@ pub fn cmd_update_keybinding(
         .map(String::from);
     let keybindings = mt_core::update_keybinding(id, accelerator)
         .map_err(|e| e.to_string())?;
-    Ok(serde_json::to_value(keybindings).map_err(|e| e.to_string())?)
+    serde_json::to_value(keybindings).map_err(|e| e.to_string())
 }

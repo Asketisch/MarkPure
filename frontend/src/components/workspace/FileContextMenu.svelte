@@ -1,14 +1,10 @@
 <script lang="ts">
   /**
-   * Right-click context menu for a file tree entry. The
-   * host (WorkSpace) supplies the path and a set of action
-   * callbacks; this component is presentational and knows
-   * nothing about IPC.
+   * 文件树条目的右键菜单。宿主（WorkSpace）提供路径与一组动作
+   * 回调；本组件是展示层，对 IPC 一无所知。
    *
-   * The "new file" / "new folder" items only appear when
-   * the right-clicked entry is a directory (you can't create
-   * a sibling under a file). The host tells us which via
-   * the `isDir` prop.
+   * “新建文件” / “新建文件夹”只在右键落点是目录时出现
+   * （文件下无法新建同级项）。宿主通过 `isDir` prop 告知。
    */
   import { useI18n } from '$lib/stores/i18n.svelte'
 
@@ -27,13 +23,12 @@
     onDelete,
     onRefresh,
   }: {
-    /** Viewport coordinates from the right-click event. */
+    /** 来自右键事件的视口坐标。 */
     x: number
     y: number
-    /** Path of the right-clicked entry. */
+    /** 右键条目的路径。 */
     path: string
-    /** True if the entry is a directory. Drives whether the
-     *  "new file/folder" actions are shown. */
+    /** 条目是否为目录。决定“新建文件/文件夹”动作是否显示。 */
     isDir: boolean
     onCloseMenu: () => void
     onNewFile: () => void

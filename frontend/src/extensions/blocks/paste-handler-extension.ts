@@ -4,18 +4,14 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 export const pasteHandlerPluginKey = new PluginKey('pasteHandler')
 
 /**
- * Extension that handles paste events. Typora-style behaviour:
- * when the user pastes HTML from a web page or rich-text
- * editor, we convert it to Markdown (preserving links,
- * emphasis, lists, headings, code blocks) instead of the
- * legacy "strip to plain text" path that lost every link and
- * formatting marker.
+ * 处理粘贴事件的扩展。其行为模式为：当用户从网页或富文本编辑器
+ * 粘贴 HTML 时，把它转换为 Markdown（保留链接、强调、列表、
+ * 标题、代码块），取代旧的「剥成纯文本」路径——那会丢失
+ * 所有链接与格式标记。
  *
- * The conversion uses an internal `htmlToMarkdown` function
- * that walks the parsed DOM and emits a Markdown string. The
- * fallback to plain text only kicks in when the conversion
- * yields an empty string (e.g. the clipboard payload is
- * actually plain text).
+ * 转换使用内部的 `htmlToMarkdown` 函数：遍历解析后的 DOM
+ * 并输出 Markdown 字符串。仅当转换结果为空字符串时
+ * （例如剪贴板载荷本来就是纯文本），才回退到纯文本。
  */
 export const PasteHandlerExtension = Extension.create({
   name: 'pasteHandler',
@@ -35,16 +31,13 @@ export const PasteHandlerExtension = Extension.create({
             const hasHtml = types.includes('text/html')
             const hasText = types.includes('text/plain')
 
-            // P0-X: Typora-style image paste. When the
-            // clipboard carries a `Files` payload with
-            // image/* MIME (e.g. user copies an image from
-            // Preview, screenshots to clipboard, or drags
-            // an image into the editor from another app
-            // and Cmd+Vs into MarkPure), we forward each
-            // file to the host's `handleImagesDropped`
-            // pipeline — same code path as drag-and-drop.
-            // The host reads each File via FileReader →
-            // base64 → `savePastedImage` IPC → image node.
+            // 图片粘贴。当剪贴板携带含 image/* MIME 的 `Files` 载荷时
+            // （例如用户从看图软件复制图片、截图到剪贴板，
+            // 或从其他应用拖入图片再按 Cmd+V 粘贴进 MarkPure），
+            // 我们把每个文件转发给宿主的 `handleImagesDropped`
+            // 流水线——与拖放走同一条代码路径。
+            // 宿主通过 FileReader 读取每个 File → base64 →
+            // `savePastedImage` IPC → 图片节点。
             if (types.includes('Files') && clipboardData.files.length > 0) {
               const imageFiles = Array.from(clipboardData.files).filter(
                 (f) => f.type.startsWith('image/'),
@@ -60,34 +53,31 @@ export const PasteHandlerExtension = Extension.create({
               }
             }
 
-            // Plain text only — let ProseMirror handle natively.
+            // 只有纯文本——交给 ProseMirror 原生处理。
             if (!hasHtml && hasText) return false
 
-            // Has HTML — convert to Markdown instead of stripping.
+            // 有 HTML——转换为 Markdown，而不是剥除格式。
             if (hasHtml) {
               const html = clipboardData.getData('text/html')
               if (isLikelyPlainText(html)) {
-                // Plain text wrapped as HTML (e.g. some terminals
-                // emit `<meta>` + text). Fall through to the
-                // native handler so we keep line breaks.
+                // 以 HTML 包裹的纯文本（例如某些终端会输出
+                // `<meta>` + 文本）。回退到原生处理器以保留换行。
                 return false
               }
 
               const markdown = htmlToMarkdown(html)
               if (markdown.trim()) {
                 event.preventDefault()
-                // Dispatch a window event with the converted
-                // Markdown. The host (App.svelte) listens and
-                // runs `editor.commands.insertContent(md)`,
-                // which routes through the @tiptap/markdown
-                // transformer registered in createEditor —
-                // that's the only way to make `contentType:
-                // 'markdown'` see the pasted content.
+                // 派发携带转换后 Markdown 的 window 事件。
+                // 宿主（App.svelte）监听后执行
+                // `editor.commands.insertContent(md)`，经由在
+                // createEditor 中注册的 @tiptap/markdown 转换器——
+                // 这是让 `contentType: 'markdown'`
+                // 看到粘贴内容的唯一途径。
                 //
-                // We can't call `commands.insertContent` from
-                // a ProseMirror plugin: the plugin API exposes
-                // only `view` / `state`, not the Tiptap
-                // command bus.
+                // 我们无法从 ProseMirror 插件中调用
+                // `commands.insertContent`：插件 API 只暴露
+                // `view` / `state`，而不暴露 Tiptap 的命令总线。
                 window.dispatchEvent(
                   new CustomEvent('mt:paste-markdown', {
                     detail: { markdown },
@@ -106,7 +96,7 @@ export const PasteHandlerExtension = Extension.create({
 })
 
 /**
- * Check if the HTML content is likely to be plain text disguised as HTML
+ * 判断该 HTML 内容是否极可能是伪装成 HTML 的纯文本
  */
 function isLikelyPlainText(html: string): boolean {
   if (!html.includes('<')) return true
@@ -125,28 +115,25 @@ function isLikelyPlainText(html: string): boolean {
 }
 
 /**
- * Convert an HTML fragment to a Markdown string. The
- * converter covers the cases Typora handles out of the box
- * — links, emphasis, lists, headings, code blocks, images,
- * line breaks, blockquotes — and falls back to plain text
- * for unknown tags.
+ * 把一段 HTML 片段转换为 Markdown 字符串。该转换器覆盖常见的情形
+ * ——链接、强调、列表、标题、代码块、图片、换行、引用块——
+ * 对未知标签回退为纯文本。
  *
- * We intentionally avoid pulling in a heavy library like
- * `turndown` to keep the bundle small; the cases below cover
- * 95% of real clipboard payloads.
+ * 我们刻意不引入 `turndown` 这类重型库以保持打包体积小巧；
+ * 下面的情形已覆盖约 95% 的真实剪贴板载荷。
  */
 function htmlToMarkdown(html: string): string {
   const temp = document.createElement('div')
   temp.innerHTML = html
 
-  // Drop content-bearing "noisy" tags BEFORE walking. These
-  // tags shouldn't appear in a paste payload, but a hostile
-  // page could include them — strip them defensively.
+  // 在遍历之前先剔除会携带内容的「噪音」标签。这些标签
+  // 本不应出现在粘贴载荷中，但恶意页面可能包含它们——
+  // 防御性地剥离。
   const noisy = temp.querySelectorAll(
     'script, style, noscript, template, iframe, object, embed',
   )
   noisy.forEach(n => n.remove())
-  // HTML comments
+  // HTML 注释
   const walker = document.createTreeWalker(temp, NodeFilter.SHOW_COMMENT)
   const comments: Node[] = []
   let node: Node | null
@@ -165,31 +152,31 @@ function htmlToMarkdown(html: string): string {
   return out.join('\n\n')
 }
 
-/** Walk a block-level element and emit Markdown. */
+/** 遍历块级元素并输出 Markdown。 */
 function convertBlock(el: HTMLElement): string {
   const tag = el.tagName.toLowerCase()
-  // Headings
+  // 标题
   if (/^h[1-6]$/.test(tag)) {
     const level = Number(tag[1])
     return '#'.repeat(level) + ' ' + convertInline(el)
   }
-  // Paragraphs
+  // 段落
   if (tag === 'p') {
     return convertInline(el)
   }
-  // Blockquote
+  // 引用块
   if (tag === 'blockquote') {
     const inner = htmlToMarkdown(el.innerHTML)
     return inner.split('\n').map(l => '> ' + l).join('\n')
   }
-  // Pre / code block
+  // 预格式化 / 代码块
   if (tag === 'pre') {
     const code = el.querySelector('code')
     const lang = code?.className.match(/language-(\S+)/)?.[1] ?? ''
     const text = code?.textContent ?? el.textContent ?? ''
     return '```' + lang + '\n' + text.replace(/\n$/, '') + '\n```'
   }
-  // Lists
+  // 列表
   if (tag === 'ul') {
     return convertList(el, false)
   }
@@ -202,7 +189,7 @@ function convertBlock(el: HTMLElement): string {
   if (tag === 'br') {
     return ''
   }
-  // Fallback: walk children as inline
+  // 兜底：把子节点按行内元素遍历
   return convertInline(el)
 }
 
@@ -217,7 +204,7 @@ function convertList(el: HTMLElement, ordered: boolean): string {
     .join('\n')
 }
 
-/** Walk inline children and emit Markdown inline syntax. */
+/** 遍历行内子节点并输出 Markdown 行内语法。 */
 function convertInline(el: HTMLElement): string {
   let out = ''
   for (const node of Array.from(el.childNodes)) {
@@ -257,7 +244,7 @@ function convertInline(el: HTMLElement): string {
         break
       case 'span':
       case 'font':
-        // Drop formatting wrappers but keep their text.
+        // 丢弃格式包裹层但保留其中的文本。
         out += inner
         break
       default:
@@ -265,51 +252,4 @@ function convertInline(el: HTMLElement): string {
     }
   }
   return out
-}
-
-/**
- * Extract plain text from HTML by stripping all tags.
- *
- * Before reading `textContent` we explicitly remove `<script>`,
- * `<style>`, `<noscript>`, and `<template>` nodes. Without this
- * step the browser still surfaces those nodes' text content (CSS
- * rules, JS source), so pasting a chunk of HTML from a web page
- * would silently drop a wall of CSS into the user's document.
- *
- * We also strip HTML comments, which the browser exposes as
- * comment nodes but DOM `textContent` happily includes as
- * `<!-- … -->` text.
- */
-function extractPlainText(html: string): string {
-  // We work on a detached node so the browser doesn't execute any
-  // `<script>` tags in the user-supplied HTML.
-  const temp = document.createElement('div')
-  // The HTML the user pasted is "data", not "code" — opt the
-  // parser out of running scripts. `<img onerror>` and similar
-  // nasties won't fire.
-  temp.innerHTML = html
-
-  // Drop content-bearing "noisy" tags BEFORE reading textContent.
-  // We use a fresh array because getElementsByTagName returns a
-  // live collection and removals during iteration would skip
-  // siblings.
-  const noisy = temp.querySelectorAll(
-    'script, style, noscript, template, iframe, object, embed'
-  )
-  noisy.forEach(n => n.remove())
-
-  // HTML comments — Node.COMMENT_NODE === 8
-  const walker = document.createTreeWalker(temp, NodeFilter.SHOW_COMMENT)
-  const comments: Node[] = []
-  let node: Node | null
-  while ((node = walker.nextNode())) comments.push(node)
-  comments.forEach(c => c.parentNode?.removeChild(c))
-
-  let text = temp.textContent || temp.innerText || ''
-
-  text = text.replace(/[\r\n]+/g, '\n')
-  text = text.replace(/[ \t]+/g, ' ')
-  text = text.split('\n').map(line => line.trim()).join('\n')
-
-  return text
 }

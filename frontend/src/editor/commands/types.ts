@@ -1,7 +1,7 @@
 /**
- * Shared type definitions used by more than one topic module.
- * Topic-local types (e.g. `Bookmark`, `TableOp`) stay in their
- * own module so the dependency graph is one-way.
+ * 被多个主题模块共用的类型定义。
+ * 模块内部的局部类型（如 `Bookmark`、`TableOp`）保留在各自
+ * 模块中，保证依赖图是单向的。
  */
 
 // File I/O
@@ -62,10 +62,8 @@ export interface AppConfig {
   theme: string
   language: string | null
   last_workspace: string | null
-  // P0-X: Typora-style word-count goal. Top-level
-  // AppConfig field so the Settings panel reads /
-  // writes it through the same `editor` namespace as
-  // the rest of the live config.
+  // 字数统计目标。放在 AppConfig 顶层字段，设置面板
+  // 与其他实时配置一样通过 `editor` 命名空间读写它。
   word_count_goal?: number
   editor: {
     font_family: string
@@ -75,30 +73,27 @@ export interface AppConfig {
     line_numbers: boolean
     word_wrap: boolean
     auto_save_interval: number
-    /** P1-11: enable spell-checking. macOS uses NSSpellChecker
-     *  (CJK + English); other platforms fall back to the
-     *  bundled English dictionary. */
+    /** 是否启用拼写检查。macOS 使用 NSSpellChecker
+     *  （支持中日韩与英文）；其他平台回退到内置的英文词典。 */
     spellcheck_enabled: boolean
-    /** Override the spell-check language. `null` means follow
-     *  the UI language. */
+    /** 覆盖拼写检查语言。`null` 表示跟随界面语言。 */
     spellcheck_language: string | null
-    /** P0-X: Typora-style "lint on save". When true, the
-     *  Rust host runs `lint_markdown` over the buffer
-     *  before writing it to disk. Default false so
-     *  existing users' workflows don't change. */
+    /** 是否在保存时执行 Markdown 检查。开启后，Rust 宿主
+     *  会在写盘前对缓冲区运行 `lint_markdown`。默认关闭，
+     *  避免改变存量用户的工作流。 */
     lint_on_save?: boolean
   }
-  /** P2-7: global Vim mode toggle (persisted). */
+  /** 全局 Vim 模式开关（持久化保存）。 */
   vim_mode?: boolean
 }
 
-// Search results (workspace + per-document)
+// 搜索结果（工作区 + 单个文档）
 export interface SearchMatch {
   file: string
   line_number: number
-  /** UTF-8 byte offset of the match start in `content`. */
+  /** 匹配起点在 `content` 中的 UTF-8 字节偏移。 */
   column: number
-  /** Length of the match in UTF-8 bytes. */
+  /** 匹配内容的 UTF-8 字节长度。 */
   match_length: number
   content: string
 }
@@ -109,7 +104,7 @@ export interface WorkspaceSearchResult {
   total_matches: number
 }
 
-// Themes — 1:1 aligned with backend/crates/core-lib/src/theme.rs ThemeColors
+// 主题——与 backend/crates/core-lib/src/theme.rs 的 ThemeColors 字段一一对应
 export interface ThemeColors {
   bg: string
   bg_secondary: string

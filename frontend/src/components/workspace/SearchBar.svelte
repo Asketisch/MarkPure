@@ -11,6 +11,7 @@
     searchPluginKey,
   } from '$lib/plugins/search'
   import { useI18n } from '$lib/stores/i18n.svelte'
+  import { onDestroy } from 'svelte'
 
   let { editor, visible = $bindable(false) }: { editor: Editor; visible: boolean } = $props()
 
@@ -58,12 +59,20 @@
     refreshMatchInfo()
   }
 
+  // 「全部替换后延迟关闭」的定时器——组件在 500ms 内卸载时（用户
+  // 抢先按了 Esc）必须取消，否则会对已卸载的组件/视图执行清理。
+  let closeTimer: ReturnType<typeof setTimeout> | null = null
+  onDestroy(() => {
+    if (closeTimer) clearTimeout(closeTimer)
+  })
+
   function handleReplaceAll() {
     if (!editor) return
     replaceAll(editor.view, replacement)
     refreshMatchInfo()
-    // Close search bar after replace all
-    setTimeout(() => {
+    // 全部替换后延迟关闭搜索栏，让用户看到替换结果
+    if (closeTimer) clearTimeout(closeTimer)
+    closeTimer = setTimeout(() => {
       handleClose()
     }, 500)
   }
@@ -91,7 +100,7 @@
     }
   }
 
-  // Subscribe to editor state changes to keep match info updated
+  // 订阅编辑器状态变化，保持匹配信息同步更新
   $effect(() => {
     if (!editor || !visible) return
     const handler = () => refreshMatchInfo()
@@ -103,7 +112,7 @@
     }
   })
 
-  // Re-search when options change
+  // 选项变化时重新搜索
   $effect(() => {
     caseSensitive; wholeWord; useRegex
     if (query && visible) {

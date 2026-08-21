@@ -1,36 +1,28 @@
 /**
- * Manual end-to-end validation for the P0-X Typora-style
- * emoji shortcode expansion feature.
+ * emoji 短代码展开功能的端到端人工验证。
  *
- * The script exercises the regex used by
- * `extensions/editing/emoji-extension.ts` against a battery
- * of positive / negative cases to prove the rule fires
- * on the right shortcodes (`:smile:` → `😄`) and stays
- * silent on the wrong ones (`:not-a-shortcode:`,
- * `:smile:` mid-URL, etc.).
+ * 脚本用一批正 / 负用例去验证
+ * `extensions/editing/emoji-extension.ts` 使用的正则，证明规则
+ * 会在正确的短代码（`:smile:` → `😄`）上触发，并在错误的
+ * 输入（`:not-a-shortcode:`、URL 中间的 `:smile:` 等）上保持静默。
  *
- * We re-create the regex inline rather than importing the
- * extension because `InputRule.find` is consumed at
- * `addInputRules()` time and isn't exposed publicly.
- * Keeping the regex in sync with `emoji-extension.ts` is
- * enforced by the regex source being pasted from the
- * implementation; the test will fail if either side
- * diverges.
+ * 这里内联重建正则而不导入扩展，是因为 `InputRule.find` 在
+ * `addInputRules()` 时就被消费，没有公开出口。正则需要与
+ * `emoji-extension.ts` 保持一致——实现里粘贴了同一份正则源，
+ * 任一侧漂移都会让本测试失败。
  */
 import { DEFAULT_SHORTCODES, EmojiShortcodeExtension } from '../frontend/src/extensions/editing/emoji-extension'
 
 interface Case {
-  /** Input the user "typed" — the literal string ending
-   *  with the trigger character (space / enter / tab). */
+  /** 用户“输入”的文本——以触发字符（空格 / 回车 / Tab）结尾的字符串。 */
   input: string
-  /** Expected emoji glyph, or `null` when the rule should
-   *  NOT fire (e.g. unknown shortcode, URL fragment). */
+  /** 期望的 emoji 字形；规则不应触发（未知短代码、URL 片段等）时为 `null`。 */
   expected: string | null
   label: string
 }
 
 const cases: Case[] = [
-  // Positive cases — common shortcodes
+  // 正向用例——常见短代码
   { input: ':smile: ', expected: '😄', label: ':smile: + space' },
   { input: ':grinning: ', expected: '😀', label: ':grinning: + space' },
   { input: ':joy: ', expected: '😂', label: ':joy: + space' },
@@ -39,22 +31,21 @@ const cases: Case[] = [
   { input: ':fire: ', expected: '🔥', label: ':fire: + space' },
   { input: ':tada: ', expected: '🎉', label: ':tada: + space' },
   { input: ':coffee: ', expected: '☕', label: ':coffee: + space' },
-  // Other trigger chars
+  // 其他触发字符
   { input: ':smile:\n', expected: '😄', label: ':smile: + enter' },
   { input: ':smile:\t', expected: '😄', label: ':smile: + tab' },
-  // Multi-word: longest shortcode wins.
-  // `:point_right:` is a known entry; `:point:` is not.
+  // 多词：最长的短代码优先匹配。
+  // `:point_right:` 是已知条目；`:point:` 不是。
   { input: ':point_right: ', expected: '👉', label: 'longer shortcode wins' },
-  // Negative cases
+  // 负向用例
   { input: ':notarealshortcode: ', expected: null, label: 'unknown shortcode' },
-  // URL fragment: `:1234` after a host — the leading
-  // alphanumeric char should NOT trigger the rule.
+  // URL 片段：主机后的 `:1234`——前面的字母数字字符不应触发规则。
   { input: 'https://example.com/:1234', expected: null, label: 'mid-URL colon' },
-  // `:smile` without the closing colon — rule requires both.
+  // `:smile` 缺少结尾冒号——规则要求成对出现。
   { input: 'hello :smile ', expected: null, label: 'missing closing colon' },
-  // `:smile:` followed by a non-trigger char (not space/enter/tab)
+  // `:smile:` 后跟非触发字符（不是空格 / 回车 / Tab）
   { input: ':smile:x', expected: null, label: 'non-trigger char' },
-  // Empty shortcode
+  // 空短代码
   { input: ':: ', expected: null, label: 'empty shortcode' },
 ]
 
@@ -62,11 +53,9 @@ let pass = 0
 let fail = 0
 
 function compilePattern(): { regex: RegExp; lookup: Record<string, string> } {
-  // Mirror the regex construction from
-  // `extensions/editing/emoji-extension.ts`. Keeping the
-  // two in sync is a manual contract — if the test fails
-  // with a "regex doesn't match" error, the source files
-  // drifted and one of them needs to be updated.
+  // 镜像 `extensions/editing/emoji-extension.ts` 中的正则构造。
+  // 两处保持一致是手工约定——若测试报“正则不匹配”，
+  // 说明两侧源码已漂移，需要更新其中一边。
   const shortcodes = Object.keys(DEFAULT_SHORTCODES)
     .sort((a, b) => b.length - a.length)
   const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -81,9 +70,8 @@ console.log('— validate-emoji-shortcode —')
 const { regex, lookup } = compilePattern()
 
 for (const c of cases) {
-  // The InputRule fires on the trailing trigger char so we
-  // match against the input exactly (it ends with the
-  // trigger).
+  // InputRule 在触发字符处触发，因此严格按输入精确匹配
+  //（它以触发字符结尾）。
   const m = c.input.match(regex)
   let got: string | null = null
   if (m) {
@@ -100,9 +88,8 @@ for (const c of cases) {
   }
 }
 
-// Smoke check: the EmojiShortcodeExtension instance can
-// be constructed without throwing — guards against a
-// missing import or typo in the extension factory.
+// 冒烟检查：EmojiShortcodeExtension 实例能无异常构造——防止
+// 扩展工厂缺导入或打错字。
 try {
   const ext = EmojiShortcodeExtension.configure({})
   if (ext.name !== 'emojiShortcode') {

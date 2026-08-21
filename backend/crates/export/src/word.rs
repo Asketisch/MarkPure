@@ -1,25 +1,21 @@
-//! Export markdown to Word (.docx) using the `docx-rs` builder.
+//! 使用 `docx-rs` 构建器把 Markdown 导出为 Word（.docx）文件。
 //!
-//! The previous implementation hand-rolled a minimal zip file with a
-//! hard-coded set of supported HTML tags. That approach had two
-//! problems:
-//!   1. It could not embed images, so ` ```mermaid ` blocks were
-//!      exported as Courier-plain monospace text.
-//!   2. The `<w:numId>` reference for list items pointed to a
-//!      non-existent `numbering.xml`, so list items rendered as
-//!      plain paragraphs in real Word.
+//! 先前的实现在硬编码的支持 HTML 标签集上手工拼接最小 zip 包。
+//! 该方案有两个问题：
+//!   1. 无法嵌入图片，因此 ` ```mermaid ` 块只能导出为等宽纯文本。
+//!   2. 列表项的 `<w:numId>` 引用指向不存在的 `numbering.xml`，
+//!      导致列表项在真实 Word 中渲染为普通段落。
 //!
-//! This module replaces the hand-rolled zip with `docx-rs`, which:
-//!   - Embeds PNG images via `Pic::new` + `Run::add_image`
-//!   - Auto-generates `numbering.xml` for list items
-//!   - Handles XML escaping for us (the previous code had a
-//!     `strip_html_tags` helper that became dead weight).
+//! 本模块用手工 zip 替换为 `docx-rs`，它：
+//!   - 通过 `Pic::new` + `Run::add_image` 嵌入 PNG 图片
+//!   - 为列表项自动生成 `numbering.xml`
+//!   - 替我们处理 XML 转义（先前代码中的 `strip_html_tags` 辅助
+//!     函数已变成死重）。
 //!
-//! Markdown parsing: we walk the text line-by-line, tracking block
-//! boundaries, and emit one `Paragraph` per text run, with the
-//! appropriate `style` for headings and code blocks. Mermaid blocks
-//! are pre-rendered to PNG via `markdown::render_mermaid_to_png_cached`
-//! and embedded as inline images.
+//! Markdown 解析：我们逐行遍历文本，跟踪块边界，为每个文本run
+//! 生成一个 `Paragraph`，标题与代码块使用相应的 `style`。Mermaid 块
+//! 通过 `markdown::render_mermaid_to_png_cached` 预渲染为 PNG
+//! 并作为内联图片嵌入。
 
 use docx_rs::{
     AlignmentType, Docx, Paragraph, Pic, Run,
@@ -27,16 +23,14 @@ use docx_rs::{
 use std::collections::HashMap;
 use std::io::Cursor;
 
-/// A footnote collected from the document body. We use the public
-/// `markdown::FootnoteDef` type which is already in document order
-/// (see `footnote::collect_footnotes`).
+/// 从文档正文收集的脚注。我们使用公开的 `markdown::FootnoteDef` 类型，
+/// 它已按文档顺序排列（见 `footnote::collect_footnotes`）。
 type Footnote = markdown::FootnoteDef;
 
-/// Export markdown content to a Word (.docx) file as a byte vector.
+/// 把 Markdown 内容导出为 Word（.docx）文件的字节向量。
 pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
-    // Pre-render every mermaid block to PNG so the per-line loop
-    // can embed them without a second pass. The render is cached
-    // internally so re-exports are cheap.
+    // 预渲染每个 mermaid 块为 PNG，使逐行循环无需二次遍历即可嵌入。
+    // 渲染结果在内部缓存，因此重复导出开销很小。
     let mermaid_blocks = markdown::extract_mermaid_blocks(markdown);
     let mut mermaid_pngs: HashMap<usize, Vec<u8>> = HashMap::new();
     for (line_number, source) in &mermaid_blocks {
@@ -45,24 +39,23 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
         }
     }
 
-    // Collect footnotes in document order so the in-text references
-    // and the `footnotes.xml` injection use the same numbering.
+    // 按文档顺序收集脚注，使正文引用与 `footnotes.xml` 注入使用同一编号。
     let footnotes: Vec<Footnote> = markdown::collect_footnotes(markdown);
 
     let mut docx = Docx::new();
-    // Title as a top-level heading.
+    // 标题作为顶级标题。
     docx = docx.add_paragraph(
         Paragraph::new()
             .align(AlignmentType::Center)
             .add_run(Run::new().add_text(title).size(36).bold()),
     );
 
-    // Walk lines, emitting paragraphs. We track the current block type
-    // (paragraph / heading / list / code) and emit on block boundary.
+    // 遍历行并生成段落。我们跟踪当前块类型（段落 / 标题 / 列表 /
+    // 代码）并在块边界输出。
     let mut current_paragraph: Vec<String> = Vec::new();
-    let mut in_code_block: Option<String> = None; // language of the current code block
+    let mut in_code_block: Option<String> = None; // 当前代码块的语言
     let mut in_mermaid_open_line: Option<usize> = None;
-    let mut list_items: Vec<Option<bool>> = Vec::new(); // Some(checked) for tasks, None for bullet
+    let mut list_items: Vec<Option<bool>> = Vec::new(); // Some(checked) 为任务项，None 为圆点项
 
     let flush_paragraph = |text: &str, docx: Docx| -> Docx {
         let t = text.trim();
@@ -72,16 +65,15 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
         docx.add_paragraph(Paragraph::new().add_run(Run::new().add_text(t)))
     };
 
-    let mut docx = docx;
     let mut code_buffer: Vec<String> = Vec::new();
 
     for (idx, line) in markdown.lines().enumerate() {
         let line_number = idx + 1;
         let trimmed = line.trim();
 
-        // ---- Mermaid blocks take priority over generic code blocks ----
+        // ---- Mermaid 块优先于通用代码块 ----
         if trimmed.starts_with("```mermaid") {
-            // Flush any pending paragraph first.
+            // 先冲刷待决段落。
             docx = flush_paragraph(&current_paragraph.join(" "), docx);
             current_paragraph.clear();
             in_mermaid_open_line = Some(line_number);
@@ -91,12 +83,11 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             if trimmed.starts_with("```") {
                 let open_line = in_mermaid_open_line.take().unwrap();
                 if let Some(png_bytes) = mermaid_pngs.get(&open_line) {
-                    // Embed the pre-rendered PNG. EMU = 914400 per inch.
-                    // A 6" wide image is 6 * 914400 = 5486400 EMU.
-                    // Height is computed from a default 4:3 aspect ratio
-                    // when we don't know the PNG dimensions here — the
-                    // .size() call below is the requested rendered size,
-                    // not the source pixel size.
+                    // 嵌入预渲染的 PNG。EMU = 每英寸 914400。
+                    // 6 英寸宽的图片为 6 * 914400 = 5486400 EMU。
+                    // 我们在此处不知道 PNG 尺寸，高度按默认 4:3 宽高比
+                    // 计算——下面的 .size() 调用是请求的渲染尺寸，
+                    // 而非源像素尺寸。
                     let width_emu: u32 = 6 * 914400;
                     let height_emu: u32 = 4 * 914400;
                     let pic = Pic::new(png_bytes).size(width_emu, height_emu);
@@ -104,8 +95,8 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
                         Paragraph::new().add_run(Run::new().add_image(pic)),
                     );
                 } else {
-                    // Pre-render failed (mmdc missing or diagram invalid).
-                    // Insert a visible placeholder so the user knows.
+                    // 预渲染失败（mmdc 缺失或图表无效）。
+                    // 插入可见占位文本，让用户知道发生了什么。
                     docx = docx.add_paragraph(
                         Paragraph::new()
                             .add_run(Run::new().add_text("[Mermaid diagram unavailable: mmdc not installed or render failed]")),
@@ -115,10 +106,10 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             continue;
         }
 
-        // ---- Generic code blocks ----
+        // ---- 通用代码块 ----
         if let Some(_lang) = &in_code_block {
             if trimmed.starts_with("```") {
-                // End of code block — emit it.
+                // 代码块结束——输出它。
                 let code_text = code_buffer.join("\n");
                 docx = docx.add_paragraph(
                     Paragraph::new()
@@ -142,7 +133,7 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             }
         }
         if trimmed.starts_with("```") {
-            // Enter a code block.
+            // 进入代码块。
             docx = flush_paragraph(&current_paragraph.join(" "), docx);
             current_paragraph.clear();
             let lang = trimmed.trim_start_matches("```").trim().to_string();
@@ -150,14 +141,14 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             continue;
         }
 
-        // ---- Headings ----
+        // ---- 标题 ----
         if let Some(rest) = trimmed.strip_prefix("# ") {
             docx = flush_paragraph(&current_paragraph.join(" "), docx);
             current_paragraph.clear();
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .style("Heading1")
-                    .add_run(Run::new().add_text(rest).bold().size(32)),
+                    .add_run(Run::new().add_text(strip_footnote_refs(rest, &footnotes)).bold().size(32)),
             );
             continue;
         }
@@ -167,7 +158,7 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .style("Heading2")
-                    .add_run(Run::new().add_text(rest).bold().size(28)),
+                    .add_run(Run::new().add_text(strip_footnote_refs(rest, &footnotes)).bold().size(28)),
             );
             continue;
         }
@@ -177,7 +168,7 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .style("Heading3")
-                    .add_run(Run::new().add_text(rest).bold().size(24)),
+                    .add_run(Run::new().add_text(strip_footnote_refs(rest, &footnotes)).bold().size(24)),
             );
             continue;
         }
@@ -187,12 +178,12 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .style("Heading4")
-                    .add_run(Run::new().add_text(rest).bold().size(22)),
+                    .add_run(Run::new().add_text(strip_footnote_refs(rest, &footnotes)).bold().size(22)),
             );
             continue;
         }
 
-        // ---- Task list items (- [ ] or - [x]) ----
+        // ---- 任务列表项（- [ ] 或 - [x]） ----
         if let Some(rest) = trimmed.strip_prefix("- [ ] ") {
             docx = flush_paragraph(&current_paragraph.join(" "), docx);
             current_paragraph.clear();
@@ -200,7 +191,7 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .style("ListTaskUnchecked")
-                    .add_run(Run::new().add_text(format!("☐ {}", rest))),
+                    .add_run(Run::new().add_text(format!("☐ {}", strip_footnote_refs(rest, &footnotes)))),
             );
             continue;
         }
@@ -211,11 +202,11 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .style("ListTaskChecked")
-                    .add_run(Run::new().add_text(format!("☑ {}", rest))),
+                    .add_run(Run::new().add_text(format!("☑ {}", strip_footnote_refs(rest, &footnotes)))),
             );
             continue;
         }
-        // ---- Plain bullet list ----
+        // ---- 普通圆点列表 ----
         if let Some(rest) = trimmed.strip_prefix("- ") {
             docx = flush_paragraph(&current_paragraph.join(" "), docx);
             current_paragraph.clear();
@@ -223,41 +214,54 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .style("ListBullet")
-                    .add_run(Run::new().add_text(format!("• {}", rest))),
+                    .add_run(Run::new().add_text(format!("• {}", strip_footnote_refs(rest, &footnotes)))),
             );
             continue;
         }
-        // ---- Ordered list ----
-        if let Some(rest) = trimmed
-            .strip_prefix("1. ")
-            .or_else(|| trimmed.strip_prefix("2. "))
-            .or_else(|| trimmed.strip_prefix("3. "))
-            .or_else(|| trimmed.strip_prefix("4. "))
+        // ---- 有序列表（任意序号，如 `5. text` / `10. text`） ----
+        // 旧实现只识别 `1. `–`4. ` 前缀，且把每一项都渲染成字面量
+        // "1. text"（丢失真实序号）。现在解析完整的数字前缀并原样保留。
+        if let Some((num, rest)) = trimmed
+            .split_once('.')
+            .filter(|(n, r)| {
+                !n.is_empty()
+                    && n.bytes().all(|b| b.is_ascii_digit())
+                    && r.starts_with(' ')
+            })
         {
             docx = flush_paragraph(&current_paragraph.join(" "), docx);
             current_paragraph.clear();
             docx = docx.add_paragraph(
                 Paragraph::new()
                     .style("ListNumber")
-                    .add_run(Run::new().add_text(format!("1. {}", rest))),
+                    .add_run(Run::new().add_text(format!(
+                        "{}. {}",
+                        num,
+                        strip_footnote_refs(rest.trim(), &footnotes)
+                    ))),
             );
             continue;
         }
 
-        // ---- Blank line: paragraph boundary ----
+        // ---- 空行：段落边界 ----
         if trimmed.is_empty() {
             docx = flush_paragraph(&current_paragraph.join(" "), docx);
             current_paragraph.clear();
             continue;
         }
 
-        // ---- Otherwise, accumulate into the current paragraph ----
-        current_paragraph.push(trimmed.to_string());
+        // ---- 否则，累积进当前段落 ----
+        // 行内 `[^label]` 脚注引用会被改写为文档顺序编号 `[N]`
+        // （与末尾 Footnotes 一节的编号一致），避免原始标记泄漏进正文。
+        let cleaned = strip_footnote_refs(trimmed, &footnotes);
+        if !cleaned.is_empty() {
+            current_paragraph.push(cleaned);
+        }
     }
 
-    // Flush any leftover text.
+    // 冲刷残留文本。
     docx = flush_paragraph(&current_paragraph.join(" "), docx);
-    // Flush any leftover code block.
+    // 冲刷残留代码块。
     if !code_buffer.is_empty() {
         let code_text = code_buffer.join("\n");
         docx = docx.add_paragraph(
@@ -271,12 +275,10 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
         );
     }
 
-    // Append a "Footnotes:" section at the end of the document. We
-    // use a v1 approach (numbered paragraphs at the end) instead of
-    // injecting a real `word/footnotes.xml` part because docx-rs
-    // 0.4 has no first-class footnote API and a hand-rolled XML
-    // injection is fragile. A future change can replace this with
-    // a proper `<w:footnoteReference>` wiring.
+    // 在文档末尾追加「Footnotes:」一节。我们采用 V1 方案（末尾带编号
+    // 的段落），而不是注入真正的 `word/footnotes.xml` 部件，因为
+    // docx-rs 0.4 没有一流的脚注 API，手工 XML 注入又很脆弱。
+    // 未来的改动可以用正确的 `<w:footnoteReference>` 接线替换它。
     if !footnotes.is_empty() {
         docx = docx.add_paragraph(
             Paragraph::new()
@@ -290,13 +292,45 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
         }
     }
 
-    // Build and pack into a Vec<u8>.
+    // 构建并打包为 Vec<u8>。
     let xml_docx = docx.build();
     let mut buf = Vec::new();
     xml_docx
         .pack(Cursor::new(&mut buf))
         .map_err(|e| format!("pack error: {}", e))?;
     Ok(buf)
+}
+
+/// 把行内 `[^label]` 脚注引用改写为 `[N]`，其中 `N` 是
+/// [`collect_footnotes`](markdown::collect_footnotes) 分配的文档顺序编号。
+/// 脚注定义以独立一节追加在文档末尾，若不改写行内标记，
+/// `[^1]` 这类原始文本就会原样泄漏进 docx 正文。
+/// 找不到对应定义的标记（如 `[^missing]`）会被原样保留，
+/// 让用户能看到引用了不存在的脚注。
+///
+/// `text` 中的多字节字符通过 `chars()` 逐字推进保证字节偏移
+/// 始终落在字符边界上。
+fn strip_footnote_refs(text: &str, footnotes: &[Footnote]) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < text.len() {
+        if let Some(rest) = text[i..].strip_prefix("[^") {
+            if let Some(close) = rest.find(']') {
+                let label = &rest[..close];
+                if let Some(note) = footnotes.iter().find(|f| f.label == label) {
+                    out.push('[');
+                    out.push_str(&note.number.to_string());
+                    out.push(']');
+                    i += close + 1;
+                    continue;
+                }
+            }
+        }
+        let ch = text[i..].chars().next().unwrap();
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+    out
 }
 
 #[cfg(test)]
@@ -307,9 +341,9 @@ mod tests {
     fn export_word_basic_heading_and_paragraph() {
         let md = "# Title\n\nHello world.\n";
         let bytes = export_word(md, "T").expect("should produce bytes");
-        // The output must be a valid zip (docx files are zips).
+        // 输出必须是有效的 zip（docx 文件就是 zip）。
         assert!(bytes.len() > 4, "output too small");
-        // PK\x03\x04 is the local file header magic for zip files.
+        // PK\x03\x04 是 zip 文件头的魔数。
         assert_eq!(
             &bytes[0..4],
             b"PK\x03\x04",
@@ -329,22 +363,64 @@ mod tests {
 
     #[test]
     fn export_word_handles_no_mermaid() {
-        // Plain markdown with no mermaid should still produce a valid
-        // docx, with no PNGs embedded.
+        // 不含 mermaid 的纯 Markdown 仍应生成有效的 docx，且不嵌入 PNG。
         let md = "## Subtitle\n\nSome **bold** text.\n";
         let bytes = export_word(md, "T").expect("should produce bytes");
         let s = String::from_utf8_lossy(&bytes);
-        // We don't expect a word/media/ folder when there are no
-        // mermaid blocks. docx-rs only creates the media folder when
-        // a Pic is added.
+        // 无 mermaid 块时不应出现 word/media/ 目录。docx-rs 仅在
+        // 添加 Pic 时才会创建 media 目录。
         assert!(!s.contains("word/media/"), "unexpected media folder");
     }
 
     #[test]
+    fn export_word_ordered_list_preserves_real_numbers() {
+        // 任意起始序号（≥5）都必须被识别，且序号原样保留
+        // （旧实现只认 1.–4. 且把所有项渲染成 "1. ..."）。
+        let md = "# T\n\n5. first\n6. second\n10. tenth\n";
+        let bytes = export_word(md, "T").expect("should produce bytes");
+        let s = String::from_utf8_lossy(&bytes).to_string();
+        assert!(s.contains("5. first"), "expected '5. first' in docx");
+        assert!(s.contains("10. tenth"), "expected '10. tenth' in docx");
+        // 小数点正文（如 "3.14"）不得被误判为列表项。
+        let md2 = "# T\n\npi is 3.14 approx\n";
+        let bytes2 = export_word(md2, "T").expect("should produce bytes");
+        let s2 = String::from_utf8_lossy(&bytes2).to_string();
+        assert!(s2.contains("pi is 3.14 approx"), "decimal text mangled: {s2}");
+    }
+
+    #[test]
+    fn export_word_inline_footnote_refs_are_renumbered_not_leaked() {
+        // 行内 `[^a]` 应改写为文档顺序编号 `[1]`，
+        // 原始标记不得泄漏进 docx 正文。
+        let md = "Body with a ref [^a] and text.\n\n[^a]: The definition.\n";
+        let bytes = export_word(md, "T").expect("should produce bytes");
+        let s = String::from_utf8_lossy(&bytes).to_string();
+        assert!(s.contains("[1]"), "renumbered ref missing: {s}");
+        assert!(
+            !s.contains("[^a]"),
+            "raw footnote marker leaked into docx"
+        );
+        assert!(s.contains("The definition"), "footnote section missing");
+    }
+
+    #[test]
+    fn strip_footnote_refs_keeps_unknown_labels_intact() {
+        let notes: Vec<Footnote> = Vec::new();
+        // 无定义：原样保留，让用户能看到悬空引用。
+        assert_eq!(
+            strip_footnote_refs("see [^missing] here", &notes),
+            "see [^missing] here"
+        );
+        // 未闭合的 `[^` 不是引用，原样保留。
+        assert_eq!(strip_footnote_refs("a [^ b", &notes), "a [^ b");
+        // 多字节字符边界安全。
+        assert_eq!(strip_footnote_refs("你好 [^x] 世界", &notes), "你好 [^x] 世界");
+    }
+
+    #[test]
     fn export_word_mermaid_block_uses_fallback_when_mmdc_missing() {
-        // With MMDC_DISABLED set, mermaid blocks should fall back to
-        // the visible "[Mermaid diagram unavailable: ...]" text
-        // rather than crash.
+        // 设置了 MMDC_DISABLED 时，mermaid 块应回退为可见的
+        // "[Mermaid diagram unavailable: ...]" 文本，而非崩溃。
         std::env::set_var("MMDC_DISABLED", "1");
         let md = "before\n\n```mermaid\ngraph TD\n    A --> B\n```\n\nafter\n";
         let bytes = export_word(md, "T").expect("should produce bytes");

@@ -5,8 +5,8 @@ use mt_core::error::{Error, Result};
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncReadExt;
 
-/// Validate that a file name does not contain path traversal components.
-/// Rejects names containing `..`, path separators, or null bytes.
+/// 校验文件名是否包含路径穿越成分。
+/// 拒绝包含 `..`、路径分隔符或空字节的名称。
 pub fn validate_file_name(name: &str) -> std::result::Result<(), String> {
     if name.is_empty() {
         return Err("file name is empty".into());
@@ -23,7 +23,7 @@ pub fn validate_file_name(name: &str) -> std::result::Result<(), String> {
     Ok(())
 }
 
-/// Read a file with automatic encoding detection
+/// 读取文件并自动检测编码
 pub async fn read_file(path: &Path) -> Result<Document> {
     let mut file = tokio::fs::File::open(path).await.map_err(Error::Io)?;
     let mut raw_bytes = Vec::new();
@@ -36,11 +36,11 @@ pub async fn read_file(path: &Path) -> Result<Document> {
     Ok(Document::from_content(
         &text,
         Some(path_buf),
-        encoding_to_doc(&encoding),
+        encoding_to_doc(encoding),
     ))
 }
 
-/// Write a document to a file
+/// 将文档写入文件
 pub async fn write_file(document: &Document, path: &Path) -> Result<()> {
     let content = document.text();
     let encoding = document.encoding();
@@ -51,14 +51,22 @@ pub async fn write_file(document: &Document, path: &Path) -> Result<()> {
     } else {
         let enc = Encoding::for_label(encoding_label.as_bytes())
             .ok_or_else(|| Error::Encoding(format!("Unknown encoding: {}", encoding_label)))?;
-        let (encoded, _encoding_used, _had_errors) = enc.encode(&content);
+        let (encoded, _encoding_used, had_errors) = enc.encode(&content);
+        // 目标编码表示不了的字符（如 GBK 文档中的 emoji / 生僻字）
+        // 会被默认替换为 `?`——静默写入等于丢数据。宁可让保存失败，
+        // 由用户改用 UTF-8 保存，也不在磁盘上留下残缺文档。
+        if had_errors {
+            return Err(Error::Encoding(format!(
+                "Document contains characters that {encoding_label} cannot represent; saving would lose content — save as UTF-8 instead",
+            )));
+        }
         encoded.into_owned()
     };
 
     tokio::fs::write(path, encoded).await.map_err(Error::Io)
 }
 
-/// Detect encoding and decode bytes to String
+/// 检测编码并将字节解码为字符串
 fn detect_and_decode(raw: &[u8]) -> Result<(String, &'static Encoding)> {
     let mut detector = EncodingDetector::new();
     detector.feed(raw, true);
@@ -67,7 +75,7 @@ fn detect_and_decode(raw: &[u8]) -> Result<(String, &'static Encoding)> {
     let (text, _encoding_used, _had_errors) = encoding.decode(raw);
     let mut text = text.into_owned();
 
-    // Strip UTF-8 BOM if present (0xEF 0xBB 0xBF)
+    // 若存在 UTF-8 BOM（0xEF 0xBB 0xBF）则将其去除
     if text.starts_with('\u{feff}') {
         text = text[3..].to_string();
     }
@@ -75,7 +83,7 @@ fn detect_and_decode(raw: &[u8]) -> Result<(String, &'static Encoding)> {
     Ok((text, encoding))
 }
 
-/// Convert encoding_rs Encoding to our DocEncoding
+/// 将 encoding_rs 的编码转换为项目内部的 DocEncoding
 fn encoding_to_doc(enc: &'static Encoding) -> DocEncoding {
     match enc.name() {
         "UTF-8" => DocEncoding::Utf8,
@@ -86,25 +94,39 @@ fn encoding_to_doc(enc: &'static Encoding) -> DocEncoding {
     }
 }
 
-// CRUD operations
+// 文件的增删改查操作
 
-/// Create a new empty file
+/// 创建新的空文件。若文件已存在则报错——绝不能截断已有内容。
 pub async fn create_file(path: &Path) -> Result<()> {
-    // Ensure parent directory exists
+    // 确保父目录存在
     if let Some(parent) = path.parent() {
         if !parent.exists() {
             tokio::fs::create_dir_all(parent).await.map_err(Error::Io)?;
         }
     }
-    tokio::fs::write(path, "").await.map_err(Error::Io)
+    // `create_new(true)` 保证文件不存在才创建；`tokio::fs::write`
+    // 会静默截断已存在的文件，把用户内容清零。
+    tokio::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(path)
+        .await
+        .map(|_| ())
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                Error::Other(format!("file already exists: {}", path.display()))
+            } else {
+                Error::Io(e)
+            }
+        })
 }
 
-/// Create a new directory
+/// 创建新目录
 pub async fn create_directory(path: &Path) -> Result<()> {
     tokio::fs::create_dir_all(path).await.map_err(Error::Io)
 }
 
-/// Delete a file or directory
+/// 删除文件或目录
 pub async fn delete_file(path: &Path) -> Result<()> {
     if path.is_dir() {
         tokio::fs::remove_dir_all(path).await.map_err(Error::Io)
@@ -113,16 +135,16 @@ pub async fn delete_file(path: &Path) -> Result<()> {
     }
 }
 
-/// Rename a file or directory
-/// Returns the new path
+/// 重命名文件或目录
+/// 返回新的路径
 pub async fn rename_file(old_path: &Path, new_name: &str) -> Result<PathBuf> {
-    validate_file_name(new_name).map_err(|e| Error::Other(e))?;
+    validate_file_name(new_name).map_err(Error::Other)?;
 
     let new_path = old_path.parent().map(|p| p.join(new_name)).ok_or_else(|| {
         Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"))
     })?;
 
-    // Verify the resolved path stays within the same parent directory
+    // 校验解析后的路径仍位于同一个父目录之内
     let parent = old_path.parent().ok_or_else(|| {
         Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"))
     })?;
@@ -168,5 +190,20 @@ mod tests {
         write_file(&doc, &path).await.unwrap();
         let loaded = read_file(&path).await.unwrap();
         assert_eq!(loaded.text_normalized(), doc.text_normalized());
+    }
+
+    #[tokio::test]
+    async fn test_write_rejects_unencodable_chars() {
+        // GBK 无法表示 emoji——旧实现静默写成 `?`（数据丢失）。
+        // 现在必须报错且不落盘。
+        let dir = std::env::temp_dir().join("markpure-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("test_unencodable.md");
+        std::fs::remove_file(&path).ok();
+
+        let doc = Document::from_content("你好 🎉", None, DocEncoding::Gbk);
+        let res = write_file(&doc, &path).await;
+        assert!(res.is_err());
+        assert!(!path.exists());
     }
 }

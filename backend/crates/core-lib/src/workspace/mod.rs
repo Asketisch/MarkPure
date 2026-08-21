@@ -1,22 +1,19 @@
-//! Workspace model split into three submodules.
+//! 工作区模型，拆分为三个子模块。
 //!
-//! - [`pane`]            — `Pane` + `Orientation`
-//! - [`workspace_state`] — `WorkspaceState` (the panes HashMap + root/active ids)
-//! - [`folder`]          — `FolderInfo` + `Workspace` (the older
-//!                          per-pane folder model; superseded by the
-//!                          P2-4 `WorkspaceRoot` in `crate::workspace_root`)
+//! - [`pane`] —— `Pane` + `Orientation`
+//! - [`workspace_state`] —— `WorkspaceState`（面板哈希表 + 根/活动标识符）
+//! - [`folder`] —— `FolderInfo` + `Workspace`（旧的逐面板文件夹模型，
+//!   已被 `crate::workspace_root` 中的多根 `WorkspaceRoot` 取代）
 //!
-//! The P2-4 multi-root system lives in `crate::workspace_root` and is
-//! persisted on the `AppConfig`; the types here are kept for
-//! backward compatibility and the in-memory pane tree.
+//! 多根工作区系统位于 `crate::workspace_root` 并在 `AppConfig` 上持久化；
+//! 此处保留的类型用于向后兼容以及内存中的面板树。
 
 pub mod pane;
 pub mod workspace_state;
 pub mod folder;
 
-// Re-export the public types so existing call sites
-// (`mt_core::Pane`, `mt_core::WorkspaceState`, ...) keep working
-// unchanged after the split.
+// 重新导出公共类型，使既有的调用点
+// （`mt_core::Pane`、`mt_core::WorkspaceState` 等）在拆分后无需改动即可继续工作。
 pub use pane::{Orientation, Pane};
 pub use workspace_state::WorkspaceState;
 pub use folder::{FolderInfo, Workspace};

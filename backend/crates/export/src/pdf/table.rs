@@ -1,25 +1,21 @@
-//! Markdown table parsing and rendering for the PDF export pipeline.
+//! PDF 导出流程中 Markdown 表格的解析与渲染。
 //!
-//! Extracted from `pdf.rs` (where it lived inline with the main
-//! `export_pdf` orchestration) so the per-row helpers and the
-//! `is_table_*` predicates are easy to grep and unit-test on
-//! their own. The render helpers still take the live
-//! `PdfDocumentReference` + page-index pair so the caller can
-//! flow pagination through without locking the whole document.
+//! 本模块从 `pdf.rs` 中拆分出来（原先内联在主 `export_pdf` 编排逻辑中），
+//! 使逐行处理的辅助函数以及 `is_table_*` 这类判断谓词便于单独检索和单元测试。
+//! 渲染辅助函数仍然接收活动的 `PdfDocumentReference` + 页码索引对，
+//! 以便调用方在不锁定整个文档的前提下自主控制分页流程。
 
 use printpdf::{IndirectFontRef, Mm, PdfDocumentReference, PdfLayerIndex, PdfPageIndex};
 
-/// True if `line` is a markdown table row: starts and ends
-/// with `|` and has at least one more `|` inside. Empty
-/// cells are fine.
+/// 判断 `line` 是否为 Markdown 表格行：以 `|` 开头和结尾，
+/// 且内部至少再含一个 `|`。空单元格也是允许的。
 pub fn is_table_row(line: &str) -> bool {
     let t = line.trim();
     t.starts_with('|') && t.ends_with('|') && t.matches('|').count() >= 2
 }
 
-/// True if `line` is a markdown table separator row
-/// (`| --- | --- |`). Used to skip the divider line that
-/// appears after the header.
+/// 判断 `line` 是否为 Markdown 表格的分隔行
+/// （`| --- | --- |`）。用于跳过表头下方出现的分割线。
 pub fn is_table_separator(line: &str) -> bool {
     if !is_table_row(line) {
         return false;
@@ -28,11 +24,11 @@ pub fn is_table_separator(line: &str) -> bool {
         .filter(|s| !s.trim().is_empty())
         .all(|s| {
             let t = s.trim();
-            t.chars().all(|c| c == '-' || c == ':') && t.len() >= 1
+            t.chars().all(|c| c == '-' || c == ':') && !t.is_empty()
         })
 }
 
-/// Split a `| col | col |` line into trimmed cell strings.
+/// 将 `| 列1 | 列2 |` 行拆分为去除首尾空白的单元格字符串列表。
 pub fn parse_table_row(line: &str) -> Vec<String> {
     line.trim()
         .trim_start_matches('|')
@@ -42,9 +38,10 @@ pub fn parse_table_row(line: &str) -> Vec<String> {
         .collect()
 }
 
-/// Render a single table row. Columns are spaced 6mm apart
-/// and truncated to fit the page width. `font` is the regular
-/// or bold font (use bold for the header).
+/// 渲染单行表格。各列之间间隔 6mm，超宽内容会被截断以适配页面宽度。
+/// `font` 为常规或加粗字体（表头请使用加粗字体）。
+// 参数多是因为要透传 printpdf 的可变页面状态（doc/页/图层/y）与版式常量。
+#[allow(clippy::too_many_arguments)]
 pub fn render_table_row(
     doc: &mut PdfDocumentReference,
     current_page_idx: &mut PdfPageIndex,
@@ -81,5 +78,5 @@ pub fn render_table_row(
         };
         layer.use_text(&text, 8.5, Mm(x), Mm(*y), font);
     }
-    *y -= 5.5; // slightly larger than line_height for table breathing
+    *y -= 5.5; // 比行高略大，为表格留出呼吸感间隔
 }

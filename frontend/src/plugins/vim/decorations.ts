@@ -1,21 +1,16 @@
 /**
- * Decoration helpers for the Vim mode plugin (P2-7).
+ * Vim 模式插件的装饰助手。
  *
- * The plugin's `props.decorations` returns a `DecorationSet`
- * that paints:
- *   - NORMAL mode  : a 1-char-wide block caret at the cursor
- *                    (uses `Decoration.widget`)
- *   - INSERT mode  : a 1px-wide bar caret (the default; we
- *                    don't paint an extra widget)
- *   - VISUAL char  : an inline highlight on the selected range
- *   - VISUAL line  : per-line `Decoration.line` on each affected line
- *   - VISUAL block : per-line inline highlights; the underlying
- *                    `CellSelection` paints its own background
+ * 插件的 `props.decorations` 返回一个 `DecorationSet`，绘制：
+ *   - NORMAL 模式  ：光标处 1 字符宽的块状光标（用 `Decoration.widget`）
+ *   - INSERT 模式  ：1px 宽的条状光标（默认；不再额外绘制 widget）
+ *   - VISUAL 字符  ：选区范围内的行内高亮
+ *   - VISUAL 行    ：每个受影响行上的按行 `Decoration.line`
+ *   - VISUAL 块    ：按行的行内高亮；底层的 `CellSelection` 自行绘制背景
  *
- * The decorations are minimal because the StatusBar chip + the
- * PM-native `CellSelection` together provide the visual story
- * the user needs. Adding more decorations here would slow the
- * editor on every transaction.
+ * 装饰保持最小，因为状态栏标签 + PM 原生的 `CellSelection` 一起
+ * 提供了用户所需的视觉表达。在这里加更多装饰会让编辑器每次事务
+ * 都变慢。
  */
 
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
@@ -28,7 +23,7 @@ import {
   type VimState,
 } from './types'
 
-/** Rebuild decorations from Vim mode + PM selection (called each apply). */
+/** 由 Vim 模式 + PM 选区重建装饰（每次 apply 时调用）。 */
 export function rebuildVimDecorations(
   s: VimState,
   selection: { from: number; to: number; head: number },
@@ -57,13 +52,13 @@ export function rebuildVimDecorations(
   return DecorationSet.empty
 }
 
-/** @deprecated Use rebuildVimDecorations from plugin apply instead. */
+/** 已废弃：请改用插件 apply 中的 rebuildVimDecorations。 */
 export function buildVimDecorations(state: { doc: unknown }): DecorationSet {
   void state
   return DecorationSet.empty
 }
 
-/** Build a single block-caret widget for NORMAL mode at `pos`. */
+/** 在 `pos` 处构建 NORMAL 模式的单个块状光标 widget。 */
 export function makeBlockCaret(pos: number): Decoration {
   return Decoration.widget(pos, () => {
     const span = document.createElement('span')
@@ -74,7 +69,7 @@ export function makeBlockCaret(pos: number): Decoration {
   }, { side: -1, ignoreSelection: true })
 }
 
-/** Build a bar-caret widget for INSERT mode at `pos`. */
+/** 在 `pos` 处构建 INSERT 模式的条状光标 widget。 */
 export function makeBarCaret(pos: number): Decoration {
   return Decoration.widget(pos, () => {
     const span = document.createElement('span')
@@ -85,12 +80,12 @@ export function makeBarCaret(pos: number): Decoration {
   }, { side: -1, ignoreSelection: true })
 }
 
-/** Build a per-line highlight decoration for V-LINE mode. */
+/** 构建 V-LINE 模式的按行高亮装饰。 */
 export function makeLineHighlight(from: number, to: number): Decoration {
   return Decoration.node(from, to, { class: VIM_VISUAL_LINE_CLASS })
 }
 
-/** Build an inline highlight decoration for V-BLOCK mode. */
+/** 构建 V-BLOCK 模式的行内高亮装饰。 */
 export function makeBlockHighlight(from: number, to: number): Decoration {
   return Decoration.inline(from, to, { class: VIM_VISUAL_BLOCK_CLASS })
 }

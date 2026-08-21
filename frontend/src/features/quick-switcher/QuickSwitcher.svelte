@@ -1,18 +1,15 @@
 <script lang="ts">
   /**
-   * Quick File Switcher — Cmd+P (VSCode / Obsidian style).
+   * 快速文件切换器 —— Cmd+P。
    *
-   * Lazy-loads a flat list of file paths from the current
-   * workspace (via the existing `getDirectoryTree` IPC) and
-   * fuzzy-filters them in-memory. For very large workspaces
-   * this could be replaced with an indexed search, but for
-   * the typical "hundreds of files" case the in-memory approach
-   * is well below 1ms per keystroke and stays simple.
+   * 从当前工作区懒加载一份扁平的文件路径列表（经由既有的
+   * `getDirectoryTree` IPC），并在内存中做模糊过滤。超大型工作区
+   * 可换成索引搜索，但对常见的“几百个文件”场景，内存方案每次
+   * 按键远低于 1ms，且保持简单。
    *
-   * The host owns the file-open side-effect via the `onOpen`
-   * callback — this component is presentational.
+   * 打开文件的副作用由宿主通过 `onOpen` 回调负责——本组件只是
+   * 展示层。
    */
-  import { onMount, onDestroy } from 'svelte'
   import { getDirectoryTree } from '$lib/editor/commands'
   import { useI18n } from '$lib/stores/i18n.svelte'
 
@@ -34,11 +31,20 @@
   let loading = $state(false)
   let inputEl: HTMLInputElement | null = $state(null)
 
+  // 递增序号：加载期间工作区可能已切换，旧路径的响应不得落回
+  // allFiles（否则会显示其他工作区的文件列表）。
+  let loadSeq = 0
+  let loadingPath = ''
+
   async function loadFiles() {
-    if (!workspacePath || loading) return
+    if (!workspacePath) return
+    if (loading && loadingPath === workspacePath) return // 相同路径已在途
+    const seq = ++loadSeq
     loading = true
+    loadingPath = workspacePath
     try {
       const tree = await getDirectoryTree(workspacePath, 10, false)
+      if (seq !== loadSeq) return // 已有更新的加载请求
       const out: string[] = []
       const walk = (entries: typeof tree) => {
         for (const e of entries) {
@@ -53,9 +59,13 @@
       allFiles = out
     } catch (e) {
       console.error('[QuickSwitcher] failed to load files:', e)
+      if (seq !== loadSeq) return
       allFiles = []
     } finally {
-      loading = false
+      if (seq === loadSeq) {
+        loading = false
+        loadingPath = ''
+      }
     }
   }
 
@@ -69,21 +79,20 @@
     return parts.join('/') || '/'
   }
 
-  /** Same shape as CommandPalette's scorer — subsequence match
-   *  with word-start + consecutive-run bonuses. */
+  /** 与 CommandPalette 的打分器同构——子序列匹配，带词首与
+   *  连续命中加分。 */
   function score(path: string, q: string): number {
     if (!q) return 1
     const name = basename(path).toLowerCase()
     const dir = dirname(path).toLowerCase()
-    // Match against the full path so 'docs/foo' finds docs/foo.md.
+    // 对完整路径匹配，让 'docs/foo' 能命中 docs/foo.md。
     const haystack = (name + ' ' + path).toLowerCase()
     const needle = q.toLowerCase()
     let hi = 0, ni = 0, s = 0, prevHit = -1
     while (hi < haystack.length && ni < needle.length) {
       if (haystack[hi] === needle[ni]) {
         const atWordStart = hi === 0 || !/[a-z0-9]/.test(haystack[hi - 1])
-        // Extra bonus for hitting the basename (most users
-        // search by file name, not by directory).
+        // 命中文件名的额外加分（多数用户按文件名而非目录搜索）。
         const isName = hi < name.length
         s += (atWordStart ? 5 : 1) + (isName ? 3 : 0)
         if (prevHit === hi - 1) s += 3
@@ -121,21 +130,34 @@
   })
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      visible = false
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      activeIndex = Math.min(filtered.length - 1, activeIndex + 1)
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      activeIndex = Math.max(0, activeIndex - 1)
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      const p = filtered[activeIndex]
-      if (p) {
+    // 该 handler 同时绑在 backdrop / 容器 / 输入框三层：处理过的
+    // 按键必须 stopPropagation，否则事件冒泡会让外层重复 handler
+    // 再次执行（Enter 把 onOpen 最多触发 3 次、方向键一次移动 3 格）。
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault()
+        e.stopPropagation()
         visible = false
-        onOpen?.(p)
+        break
+      case 'ArrowDown':
+        e.preventDefault()
+        e.stopPropagation()
+        activeIndex = Math.min(filtered.length - 1, activeIndex + 1)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        e.stopPropagation()
+        activeIndex = Math.max(0, activeIndex - 1)
+        break
+      case 'Enter': {
+        e.preventDefault()
+        e.stopPropagation()
+        const p = filtered[activeIndex]
+        if (p) {
+          visible = false
+          onOpen?.(p)
+        }
+        break
       }
     }
   }

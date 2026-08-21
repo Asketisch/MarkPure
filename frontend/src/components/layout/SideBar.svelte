@@ -10,10 +10,10 @@
     onPinTab?: (path: string) => void
     onWorkspaceChange?: (path: string) => void
     isResizing?: boolean
-    // P0-5: WorkSpace registers its `loadTree` callback via this
-    // prop on mount. App.svelte stores the latest registration
-    // in `refreshFileTree` and calls it from `handleFileChanges`
-    // so the tree stays in sync with disk events.
+    // 文件树刷新回调。`WorkSpace` 在挂载时通过该 prop
+    // 注册它的 `loadTree` 回调；App.svelte 把最新注册保存到
+    // `refreshFileTree`，并在 `handleFileChanges` 中调用它，
+    // 让文件树与磁盘事件保持同步。
     onRegisterRefresh?: (refresh: () => void) => void
   }
 
@@ -44,11 +44,12 @@
     </button>
   </div>
 
-  {#if !collapsed}
-    <div class="sidebar-content">
-      <WorkSpace {workspacePath} {onOpenFile} {onPinTab} {onWorkspaceChange} {onRegisterRefresh} />
-    </div>
-  {/if}
+  <!-- 折叠时只隐藏、不卸载：卸载会丢失文件树状态（展开的目录、
+       已加载的条目），还会让 App 持有的 `onRegisterRefresh`
+       回调指向已销毁的实例。 -->
+  <div class="sidebar-content" class:hidden={collapsed}>
+    <WorkSpace {workspacePath} {onOpenFile} {onPinTab} {onWorkspaceChange} {onRegisterRefresh} />
+  </div>
 </div>
 
 <style>
@@ -129,5 +130,9 @@
     overflow-y: auto;
     overflow-x: hidden;
     min-width: 0;
+  }
+
+  .sidebar-content.hidden {
+    display: none;
   }
 </style>

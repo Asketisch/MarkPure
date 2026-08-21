@@ -1,74 +1,67 @@
 /**
- * Types and invariants for the multi-cursor plugin.
+ * 多光标插件的类型与不变量。
  *
- * The plugin keeps the user's *primary* cursor in
- * `state.selection` (PM standard) and stores additional
- * secondary cursors in plugin state. This split keeps PM's
- * built-in history, mapping, and input machinery working
- * unchanged — we never replace the Selection class.
+ * 插件把用户的 *主* 光标保存在 `state.selection`（PM 标准做法），
+ * 次要光标存在插件状态里。这种划分让 PM 内置的历史、映射与
+ * 输入机制无需改动即可正常工作——我们从不替换 Selection 类。
  *
- * Invariants:
- *   1. `cursors` is sorted ascending by `pos` (decorations
- *      read top-to-bottom, binary search is cheap).
- *   2. `cursors[i].anchor` exists ⇔ the user wanted a range
- *      (Alt+Shift+Click, or Cmd+D on a previous match). When
- *      absent, the cursor is a single-point caret at `pos`.
- *   3. Deduplication: no two entries share the same
- *      `(pos, anchor)` pair. `addCursor` enforces this.
- *   4. Length cap: `MAX_CURSORS` entries; `addCursor` silently
- *      truncates beyond that. Matches VSCode's behaviour and
- *      keeps a single insertText fan-out bounded.
- *   5. The primary cursor (state.selection) is **not**
- *      duplicated in `cursors`. `cursors[0]` happens to track
- *      the primary, but PM's selection is the source of truth.
+ * 不变量：
+ *   1. `cursors` 按 `pos` 升序排序（装饰自上而下读取，二分查找成本低）。
+ *   2. `cursors[i].anchor` 存在 ⇔ 用户想要区间光标（Alt+Shift+点击，
+ *      或对之前匹配按 Cmd+D）。缺失时该光标是 `pos` 处的单点插入符。
+ *   3. 去重：不存在两对相同的 `(pos, anchor)`。`addCursor` 保证这一点。
+ *   4. 数量上限：`MAX_CURSORS` 条；超出后 `addCursor` 静默截断。
+ *      这与其他主流编辑器的行为一致，也让单次 insertText 扇出
+ *      保持有界。
+ *   5. 主光标（state.selection）**不会**重复出现在 `cursors` 中。
+ *      `cursors[0]` 恰好跟踪主光标，但 PM 的 selection 才是
+ *      唯一事实来源。
  */
 
 import { PluginKey } from '@tiptap/pm/state'
 
-/** A single secondary cursor. `anchor` is set for range cursors. */
+/** 单个次要光标。区间光标会设置 `anchor`。 */
 export interface Cursor {
-  /** Document position of the caret (or the head of a range). */
+  /** 光标的文档位置（或区间的头部位置）。 */
   pos: number
-  /** For a range: the opposite end. `undefined` ⇔ point cursor. */
+  /** 区间光标的另一端。`undefined` ⇔ 点光标。 */
   anchor?: number
 }
 
 /**
- * The full plugin state. Stored in `Plugin.state` and read by
- * `props.decorations` and the input handler.
+ * 完整插件状态。存放在 `Plugin.state` 中，由 `props.decorations`
+ * 与输入处理器读取。
  */
 export interface MultiCursorState {
-  /** Secondary cursors. Length 0 ⇔ single-cursor mode. */
+  /** 次要光标列表。长度为 0 ⇔ 单光标模式。 */
   cursors: Cursor[]
-  /** Stack of previous cursor sets, used by undoLastCursor (Cmd+U). */
+  /** 先前光标集合的栈，供 undoLastCursor（Cmd+U）使用。 */
   history: Cursor[][]
-  /** Decoration cache, rebuilt on every apply(). */
+  /** 装饰缓存，每次 apply() 时重建。 */
   decorations: import('@tiptap/pm/view').DecorationSet
-  /** Current count, denormalised for cheap reads. */
+  /** 当前数量，反范式化以便快速读取。 */
   count: number
 }
 
 /**
- * Transaction meta payload. Each `dispatch` that touches the
- * cursor set goes through one of these; the plugin's
- * `apply(tr, prev)` reads `tr.getMeta(multiCursorPluginKey)`.
+ * 事务 meta 负载。凡是对光标集合动手的 `dispatch` 都经过其中一种；
+ * 插件的 `apply(tr, prev)` 读取 `tr.getMeta(multiCursorPluginKey)`。
  */
 export type MultiCursorMeta =
   | { type: 'set'; cursors: Cursor[] }
   | { type: 'clear' }
-  | { type: 'preserve' } // doc/selection changed but cursors stay
+  | { type: 'preserve' } // 文档/选区变化但光标保持不动
   | { type: 'undoLast' }
 
-/** Soft cap to keep one fan-out transaction bounded. */
+/** 软上限，保证一次扇出事务有界。 */
 export const MAX_CURSORS = 64
 
-/** CSS class applied to each secondary-cursor widget. */
+/** 每个次要光标 widget 使用的 CSS 类。 */
 export const CURSOR_DECO_CLASS = 'mc-cursor'
 
 /**
- * Singleton plugin key. Defined here so every submodule can
- * import the same identifier without going through index.ts
- * (which would create a cycle since index.ts imports from
- * every other module).
+ * 单例插件 key。定义在这里是为了让每个子模块都能导入同一个
+ * 标识符，而不必经过 index.ts（index.ts 从所有其他模块导入，
+ * 那样会形成循环依赖）。
  */
 export const multiCursorPluginKey = new PluginKey<MultiCursorState>('multiCursor')

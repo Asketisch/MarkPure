@@ -1,10 +1,9 @@
-//! Markdown-extension helpers: frontmatter, table transforms, code
-//! folding, pandoc-style task items.
+//! Markdown 扩展辅助：frontmatter、表格转换、代码折叠、
+//! pandoc 风格任务项。
 //!
-//! All four are pure functions of the input `content` string —
-//! no `AppState` access — so they share an `editor_ops/`
-//! sub-module to keep `editor_ops/mod.rs` focused on the
-//! "needs state" handlers (LRU registry, spell check).
+//! 这四类都是输入 `content` 字符串的纯函数——不访问 `AppState`——
+//! 因此共享一个 `editor_ops/` 子模块，让 `editor_ops/mod.rs` 专注于
+//! 「需要状态」的处理器（LRU 注册表、拼写检查）。
 
 // ============================== Frontmatter ==============================
 
@@ -29,15 +28,12 @@ pub fn cmd_update_frontmatter_field(
     }
 }
 
-// ============================== Markdown lint ==============================
+// ============================== Markdown 整理 ==============================
 
-/// P0-X: standalone `lint_markdown` IPC. The Settings
-/// panel's "preview the cleanup" button calls this with
-/// the current editor contents so the user can see the
-/// diff before turning the toggle on. `cmd_save_file`
-/// applies the same rules in-place when
-/// `config.editor.lint_on_save` is true (see
-/// `file_ops/open_save.rs`).
+/// 独立的 `lint_markdown` IPC。设置面板的「预览整理结果」按钮用
+/// 当前编辑器内容调用它，让用户可以在打开开关之前看到差异。
+/// 当 `config.editor.lint_on_save` 为 true 时，`cmd_save_file`
+/// 会就地应用相同的规则（见 `file_ops/open_save.rs`）。
 pub fn cmd_lint_markdown(
     params: &serde_json::Value,
 ) -> std::result::Result<serde_json::Value, String> {
@@ -54,7 +50,7 @@ pub fn cmd_lint_markdown(
     }))
 }
 
-// ============================== Table ==============================
+// ============================== 表格 ==============================
 
 pub fn cmd_transform_table(
     params: &serde_json::Value,
@@ -126,14 +122,14 @@ pub fn cmd_to_csv(params: &serde_json::Value) -> std::result::Result<serde_json:
     Ok(serde_json::json!({ "csv": csv }))
 }
 
-// ============================== Folding ==============================
+// ============================== 折叠 ==============================
 
 pub fn cmd_compute_folds(
     params: &serde_json::Value,
 ) -> std::result::Result<serde_json::Value, String> {
     let content = params["content"].as_str().ok_or("Missing 'content'")?;
     let ranges = markdown::compute_folding_ranges(content);
-    Ok(serde_json::to_value(ranges).map_err(|e| e.to_string())?)
+    serde_json::to_value(ranges).map_err(|e| e.to_string())
 }
 
 // ============================== Pandoc ==============================
@@ -143,5 +139,5 @@ pub fn cmd_parse_task_items(
 ) -> std::result::Result<serde_json::Value, String> {
     let content = params["content"].as_str().ok_or("Missing 'content'")?;
     let items = markdown::parse_task_items(content);
-    Ok(serde_json::to_value(items).map_err(|e| e.to_string())?)
+    serde_json::to_value(items).map_err(|e| e.to_string())
 }

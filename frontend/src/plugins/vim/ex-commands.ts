@@ -1,22 +1,20 @@
 /**
- * Ex command execution for the Vim mode plugin (P2-7).
+ * Vim 模式插件的 ex 命令执行。
  *
- * Parsed ex commands are dispatched by the plugin via
- * `executeEx(cmd, ctx)`. The function calls into the existing
- * editor commands / IPC bridges; it does NOT mutate the doc
- * directly (the result is a side-effect on the host).
+ * 插件解析出的 ex 命令通过 `executeEx(cmd, ctx)` 派发。该函数
+ * 调用既有的编辑器命令 / IPC 桥接；它不会直接改动文档
+ * （结果是宿主侧的一个副作用）。
  *
- * V1 command set:
- *   - `:w`           → save the current tab
- *   - `:q`           → close the current tab (refused if dirty)
- *   - `:wq` / `:x`   → save then close
- *   - `:e`           → reload the current tab from disk
- *   - `:e <path>`    → open a workspace file by relative path
- *   - `:b<N>`        → switch to tab N (1-indexed)
+ * 当前命令集：
+ *   - `:w`           → 保存当前标签页
+ *   - `:q`           → 关闭当前标签页（有未保存修改时拒绝）
+ *   - `:wq` / `:x`   → 先保存再关闭
+ *   - `:e`           → 从磁盘重新加载当前标签页
+ *   - `:e <path>`    → 按相对路径打开工作区文件
+ *   - `:b<N>`        → 切换到第 N 个标签页（从 1 开始编号）
  *
- * The host injects `ExecContext` with a minimal surface so
- * this module stays easy to unit-test (no DOM, no editor
- * instance required):
+ * 宿主注入最小面的 `ExecContext`，让本模块易于单元测试
+ * （无需 DOM、无需编辑器实例）：
  *
  *   - `save(): Promise<{ ok: boolean, error?: string }>`
  *   - `reload(): Promise<{ ok: boolean, error?: string }>`
@@ -24,8 +22,7 @@
  *   - `openFile(path: string): Promise<{ ok: boolean, error?: string }>`
  *   - `switchTab(index: number): Promise<{ ok: boolean, error?: string }>`
  *
- * Returns a `ExResult` that the plugin turns into a status-
- * bar transient message.
+ * 返回 `ExResult`，由插件转成一条临时的状态栏消息。
  */
 
 import type { ExCmd } from './types'
@@ -35,18 +32,15 @@ export interface ExecContext {
   reload: () => Promise<{ ok: boolean; error?: string }>
   close: (force?: boolean) => Promise<{ ok: boolean; error?: string }>
   /**
-   * P0-X: open a file by absolute or workspace-relative
-   * path. The host wires this to the existing
-   * `handleOpenFile` flow which already handles
-   * path-resolution + doc registry updates. V2 can add
-   * fuzzy matching by name; V1 just delegates.
+   * 按绝对路径或工作区相对路径打开文件。宿主把它接到既有的
+   * `handleOpenFile` 流程上，该流程已处理路径解析与文档注册表
+   * 更新。后续版本可以按名称做模糊匹配；当前只是直接委托。
    */
   openFile: (path: string) => Promise<{ ok: boolean; error?: string }>
   /**
-   * P0-X: switch to tab N (1-indexed). The host wires
-   * this to `switchTab(tabs[N-1].id)`. Returns
-   * `{ ok: false, error }` when N is out of range so we
-   * can surface a transient status message.
+   * 切换到第 N 个标签页（从 1 开始编号）。宿主把它接到
+   * `switchTab(tabs[N-1].id)` 上。N 越界时返回
+   * `{ ok: false, error }`，以便显示一条临时的状态消息。
    */
   switchTab: (index: number) => Promise<{ ok: boolean; error?: string }>
   isDirty: () => boolean
@@ -56,7 +50,7 @@ export type ExResult =
   | { ok: true; message: string }
   | { ok: false; message: string }
 
-/** Execute a parsed ex command against the host. */
+/** 针对宿主执行一条解析好的 ex 命令。 */
 export async function executeEx(cmd: ExCmd, ctx: ExecContext): Promise<ExResult> {
   switch (cmd.type) {
     case 'write': {
@@ -67,7 +61,7 @@ export async function executeEx(cmd: ExCmd, ctx: ExecContext): Promise<ExResult>
     }
     case 'quit': {
       if (ctx.isDirty() && !ctx.close.length) {
-        // Force close signature present; let the host decide.
+        // 带强制关闭签名；交给宿主决定。
       }
       const r = await ctx.close(false)
       return r.ok
