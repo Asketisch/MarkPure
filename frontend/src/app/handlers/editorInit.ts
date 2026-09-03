@@ -173,12 +173,20 @@ export function createEditorInit(ctx: EditorInitDeps) {
       onVimModeChange: persistVimMode,
     })
     setEditor(editor)
+    // 调试钩子：活动标签对应的 Rust 文档注册表 id（= tab id）。
+    ;(window as unknown as Record<string, unknown>).__markpure_active_doc_id = myTabId
     // 首次同步
     const content = tab.content || getMarkdown(editor) || ''
     if (content) {
       sync.syncToRust(myTabId, content)
     }
     sync.updateStats(myTabId)
+    // 源码 / 分屏视图的镜像内容必须跟随本次初始化的标签页——
+    // 否则在源码模式下切换标签，SourceEditor 仍显示上一个标签
+    // 的 Markdown。
+    if (app.viewMode === 'source' || app.viewMode === 'split') {
+      app.sourceContent = tab.content
+    }
 
     // 表格工具栏状态（app.isInTable）必须跟随 *当前* 编辑器，
     // 而不是组件挂载时页面上的编辑器。在 `setEditor(createEditor(...))`

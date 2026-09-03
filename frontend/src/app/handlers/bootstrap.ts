@@ -5,7 +5,7 @@
  * 完成后翻转 `app.ready` 门控并按需初始化编辑器。
  */
 import { setVimEnabled } from '$lib/plugins/vim'
-import { getConfig } from '$lib/editor/commands'
+import { getConfig, getTabs } from '$lib/editor/commands'
 import type { AppCtx } from './ctx'
 import type { ConfigOps } from './configOps'
 import type { EditorInit } from './editorInit'
@@ -15,6 +15,8 @@ export interface BootstrapDeps extends AppCtx {
   applyEditorConfig: (cfg: { font_family?: string; font_size?: number; word_wrap?: boolean; line_numbers?: boolean; tab_size?: number; soft_tabs?: boolean }) => void
   initEditor: () => void
   updateTableState: () => void
+  /** 会话恢复（fileOps 提供）：按路径重开上次的标签页。 */
+  restoreSession: (paths: string[], activePath: string | null) => Promise<boolean>
 }
 
 export function createBootstrap(ctx: BootstrapDeps) {
@@ -101,6 +103,25 @@ export function createBootstrap(ctx: BootstrapDeps) {
       // 上方的 mirror $effect 让 `app.workspacePath` 与 `workspace.activePath` 保持同步，
       // 包括 `workspace.init()` 返回的初始水合值。这里无需显式赋值——
       // 该块返回后，effect 会在挂载时运行一次。
+
+      // 4) 会话恢复：工作区就绪后，重开上次退出时的标签页。
+      // README 承诺的「关闭后恢复上次的标签页状态」——后端的
+      // get_tabs / 落盘 / 启动加载早已就绪，此前一直缺前端这半截。
+      // 只在没有已打开标签页时执行（避免与未来的多窗口入口冲突）。
+      if (app.tabs.length === 0) {
+        try {
+          const windows = await getTabs()
+          const win = windows.find(w => w.window_id === 'main') ?? windows[0]
+          const tabStates = win?.tabs ?? []
+          const paths = tabStates.map(t => t.path).filter((p): p is string => !!p)
+          const activePath = tabStates.find(t => t.id === win?.active_tab_id)?.path ?? null
+          if (paths.length > 0) {
+            await ctx.restoreSession(paths, activePath)
+          }
+        } catch (e: unknown) {
+          console.error('Session restore failed:', e)
+        }
+      }
 
       app.ready = true
 

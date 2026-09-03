@@ -13,6 +13,7 @@
   import { setContent } from '$lib/editor/editor'
   import {
     watchDirectory, unwatchDirectory, onFileChanges, offFileChanges, loadWorkspaceStyles,
+    saveTabs,
   } from '$lib/editor/commands'
   import MenuBar from '$lib/components/layout/MenuBar.svelte'
   import WorkspaceRootTabs from '$lib/components/workspace/WorkspaceRootTabs.svelte'
@@ -163,6 +164,43 @@
       offFileChanges()
       unwatchDirectory().catch(() => {})
     }
+  })
+
+  // 会话持久化：标签页集合 / 活动标签变化时防抖保存到宿主
+  //（tabs.json）。重启后 bootstrap 会经 get_tabs 恢复。深比较没
+  // 必要——content 的编辑不进这里（tab.content 不在快照里），
+  // 结构变化（开/关/切）才值得落盘。
+  let saveTabsTimer: ReturnType<typeof setTimeout>
+  $effect(() => {
+    const snapshot = app.tabs.map(t => ({
+      id: String(t.id),
+      name: t.name,
+      path: t.path || null,
+      dirty: t.dirty,
+      active: t.id === app.activeTabId,
+    }))
+    const workspaceRootIdFor = (path: string | null) =>
+      path ? (workspace as any).rootIdForPath?.(path) ?? null : null
+    if (saveTabsTimer) clearTimeout(saveTabsTimer)
+    saveTabsTimer = setTimeout(() => {
+      const windows = [
+        {
+          window_id: 'main',
+          active_tab_id: snapshot.find(s => s.active)?.id ?? null,
+          tabs: snapshot.map(s => ({
+            id: s.id,
+            name: s.name,
+            path: s.path,
+            content: '',
+            is_modified: s.dirty,
+            scroll_ratio: 0,
+            read_only: false,
+            workspace_root_id: workspaceRootIdFor(s.path),
+          })),
+        },
+      ]
+      void saveTabs(windows as any).catch(() => {})
+    }, 800)
   })
 
   // 根目录切换淘汰：Rust 丢弃不属于新活动根目录的 LRU 文档并返回

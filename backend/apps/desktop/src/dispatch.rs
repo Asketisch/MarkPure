@@ -81,6 +81,9 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
         // 搜索 → 慢速（遍历工作区）
         "search_workspace" => return None,
 
+        // 工作区搜索替换（预览不写盘；执行直接落盘）→ 慢速
+        "preview_workspace_replace" | "replace_in_workspace" => return None,
+
         // 国际化 — 快速（内存操作）
         "get_locale" => workspace_ops::cmd_get_locale(state),
         "set_locale" => workspace_ops::cmd_set_locale(&msg.params, state),
@@ -270,6 +273,10 @@ fn run_slow_command(
 
         // 工作区搜索
         "search_workspace" => export_ops::cmd_search_workspace(&msg.params),
+
+        // 工作区搜索替换（预览不写盘；执行直接落盘）
+        "preview_workspace_replace" => export_ops::cmd_preview_workspace_replace(&msg.params),
+        "replace_in_workspace" => export_ops::cmd_replace_in_workspace(&msg.params),
 
         // 资源
         "save_pasted_image" => export_ops::cmd_save_pasted_image(&msg.params, state),

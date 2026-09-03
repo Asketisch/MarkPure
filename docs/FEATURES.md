@@ -270,6 +270,34 @@ JSON 格式主题存储在 `~/.config/markpure/themes/`；通过 `backend/crates
 
 ---
 
+## 6.3 工作区搜索替换 — 2026-09 ✅
+
+搜索面板（`Cmd+Shift+F`）新增替换模式（面板内 ⇄ 按钮）：
+预览（`preview_workspace_replace`，逐行 before/after 对照，不写盘）
+→ 确认（两段式按钮，防「预览 A 替换 B」）→ 执行
+（`replace_in_workspace`，直接落盘）→ 自动刷新搜索结果。
+多根：`paths` 参数逐根执行合并。后端复用 `search::replace_in_files` /
+`search::preview_replace`（含 CRLF 保留、同行多处匹配）。
+
+- **关键文件**：`backend/apps/desktop/src/export_ops.rs`、
+  `frontend/src/components/workspace/WorkspaceSearch.svelte`、
+  `frontend/src/components/workspace/WorkspaceReplacePanel.svelte`（预览子面板）、
+  `frontend/src/editor/commands/export.ts`
+- **安全护栏**：两段确认；预览列表超过 100 条截断渲染；替换由文件
+  监视器联动（打开中的非脏标签自动重载，脏标签弹「重新加载/保留」）
+
+## 6.4 标签页会话恢复 — 2026-09 ✅
+
+重启后自动恢复上次退出时打开的标签页（README 承诺补齐）。
+标签页集合 / 活动标签变化后 800ms 防抖调用 `save_tabs` 落盘
+（含 `workspace_root_id` 绑定）；启动时 `bootstrap` 在工作区就绪后
+`get_tabs` → 按路径逐个重开（失效路径静默跳过）→ 恢复活动标签。
+
+- **关键文件**：`frontend/src/app/handlers/bootstrap.ts`、
+  `frontend/src/app/handlers/fileOps.ts`（`restoreSession`）、
+  `frontend/src/app/App.svelte`（防抖保存 effect）
+- **后端**：零改动（`get_tabs` / `save_tabs` / 启动加载早已就绪）
+
 ## 7. 已知限制
 
 | 限制 | 说明 |
@@ -282,6 +310,8 @@ JSON 格式主题存储在 `~/.config/markpure/themes/`；通过 `backend/crates
 | 1MB+ markdown 解析可能慢 | pulldown-cmark 固有开销（与虚拟化无关） |
 | macOS 14 老 WebView 缺 `content-visibility: auto` | 虚拟化降级到 `display: none`，滚动条高度可能略有偏差 |
 | 文件树 16+ 层不支持 | 当前深度上限 15 |
+| `compute_folds` 不接入 WYSIWYG | 折叠范围是 markdown 文本偏移，与 PM 文档位置坐标空间不匹配；WYSIWYG 折叠应由纯前端 PM 插件实现，源码模式用 CM6 自带 foldService |
+| `transform_table` / `align_table_column` 暂不接线 | 坐标是 markdown 文本偏移，WYSIWYG 下 Tiptap 原生表格命令已覆盖同等能力 |
 | Add to Dictionary 未持久化 | 仅显示候选菜单项，需后端 personal dict 支持 |
 
 ---

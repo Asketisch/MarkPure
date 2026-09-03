@@ -203,6 +203,113 @@ pub fn cmd_search_workspace(
     serde_json::to_value(result).map_err(|e| e.to_string())
 }
 
+// ============================== 工作区搜索替换 ==============================
+
+/// 解析工作区替换命令的公共参数：`query` / `replacement` /
+/// `path|paths` / 搜索选项。`preview_workspace_replace` 与
+/// `replace_in_workspace` 共用。
+struct WorkspaceReplaceParams {
+    query: String,
+    replacement: String,
+    root_paths: Vec<PathBuf>,
+    options: search::SearchOptions,
+}
+
+fn parse_workspace_replace_params(
+    params: &serde_json::Value,
+) -> std::result::Result<WorkspaceReplaceParams, String> {
+    let query = params["query"]
+        .as_str()
+        .ok_or("Missing 'query' parameter")?
+        .to_string();
+    let replacement = params["replacement"]
+        .as_str()
+        .ok_or("Missing 'replacement' parameter")?
+        .to_string();
+
+    let mut path_strs: Vec<String> = params["paths"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+    if path_strs.is_empty() {
+        if let Some(p) = params["path"].as_str() {
+            path_strs.push(p.to_string());
+        }
+    }
+    if path_strs.is_empty() {
+        return Err("Missing 'path' or 'paths' parameter".to_string());
+    }
+    let root_paths: Vec<PathBuf> = path_strs.iter().map(PathBuf::from).collect();
+
+    let options = search::SearchOptions {
+        case_sensitive: params
+            .get("case_sensitive")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        whole_word: params
+            .get("whole_word")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        use_regex: params
+            .get("use_regex")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
+        max_depth: params.get("max_depth").and_then(|v| v.as_u64()).map(|v| v as usize),
+    };
+
+    Ok(WorkspaceReplaceParams { query, replacement, root_paths, options })
+}
+
+/// `preview_workspace_replace`：跨文件替换预览（不写盘）。
+/// 多根：逐根执行后合并（不同根的文件路径天然不重叠）。
+pub fn cmd_preview_workspace_replace(
+    params: &serde_json::Value,
+) -> std::result::Result<serde_json::Value, String> {
+    let p = parse_workspace_replace_params(params)?;
+    let mut all: Vec<serde_json::Value> = Vec::new();
+    for root in &p.root_paths {
+        let previews = search::preview_replace(root, &p.query, &p.replacement, &p.options)
+            .map_err(|e| e.to_string())?;
+        all.extend(
+            previews
+                .into_iter()
+                .map(|pv| serde_json::to_value(&pv).unwrap_or(serde_json::Value::Null)),
+        );
+    }
+    Ok(serde_json::Value::Array(all))
+}
+
+/// `replace_in_workspace`：执行跨文件替换并落盘。
+pub fn cmd_replace_in_workspace(
+    params: &serde_json::Value,
+) -> std::result::Result<serde_json::Value, String> {
+    let p = parse_workspace_replace_params(params)?;
+    let mut total_files = 0usize;
+    let mut total_replacements = 0usize;
+    let mut all_results: Vec<serde_json::Value> = Vec::new();
+    for root in &p.root_paths {
+        let summary = search::replace_in_files(root, &p.query, &p.replacement, &p.options)
+            .map_err(|e| e.to_string())?;
+        total_files += summary.total_files_modified;
+        total_replacements += summary.total_replacements;
+        all_results.extend(
+            summary
+                .results
+                .into_iter()
+                .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null)),
+        );
+    }
+    Ok(serde_json::json!({
+        "total_files_modified": total_files,
+        "total_replacements": total_replacements,
+        "results": all_results,
+    }))
+}
+
 // ============================== 资源 ==============================
 
 pub fn cmd_save_pasted_image(

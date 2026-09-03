@@ -85,6 +85,21 @@ export function createViewOps(ctx: ViewOpsDeps) {
       }
     }
 
+    // 纯源码模式下销毁 Tiptap 实例。否则旧编辑器仍存活（挂在已
+    // 卸载的 DOM 上，文档停在切出前的内容），而保存 / 切换 / 导出
+    // 的 `editor ? getMarkdown(editor) : tab.content` 路径会取到
+    // 过期文档——源码模式的编辑被旧内容覆盖，且脏标记被错误清除。
+    // 销毁后这些路径统一回退到 tab.content（onSourceUpdate 实时
+    // 更新）；切回 wysiwyg/split 时 scheduleInitEditor 会按
+    // tab.content 重建编辑器。
+    if (mode === 'source') {
+      const ed = getEditor()
+      if (ed) {
+        ed.destroy()
+        ctx.setEditor(null)
+      }
+    }
+
     // 若新模式渲染 Tiptap 编辑器（wysiwyg 或 split），
     // 旧视图的 `editor-area` div 即将被卸载，新的会被挂载。
     // Tiptap 编辑器实例仍附加在旧的（即将被移除的）节点上，

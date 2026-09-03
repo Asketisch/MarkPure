@@ -100,6 +100,7 @@ export function wireApp(ctx: AppCtx) {
     applyEditorConfig: configOps.applyEditorConfig,
     initEditor: editorInit.initEditor,
     updateTableState: editorInit.updateTableState,
+    restoreSession: fileOps.restoreSession,
   })
   const windowEvents = createWindowEvents({
     ...ctx,
