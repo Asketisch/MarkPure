@@ -3,7 +3,6 @@
 //! 提供根据 Markdown 标题层级计算和管理折叠范围的功能。
 
 use serde::{Deserialize, Serialize};
-use crate::parser::{parse_markdown, Event, Tag, TagEnd, HeadingLevel};
 
 /// 表示 Markdown 文档中可折叠的范围
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,109 +31,76 @@ struct HeadingInfo {
 
 /// 根据 Markdown 标题计算所有可折叠范围
 ///
-/// 算法：
-/// 1. 找出所有标题及其位置
-/// 2. 对每个标题确定其折叠范围（直到下一个同级或更高级的标题）
-/// 3. 返回不仅包含标题行自身的范围
+/// 实现：逐行识别 ATX 标题（`#{1,6} `），折叠范围从标题行开始，
+/// 到下一个同级或更高级标题的前一行结束（末尾标题折叠到文档末尾）。
+/// `from` / `to` 是**字节偏移**（行起点精确可算，无需启发式近似）；
+/// 旧实现用事件计数近似偏移，遇到 CJK 内容会在非字符边界切片 panic。
 pub fn compute_folding_ranges(content: &str) -> Vec<FoldRange> {
-    let events: Vec<Event> = parse_markdown(content);
-
-    let mut headings: Vec<HeadingInfo> = Vec::new();
-    let mut char_offset: usize = 0;
-    let mut line_number: usize = 1;
-    let mut current_heading: Option<HeadingInfo> = None;
-
-    let mut _heading_start_offset: usize = 0;
-
-    for event in events {
-        match event {
-            Event::Start(Tag::Heading { level, .. }) => {
-                let h_level = match level {
-                    HeadingLevel::H1 => 1,
-                    HeadingLevel::H2 => 2,
-                    HeadingLevel::H3 => 3,
-                    HeadingLevel::H4 => 4,
-                    HeadingLevel::H5 => 5,
-                    HeadingLevel::H6 => 6,
-                };
-                _heading_start_offset = char_offset;
-                current_heading = Some(HeadingInfo {
-                    level: h_level,
-                    start_pos: char_offset,
-                    text: String::new(),
-                    line_number,
-                });
-            }
-            Event::End(TagEnd::Heading(_)) => {
-                if let Some(h) = current_heading.take() {
-                    // 只添加有内容（可折叠范围）的标题
-                    if !h.text.is_empty() {
-                        headings.push(h);
-                    }
-                }
-            }
-            Event::Text(ref text) | Event::Code(ref text) => {
-                if let Some(ref mut h) = current_heading {
-                    if !h.text.is_empty() {
-                        h.text.push(' ');
-                    }
-                    h.text.push_str(text);
-                }
-            }
-            Event::SoftBreak | Event::HardBreak => {
-                char_offset += 1;
-                line_number += 1;
-            }
-            _ => {
-                // 其他事件也计为字符以跟踪偏移。
-                // 这是近似值，但对粗略的位置跟踪足够。
+    // 行起点字节偏移（0-based 行索引 → 偏移）。
+    let line_starts: Vec<usize> = {
+        let mut v = vec![0usize];
+        for (i, b) in content.bytes().enumerate() {
+            if b == b'\n' {
+                v.push(i + 1);
             }
         }
+        v
+    };
 
-        // 基于事件类型粗略跟踪字符偏移
-        match event {
-            Event::Text(_) | Event::Code(_) | Event::Html(_) => {
-                // 这些会增加字符偏移，但目前按行跟踪
-            }
-            _ => {}
+    // 识别标题行（0-based 行号 + 层级）。
+    struct HeadingLine {
+        level: u8,
+        line: usize,
+        text: String,
+    }
+    let mut headings: Vec<HeadingLine> = Vec::new();
+    for (idx, line) in content.lines().enumerate() {
+        let trimmed = line.trim_start();
+        let hashes = trimmed.bytes().take_while(|&b| b == b'#').count();
+        if hashes == 0 || hashes > 6 {
+            continue;
         }
+        // ATX 标题要求 `#` 后跟空格或行尾（`#tag` 不是标题）。
+        let rest = &trimmed[hashes..];
+        if !rest.is_empty() && !rest.starts_with(' ') && !rest.starts_with('\t') {
+            continue;
+        }
+        headings.push(HeadingLine {
+            level: hashes as u8,
+            line: idx,
+            text: trimmed[hashes..].trim().to_string(),
+        });
     }
 
-    // 现在计算折叠范围——每个标题折叠到下一个同级或更高级标题
+    let line_end_offset = |line: usize| -> usize {
+        if line + 1 < line_starts.len() {
+            line_starts[line + 1] - 1 // 不含换行符
+        } else {
+            content.len()
+        }
+    };
+
     let mut ranges: Vec<FoldRange> = Vec::new();
-    let lines: Vec<&str> = content.lines().collect();
-
-    for (i, heading) in headings.iter().enumerate() {
-        let mut end_pos = content.len();
-
-        // 找到下一个同级或更高级的标题
+    for (i, h) in headings.iter().enumerate() {
+        // 折叠范围终点：下一个同级或更高级标题的前一行；没有则到文档末尾。
+        let mut end_line = line_starts.len().saturating_sub(1); // 最后一行（0-based）
         for next in headings.iter().skip(i + 1) {
-            if next.level <= heading.level {
-                // 下一个标题的开头就是我们的结束位置
-                end_pos = next.start_pos;
+            if next.level <= h.level {
+                end_line = next.line.saturating_sub(1);
                 break;
             }
         }
-
-        // 计算按行的结束位置
-        let end_line = if end_pos == content.len() {
-            lines.len()
-        } else {
-            // 近似：统计 end_pos 之前的换行数
-            content[..end_pos].chars().filter(|&c| c == '\n').count() + 1
-        };
-
-        // 只有标题之间存在内容时才创建折叠范围
-        if end_line > heading.line_number + 1 {
-            ranges.push(FoldRange {
-                from: heading.start_pos,
-                to: end_pos,
-                level: heading.level,
-                is_collapsed: false,
-                heading_text: heading.text.clone(),
-                line_number: heading.line_number,
-            });
+        if end_line <= h.line {
+            continue; // 没有可折叠的内容
         }
+        ranges.push(FoldRange {
+            from: line_starts[h.line],
+            to: line_end_offset(end_line),
+            level: h.level,
+            is_collapsed: false,
+            heading_text: h.text.clone(),
+            line_number: h.line + 1,
+        });
     }
 
     ranges
@@ -208,6 +174,20 @@ Content under heading 2
         let ranges = compute_folding_ranges(md);
         // 后面没有内容的单个标题不应可折叠
         assert!(ranges.is_empty() || ranges.iter().all(|r| r.to == md.len()));
+    }
+
+    #[test]
+    fn test_compute_folding_ranges_cjk_no_panic() {
+        // 回归：中文段落 + 多标题，旧实现的字节切片会在非字符边界
+        // panic（`end (0|2) is not a char boundary`）。
+        let md = "中文\n段落\n\n# T1\ntext 中文\nmore\n\n# T2\nend 中文";
+        let ranges = compute_folding_ranges(md);
+        // T1（行4）折叠到 T2 前，T2（行8）折叠到文档末尾
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(ranges[0].line_number, 4);
+        // from/to 必须落在字符边界上
+        assert!(md.is_char_boundary(ranges[0].from));
+        assert!(md.is_char_boundary(ranges[0].to));
     }
 
     #[test]

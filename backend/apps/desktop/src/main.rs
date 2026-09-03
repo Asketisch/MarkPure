@@ -30,7 +30,7 @@ mod state;
 mod test_driver;
 mod workspace_ops;
 
-use state::{lock_or_recover, AppEvent, AppState, IpcMessage};
+use state::{lock_or_recover, AppEvent, AppState, IpcMessage, IpcResponse};
 use std::sync::Arc;
 use std::sync::Mutex;
 use tao::event::{Event, WindowEvent};
@@ -193,6 +193,25 @@ fn main() {
             Ok(m) => m,
             Err(e) => {
                 eprintln!("IPC parse error: {e}");
+                // 解析失败时前端没有可匹配的 id——用 id=0 回一个
+                // 错误响应，避免调用方 Promise 永久挂起；ipc.ts 的
+                // 待处理表里没有 id 0，会安全忽略（或至少在控制台
+                // 可见）。
+                let response = IpcResponse {
+                    id: 0,
+                    result: None,
+                    error: Some(format!("malformed IPC message: {e}")),
+                };
+                if let Ok(js) = serde_json::to_string(&response) {
+                    let js_escaped = state::escape_for_js(&js);
+                    if let Ok(wv) = wv_clone.lock() {
+                        if let Some(ref webview) = *wv {
+                            let _ = webview.evaluate_script(&format!(
+                                "window.__mt_dispatch('{js_escaped}')"
+                            ));
+                        }
+                    }
+                }
                 return;
             }
         };

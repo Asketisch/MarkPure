@@ -63,8 +63,13 @@ impl FileWatcher {
 
                     for path in event.paths {
                         let canonical = path.to_string_lossy().to_string();
+                        // 前缀必须落在路径边界（后跟分隔符或长度相等），
+                        // 否则 `/proj` 会错误改写 `/proj2/...`。
+                        let boundary = canonical_root.len() == canonical.len()
+                            || canonical.as_bytes().get(canonical_root.len()) == Some(&b'/');
                         let reported = if canonical_root != user_root
                             && canonical.starts_with(canonical_root.as_str())
+                            && boundary
                         {
                             format!("{}{}", user_root, &canonical[canonical_root.len()..])
                         } else {
@@ -93,19 +98,19 @@ impl FileWatcher {
             .map_err(|e| e.to_string())?;
 
         let handle = WatcherHandle { watcher };
-        self.watchers.lock().unwrap().insert(id.clone(), handle);
+        self.watchers.lock().unwrap_or_else(|p| p.into_inner()).insert(id.clone(), handle);
 
         Ok(rx)
     }
 
     /// 停止监视目录
     pub fn unwatch(&mut self, id: &str) {
-        self.watchers.lock().unwrap().remove(id);
+        self.watchers.lock().unwrap_or_else(|p| p.into_inner()).remove(id);
     }
 
     /// 若给定工作区 id 有活动的监视器则返回 true。
     pub fn has_watcher(&self, id: &str) -> bool {
-        self.watchers.lock().unwrap().contains_key(id)
+        self.watchers.lock().unwrap_or_else(|p| p.into_inner()).contains_key(id)
     }
 
     /// 返回所有当前活动监视器的 id。

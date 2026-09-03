@@ -145,9 +145,23 @@ pub fn search_workspace(
     let mut truncated = false;
 
     // 构建文件遍历器
+    // `filter_entry` 真正剪枝：`continue` 只跳过目录条目本身，
+    // walkdir 仍会下降进 `.git/`、`node_modules/` 内部，把里面的
+    // .js/.json 等白名单文件全部卷进搜索结果。
     let walker = WalkDir::new(root_path)
         .follow_links(true)
-        .max_depth(options.max_depth.unwrap_or(10));
+        .max_depth(options.max_depth.unwrap_or(10))
+        .into_iter()
+        .filter_entry(|e| {
+            // 根目录自身不过滤（工作区路径可能以 . 开头）。
+            if e.depth() == 0 {
+                return true;
+            }
+            e.file_name()
+                .to_str()
+                .map(|name| !(name.starts_with('.') || name == "node_modules" || name == "target"))
+                .unwrap_or(true)
+        });
 
     // 环护栏：`follow_links` 下符号链接目录环（`ln -s ..`）会无限
     // 遍历。按 (设备, inode/file_id) 记录每个已访问的真实目录，

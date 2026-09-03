@@ -243,6 +243,11 @@ fn snapshot_webview(
 }
 
 #[cfg(not(target_os = "macos"))]
-fn snapshot_webview(_webview: &wry::WebView, _out_path: &str) -> Result<(), String> {
+fn snapshot_webview(
+    _webview: &wry::WebView,
+    _out_path: &str,
+    _driver_dir: Option<std::path::PathBuf>,
+    _cmd_id: u64,
+) -> Result<(), String> {
     Err("snapshot only implemented on macOS".into())
 }

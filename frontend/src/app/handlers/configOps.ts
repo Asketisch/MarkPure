@@ -22,7 +22,7 @@ export function createConfigOps(ctx: AppCtx) {
     // ProseMirror 的自动换行 CSS。
     if (cfg.word_wrap !== undefined) root.style.setProperty('--editor-word-wrap', cfg.word_wrap ? '1' : '0')
     if (cfg.tab_size !== undefined) root.style.setProperty('--editor-tab-size', String(cfg.tab_size))
-    if (cfg.soft_tabs !== undefined) root.style.setProperty('--editor-soft-app.tabs', cfg.soft_tabs ? '1' : '0')
+    if (cfg.soft_tabs !== undefined) root.style.setProperty('--editor-soft-tabs', cfg.soft_tabs ? '1' : '0')
     if (cfg.line_numbers !== undefined) root.style.setProperty('--editor-line-numbers', cfg.line_numbers ? '1' : '0')
   }
 
@@ -59,7 +59,7 @@ export function createConfigOps(ctx: AppCtx) {
         // 只是在宿主元素上翻转一个类。
         const root = document.documentElement
         root.style.setProperty('--editor-tab-size', String(merged.tab_size))
-        root.style.setProperty('--editor-soft-app.tabs', merged.soft_tabs ? '1' : '0')
+        root.style.setProperty('--editor-soft-tabs', merged.soft_tabs ? '1' : '0')
         if (merged.word_wrap) host.classList.remove('no-wrap')
         else host.classList.add('no-wrap')
         if (merged.line_numbers) host.classList.remove('no-line-numbers')

@@ -240,6 +240,16 @@ function handleCharKey(state: VimState, key: string): ParseResult {
   // ----- 操作符待处理：下一个字符要么是移动、要么是文本对象
   //       修饰符（i/a），要么是双操作符。-----
   if (p.kind === 'operator') {
+    // >> / << 的哨兵位（空闲态的 `>`/`<` 用 'yank'/'delete' 暂存，
+    // 等 待第二个同键）。命中即触发行缩进命令——此前该路径
+    // 落入 MOTION_TABLE 报 unknown motion，indentLine/dedentLine
+    // 成为不可达死代码。
+    if (key === '>' && p.op === 'yank') {
+      return ready({ type: 'indentLine', count: p.count }, state, { ...state, pending: { kind: 'idle' } })
+    }
+    if (key === '<' && p.op === 'delete') {
+      return ready({ type: 'dedentLine', count: p.count }, state, { ...state, pending: { kind: 'idle' } })
+    }
     if (key === p.op[0]) {
       // dd / cc / yy —— 双操作符。
       return ready(

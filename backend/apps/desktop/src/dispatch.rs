@@ -197,7 +197,19 @@ pub fn dispatch_slow(msg: IpcMessage, state: Arc<AppState>) {
 
     let state_for_thread = state.clone();
     std::thread::spawn(move || {
-        let result = run_slow_command(&msg, &state_for_thread);
+        // 慢速处理器 panic（如畸形参数触发索引越界）时线程会静默
+        // 死亡，前端 promise 永久挂起。捕获并转为 error 响应。
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run_slow_command(&msg, &state_for_thread)
+        }))
+        .unwrap_or_else(|p| {
+            let m = p
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()))
+                .unwrap_or_else(|| "internal panic".into());
+            Err(format!("internal error: {m}"))
+        });
         let response = match result {
             Ok(v) => IpcResponse { id: msg.id, result: Some(v), error: None },
             Err(e) => IpcResponse { id: msg.id, result: None, error: Some(e) },

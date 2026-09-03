@@ -138,16 +138,22 @@ export const EmojiShortcodeExtension = Extension.create<EmojiOptions>({
           const name = match[1]
           const emoji = table[name]
           if (!emoji) return
+          // 匹配头部的 `(?:^|[^\w])` 会在非行首时吞掉一个前导
+          // 字符（通常是 `:smile:` 前的空格），而它属于 match[0]，
+          // 也就落在 range 内。直接从 range.from 替换会把这个
+          // 无辜的字符一起删掉（`word :smile: ` → `word😄`）。
+          // 计算前导长度，从短代码真正的起点开始替换。
+          const prefixLen = match[0].length - (name.length + 3) // +2 冒号 +1 触发字符
           // 把整个 `:name:` 替换为 emoji 字形。我们裁掉用户
           // 刚打出的尾部空白（空格 / 回车），让光标干净地落在
           // emoji 之后。
           chain()
             .insertContentAt(
-              { from: range.from, to: range.to - 1 },
+              { from: range.from + prefixLen, to: range.to - 1 },
               emoji,
             )
             // 把光标放在插入的 emoji 正后方。
-            .setTextSelection(range.from + emoji.length)
+            .setTextSelection(range.from + prefixLen + emoji.length)
             .run()
         },
       }),

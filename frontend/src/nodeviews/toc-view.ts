@@ -26,10 +26,21 @@ export class TocNodeView {
     this.refresh()
 
     // 文档变化时重新渲染。用底层 `transaction` 事件而非 `update`，
-    // 这样无论标题编辑发生在文档何处都能被捕获。
-    const handler = () => this.refresh()
+    // 这样无论标题编辑发生在文档何处都能被捕获。仅在文档真正
+    // 变化时刷新，且做 150ms 防抖——光标移动、多光标闪烁等事务
+    // 若也触发 O(doc) 的标题提取 + innerHTML 全量重建，编辑大文档
+    // 时会明显卡顿（Outline.svelte 侧早有同样的防抖处理）。
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null
+    const handler = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+      if (!transaction.docChanged) return
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(() => this.refresh(), 150)
+    }
     editor.on('transaction', handler)
-    this.updateListener = () => editor.off('transaction', handler)
+    this.updateListener = () => {
+      editor.off('transaction', handler)
+      if (refreshTimer) clearTimeout(refreshTimer)
+    }
   }
 
   update(node: PMNode): boolean {

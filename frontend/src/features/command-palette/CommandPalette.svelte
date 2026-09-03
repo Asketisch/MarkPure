@@ -129,16 +129,10 @@
   }
 
   onMount(() => {
-    // 全局快捷键：Cmd+Shift+P / Ctrl+Shift+P 开合面板。宿主也会
-    // 绑定；这里防御性地监听，避免宿主绑定遗漏导致面板无法唤起。
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
-        e.preventDefault()
-        visible = !visible
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    // 快捷键统一由宿主 keybinds 处理（Cmd/Ctrl+Shift+P 开合）。
+    // 此处若再监听一次，同一事件会被两个监听器各取反一次——
+    // 两次取反相互抵消，面板表现为「打不开」或状态分叉。
+    return () => {}
   })
 
   // 按类别分组，用于分区视图。

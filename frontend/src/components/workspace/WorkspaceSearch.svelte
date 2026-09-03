@@ -37,8 +37,13 @@
   let error = $state('')
   let selectedIndex = $state(-1)
   // 多根搜索范围。宿主可以通过 `initialScope` 预置；用户也可以
-  // 通过工具栏里的小下拉切换。
+  // 通过工具栏里的小下拉切换。组件常驻不卸载——`$state` 只在
+  // 首次挂载时取 initialScope，此后宿主再次以 `all` 打开时需要
+  // 显式同步，否则「搜索所有根目录」入口永远只搜活动根。
   let scope = $state<'active' | 'all'>(initialScope)
+  $effect(() => {
+    if (visible) scope = initialScope
+  })
   let searchSeq = 0 // 请求序号，用于丢弃过期结果
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 

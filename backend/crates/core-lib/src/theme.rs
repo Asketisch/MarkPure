@@ -241,7 +241,7 @@ pub fn load_custom_themes() -> Vec<Theme> {
 }
 
 /// 校验主题标识符是否可以安全用作文件名
-fn validate_theme_id(id: &str) -> std::result::Result<(), String> {
+pub fn validate_theme_id(id: &str) -> std::result::Result<(), String> {
     if id.is_empty() {
         return Err("theme ID is empty".into());
     }
@@ -314,7 +314,7 @@ fn generate_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_nanos();
     let rand_suffix = (now as u64).wrapping_mul(2654435761).rotate_left(17);
     format!("{:x}{:08x}", now, rand_suffix & 0xFFFFFFFF)

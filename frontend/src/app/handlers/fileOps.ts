@@ -60,6 +60,14 @@ export function createFileOps(ctx: FileOpsDeps) {
       if (!info) return
       const existing = app.tabs.find(t => t.path === info.path)
       if (existing) {
+        // 标签有未保存修改时不静默覆盖——弹「文件已变更」对话框，
+        // 由用户决定重新加载还是保留自己的修改。
+        if (existing.dirty) {
+          if (!app.fileReloadPrompt) {
+            app.fileReloadPrompt = { tabId: existing.id, path: info.path, fileName: existing.name }
+          }
+          return
+        }
         existing.content = info.content
         existing.dirty = false
         existing.preview = false  // 显式打开时固定为普通标签页
@@ -104,6 +112,12 @@ export function createFileOps(ctx: FileOpsDeps) {
       if (!info) return
       const existing = app.tabs.find(t => t.path === info.path)
       if (existing) {
+        if (existing.dirty) {
+          if (!app.fileReloadPrompt) {
+            app.fileReloadPrompt = { tabId: existing.id, path: info.path, fileName: existing.name }
+          }
+          return
+        }
         existing.content = info.content
         existing.dirty = false
         existing.preview = false  // 固定标签页
@@ -147,6 +161,12 @@ export function createFileOps(ctx: FileOpsDeps) {
       if (!info) return
       const existing = app.tabs.find(t => t.path === info.path)
       if (existing) {
+        if (existing.dirty) {
+          if (!app.fileReloadPrompt) {
+            app.fileReloadPrompt = { tabId: existing.id, path: info.path, fileName: existing.name }
+          }
+          return
+        }
         existing.content = info.content
         existing.dirty = false
         existing.mtime = info.mtime

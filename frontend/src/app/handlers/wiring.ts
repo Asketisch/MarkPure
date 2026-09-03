@@ -62,6 +62,7 @@ export function wireApp(ctx: AppCtx) {
     ...ctx,
     getActiveContent: sync.getActiveContent,
     switchTab: tabOps.switchTab,
+    performCloseTab: tabOps.performCloseTab,
     handleOpenFile: fileOps.handleOpenFile,
   })
   wikiOps = createWikiOps({

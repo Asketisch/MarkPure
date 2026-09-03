@@ -106,6 +106,13 @@ export function createWorkspaceOps(ctx: WorkspaceOpsDeps) {
       if (!info) return
       const existing = app.tabs.find(t => t.path === info.path)
       if (existing) {
+        // 脏标签不静默覆盖磁盘内容——提示用户决定。
+        if (existing.dirty) {
+          if (!app.fileReloadPrompt) {
+            app.fileReloadPrompt = { tabId: existing.id, path: info.path, fileName: existing.name }
+          }
+          return
+        }
         existing.content = info.content
         existing.dirty = false
         existing.mtime = info.mtime
@@ -122,6 +129,26 @@ export function createWorkspaceOps(ctx: WorkspaceOpsDeps) {
         }
         app.tabs = [...app.tabs, tab]
         switchTab(tab.id)
+      }
+      // 跳转到匹配行。编辑器可能刚（重新）初始化——轮询等它就绪。
+      // 行号来自 Markdown 源文件，WYSIWYG 文档按块近似映射。
+      for (let i = 0; i < 20; i++) {
+        const ed = ctx.getEditor()
+        if (ed) {
+          try {
+            const text = ed.state.doc.textBetween(1, ed.state.doc.content.size, '\n', '\n')
+            const lines = text.split('\n')
+            const idx = Math.max(0, Math.min(line - 1, lines.length - 1))
+            let offset = 1
+            for (let l = 0; l < idx; l++) offset += lines[l].length + 1
+            const pos = Math.min(offset, ed.state.doc.content.size)
+            ed.chain().focus().setTextSelection(pos).scrollIntoView().run()
+            break
+          } catch {
+            break
+          }
+        }
+        await new Promise(r => setTimeout(r, 120))
       }
     } catch (e) {
       console.error('Failed to open file from search:', e)

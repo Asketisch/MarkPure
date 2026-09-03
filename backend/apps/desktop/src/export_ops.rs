@@ -13,6 +13,24 @@ use std::path::PathBuf;
 
 // ============================== 导出 ==============================
 
+/// 把文档标题消毒成可安全用作文件名的形式。`rfd` 的
+/// `set_file_name` 遇到 `/` 等非法字符时会静默失败——保存对话框
+/// 一闪而过或干脆不弹，用户以为导出坏了。这里把路径分隔符与
+/// 控制字符替换为 `_`，并限制长度（多数文件系统上限 255 字节）。
+fn sanitize_title_for_filename(title: &str) -> String {
+    let cleaned: String = title
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            c if (c as u32) < 32 => '_',
+            c => c,
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_end_matches('.');
+    let out = if trimmed.is_empty() { "untitled".to_string() } else { trimmed.to_string() };
+    out.chars().take(120).collect()
+}
+
 pub fn cmd_export_html(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
     let content = params["content"]
         .as_str()
@@ -30,7 +48,7 @@ pub fn cmd_export_html(params: &serde_json::Value) -> std::result::Result<serde_
 
     let path = FileDialog::new()
         .add_filter("HTML", &["html"])
-        .set_file_name(format!("{}.html", title))
+        .set_file_name(format!("{}.html", sanitize_title_for_filename(title)))
         .set_title("Export HTML")
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())?;
@@ -55,7 +73,7 @@ pub fn cmd_export_pdf(params: &serde_json::Value) -> std::result::Result<serde_j
 
     let path = FileDialog::new()
         .add_filter("PDF", &["pdf"])
-        .set_file_name(format!("{}.pdf", title))
+        .set_file_name(format!("{}.pdf", sanitize_title_for_filename(title)))
         .set_title("Export PDF")
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())?;
@@ -78,7 +96,7 @@ pub fn cmd_export_word(params: &serde_json::Value) -> std::result::Result<serde_
 
     let path = FileDialog::new()
         .add_filter("Word Document", &["docx"])
-        .set_file_name(format!("{}.docx", title))
+        .set_file_name(format!("{}.docx", sanitize_title_for_filename(title)))
         .set_title("Export Word Document")
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())?;
@@ -117,7 +135,7 @@ pub fn cmd_export_png(params: &serde_json::Value) -> std::result::Result<serde_j
 
     let path = FileDialog::new()
         .add_filter("PNG Image", &["png"])
-        .set_file_name(format!("{}.png", title))
+        .set_file_name(format!("{}.png", sanitize_title_for_filename(title)))
         .set_title("Export PNG Image")
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())?;
