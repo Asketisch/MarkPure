@@ -113,19 +113,25 @@ pub fn replace_in_files(
     let mut files_modified: HashMap<String, Vec<LineChange>> = HashMap::new();
 
     // 遍历目录并查找匹配
+    // 剪枝 + 环护栏。此函数经 `replace_in_workspace` IPC 直接可达
+    // 用户输入：`follow_links` 下符号链接环会无限遍历，隐藏目录 /
+    // node_modules 不剪枝会把范围外的文件卷进替换（改写不可逆）。
     let walker = WalkDir::new(root_path)
         .follow_links(true)
-        .max_depth(options.max_depth.unwrap_or(10));
+        .max_depth(options.max_depth.unwrap_or(10))
+        .into_iter()
+        .filter_entry(|e| {
+            if e.depth() == 0 {
+                return true;
+            }
+            e.file_name()
+                .to_str()
+                .map(|name| !(name.starts_with('.') || name == "node_modules" || name == "target"))
+                .unwrap_or(true)
+        });
 
     for entry in walker.into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
-
-        // 跳过隐藏文件/目录及常见的忽略模式
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            if name.starts_with('.') || name == "node_modules" || name == "target" {
-                continue;
-            }
-        }
 
         // 跳过二进制文件
         if super::is_binary_file(&path.to_path_buf()) {
@@ -245,19 +251,25 @@ pub fn preview_replace(
     // 互相覆盖，导致预览丢失其他文件的结果。
     let mut file_preview: HashMap<(String, usize), ReplacePreview> = HashMap::new();
 
+    // 剪枝 + 环护栏。此函数经 `replace_in_workspace` IPC 直接可达
+    // 用户输入：`follow_links` 下符号链接环会无限遍历，隐藏目录 /
+    // node_modules 不剪枝会把范围外的文件卷进替换（改写不可逆）。
     let walker = WalkDir::new(root_path)
         .follow_links(true)
-        .max_depth(options.max_depth.unwrap_or(10));
+        .max_depth(options.max_depth.unwrap_or(10))
+        .into_iter()
+        .filter_entry(|e| {
+            if e.depth() == 0 {
+                return true;
+            }
+            e.file_name()
+                .to_str()
+                .map(|name| !(name.starts_with('.') || name == "node_modules" || name == "target"))
+                .unwrap_or(true)
+        });
 
     for entry in walker.into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
-
-        // 跳过隐藏文件/目录及常见的忽略模式
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            if name.starts_with('.') || name == "node_modules" || name == "target" {
-                continue;
-            }
-        }
 
         if super::is_binary_file(&path.to_path_buf()) {
             continue;
