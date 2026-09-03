@@ -11,8 +11,6 @@
  * 每当新增 `__mt_*` 全局量时，请保持本文件与 `main.rs` 同步。
  */
 
-import type { FileChangeEvent } from './editor/commands/types'
-
 export {}
 
 declare global {
@@ -25,9 +23,9 @@ declare global {
     /** 入站 IPC。Rust 在命令响应就绪时推送；渲染进程解析 JSON
      *  并 resolve 匹配的待处理 Promise。 */
     __mt_dispatch: (json: string) => void
-    /** 渲染进程希望 Rust 开始推送文件监视事件时设置。Rust 以变更
-     *  事件负载调用它。 */
-    __mt_on_file_changes: ((events: FileChangeEvent[]) => void) | null
+    /** 渲染进程希望 Rust 开始推送文件监视事件时设置。Rust 以 JSON
+     *  字符串（事件数组）调用它，包装层负责解析。 */
+    __mt_on_file_changes: ((json: string) => void) | null
     /** 快速插入弹出层运行时（Tiptap suggestion）。严格来说不属于
      *  IPC 桥的一部分，但由编辑器的 QuickInsert 扩展注入。 */
     __qi_props?: unknown

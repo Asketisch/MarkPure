@@ -148,8 +148,9 @@
 
   $effect(() => {
     const path = app.workspacePath
+    const rootId = workspace.activeId
     if (path) {
-      watchDirectory(path).catch((e) => console.error('Failed to watch directory:', e))
+      watchDirectory(path, rootId).catch((e) => console.error('Failed to watch directory:', e))
       onFileChanges(fileWatch.handleFileChanges)
       // 加载工作区级 CSS 片段。
       void loadWorkspaceStyles(path).then(s => {

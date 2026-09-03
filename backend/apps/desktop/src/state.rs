@@ -72,6 +72,9 @@ pub enum AppEvent {
     /// 异步 IPC 处理器已在 tokio 工作线程上完成。`js` 字段是
     /// 预序列化、已转义、可供 `evaluate_script` 直接使用的回复字符串。
     IpcResponse { js: String },
+    /// 测试驱动器（`MARKPURE_TEST_DRIVER` 门控，见 `test_driver`）把
+    /// 一条命令投递到主线程执行。载荷是原始命令 JSON。
+    TestDriver(String),
 }
 
 /// 共享状态。每个字段都用 `Mutex` 包裹，因为 IPC 处理器运行在

@@ -91,7 +91,7 @@ export async function savePastedImage(
   name?: string,
 ): Promise<SavedImage> {
   return await ipc('save_pasted_image', {
-    workspace_path: workspacePath, data, name,
+    workspace_root_path: workspacePath, data, name,
   })
 }
 

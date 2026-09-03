@@ -63,6 +63,20 @@ class WorkspaceStore {
     return this.roots.find((r) => r.id === id)?.name ?? '?'
   }
 
+  /** 返回包含 `filePath` 的根目录 id（路径前缀匹配），无匹配时为
+   *  `null`。供 `doc_open` 把文档绑定到多根工作区，让切换根目录
+   *  时的 LRU 清理（`gc_docs_outside_root`）能命中它。 */
+  rootIdForPath(filePath: string | null | undefined): string | null {
+    if (!filePath) return null
+    for (const r of this.roots) {
+      const prefix = r.path.endsWith('/') ? r.path : r.path + '/'
+      if (filePath === r.path || filePath.startsWith(prefix)) {
+        return r.id
+      }
+    }
+    return null
+  }
+
   async init(): Promise<void> {
     try {
       const { roots, active_id } = await listWorkspaceRoots()
@@ -83,7 +97,7 @@ class WorkspaceStore {
     const promises = this.roots
       .filter((r) => r.exists !== false)
       .map((r) =>
-        watchDirectory(r.path).catch((e) =>
+        watchDirectory(r.path, r.id).catch((e) =>
           console.error(`[workspace] watch failed for ${r.path}:`, e),
         ),
       )

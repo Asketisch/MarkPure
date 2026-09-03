@@ -94,13 +94,19 @@ export function createViewOps(ctx: ViewOpsDeps) {
     //（旧实现只在 `mode === 'wysiwyg'` 时重新初始化，所以进入 split 时
     // 所见即所得面板是空的——Tiptap 实例仍存在但指向已分离的 DOM 节点。）
     if (mode === 'wysiwyg' || mode === 'split') {
-      requestAnimationFrame(() => {
+      // rAF 在不可见窗口会被暂停；兜底定时器保证隐藏窗口下仍能重挂。
+      let ran = false
+      const run = () => {
+        if (ran) return
+        ran = true
         const container = document.querySelector('.editor-area') as HTMLElement | null
         if (container && getEditor()) {
           ctx.setEditorContainer(container)
           ctx.scheduleInitEditor()
         }
-      })
+      }
+      requestAnimationFrame(run)
+      setTimeout(run, 120)
     }
     app.viewMode = mode
     // 让旧标志保持同步，供其他调用点使用。

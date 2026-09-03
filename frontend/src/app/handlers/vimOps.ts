@@ -31,6 +31,10 @@ export function createVimOps(ctx: VimOpsDeps) {
     persistVimMode(next)
   }
 
+  // 调试 / 自动化测试钩子：Cmd+. 在部分环境下无法通过合成 DOM
+  // 事件触发（全局快捷键），测试驱动经此入口切换 Vim 模式。
+  ;(window as unknown as Record<string, unknown>).__markpure_toggle_vim = toggleVimMode
+
   /** 安装 ex 命令上下文（一次性）。 */
   function initExContext() {
     setVimExContext({

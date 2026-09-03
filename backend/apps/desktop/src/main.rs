@@ -27,6 +27,7 @@ mod editor_ops;
 mod export_ops;
 mod file_ops;
 mod state;
+mod test_driver;
 mod workspace_ops;
 
 use state::{lock_or_recover, AppEvent, AppState, IpcMessage};
@@ -35,7 +36,7 @@ use std::sync::Mutex;
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tao::window::WindowBuilder;
-use wry::http::{header::CONTENT_TYPE, Response, StatusCode};
+use wry::http::{header, header::CONTENT_TYPE, Response, StatusCode};
 use wry::WebViewBuilder;
 
 // ============================== 资源服务 ==============================
@@ -43,14 +44,37 @@ use wry::WebViewBuilder;
 /// 提供嵌入的 Vite 构建产物中的文件。用于 WebView 发出的
 /// `mt://localhost/...` 请求。SPA 路由回退到 `index.html`，
 /// 让 `mt://localhost/some/note` 这类深链接在刷新后也能工作。
+///
+/// 细节：
+/// - 响应必须带 `Access-Control-Allow-Origin`：Vite 构建给
+///   `<script type="module" crossorigin>` / `modulepreload` /
+///   样式表都加了 `crossorigin` 属性，而自定义协议上的 CORS 检查
+///   需要 ACAO 头。缺失时模块脚本会被静默拦截，应用白屏无法启动。
+/// - 带「类文件扩展名」的路径不做 SPA 回退：构建升级后旧的带哈希
+///   资产名会失效，若把 `index.html`（HTML）当作 JS 返回，模块
+///   同样静默失败。让它 404，配合 `no-store` 头强制 WebView 每次
+///   取最新的 `index.html`，即可避免「旧 HTML 引用已删除资产」。
+/// - `Cache-Control: no-store`：应用的资产随构建变化，无缓存价值。
 fn serve_asset(path: &str) -> Response<Vec<u8>> {
     let path = path.trim_start_matches('/');
+
+    const NO_STORE: &str = "no-store";
 
     if let Some(file) = state::Assets::get(path) {
         let mime = file.metadata.mimetype();
         return Response::builder()
             .header(CONTENT_TYPE, mime)
+            .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+            .header(header::CACHE_CONTROL, NO_STORE)
             .body(file.data.to_vec())
+            .unwrap();
+    }
+
+    // 资产类请求（带扩展名）缺失时直接 404，不回退到 SPA 入口。
+    if path.split('/').last().is_some_and(|last| last.contains('.')) {
+        return Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(b"404 Not Found".to_vec())
             .unwrap();
     }
 
@@ -59,6 +83,8 @@ fn serve_asset(path: &str) -> Response<Vec<u8>> {
         let mime = file.metadata.mimetype();
         return Response::builder()
             .header(CONTENT_TYPE, mime)
+            .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+            .header(header::CACHE_CONTROL, NO_STORE)
             .body(file.data.to_vec())
             .unwrap();
     }
@@ -124,6 +150,12 @@ fn main() {
         .with_inner_size(tao::dpi::LogicalSize::new(1200, 800));
     if let Some(icon) = window_icon {
         window_builder = window_builder.with_window_icon(Some(icon));
+    }
+    // 测试钩子：MARKPURE_ALL_SPACES=1 时窗口悬浮于所有 Space
+    // （自动化测试宿主常停在自身的全屏 Space 上，普通窗口会
+    // 落在不可见的桌面 Space）。生产环境不设置该变量，行为不变。
+    if std::env::var("MARKPURE_ALL_SPACES").as_deref() == Ok("1") {
+        window_builder = window_builder.with_visible_on_all_workspaces(true);
     }
     let window = window_builder.build(&event_loop).unwrap();
 
@@ -191,6 +223,10 @@ fn main() {
     let built = builder.build(&window).unwrap();
     *lock_or_recover(&webview) = Some(built);
 
+    // 调试专用测试驱动器（MARKPURE_TEST_DRIVER 门控）：命令经
+    // EventLoopProxy 到主线程执行，见 `test_driver` 模块文档。
+    test_driver::spawn_if_enabled(event_loop.create_proxy());
+
     let webview_for_el = webview.clone();
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -200,6 +236,23 @@ fn main() {
                 ..
             } => {
                 *control_flow = ControlFlow::Exit;
+            }
+            Event::UserEvent(AppEvent::TestDriver(cmd)) => {
+                // 测试命令允许失败：快照/求值的 objc 调用异常时
+                // 捕获 panic（仅中止该条命令），应用保持存活。
+                let body = cmd.clone();
+                let wv = webview_for_el.clone();
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+                    test_driver::execute(&body, &wv);
+                }))
+                .map_err(|p| {
+                    let msg = p
+                        .downcast_ref::<String>()
+                        .cloned()
+                        .or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()))
+                        .unwrap_or_else(|| "unknown panic".into());
+                    eprintln!("[test_driver] command panicked: {msg}");
+                });
             }
             Event::UserEvent(AppEvent::FileChanges(events)) => {
                 if let Ok(wv) = webview_for_el.lock() {

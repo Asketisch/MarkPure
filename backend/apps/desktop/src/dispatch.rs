@@ -104,6 +104,10 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
         // 应用信息 — 快速
         "get_app_info" => workspace_ops::cmd_get_app_info(),
 
+        // 测试驱动器的回传通道（`__` 前缀：非公开契约）。快速路径
+        // 直接写驱动目录下的 result 文件。
+        "__driver_report" => crate::test_driver::cmd_report(&msg.params),
+
         // 拼写检查 → 慢速（拼写检查器运行在主线程）
         "check_spelling" => return None,
 

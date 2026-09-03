@@ -228,7 +228,16 @@ export async function getAppInfo(): Promise<AppInfo> {
 export type { FileChangeEvent }
 
 export function onFileChanges(handler: (events: FileChangeEvent[]) => void): void {
-  window.__mt_on_file_changes = handler
+  // Rust 侧经 evaluate_script 以 JSON **字符串**推送（与 `__mt_dispatch`
+  // 相同的转义约定），这里负责解析后再交给业务处理器。
+  window.__mt_on_file_changes = (json: string) => {
+    try {
+      const events = JSON.parse(json)
+      if (Array.isArray(events)) handler(events)
+    } catch (e) {
+      console.error('[IPC] Failed to parse file change events:', e)
+    }
+  }
 }
 
 export function offFileChanges(): void {
@@ -308,7 +317,10 @@ export async function getWorkspaceTags(
 
 /** 返回所有通过 `[[页面]]` 或 `[[页面|别名]]` 链接到 `page` 的
  *  工作区文档（匹配时忽略别名）。不区分大小写的精确名称匹配。
- *  多根工作区：传入 `paths` 即可跨多个根目录扫描。 */
+ *  多根工作区：传入 `paths` 即可跨多个根目录扫描。
+ *
+ *  后端按来源文件分组返回 `{source_path, hits:[{line, snippet}]}`；
+ *  这里展平为每条命中一个 `Backlink`，方便面板逐条渲染。 */
 export async function getBacklinks(
   page: string,
   path: string | string[],
@@ -319,8 +331,16 @@ export async function getBacklinks(
     typeof path === 'string'
       ? { page, path, max_depth: maxDepth, show_hidden: showHidden }
       : { page, paths: path, max_depth: maxDepth, show_hidden: showHidden }
-  const result = await ipc<{ backlinks: Backlink[] }>('get_backlinks', params)
-  return result?.backlinks ?? []
+  const result = await ipc<{
+    backlinks: { source_path: string; hits: { line: number; snippet: string }[] }[]
+  }>('get_backlinks', params)
+  const flat: Backlink[] = []
+  for (const group of result?.backlinks ?? []) {
+    for (const hit of group.hits ?? []) {
+      flat.push({ source_path: group.source_path, line: hit.line, context: hit.snippet })
+    }
+  }
+  return flat
 }
 
 // ============================== 工作区自定义 CSS ==============================

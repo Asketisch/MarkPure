@@ -336,19 +336,23 @@ fn is_binary_file(path: &PathBuf) -> bool {
             if sample.contains(&0) {
                 return true;
             }
-            // 额外启发式：若超过 20% 的非空字节不可打印，
-            // 视为二进制
-            let mut non_printable = 0;
-            let mut ascii_count = 0;
-            for &b in sample {
-                if b == 0 { return true; }
-                if (32..127).contains(&b) {
-                    ascii_count += 1;
-                } else if b != b'\n' && b != b'\r' && b != b'\t' {
+            // 按 **字符** 统计不可打印比例（UTF-8 lossy 解码）。
+            // 旧的按字节启发式把 UTF-8 中文（每字符 3 个 ≥0x80 的
+            // 字节）全算成「不可打印」，中文笔记一律被误判为二进制
+            // 而跳过搜索——中文场景下搜索功能等于完全失效。
+            let text = String::from_utf8_lossy(sample);
+            let mut non_printable = 0usize;
+            let mut total = 0usize;
+            for ch in text.chars() {
+                total += 1;
+                if ch == '\u{FFFD}' {
+                    // 解码失败的字节：疑似二进制
+                    non_printable += 1;
+                } else if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
                     non_printable += 1;
                 }
             }
-            if ascii_count > 0 && non_printable as f64 / (ascii_count + non_printable) as f64 > 0.3 {
+            if total > 0 && non_printable as f64 / total as f64 > 0.3 {
                 return true;
             }
         }

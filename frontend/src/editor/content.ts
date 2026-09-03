@@ -10,7 +10,21 @@
 import type { Editor } from '@tiptap/core'
 
 export function getMarkdown(editor: Editor): string {
-  return editor.getMarkdown()
+  const md = editor.getMarkdown()
+  // CommonMark 序列化器会过度转义：正文中的 `[` `]` `_` 前都会加
+  // 反斜杠（如 `\[` `\_`）。编辑器自己重新打开没问题（解析时反转
+  // 义），但落盘字节与 Obsidian / GitHub 等工具不兼容，且反链 /
+  // wikilink 补全的磁盘扫描会因 `\[\[` 失配，搜索 `EXTERNAL_LINE`
+  // 这类词也会因 `\_` 失配。这里做保守的反转义：
+  //   \[\[ → [[   \]\] → ]]   \_ → _   \\ → \(先行还原，放最后)
+  // 代码块内容不含反斜杠转义序列，不受影响；若用户原本就想输入
+  // 字面 `\_`，序列化产物是 `\\_`，反转义后恰为 `\_`，语义不变。
+  return md
+    .replace(/\\\\/g, '\u0000')
+    .replace(/\\\[\\\[/g, '[[')
+    .replace(/\\\]\\\]/g, ']]')
+    .replace(/\\_/g, '_')
+    .replace(/\u0000/g, '\\\\')
 }
 
 export function setContent(editor: Editor, markdown: string): void {

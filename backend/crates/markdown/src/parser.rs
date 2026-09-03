@@ -10,10 +10,13 @@ static WIKILINK_RE: Lazy<Regex> = Lazy::new(|| {
 });
 
 /// 预编译的标签正则：`#标签`。
+/// `\p{Alphabetic}` 覆盖各语言字母（中文 / 日文等）——中文笔记的
+/// `#测试标签` 是核心用法，ASCII-only 的 `[a-zA-Z]` 会漏掉全部
+/// CJK 标签。
 /// `regex` 不支持 lookbehind，「前面不能紧跟 `#` 或单词字符」的
-/// 校验改在 `extract_tags` 里按字节手动完成（见下方 filter_map）。
+/// 校验改在 `extract_tags` 里按字符手动完成（见下方 filter_map）。
 static TAG_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"#([a-zA-Z][a-zA-Z0-9_-]*)").unwrap()
+    Regex::new(r"#(\p{Alphabetic}[\p{Alphabetic}\p{N}_/-]*)").unwrap()
 });
 
 /// 解析后的 Markdown 元素（简化的语法树节点）
@@ -133,20 +136,25 @@ pub struct MarkdownTag {
 }
 
 /// 从 Markdown 文本中提取标签（例如 #tag）。
-/// 注意：匹配在原始文本层面进行（正则 + 前一字节校验），不识别
+/// 注意：匹配在原始文本层面进行（正则 + 前一字符校验），不识别
 /// Markdown 结构——代码块或 URL 中的 `#tag` 也可能被报告，
 /// 需要过滤的调用方应自行按上下文判断。
 pub fn extract_tags(text: &str) -> Vec<MarkdownTag> {
-    let bytes = text.as_bytes();
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
     TAG_RE
         .captures_iter(text)
         .filter_map(|cap| {
             let m = cap.get(0)?;
             // 前置校验（等价于原 lookbehind `(?<![#\w])`）：
-            // 前一个字符是 `#`（标题 `##`）或单词字符时不算标签。
-            if let Some(&prev) = bytes.get(m.start().saturating_sub(1)) {
-                if prev == b'#' || prev.is_ascii_alphanumeric() || prev == b'_' {
-                    return None;
+            // `#` 的前一个字符是 `#`、字母、数字或下划线时不算标签
+            // （`a#tag`、`x1#tag`、`##tag` 均拒绝）。按字符而非字节
+            // 判断，避免把多字节字符的尾字节误当独立字符。
+            if let Some(pos) = chars.iter().position(|&(idx, _)| idx == m.start()) {
+                if pos > 0 {
+                    let prev = chars[pos - 1].1;
+                    if prev == '#' || prev.is_alphanumeric() || prev == '_' {
+                        return None;
+                    }
                 }
             }
             let name = cap.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
@@ -190,6 +198,14 @@ mod tests {
         // 位置（字节偏移）包含 `#` 本身：「我喜欢 」= 9 + 1 字节
         assert_eq!(tags[0].start, 10);
         assert_eq!(tags[0].end, 15);
+    }
+
+    #[test]
+    fn test_extract_tags_cjk() {
+        // 中文标签是核心场景（Obsidian 兼容）。
+        let tags = extract_tags("这个页面有一个标签：#测试标签");
+        let names: Vec<&str> = tags.iter().map(|t| t.name.as_str()).collect();
+        assert_eq!(names, vec!["测试标签"]);
     }
 
     #[test]

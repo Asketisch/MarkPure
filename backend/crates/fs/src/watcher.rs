@@ -42,6 +42,15 @@ impl FileWatcher {
         // 创建监视器时的路径。这是按根目录刷新的关键。
         let id_for_closure = id.clone();
 
+        // macOS 上 notify/FSEvents 报告的是**规范化**路径（`/tmp`
+        // 变成 `/private/tmp`），与前端标签页持有的用户输入路径
+        // 不一致——「按路径匹配标签页」的外部变更重载会因此失效。
+        // 记住用户提供的根与规范化根，事件路径改写回用户前缀。
+        let user_root = path.to_string_lossy().to_string();
+        let canonical_root = std::fs::canonicalize(path)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| user_root.clone());
+
         let mut watcher = RecommendedWatcher::new(
             move |res: Result<notify::Event, notify::Error>| {
                 if let Ok(event) = res {
@@ -53,15 +62,23 @@ impl FileWatcher {
                     };
 
                     for path in event.paths {
+                        let canonical = path.to_string_lossy().to_string();
+                        let reported = if canonical_root != user_root
+                            && canonical.starts_with(canonical_root.as_str())
+                        {
+                            format!("{}{}", user_root, &canonical[canonical_root.len()..])
+                        } else {
+                            canonical
+                        };
                         let change = FileChangeEvent {
                             workspace_id: id_for_closure.clone(),
-                            path: path.to_string_lossy().to_string(),
+                            path: reported.clone(),
                             kind: kind.to_string(),
                         };
                         if tx.send(change).is_err() {
                             eprintln!(
                                 "[FileWatcher] receiver dropped, event dropped: {}",
-                                path.to_string_lossy()
+                                reported
                             );
                         }
                     }

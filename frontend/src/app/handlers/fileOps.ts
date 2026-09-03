@@ -122,7 +122,7 @@ export function createFileOps(ctx: FileOpsDeps) {
         previewTab.preview = false  // 固定标签页
         previewTab.mtime = info.mtime
         docClose(previewTab.id).catch(() => {})
-        docOpen(previewTab.id, info.content).catch(() => {})
+        docOpen(previewTab.id, info.content, ctx.workspace.rootIdForPath(info.path)).catch(() => {})
         switchTab(previewTab.id)
       } else {
         const tab: Tab = {

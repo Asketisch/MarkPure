@@ -49,10 +49,18 @@ export function createEditorInit(ctx: EditorInitDeps) {
   function scheduleInitEditor() {
     initRafToken++
     const token = initRafToken
-    requestAnimationFrame(() => {
-      if (token !== initRafToken) return
+    // rAF 在窗口不可见（被完全遮挡、显示器休眠、其他 Space、
+    // 自动化测试宿主）时会被 WebKit 无限期暂停，编辑器将永远
+    // 不初始化。并行挂一个兜底定时器，二者先到先得（ran 保证
+    // 只执行一次）。
+    let ran = false
+    const run = () => {
+      if (ran || token !== initRafToken) return
+      ran = true
       initEditor()
-    })
+    }
+    requestAnimationFrame(run)
+    setTimeout(run, 120)
   }
 
   function updateTableState() {
@@ -95,8 +103,8 @@ export function createEditorInit(ctx: EditorInitDeps) {
     }
     container.innerHTML = ''
 
-    // 在 Rust 中注册文档
-    docOpen(myTabId, tab.content).catch(() => {})
+    // 在 Rust 中注册文档（绑定到所属工作区根目录，供切换根时的 LRU 回收）
+    docOpen(myTabId, tab.content, ctx.workspace.rootIdForPath(tab.path)).catch(() => {})
 
     const editor = createEditor({
       parent: container,
