@@ -18,6 +18,11 @@ export interface Tab {
   /** 打开时的文件修改时间（unix 秒，浮点）。用于从磁盘重新加载的
    *  提示，以检测外部改动。 */
   mtime: number | null
+  /** 源文件的编码标签（"UTF-8" / "UTF-8 BOM" / "GBK" / …）。
+   *  另存为到新路径时沿用它，避免 GBK 文档被存成 UTF-8。 */
+  encoding?: string | null
+  /** 源文件的行尾（"\n" / "\r\n"）。同上，另存为时沿用。 */
+  lineEnding?: string | null
 }
 
 /** 一次根切换的驱逐：`set_active_workspace_root` IPC 完成后，

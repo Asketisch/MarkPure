@@ -172,6 +172,30 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
 
 // ============================== 慢速命令 ==============================
 
+/// 同步执行任意一条 IPC 命令：先走快速路径，未命中再走慢速路径。
+///
+/// 桌面应用本身**不**用这个函数——它把慢速命令卸载到工作线程，
+/// 通过 `EventLoopProxy` 异步回传，以免冻结界面。但测试 harness
+/// （`src/bin/mt_harness.rs`）与单元测试需要一个确定性的、单线程的
+/// 入口：同样的路由表，同样的处理器，只是「等它跑完」而不是
+/// 「异步等回调」。
+///
+/// 快速路径返回 `Some(response)`；慢速命令返回 `None`，此时由本
+/// 函数调用 `run_slow_command` 同步执行。
+pub fn execute_command(
+    msg: &IpcMessage,
+    state: &AppState,
+) -> std::result::Result<serde_json::Value, String> {
+    if let Some(response) = handle_command(msg, state) {
+        return match (response.result, response.error) {
+            (Some(v), _) => Ok(v),
+            (None, Some(e)) => Err(e),
+            (None, None) => Ok(serde_json::Value::Null),
+        };
+    }
+    run_slow_command(msg, state)
+}
+
 /// 在专用操作系统线程上分发慢速命令。结果被序列化并通过
 /// `EventLoopProxy` 作为 `AppEvent::IpcResponse` 回传，随后由
 /// tao 事件循环通过 `evaluate_script` 投递给 WebView。

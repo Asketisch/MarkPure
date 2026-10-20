@@ -167,6 +167,16 @@ impl AppState {
     }
 }
 
+/// `AppState::new()` 的等价默认实现。
+///
+/// 存在的理由只是让 clippy 的 `new_without_default` 满意——`new()`
+/// 读取磁盘上的配置并建立运行时，语义上就是一个"默认状态"。
+impl Default for AppState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// 获取 `Mutex` 锁，而不会因之前持有者 panic 毒化整条 IPC 管道。
 /// 我们会记录恢复（互斥锁被毒化说明先前某个处理器 panic 过）并
 /// 返回同一数据上的全新守卫。

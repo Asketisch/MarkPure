@@ -34,3 +34,10 @@ graphify-out/cache/
 graphify-out/manifest.json
 graphify-out/graph.html
 graphify-out/cost.json
+# 按日期归档的图谱快照——`graphify update` 每次自动备份一份，
+# 属于本地产物，不进版本库（当前图谱由 graph.json / GRAPH_REPORT.md 承载）。
+graphify-out/20??-??-??/
+graphify-out/20??-??-??_*/
+
+# 性能测试夹具——由脚本生成，可随时重建（见 exportActions.svelte.ts 的说明）
+/synth-1k.md

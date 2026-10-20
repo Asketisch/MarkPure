@@ -13,6 +13,37 @@ use std::path::PathBuf;
 
 // ============================== 导出 ==============================
 
+/// 解析导出目标路径。
+///
+/// 当 `params.dest_path` 非空时直接使用它，跳过原生「另存为」对话框。
+/// 两个理由：
+///
+///  1. **可测试性** —— IPC 测试 harness 运行在无 GUI 环境里，
+///     `FileDialog::save_file()` 在那里无法完成。带上 `dest_path`
+///     就能在命令行里跑通整条导出链路。
+///  2. **可复用性** —— 未来「导出到固定位置」「批量导出」
+///     这类功能不必再引入第二个 IPC 命令。
+///
+/// 省略 `dest_path` 时行为不变：弹出原生对话框。
+fn export_target(
+    params: &serde_json::Value,
+    default_name: &str,
+    filter: (&str, &[&str]),
+    dialog_title: &str,
+) -> std::result::Result<PathBuf, String> {
+    if let Some(p) = params.get("dest_path").and_then(|v| v.as_str()) {
+        if !p.trim().is_empty() {
+            return Ok(PathBuf::from(p));
+        }
+    }
+    FileDialog::new()
+        .add_filter(filter.0, filter.1)
+        .set_file_name(default_name)
+        .set_title(dialog_title)
+        .save_file()
+        .ok_or_else(|| "Cancelled".to_string())
+}
+
 pub fn cmd_export_html(params: &serde_json::Value) -> std::result::Result<serde_json::Value, String> {
     let content = params["content"]
         .as_str()
@@ -28,12 +59,12 @@ pub fn cmd_export_html(params: &serde_json::Value) -> std::result::Result<serde_
 
     let html = export::export_html(content, title, theme_css);
 
-    let path = FileDialog::new()
-        .add_filter("HTML", &["html"])
-        .set_file_name(format!("{}.html", title))
-        .set_title("Export HTML")
-        .save_file()
-        .ok_or_else(|| "Cancelled".to_string())?;
+    let path = export_target(
+        params,
+        &format!("{}.html", title),
+        ("HTML", &["html"]),
+        "Export HTML",
+    )?;
 
     std::fs::write(&path, html).map_err(|e| e.to_string())?;
 
@@ -53,12 +84,12 @@ pub fn cmd_export_pdf(params: &serde_json::Value) -> std::result::Result<serde_j
     // （与无法解析 URL 时的旧行为一致）。
     let source_path = params.get("source_path").and_then(|v| v.as_str());
 
-    let path = FileDialog::new()
-        .add_filter("PDF", &["pdf"])
-        .set_file_name(format!("{}.pdf", title))
-        .set_title("Export PDF")
-        .save_file()
-        .ok_or_else(|| "Cancelled".to_string())?;
+    let path = export_target(
+        params,
+        &format!("{}.pdf", title),
+        ("PDF", &["pdf"]),
+        "Export PDF",
+    )?;
 
     export::export_pdf(content, title, &path.to_string_lossy(), source_path)?;
 
@@ -76,12 +107,12 @@ pub fn cmd_export_word(params: &serde_json::Value) -> std::result::Result<serde_
 
     let bytes = export::export_word(content, title).map_err(|e| e.to_string())?;
 
-    let path = FileDialog::new()
-        .add_filter("Word Document", &["docx"])
-        .set_file_name(format!("{}.docx", title))
-        .set_title("Export Word Document")
-        .save_file()
-        .ok_or_else(|| "Cancelled".to_string())?;
+    let path = export_target(
+        params,
+        &format!("{}.docx", title),
+        ("Word Document", &["docx"]),
+        "Export Word Document",
+    )?;
 
     std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
 
@@ -115,12 +146,12 @@ pub fn cmd_export_png(params: &serde_json::Value) -> std::result::Result<serde_j
         .decode(payload)
         .map_err(|e| format!("base64 decode failed: {e}"))?;
 
-    let path = FileDialog::new()
-        .add_filter("PNG Image", &["png"])
-        .set_file_name(format!("{}.png", title))
-        .set_title("Export PNG Image")
-        .save_file()
-        .ok_or_else(|| "Cancelled".to_string())?;
+    let path = export_target(
+        params,
+        &format!("{}.png", title),
+        ("PNG Image", &["png"]),
+        "Export PNG Image",
+    )?;
 
     let path_str = path.to_string_lossy().into_owned();
     export::export_png_save(&bytes, &path_str)?;

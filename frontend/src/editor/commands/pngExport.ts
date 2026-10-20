@@ -20,7 +20,16 @@
  *  5. 把 base64 部分经 IPC 封装回传给宿主。
  */
 
-import { toPng } from 'html-to-image'
+// `html-to-image` 只在「导出 PNG」时用得上，却有几十 KB。
+// 静态 import 会让它进入首屏 bundle；改成动态导入后，导出功能
+// 第一次执行时才加载它，启动路径不受影响。
+async function toPng(
+  node: HTMLElement,
+  options: Parameters<typeof import('html-to-image').toPng>[1],
+): Promise<string> {
+  const mod = await import('html-to-image')
+  return mod.toPng(node, options)
+}
 
 /// 必须从实时编辑器主题带到独立导出文档的 CSS 变量。
 /// 顺序与 `frontend/src/app/app.css` 保持一致，便于从上到下对照。

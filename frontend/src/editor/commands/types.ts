@@ -20,6 +20,19 @@ export interface DocStats {
   lines: number
 }
 
+/**
+ * 文件的存储格式。
+ *
+ * `encoding` 是编码标签（"UTF-8" / "UTF-8 BOM" / "GBK" / "Shift_JIS" /
+ * "Big5" / …），`lineEnding` 是行尾（"\n" / "\r\n"）。两者都来自
+ * `open_file` 的返回值，保存到新路径（另存为）时沿用——否则 GBK /
+ * CRLF 文档另存后会被静默改写成 UTF-8 + LF。
+ */
+export interface FileFormat {
+  encoding?: string | null
+  lineEnding?: string | null
+}
+
 // File tree
 export type GitStatus =
   | 'unmodified' | 'added' | 'modified' | 'deleted'

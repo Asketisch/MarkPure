@@ -175,9 +175,10 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
 
 /// 获取快捷键文件的路径
 pub fn keybindings_path() -> PathBuf {
-    let config_dir = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("markpure");
+    // 走 `app_config_dir()` 而不是直接 `config_dir().join("markpure")`：
+    // 前者尊重 `MARKPURE_CONFIG_DIR` 环境变量，测试 harness 才能把
+    // 快捷键隔离到临时目录，不污染用户的真实配置。
+    let config_dir = crate::dirs::app_config_dir().unwrap_or_else(|| PathBuf::from("."));
     fs::create_dir_all(&config_dir).ok();
     config_dir.join("keybindings.json")
 }

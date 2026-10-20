@@ -104,8 +104,18 @@ pub fn cmd_to_csv(params: &serde_json::Value) -> std::result::Result<serde_json:
     let end = params["end"].as_u64().unwrap_or(0) as usize;
     let table_md = content.get(start..end).ok_or("invalid range")?;
     let structure = markdown::parse_table(table_md).ok_or("not a valid table")?;
-    let mut csv = String::new();
+
+    // 表头行必须写进 CSV——否则列名会整个丢失，导出的表格再也无法
+    // 与原文对应。`parse_table` 把表头放在 `headers`、数据行放在
+    // `rows`，两者都要输出。
+    let mut rows: Vec<&Vec<String>> = Vec::with_capacity(structure.rows.len() + 1);
+    rows.push(&structure.headers);
     for row in &structure.rows {
+        rows.push(row);
+    }
+
+    let mut csv = String::new();
+    for row in rows {
         let cells: Vec<String> = row
             .iter()
             .map(|c| {

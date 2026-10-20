@@ -9,46 +9,48 @@ import { TextSelection } from '@tiptap/pm/state'
 import { EditorView as CMView, keymap as cmKeymap } from '@codemirror/view'
 import { EditorState as CMState, Compartment } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { javascript } from '@codemirror/lang-javascript'
-import { python } from '@codemirror/lang-python'
-import { html } from '@codemirror/lang-html'
-import { css } from '@codemirror/lang-css'
-import { json } from '@codemirror/lang-json'
-import { markdown } from '@codemirror/lang-markdown'
-import { go } from '@codemirror/lang-go'
-import { java } from '@codemirror/lang-java'
-import { cpp } from '@codemirror/lang-cpp'
-import { rust as rustLang } from '@codemirror/lang-rust'
-import { sql as sqlLang } from '@codemirror/lang-sql'
-import { xml } from '@codemirror/lang-xml'
-import { yaml as yamlLang } from '@codemirror/lang-yaml'
 import { createThemeExtension, detectDarkTheme } from '../extensions/blocks/cm-theme'
 
-/** 语言扩展映射表 */
-const languageExtensions: Record<string, () => any> = {
-  javascript, js: javascript,
-  typescript: () => javascript({ typescript: true }),
-  ts: () => javascript({ typescript: true }),
-  jsx: () => javascript({ jsx: true }),
-  tsx: () => javascript({ jsx: true, typescript: true }),
-  python, py: python,
-  html, css, json,
-  markdown, md: markdown,
-  go, golang: go,
-  java,
-  cpp, 'c++': cpp, c: () => cpp,
-  rust: rustLang, rs: rustLang,
-  sql: sqlLang,
-  xml,
-  yaml: yamlLang, yml: yamlLang,
-  // 选择器中额外提供的语言。即使没有对应的 CM 扩展，
+/**
+ * 语言扩展映射表。
+ *
+ * 每个条目是一个**动态导入**函数，而不是静态 import。13 个
+ * `@codemirror/lang-*` 包加起来约 330 KB——静态引入会让它们全部进入
+ * 首屏 bundle，拖慢应用启动；而绝大多数文档只用得到一两种语言。
+ * 改成动态导入后，语法高亮按需加载：启动时不必解析这 330 KB，
+ * 打开代码块时才拉取真正需要的那个语言包。
+ */
+const languageLoaders: Record<string, () => Promise<any>> = {
+  javascript: () => import('@codemirror/lang-javascript').then((m) => m.javascript()),
+  js: () => import('@codemirror/lang-javascript').then((m) => m.javascript()),
+  typescript: () =>
+    import('@codemirror/lang-javascript').then((m) => m.javascript({ typescript: true })),
+  ts: () => import('@codemirror/lang-javascript').then((m) => m.javascript({ typescript: true })),
+  jsx: () => import('@codemirror/lang-javascript').then((m) => m.javascript({ jsx: true })),
+  tsx: () =>
+    import('@codemirror/lang-javascript').then((m) => m.javascript({ jsx: true, typescript: true })),
+  python: () => import('@codemirror/lang-python').then((m) => m.python()),
+  py: () => import('@codemirror/lang-python').then((m) => m.python()),
+  html: () => import('@codemirror/lang-html').then((m) => m.html()),
+  css: () => import('@codemirror/lang-css').then((m) => m.css()),
+  json: () => import('@codemirror/lang-json').then((m) => m.json()),
+  markdown: () => import('@codemirror/lang-markdown').then((m) => m.markdown()),
+  md: () => import('@codemirror/lang-markdown').then((m) => m.markdown()),
+  go: () => import('@codemirror/lang-go').then((m) => m.go()),
+  golang: () => import('@codemirror/lang-go').then((m) => m.go()),
+  java: () => import('@codemirror/lang-java').then((m) => m.java()),
+  cpp: () => import('@codemirror/lang-cpp').then((m) => m.cpp()),
+  'c++': () => import('@codemirror/lang-cpp').then((m) => m.cpp()),
+  c: () => import('@codemirror/lang-cpp').then((m) => m.cpp()),
+  rust: () => import('@codemirror/lang-rust').then((m) => m.rust()),
+  rs: () => import('@codemirror/lang-rust').then((m) => m.rust()),
+  sql: () => import('@codemirror/lang-sql').then((m) => m.sql()),
+  xml: () => import('@codemirror/lang-xml').then((m) => m.xml()),
+  yaml: () => import('@codemirror/lang-yaml').then((m) => m.yaml()),
+  yml: () => import('@codemirror/lang-yaml').then((m) => m.yaml()),
+  // 选择器中额外提供的语言（shell / ruby / lua）。没有对应的 CM 扩展，
   // 我们也希望语言标签能出现（让 ```shell 围栏块以 ```shell
   // 往返转换），但语法高亮会退化为纯等宽字体。
-  // `getLanguageExtension` 对未知语言返回 `[]`，因此高亮层
-  // 上这只是一个空操作。
-  shell: () => [],
-  ruby: () => [],
-  lua: () => [],
 }
 
 const languageAliases: Record<string, string> = {
@@ -61,9 +63,33 @@ function normalizeLanguage(lang: string): string {
   return languageAliases[lower] || lower
 }
 
-function getLanguageExtension(lang: string): any {
-  const ext = languageExtensions[lang.toLowerCase()]
-  return ext ? ext() : []
+/**
+ * 加载某个语言的 CodeMirror 扩展。
+ *
+ * 结果按语言缓存——同一个语言在多个代码块里出现时只加载一次。
+ */
+const languagePromises = new Map<string, Promise<any>>()
+
+function loadLanguageExtension(lang: string): Promise<any> {
+  const key = lang.toLowerCase()
+  const cached = languagePromises.get(key)
+  if (cached) return cached
+
+  const loader = languageLoaders[key]
+  if (!loader) {
+    // 没有对应 CodeMirror 包的语言（shell / ruby / lua，以及未知语言）：
+    // 围栏标签依然要能往返，语法高亮退化为纯等宽字体。
+    const empty = Promise.resolve([])
+    languagePromises.set(key, empty)
+    return empty
+  }
+
+  const promise = loader().catch((err) => {
+    console.error(`[CodeBlock] failed to load language '${key}':`, err)
+    return []
+  })
+  languagePromises.set(key, promise)
+  return promise
 }
 
 export class CodeBlockView implements NodeView {
@@ -79,6 +105,8 @@ export class CodeBlockView implements NodeView {
   private updating = 0
   languageCompartment: Compartment
   themeCompartment: Compartment
+  /** 当前已应用语法高亮的语言；变化时才重新加载。 */
+  private currentLang = ''
 
   constructor(node: PMNode, view: PMView, getPos: () => number | undefined) {
     this.node = node
@@ -175,7 +203,7 @@ export class CodeBlockView implements NodeView {
           language: newLang,
         })
       )
-      this.languageCompartment.reconfigure(getLanguageExtension(normalizeLanguage(newLang)))
+      void this.applyLanguage(normalizeLanguage(newLang))
     })
     header.appendChild(langSelect)
 
@@ -267,7 +295,9 @@ export class CodeBlockView implements NodeView {
             ...historyKeymap,
           ]),
           this.themeCompartment.of(createThemeExtension(isDark)),
-          this.languageCompartment.of(getLanguageExtension(lang)),
+          // 先用空扩展建视图；语言包加载完成后通过
+          // `applyLanguage` 重新配置 compartment 补上。
+          this.languageCompartment.of([]),
           CMView.updateListener.of((update) => this.onCMUpdate(update)),
           CMView.domEventHandlers({
             focus: () => this.forwardSelection(),
@@ -276,6 +306,12 @@ export class CodeBlockView implements NodeView {
       }),
       parent: editorWrap,
     })
+
+    // 视图建好后再按需拉取语言包。放在构造之后是为了确保
+    // `this.cm` 已经存在——`applyLanguage` 需要用它 dispatch
+    // 重新配置的 effect。
+    this.currentLang = lang
+    void this.applyLanguage(lang)
   }
 
   private onCMUpdate(update: any): void {
@@ -317,6 +353,24 @@ export class CodeBlockView implements NodeView {
     this.view.dispatch(tr)
   }
 
+  /**
+   * 按需加载某个语言的语法高亮并重新配置 compartment。
+   *
+   * 语言包是动态导入的，因此这里是异步的。加载失败时退化为
+   * 无高亮（纯等宽字体）——代码内容本身不受影响。
+   *
+   * 注意：CodeMirror 的 `Compartment.reconfigure()` 返回的是**效果**
+   * （effect），必须通过 `dispatch` 才会生效。旧实现直接调用了
+   * `reconfigure()` 而没有 dispatch，等于什么都没做——切换语言后
+   * 高亮不会更新。
+   */
+  private async applyLanguage(lang: string): Promise<void> {
+    const ext = await loadLanguageExtension(lang)
+    // 视图可能已经被销毁（文档切换 / 标签页关闭）。
+    if (!this.cm) return
+    this.cm.dispatch({ effects: this.languageCompartment.reconfigure(ext) })
+  }
+
   private forwardSelection(): void {
     const pos = this.getPos()
     if (pos === undefined) return
@@ -351,7 +405,10 @@ export class CodeBlockView implements NodeView {
     }
     // 语言变化时更新高亮
     const lang = normalizeLanguage(node.attrs.language ?? '')
-    this.languageCompartment.reconfigure(getLanguageExtension(lang))
+    if (lang !== this.currentLang) {
+      this.currentLang = lang
+      void this.applyLanguage(lang)
+    }
     // 把 `updating` 的递减推迟到微任务，让上面发生的同步
     // PM→CM 派发所触发的 CM 监听器在标志被清零*之后*才运行，
     // 而排队的微任务在当前调用栈内仍然持有该标志。

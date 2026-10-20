@@ -11,6 +11,7 @@ import { createEditor, getMarkdown } from '$lib/editor/editor'
 import { handleFilesDropped, handleImagesDropped } from '../fileDrop'
 import { multiCursorPluginKey, columnSelectPluginKey } from '$lib/plugins/multi-cursor'
 import { undoTreePluginKey, type UndoTreeState } from '$lib/plugins/undo-tree'
+import type { FileFormat } from '$lib/editor/commands/types'
 import {
   vimPluginKey,
   serializePending,
@@ -29,7 +30,12 @@ export interface EditorInitDeps extends AppCtx {
   onWikiLinkClick: (page: string) => void
   onTagClick: (tag: string) => void
   /** 拖放 / 粘贴打开文件（延迟引用 fileOps）。 */
-  openFileInNewTab: (path: string, content: string, mtime?: number | null) => void
+  openFileInNewTab: (
+    path: string,
+    content: string,
+    mtime?: number | null,
+    format?: FileFormat | null,
+  ) => void
 }
 
 export function createEditorInit(ctx: EditorInitDeps) {
@@ -95,8 +101,11 @@ export function createEditorInit(ctx: EditorInitDeps) {
     }
     container.innerHTML = ''
 
-    // 在 Rust 中注册文档
-    docOpen(myTabId, tab.content).catch(() => {})
+    // 在 Rust 中注册文档（连同源文件的存储格式——另存为时沿用）
+    docOpen(myTabId, tab.content, {
+      encoding: tab.encoding,
+      lineEnding: tab.lineEnding,
+    }).catch(() => {})
 
     const editor = createEditor({
       parent: container,

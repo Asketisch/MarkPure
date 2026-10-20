@@ -98,10 +98,14 @@ export function createEditorCommands(ctx: EditorCommandsDeps) {
   function insertFrontmatter() {
     const editor = ctx.getEditor()
     if (!editor) return
-    // 插入到文档最顶部。这是标准的 Pandoc / Jekyll / Hugo 约定。
-    const tr = editor.state.tr.insertText('---\ntitle: \ndate: \n---\n\n', 0)
-    editor.view.dispatch(tr)
-    editor.commands.focus()
+    // 插入一个真正的 `frontmatter` **节点**到文档最顶部。
+    // 这是标准的 Pandoc / Jekyll / Hugo 约定。
+    //
+    // 早期实现用 `insertText` 插入裸文本 `---…---`。那样插入的文本
+    // 只是普通段落：下一次 Markdown 往返时它会被解析成水平线 +
+    // setext 标题，frontmatter 当场被毁掉。节点形式才能保证它
+    // 始终作为一个整体存在并原样写回。
+    ;(editor as any).chain().focus().insertFrontmatter().run()
   }
   function insertToc() {
     const editor = ctx.getEditor()

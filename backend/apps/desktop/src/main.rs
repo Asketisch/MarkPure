@@ -22,14 +22,10 @@
 //! - 把 wry WebView 与 tao 事件循环接起来的 `main()` 函数。
 //! - 平台相关的原生菜单配置（仅 macOS）。
 
-mod dispatch;
-mod editor_ops;
-mod export_ops;
-mod file_ops;
-mod state;
-mod workspace_ops;
-
-use state::{lock_or_recover, AppEvent, AppState, IpcMessage};
+// 处理器实现住在库目标（`markpure`）里，本文件只保留窗口 /
+// WebView / 事件循环的接线。见 `lib.rs` 的模块文档。
+use markpure::state::{lock_or_recover, AppEvent, AppState, IpcMessage};
+use markpure::{dispatch, state};
 use std::sync::Arc;
 use std::sync::Mutex;
 use tao::event::{Event, WindowEvent};
@@ -72,8 +68,24 @@ fn serve_asset(path: &str) -> Response<Vec<u8>> {
 // ============================== 主入口 ==============================
 
 fn main() {
+    // 启动耗时追踪。默认关闭；设 `MARKPURE_STARTUP_LOG=1` 后把各阶段
+    // 的耗时打到 stderr。启动时间由三部分组成：AppKit 事件循环
+    // (~50ms) + 窗口创建 (~45ms) + WKWebView 创建 (~85ms)，
+    // 之后才是前端资源的加载与解析。
+    let t0 = std::time::Instant::now();
+    let startup_log = std::env::var("MARKPURE_STARTUP_LOG")
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false);
+    let mark = |label: &str| {
+        if startup_log {
+            eprintln!("[startup] {label}: {:?}", t0.elapsed());
+        }
+    };
+    mark("main entry");
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
+    mark("event loop built");
     let state = Arc::new(AppState::new());
+    mark("AppState ready");
     {
         let proxy = event_loop.create_proxy();
         lock_or_recover(&state.proxy).replace(proxy);
@@ -137,14 +149,21 @@ fn main() {
     let wv_clone = webview.clone();
     let state_clone = state.clone();
 
+    // DevTools 只在开发模式（`--dev`）下开启。正式版开启它会额外
+    // 建立 WebKit 检查通道，实测让 WebView 创建多花约 30ms、窗口创建
+    // 多花约 50ms——占启动时间的近三成。需要排查正式版时可用
+    // `MARKPURE_DEVTOOLS=1` 强制打开。
+    let dev_mode = std::env::args().any(|a| a == "--dev");
+    let force_devtools = std::env::var("MARKPURE_DEVTOOLS")
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false);
     let mut builder = WebViewBuilder::new()
-        .with_devtools(true)
+        .with_devtools(dev_mode || force_devtools)
         .with_custom_protocol("mt".into(), |_id, request| {
             let path = request.uri().path();
             serve_asset(path).map(Into::into)
         });
 
-    let dev_mode = std::env::args().any(|a| a == "--dev");
     if dev_mode {
         builder = builder.with_url("http://localhost:5173");
     } else if is_child {
@@ -188,10 +207,13 @@ fn main() {
         dispatch::dispatch_slow(msg, state_for_handler.clone());
     });
 
+    mark("window built");
     let built = builder.build(&window).unwrap();
+    mark("webview built");
     *lock_or_recover(&webview) = Some(built);
 
     let webview_for_el = webview.clone();
+    mark("entering event loop (page load starts now)");
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {

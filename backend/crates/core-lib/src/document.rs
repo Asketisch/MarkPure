@@ -25,6 +25,18 @@ impl LineEnding {
             LineEnding::Lf
         }
     }
+
+    /// 从 IPC 传参解析行尾风格。
+    ///
+    /// 接受两种写法：`"crlf"`（紧凑标签）与实际换行串 `"\r\n"`
+    /// （`LineEnding::as_str()` 的输出）。无法识别时按 LF 处理——
+    /// LF 是最安全的默认值（写出去仍能被任何 Markdown 工具读懂）。
+    pub fn from_label(label: &str) -> Self {
+        match label {
+            "crlf" | "\r\n" => LineEnding::Crlf,
+            _ => LineEnding::Lf,
+        }
+    }
 }
 
 /// 文件编码
@@ -48,6 +60,29 @@ impl Encoding {
             Encoding::Big5 => "Big5",
             Encoding::Other(s) => s.as_str(),
         }
+    }
+
+    /// 从标签字符串解析编码（IPC 传参用）。
+    ///
+    /// `label()` 的输出可以原样传回来，因此 `from_label(label())`
+    /// 必须还原出同一个编码。无法识别的标签退化为
+    /// [`Encoding::Other`]——写盘时若 `encoding_rs` 也不认识，
+    /// 会明确报错而不是静默写错编码。
+    pub fn from_label(label: &str) -> Self {
+        match label.trim() {
+            "UTF-8" => Encoding::Utf8,
+            "UTF-8 BOM" => Encoding::Utf8Bom,
+            "GBK" => Encoding::Gbk,
+            "Shift_JIS" => Encoding::ShiftJis,
+            "Big5" => Encoding::Big5,
+            "" => Encoding::Utf8,
+            other => Encoding::Other(other.to_string()),
+        }
+    }
+
+    /// 是否属于 UTF-8 家族（含带 BOM 的变体）。
+    pub fn is_utf8(&self) -> bool {
+        matches!(self, Encoding::Utf8 | Encoding::Utf8Bom)
     }
 }
 
@@ -81,12 +116,24 @@ impl Document {
     /// 从文本内容创建文档，含编码与换行符检测
     pub fn from_content(content: &str, path: Option<PathBuf>, encoding: Encoding) -> Self {
         let line_ending = LineEnding::detect(content);
-        // 为 rope 规范化换行符（内部统一存 LF）
-        let normalized = if line_ending == LineEnding::Crlf {
-            content.replace("\r\n", "\n")
-        } else {
-            content.to_string()
-        };
+        Self::from_content_with_format(content, path, encoding, line_ending)
+    }
+
+    /// 从文本内容创建文档，**显式指定**编码与行尾风格。
+    ///
+    /// 与 [`Document::from_content`] 的唯一区别是不从内容里猜行尾。
+    /// 编辑器里的内容永远是 LF（ProseMirror 内部规范化），而目标
+    /// 文件可能是 CRLF——保存时必须按目标文件的行尾写回，否则
+    /// 每存一次就把用户的 CRLF 改成 LF。
+    pub fn from_content_with_format(
+        content: &str,
+        path: Option<PathBuf>,
+        encoding: Encoding,
+        line_ending: LineEnding,
+    ) -> Self {
+        // rope 内部统一存 LF：内容里的 CRLF 先归一化，
+        // 写盘时由 `text()` 按 `line_ending` 还原。
+        let normalized = content.replace("\r\n", "\n");
         Self {
             rope: Rope::from(normalized),
             path,
@@ -223,6 +270,9 @@ impl Document {
     }
 
     /// 在文档中搜索模式，返回 (from, to) 字符位置
+    ///
+    /// 正则编译失败时返回空列表（历史行为）。需要区分「没有匹配」
+    /// 与「正则写错了」的调用方应改用 [`Document::try_search`]。
     pub fn search(
         &self,
         query: &str,
@@ -230,8 +280,25 @@ impl Document {
         whole_word: bool,
         use_regex: bool,
     ) -> Vec<(usize, usize)> {
+        self.try_search(query, case_sensitive, whole_word, use_regex)
+            .unwrap_or_default()
+    }
+
+    /// 与 [`Document::search`] 相同，但正则编译失败时返回错误而不是
+    /// 空列表。
+    ///
+    /// 静默返回空列表会让用户以为「文档里没有这个词」——实际上他
+    /// 只是把正则写错了。IPC 层用这个版本，把错误透传给前端，
+    /// 让搜索面板能提示「无效的正则表达式」。
+    pub fn try_search(
+        &self,
+        query: &str,
+        case_sensitive: bool,
+        whole_word: bool,
+        use_regex: bool,
+    ) -> Result<Vec<(usize, usize)>, String> {
         if query.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
         let text = self.text_normalized();
@@ -244,17 +311,14 @@ impl Document {
             pattern = format!(r"\b{}\b", pattern);
         }
 
-        let re = match RegexBuilder::new(&pattern)
+        let re = RegexBuilder::new(&pattern)
             .case_insensitive(!case_sensitive)
             // ReDoS 防护：限制引擎愿意回溯的量。没有这些限制，
             // 像 `(a+)+$` 这样的用户模式在长文档上可能锁住 IPC 线程数秒。
             .size_limit(8 * 1024 * 1024) // 8 MB 编译后模式上限
             .dfa_size_limit(8 * 1024 * 1024) // 8 MB DFA 上限
             .build()
-        {
-            Ok(r) => r,
-            Err(_) => return Vec::new(),
-        };
+            .map_err(|e| format!("invalid search pattern: {e}"))?;
 
         // 正则按字节偏移工作；转换为字符偏移
         let mut matches = Vec::new();
@@ -265,7 +329,7 @@ impl Document {
             let char_end = char_start + text[byte_start..byte_end].chars().count();
             matches.push((char_start, char_end));
         }
-        matches
+        Ok(matches)
     }
 
     /// 统计字数（非中日韩：按空格分词；中日韩：按字符计数）

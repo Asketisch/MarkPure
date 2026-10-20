@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use mt_core::document::{Document, Encoding};
+use mt_core::document::{Document, Encoding, LineEnding};
 use mt_core::markdown_lint::{lint_markdown, LintRule};
 use crate::state::{lock_or_recover, parse_doc_id_param, AppState};
 // ============================== 文件操作 ==============================
@@ -56,6 +56,17 @@ pub fn cmd_save_file(
         config.editor.lint_on_save
     };
 
+    // 目标文件的存储格式（编码 + 行尾 + BOM）。
+    //
+    // 前端传给 Rust 的内容永远是 UTF-8 + LF（ProseMirror 内部规范化）。
+    // 若不探测目标文件，打开 GBK / CRLF / 带 BOM 的文档保存后会被
+    // 静默改写——用户看到的是"我根本没动编码，文件怎么变了"。
+    // 磁盘上的文件才是它自己格式的事实来源，因此以探测结果为准。
+    //
+    // 文件不存在（新建 / 另存为到新路径）时返回 `None`，
+    // 此时退回到调用方传下来的源文档格式，再退到 UTF-8 + LF。
+    let existing = state.rt().block_on(fs::detect_format(&path));
+
     // 优先用 doc_id（从 Rust 文档注册表读取），回退到 content 参数。
     // doc_id 是 String（通过 `parse_doc_id_param` 也接受旧版数字 id）。
     if params["doc_id"].is_string() || params["doc_id"].is_u64() {
@@ -64,17 +75,29 @@ pub fn cmd_save_file(
         // 若在 write_file 期间持锁，会阻塞所有文档操作（统计、搜索、内容同步）。
         let write_info = {
             let docs = lock_or_recover(&state.documents);
-            docs.get(&doc_id).map(|doc| (doc.text(), doc.encoding()))
+            docs.get(&doc_id)
+                .map(|doc| (doc.text(), doc.encoding(), doc.line_ending()))
         }; // 互斥锁在此释放
         match write_info {
-            Some((text, encoding)) => {
+            Some((text, doc_encoding, doc_line_ending)) => {
                 let cleaned = if lint_enabled {
                     let (out, _report) = lint_markdown(&text, &lint_rules());
                     out
                 } else {
                     text
                 };
-                let tmp_doc = Document::from_content(&cleaned, Some(path.clone()), encoding);
+                // 目标文件已存在 → 以磁盘上的格式为准；
+                // 否则（新文件）沿用注册表里记录的格式。
+                let (encoding, line_ending) = match &existing {
+                    Some(fmt) => (fmt.encoding.clone(), fmt.line_ending),
+                    None => (doc_encoding, doc_line_ending),
+                };
+                let tmp_doc = Document::from_content_with_format(
+                    &cleaned,
+                    Some(path.clone()),
+                    encoding,
+                    line_ending,
+                );
                 state
                     .rt()
                     .block_on(fs::write_file(&tmp_doc, &path))
@@ -98,7 +121,27 @@ pub fn cmd_save_file(
         } else {
             content.to_string()
         };
-        let doc = Document::from_content(&cleaned, Some(path.clone()), Encoding::Utf8);
+        // 目标文件已存在 → 沿用它的编码与行尾；
+        // 否则用调用方传下来的源文档格式，再退到 UTF-8 + LF。
+        let (encoding, line_ending) = match &existing {
+            Some(fmt) => (fmt.encoding.clone(), fmt.line_ending),
+            None => (
+                params["encoding"]
+                    .as_str()
+                    .map(Encoding::from_label)
+                    .unwrap_or(Encoding::Utf8),
+                params["line_ending"]
+                    .as_str()
+                    .map(LineEnding::from_label)
+                    .unwrap_or(LineEnding::Lf),
+            ),
+        };
+        let doc = Document::from_content_with_format(
+            &cleaned,
+            Some(path.clone()),
+            encoding,
+            line_ending,
+        );
         state
             .rt()
             .block_on(fs::write_file(&doc, &path))

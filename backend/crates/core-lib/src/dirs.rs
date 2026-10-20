@@ -42,6 +42,15 @@ pub fn home_dir() -> Option<PathBuf> {
 }
 
 /// 获取应用配置目录（`markpure`）。
+///
+/// 环境变量 `MARKPURE_CONFIG_DIR` 优先于平台默认路径。它让测试
+/// harness 能把配置隔离到临时目录（测试不应污染用户的真实设置），
+/// 也方便做「便携版」安装——把配置放在程序目录旁边。
 pub fn app_config_dir() -> Option<PathBuf> {
+    if let Ok(dir) = std::env::var("MARKPURE_CONFIG_DIR") {
+        if !dir.trim().is_empty() {
+            return Some(PathBuf::from(dir));
+        }
+    }
     config_dir().map(|d| d.join("markpure"))
 }

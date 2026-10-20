@@ -529,6 +529,7 @@ html, body, #app {
 }
 
 /* Table */
+/* `.tableWrapper` 由 Tiptap 的 TableView NodeView 生成，包住每个表格。 */
 .tableWrapper {
   overflow-x: auto;
   position: relative;
@@ -538,7 +539,24 @@ html, body, #app {
 .ProseMirror table {
   border-collapse: collapse;
   margin: 0;
+  /* 宽表要能超出编辑器宽度、让 wrapper 出横向滚动条。
+     `table-layout: fixed` 会把表格钉死在容器宽度上（列被挤压、
+     内容被截断、永不溢出），所以这里用 auto + max-content：
+     列宽按内容取，超宽时整体在 wrapper 里滚动。
+     `min-width: 100% !important` 让列数少的表格仍然占满编辑器
+     宽度，并压过 Tiptap 运行时写到表格上的内联 min-width 像素值。 */
+  table-layout: auto;
+  width: max-content;
+  min-width: 100% !important;
+}
+
+/* 用户拖拽调整过列宽的表格（<col> 上出现显式 width）切回 fixed
+   布局：列宽完全由 colgroup 决定，拖拽时其他列不会被内容顶开，
+   与旧行为一致。内联 width（拖满整表后 Tiptap 会写）优先级更高，
+   CSS 的 width/max-content 不会干扰它。 */
+.ProseMirror table:has(colgroup col[style^="width"]) {
   table-layout: fixed;
+  width: auto;
 }
 
 .ProseMirror th, .ProseMirror td {
@@ -1094,6 +1112,69 @@ html, body, #app {
   filter: blur(0.5px);
 }
 
+
+/* Frontmatter block (YAML frontmatter at the top of a document) */
+.frontmatter-block {
+  margin: 0 0 16px 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary, transparent);
+  position: relative;
+}
+
+/* 左上角的小标签，让用户一眼看出这不是正文。 */
+.frontmatter-block::before {
+  content: 'FRONTMATTER';
+  position: absolute;
+  top: -8px;
+  left: 10px;
+  padding: 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  background: var(--bg, Canvas);
+  border-radius: 3px;
+}
+
+.frontmatter-block pre {
+  margin: 0;
+  font-family: var(--editor-font-family, monospace);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+/* Math (KaTeX) */
+/* KaTeX 自己的样式表按需加载（见 extensions/blocks/math-extension.ts），
+   这里只补上公式**容器**的排版：块级公式居中、行内公式随文流。 */
+.tiptap-mathematics-render {
+  display: inline-block;
+}
+
+.tiptap-mathematics-render--editable {
+  cursor: pointer;
+}
+
+.tiptap-mathematics-render .block-math-inner {
+  display: block;
+  text-align: center;
+  padding: 6px 0;
+}
+
+/* 公式加载完成前 / 渲染失败时的占位样式。 */
+.tiptap-mathematics-render.block-math-error,
+.tiptap-mathematics-render.inline-math-error {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--highlight-bg, rgba(255, 243, 176, 0.6));
+  color: var(--text);
+  font-family: var(--editor-font-family, monospace);
+  font-size: 0.9em;
+}
 
 /* TOC block (live) */
 .toc-block {

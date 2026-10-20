@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "test:backend": "python3 scripts/test_backend.py",
+    "test:markdown": "tsx scripts/validate-markdown-roundtrip.ts && tsx scripts/validate-markdown-normalize.ts",
+    "test": "npm run test:backend && npm run test:markdown && npm run test:frontend",
+    "test:frontend": "tsx scripts/validate-vim.ts && tsx scripts/validate-undo-tree.ts && tsx scripts/validate-multi-cursor.ts && tsx scripts/validate-column-select.ts && tsx scripts/validate-move-block.ts && tsx scripts/validate-virtualization.ts && tsx scripts/validate-emoji-shortcode.ts && tsx scripts/validate-png-export.ts && tsx scripts/validate-lint-on-save.ts && tsx scripts/validate-file-format.ts"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
@@ -15,6 +19,7 @@
     "@types/node": "^24.12.0",
     "svelte": "^5.53.12",
     "svelte-check": "^4.4.5",
+    "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "vite": "^8.0.1"
   },

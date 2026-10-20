@@ -10,7 +10,7 @@
 //!   不属于新活动根的文档都会从内存注册表中移除。
 
 use crate::state::{lock_or_recover, parse_doc_id_param, AppState, MAX_DOCUMENTS};
-use mt_core::document::{Document, Encoding};
+use mt_core::document::{Document, Encoding, LineEnding};
 
 /// 更新 `doc_id` 的 LRU 顺序，返回为保持在 `MAX_DOCUMENTS`
 /// 之内而必须淘汰的文档 id 列表。
@@ -50,9 +50,13 @@ fn apply_evictions(state: &AppState, evict_ids: &[String]) {
     }
 }
 
-/// `doc_open { doc_id, content, workspace_root_id? }` →
+/// `doc_open { doc_id, content, workspace_root_id?, encoding?, line_ending? }` →
 /// 注册一个文档。可选的 `workspace_root_id` 把文档绑定到
 /// 多根工作区，供切换根时的 LRU 回收使用。
+///
+/// 可选的 `encoding` / `line_ending` 记录源文件的存储格式。渲染端
+/// 从 `open_file` 的返回值里拿得到这两个值；不传时按 UTF-8 + LF 处理。
+/// 保存到新路径（另存为）时注册表里的格式会被沿用。
 pub fn cmd_doc_open(
     params: &serde_json::Value,
     state: &AppState,
@@ -64,7 +68,19 @@ pub fn cmd_doc_open(
     let evict_ids = touch_lru(state, &doc_id);
     apply_evictions(state, &evict_ids);
 
-    let doc = Document::from_content(content, None, Encoding::Utf8);
+    let encoding = params["encoding"]
+        .as_str()
+        .map(Encoding::from_label)
+        .unwrap_or(Encoding::Utf8);
+    let doc = match params["line_ending"].as_str() {
+        Some(le) => Document::from_content_with_format(
+            content,
+            None,
+            encoding,
+            LineEnding::from_label(le),
+        ),
+        None => Document::from_content(content, None, encoding),
+    };
     lock_or_recover(&state.documents).insert(doc_id.clone(), doc);
 
     if let Some(rid) = workspace_root_id {
@@ -106,6 +122,13 @@ pub fn cmd_doc_set_content(
     let doc_id = parse_doc_id_param(params)?;
     let content = params["content"].as_str().ok_or("Missing 'content' parameter")?;
 
+    // 与 `doc_open` 一样走 LRU：新文档会挤掉最旧的条目，注册表大小
+    // 因此始终不超过 `MAX_DOCUMENTS`。早期实现只更新 `doc_order`
+    // 而不淘汰任何文档，渲染端若对一个未 `doc_open` 过的 id 调用
+    // `doc_set_content`，注册表会无限增长（内存泄漏）。
+    let evict_ids = touch_lru(state, &doc_id);
+    apply_evictions(state, &evict_ids);
+
     {
         let mut docs = lock_or_recover(&state.documents);
         if let Some(doc) = docs.get_mut(&doc_id) {
@@ -119,11 +142,6 @@ pub fn cmd_doc_set_content(
         lock_or_recover(&state.doc_workspace)
             .entry(doc_id.clone())
             .or_insert_with(|| rid.to_string());
-    }
-    {
-        let mut doc_order = lock_or_recover(&state.doc_order);
-        doc_order.retain(|id| id != &doc_id);
-        doc_order.push(doc_id);
     }
 
     Ok(serde_json::Value::Null)
@@ -161,7 +179,11 @@ pub fn cmd_doc_search(
     let docs = lock_or_recover(&state.documents);
     let doc = docs.get(&doc_id).ok_or("Document not found")?;
 
-    let matches = doc.search(query, case_sensitive, whole_word, use_regex);
+    // 正则写错时把错误透传给前端——静默返回空列表会让用户误以为
+    // 「文档里没有这个词」。
+    let matches = doc
+        .try_search(query, case_sensitive, whole_word, use_regex)
+        .map_err(|e| e.to_string())?;
     let result: Vec<serde_json::Value> = matches
         .into_iter()
         .map(|(from, to)| serde_json::json!({ "from": from, "to": to }))

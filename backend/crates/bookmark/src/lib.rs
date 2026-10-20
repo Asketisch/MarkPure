@@ -41,11 +41,25 @@ pub struct BookmarkStore {
 }
 
 
+/// 获取应用配置目录。
+///
+/// 环境变量 `MARKPURE_CONFIG_DIR` 优先于平台默认路径。它让测试
+/// harness 能把书签隔离到临时目录（测试不应污染用户的真实书签），
+/// 也让「便携版」安装可以把配置放在程序目录旁边。
+fn app_config_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("MARKPURE_CONFIG_DIR") {
+        if !dir.trim().is_empty() {
+            return PathBuf::from(dir);
+        }
+    }
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("markpure")
+}
+
 /// 获取书签文件的路径
 pub fn bookmarks_path() -> PathBuf {
-    let config_dir = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("markpure");
+    let config_dir = app_config_dir();
     fs::create_dir_all(&config_dir).ok();
     config_dir.join("bookmarks.json")
 }

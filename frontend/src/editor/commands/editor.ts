@@ -6,7 +6,7 @@
  * 拼写检查也在这里，因为它属于文本内容分析而非应用状态。
  */
 import { ipc } from './ipc'
-import type { FileInfo, OutlineItem } from './types'
+import type { FileFormat, FileInfo, OutlineItem } from './types'
 
 // ============================== 大纲 / wikilinks / 标签 ==============================
 
@@ -43,9 +43,20 @@ export async function openFileByPath(path: string): Promise<FileInfo> {
 
 /** 在 Rust 持有的注册表中登记文档（达到 MAX_DOCUMENTS 时按 LRU
  *  驱逐）。渲染进程每次打开文档都会调用，让 Rust 的统计 / 搜索
- *  IPC 从一个规范缓冲区读取，而不必来回传递整个内容。 */
-export async function docOpen(docId: number, content: string): Promise<void> {
-  await ipc('doc_open', { doc_id: docId, content })
+ *  IPC 从一个规范缓冲区读取，而不必来回传递整个内容。
+ *
+ *  `format` 记录源文件的存储格式，保存到新路径（另存为）时会被沿用。 */
+export async function docOpen(
+  docId: number,
+  content: string,
+  format?: FileFormat | null,
+): Promise<void> {
+  await ipc('doc_open', {
+    doc_id: docId,
+    content,
+    encoding: format?.encoding ?? undefined,
+    line_ending: format?.lineEnding ?? undefined,
+  })
 }
 
 export async function docClose(docId: number): Promise<void> {

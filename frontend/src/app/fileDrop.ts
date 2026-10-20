@@ -11,6 +11,7 @@
  */
 import type { Editor } from '@tiptap/core'
 import { openDroppedFiles, savePastedImage } from '$lib/editor/commands'
+import type { FileFormat } from '$lib/editor/commands/types'
 import { logger } from '$lib/logger'
 
 export interface FileDropDeps {
@@ -19,7 +20,12 @@ export interface FileDropDeps {
   /** 活跃的编辑器实例，挂载前为 null。 */
   getEditor: () => Editor | null
   /** 在新标签页打开刚拖入的文件。 */
-  openFileInNewTab: (path: string, content: string) => void
+  openFileInNewTab: (
+    path: string,
+    content: string,
+    mtime?: number | null,
+    format?: FileFormat | null,
+  ) => void
 }
 
 /** 让 Rust 读取一批拖入的文件，并把每个文件作为新标签页打开。 */
@@ -36,7 +42,10 @@ export async function handleFilesDropped(
   try {
     const results = await openDroppedFiles(paths)
     for (const file of results) {
-      deps.openFileInNewTab(file.path, file.content)
+      deps.openFileInNewTab(file.path, file.content, undefined, {
+        encoding: file.encoding,
+        lineEnding: file.line_ending,
+      })
     }
   } catch (e) {
     logger.error('Failed to open dropped files', e)

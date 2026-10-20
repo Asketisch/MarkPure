@@ -30,6 +30,10 @@ pub fn cmd_open_dropped_files(
                     "content": doc.text_normalized(),
                     "path": path_str,
                     "file_name": path.file_name().map(|s| s.to_string_lossy().to_string()),
+                    // 存储格式随内容一起带出来：拖进来的文件保存到新
+                    // 路径（另存为）时应当沿用原文件的编码与行尾。
+                    "encoding": doc.encoding().label(),
+                    "line_ending": doc.line_ending().as_str(),
                 }));
             }
             Err(e) => {

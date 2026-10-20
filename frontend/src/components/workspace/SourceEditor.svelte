@@ -2,8 +2,6 @@
   import { onMount } from 'svelte'
   import { EditorView as CMView } from '@codemirror/view'
   import { EditorState as CMState, Compartment } from '@codemirror/state'
-  import { basicSetup } from 'codemirror'
-  import { markdown as mdLang } from '@codemirror/lang-markdown'
   import { createThemeExtension, detectDarkTheme } from '$lib/extensions/blocks/cm-theme'
 
   let {
@@ -18,6 +16,14 @@
   let cm: CMView | null = null
   let themeCompartment = new Compartment()
   let wrapCompartment = new Compartment()
+  // CodeMirror 的 `basicSetup`（行号、折叠、搜索、自动补全…）与
+  // Markdown 语言包**按需加载**。
+  //
+  // 它们原本是静态 import，而 `basicSetup` + `@codemirror/lang-markdown`
+  // 会把 lang-html / lang-javascript / lang-css 一并拖进首屏 bundle
+  // ——加起来三百多 KB，而源码视图只是「分屏 / 源码模式」下的次要视图，
+  // 绝大多数用户启动时根本不会打开它。
+  let setupCompartment = new Compartment()
   let updating = false
 
   // 源码编辑器的偏好设置：从 `document.documentElement` 读取
@@ -59,13 +65,14 @@
       state: CMState.create({
         doc: content,
         extensions: [
-          // basicSetup 已经通过 gutter 自带行号；在设置里关闭
-          // `line_numbers` 的用户希望源码视图干净整洁，因此这里
-          // 不再追加额外的 gutter 配置，交给 `basicSetup` 处理
-          // （softTabs 关闭时按 Tab 插入 `\t`，符合用户对源码
-          // 编辑器的预期）。
-          basicSetup,
-          mdLang(),
+          // 先用空的 setup 扩展建视图；`basicSetup` 与 Markdown
+          // 语言包加载完成后通过 `setupCompartment` 补上。
+          //
+          // basicSetup 自带行号 gutter；在设置里关闭 `line_numbers`
+          // 的用户希望源码视图干净整洁，因此这里不再追加额外的
+          // gutter 配置，交给 `basicSetup` 处理（softTabs 关闭时按
+          // Tab 插入 `\t`，符合用户对源码编辑器的预期）。
+          setupCompartment.of([]),
           themeCompartment.of(createThemeExtension(isDark)),
           CMView.updateListener.of((update) => {
             if (update.docChanged && !updating && onUpdate) {
@@ -80,6 +87,22 @@
       }),
       parent: container,
     })
+
+    // 按需加载 CodeMirror 的功能集与 Markdown 高亮。
+    void (async () => {
+      try {
+        const [{ basicSetup }, { markdown }] = await Promise.all([
+          import('codemirror'),
+          import('@codemirror/lang-markdown'),
+        ])
+        if (!cm) return
+        cm.dispatch({
+          effects: setupCompartment.reconfigure([basicSetup, markdown()]),
+        })
+      } catch (err) {
+        console.error('[SourceEditor] failed to load CodeMirror setup:', err)
+      }
+    })()
 
     // 用户在设置里切换自动换行时重新应用。configOps.applyEditorConfig
     // 把 `--editor-word-wrap` 写到根元素 style 上（不是响应式源），

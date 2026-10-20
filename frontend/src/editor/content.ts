@@ -8,6 +8,7 @@
  */
 
 import type { Editor } from '@tiptap/core'
+import { normalizeListContinuations } from './markdown-normalize'
 
 export function getMarkdown(editor: Editor): string {
   return editor.getMarkdown()
@@ -21,6 +22,9 @@ export function setContent(editor: Editor, markdown: string): void {
   // ——编辑器会把它当 HTML 处理，虽不是 markdown 想要的结果，
   // 但至少不为空。
   try {
+    // 解析前先修正列表续行的缩进，绕开 marked 在「懒续行」上会
+    // 弄坏行内标记的缺陷。详见 `markdown-normalize.ts`。
+    const normalized = normalizeListContinuations(markdown)
     // `??` 串联一串回退；`?:` 只在整个链条末尾作为最终的
     // `undefined` 兜底出现。用括号包住内层链，让优先级一目了然，
     // 也防止未来重构时不小心把链改成对 `editor.storage.markdown`
@@ -35,7 +39,7 @@ export function setContent(editor: Editor, markdown: string): void {
       const parsed = parser.call(
         (editor.storage as { markdown?: { parser?: unknown } })?.markdown?.parser
           ?? editor.markdown,
-        markdown,
+        normalized,
       )
       editor.commands.setContent(parsed as object)
       return

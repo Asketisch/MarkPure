@@ -17,18 +17,28 @@ export function getPluginKey(trigger: string): PluginKey {
   return new PluginKey(`quickInsert-${trigger}`)
 }
 
-export const QuickInsertExtension = Extension.create<{ triggerChar: string }>({
+/**
+ * 快速插入扩展。
+ *
+ * **一个扩展实例，多个触发符。** 早期实现注册了两个同名实例
+ * （`configure({triggerChar:'@'})` 与 `configure({triggerChar:'/'})`），
+ * 但 Tiptap 不允许同名扩展共存——后者直接顶掉前者，`@` 触发因此
+ * **完全失效**（控制台会打印 "Duplicate extension names found"）。
+ * 现在单个实例为每个触发符创建一个独立的 Suggestion 插件，各用各的
+ * plugin key，行为与当初的意图一致。
+ */
+export const QuickInsertExtension = Extension.create<{ triggerChars: string[] }>({
   name: 'quickInsert',
 
   addOptions() {
     return {
-      triggerChar: '@',
+      triggerChars: ['@'],
     }
   },
 
   addProseMirrorPlugins() {
-    const trigger = this.options.triggerChar
-    return [
+    // 每个触发符一个 Suggestion 插件，plugin key 互不相同。
+    return this.options.triggerChars.map((trigger) =>
       Suggestion({
         editor: this.editor,
         char: trigger,
@@ -95,6 +105,6 @@ export const QuickInsertExtension = Extension.create<{ triggerChar: string }>({
           }
         },
       }),
-    ]
+    )
   },
 })

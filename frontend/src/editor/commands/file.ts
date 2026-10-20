@@ -6,7 +6,7 @@
  * 纯粹的透传，不做任何业务判断。
  */
 import { ipc } from './ipc'
-import type { DocStats, FileEntry, FileInfo } from './types'
+import type { DocStats, FileEntry, FileFormat, FileInfo } from './types'
 
 // ============================== 文件对话框 ==============================
 
@@ -16,14 +16,39 @@ export async function openFile(): Promise<FileInfo | null> {
   return await ipc<FileInfo>('open_file', { path })
 }
 
-export async function saveFile(path: string, content: string): Promise<void> {
-  await ipc('save_file', { path, content })
+/**
+ * 保存文件。
+ *
+ * `format` 是**源文档**的存储格式（从 `open_file` 的返回值里取得）。
+ * 目标路径已存在时后端以磁盘上的文件为准；目标是新路径（另存为）
+ * 时后端沿用这里传下去的格式，避免 GBK / CRLF 文档另存后被改写成
+ * UTF-8 + LF。
+ */
+export async function saveFile(
+  path: string,
+  content: string,
+  format?: FileFormat | null,
+): Promise<void> {
+  await ipc('save_file', {
+    path,
+    content,
+    encoding: format?.encoding ?? undefined,
+    line_ending: format?.lineEnding ?? undefined,
+  })
 }
 
-export async function saveFileAs(content: string): Promise<string | null> {
+export async function saveFileAs(
+  content: string,
+  format?: FileFormat | null,
+): Promise<string | null> {
   const path = await ipc<string>('pick_save_file')
   if (!path) return null
-  await ipc('save_file', { path, content })
+  await ipc('save_file', {
+    path,
+    content,
+    encoding: format?.encoding ?? undefined,
+    line_ending: format?.lineEnding ?? undefined,
+  })
   return path
 }
 
@@ -77,6 +102,10 @@ export interface DroppedFile {
   content: string
   path: string
   file_name: string | null
+  /** 源文件的编码标签（"UTF-8" / "GBK" / …）。 */
+  encoding: string
+  /** 源文件的行尾（"\n" 或 "\r\n"）。 */
+  line_ending: string
 }
 
 export async function openDroppedFiles(paths: string[]): Promise<DroppedFile[]> {

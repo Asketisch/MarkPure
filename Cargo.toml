@@ -11,3 +11,24 @@ members = [
     "backend/crates/spellcheck",
 ]
 resolver = "2"
+
+# Release 构建配置。
+#
+# 应用启动时间 = 进程启动 + WebView 创建 + 首屏资源加载与解析。
+# 后两项由前端 bundle 体积主导（见 `vite.config.ts` 的分包设置），
+# 但 Rust 侧的二进制体积与动态链接时间也会影响**进程启动**到窗口
+# 显示之间的间隔。
+#
+# - `lto = "fat"` + `codegen-units = 1`：跨 crate 内联，产物体积更小、
+#   冷启动要装载的机器码更少。
+# - `strip = "symbols"`：去掉调试符号，二进制明显变小（不影响性能，
+#   但影响分发包体积与首次加载）。
+# - `panic = "abort"`：**故意不启用**。`lock_or_recover` 依赖互斥锁
+#   毒化来从处理器 panic 中恢复；`panic = "abort` 会让整个进程直接
+#   退出，那条恢复路径就失效了。
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+incremental = false

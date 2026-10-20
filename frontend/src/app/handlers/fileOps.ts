@@ -9,6 +9,7 @@
 import { docClose, docOpen, openFile, openFileByPath } from '$lib/editor/commands'
 import { setContent } from '$lib/editor/editor'
 import { logger } from '$lib/logger'
+import type { FileFormat } from '$lib/editor/commands/types'
 import type { Tab } from './types'
 import type { AppCtx } from './ctx'
 import type { SyncOps } from './syncOps'
@@ -29,13 +30,21 @@ export function createFileOps(ctx: FileOpsDeps) {
   async function handleOpenRecent(path: string) {
     try {
       const info = await openFileByPath(path)
-      openFileInNewTab(info.path, info.content, info.mtime)
+      openFileInNewTab(info.path, info.content, info.mtime, {
+        encoding: info.encoding,
+        lineEnding: info.line_ending,
+      })
     } catch (e) {
       console.error('[App] failed to open recent file:', path, e)
     }
   }
 
-  function openFileInNewTab(path: string, content: string, mtime: number | null = null) {
+  function openFileInNewTab(
+    path: string,
+    content: string,
+    mtime: number | null = null,
+    format?: FileFormat | null,
+  ) {
     const name = path.split('/').pop() ?? i18n.t('tab.untitled')
     // 找到可替换的预览标签页，或新建一个
     const previewTab = app.tabs.find(t => t.preview)
@@ -46,9 +55,15 @@ export function createFileOps(ctx: FileOpsDeps) {
       previewTab.dirty = false
       previewTab.preview = true  // 保持为预览标签页
       previewTab.mtime = mtime
+      previewTab.encoding = format?.encoding ?? null
+      previewTab.lineEnding = format?.lineEnding ?? null
       switchTab(previewTab.id, true)  // 强制重新初始化以显示最新内容
     } else {
-      const tab: Tab = { id: app.nextId++, path, name, dirty: false, content, preview: true, mtime }
+      const tab: Tab = {
+        id: app.nextId++, path, name, dirty: false, content, preview: true, mtime,
+        encoding: format?.encoding ?? null,
+        lineEnding: format?.lineEnding ?? null,
+      }
       app.tabs = [...app.tabs, tab]
       switchTab(tab.id)
     }
@@ -64,6 +79,8 @@ export function createFileOps(ctx: FileOpsDeps) {
         existing.dirty = false
         existing.preview = false  // 显式打开时固定为普通标签页
         existing.mtime = info.mtime
+        existing.encoding = info.encoding
+        existing.lineEnding = info.line_ending
         // 同步更新后的内容到 Rust
         sync.syncToRust(existing.id, info.content)
         switchTab(existing.id, true)  // 强制重新初始化以显示最新内容
@@ -78,6 +95,8 @@ export function createFileOps(ctx: FileOpsDeps) {
         previewTab.dirty = false
         previewTab.preview = true
         previewTab.mtime = info.mtime
+        previewTab.encoding = info.encoding
+        previewTab.lineEnding = info.line_ending
         switchTab(previewTab.id, true)  // 强制重新初始化以显示最新内容
       } else {
         const tab: Tab = {
@@ -88,6 +107,8 @@ export function createFileOps(ctx: FileOpsDeps) {
           content: info.content,
           preview: true,
           mtime: info.mtime,
+          encoding: info.encoding,
+          lineEnding: info.line_ending,
         }
         app.tabs = [...app.tabs, tab]
         switchTab(tab.id)
@@ -108,6 +129,8 @@ export function createFileOps(ctx: FileOpsDeps) {
         existing.dirty = false
         existing.preview = false  // 固定标签页
         existing.mtime = info.mtime
+        existing.encoding = info.encoding
+        existing.lineEnding = info.line_ending
         sync.syncToRust(existing.id, info.content)
         switchTab(existing.id, true)  // 强制重新初始化以显示最新内容
         return
@@ -121,8 +144,13 @@ export function createFileOps(ctx: FileOpsDeps) {
         previewTab.dirty = false
         previewTab.preview = false  // 固定标签页
         previewTab.mtime = info.mtime
+        previewTab.encoding = info.encoding
+        previewTab.lineEnding = info.line_ending
         docClose(previewTab.id).catch(() => {})
-        docOpen(previewTab.id, info.content).catch(() => {})
+        docOpen(previewTab.id, info.content, {
+          encoding: info.encoding,
+          lineEnding: info.line_ending,
+        }).catch(() => {})
         switchTab(previewTab.id)
       } else {
         const tab: Tab = {
@@ -132,6 +160,8 @@ export function createFileOps(ctx: FileOpsDeps) {
           dirty: false,
           content: info.content,
           mtime: info.mtime,
+          encoding: info.encoding,
+          lineEnding: info.line_ending,
         }
         app.tabs = [...app.tabs, tab]
         switchTab(tab.id)
@@ -150,6 +180,8 @@ export function createFileOps(ctx: FileOpsDeps) {
         existing.content = info.content
         existing.dirty = false
         existing.mtime = info.mtime
+        existing.encoding = info.encoding
+        existing.lineEnding = info.line_ending
         sync.syncToRust(existing.id, info.content)
         switchTab(existing.id)
         return
@@ -161,6 +193,8 @@ export function createFileOps(ctx: FileOpsDeps) {
         dirty: false,
         content: info.content,
         mtime: info.mtime,
+        encoding: info.encoding,
+        lineEnding: info.line_ending,
       }
       app.tabs = [...app.tabs, tab]
       switchTab(tab.id)
@@ -181,6 +215,8 @@ export function createFileOps(ctx: FileOpsDeps) {
       tab.content = info.content
       tab.mtime = info.mtime
       tab.dirty = false
+      tab.encoding = info.encoding
+      tab.lineEnding = info.line_ending
       if (tab.id === app.activeTabId && ctx.getEditor()) {
         setContent(ctx.getEditor()!, info.content)
       }

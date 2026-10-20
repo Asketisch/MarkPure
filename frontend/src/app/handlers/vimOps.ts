@@ -39,13 +39,15 @@ export function createVimOps(ctx: VimOpsDeps) {
         if (!tab) return { ok: false, error: 'no active tab' }
         try {
           const content = ctx.getActiveContent()
+          // 沿用源文档的存储格式，另存为到新路径时不被改写成 UTF-8 + LF。
+          const format = { encoding: tab.encoding, lineEnding: tab.lineEnding }
           if (!tab.path) {
-            const newPath = await saveFileAs(content)
+            const newPath = await saveFileAs(content, format)
             if (!newPath) return { ok: false, error: 'save cancelled' }
             tab.path = newPath
             tab.name = newPath.split(/[/\\]/).pop() ?? i18n.t('tab.untitled')
           } else {
-            await saveFile(tab.path, content)
+            await saveFile(tab.path, content, format)
           }
           tab.dirty = false
           return { ok: true }
@@ -59,6 +61,8 @@ export function createVimOps(ctx: VimOpsDeps) {
         try {
           const info = await openFileByPath(tab.path)
           tab.content = info.content
+          tab.encoding = info.encoding
+          tab.lineEnding = info.line_ending
           if (ctx.getEditor()) setContent(ctx.getEditor()!, info.content)
           tab.dirty = false
           return { ok: true }

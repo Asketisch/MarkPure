@@ -38,12 +38,25 @@ pub fn cmd_check_spelling(
     // 因此返回一个相当于 5xx 的错误而不是 panic。
     {
         let proxy_guard = lock_or_recover(&state.proxy);
-        let proxy = proxy_guard
-            .as_ref()
-            .ok_or_else(|| "event loop proxy not initialized".to_string())?;
-        proxy
-            .send_event(event)
-            .map_err(|e| format!("failed to dispatch spell check: {}", e))?;
+        match proxy_guard.as_ref() {
+            Some(proxy) => {
+                if let Err(e) = proxy.send_event(event) {
+                    return Err(format!("failed to dispatch spell check: {}", e));
+                }
+            }
+            None => {
+                // 没有事件循环代理（无 GUI 环境，例如 IPC 测试
+                // harness）。退回到平台无关的英文词典路径——
+                // 它不依赖主线程，因此在这里是安全的。相比直接
+                // 报错，用户至少还能得到拼写建议。
+                eprintln!(
+                    "[spellcheck] event loop proxy not initialized, \
+                     falling back to the built-in dictionary"
+                );
+                let result = spellcheck::check_spelling(text, lang);
+                return serde_json::to_value(result).map_err(|e| e.to_string());
+            }
+        }
     }
 
     // 有界等待。即使处理 1MB 的文档，NSSpellChecker 也会在一秒内
@@ -51,6 +64,29 @@ pub fn cmd_check_spelling(
     let errors = rx
         .recv_timeout(std::time::Duration::from_secs(5))
         .map_err(|e| format!("spell check timed out: {}", e))??;
+
+    let result = spellcheck::SpellCheckResult {
+        errors,
+        language: lang.to_string(),
+    };
+    serde_json::to_value(result).map_err(|e| e.to_string())
+}
+
+/// 直接在**当前线程**上执行拼写检查，不经过事件循环。
+///
+/// macOS 上调用 `NSSpellChecker` 必须在主线程，因此这个函数只能
+/// 在主线程上安全调用。它存在的意义是给无 GUI 环境（IPC 测试
+/// harness）一条与生产路径等价的检查链路：harness 的主线程就是
+/// 进程主线程。
+pub fn check_spelling_direct(
+    text: &str,
+    lang: &str,
+) -> std::result::Result<serde_json::Value, String> {
+    #[cfg(target_os = "macos")]
+    let errors = spellcheck::macos::check_with_nsspellchecker(text, lang);
+
+    #[cfg(not(target_os = "macos"))]
+    let errors = spellcheck::check_spelling(text, lang).errors;
 
     let result = spellcheck::SpellCheckResult {
         errors,

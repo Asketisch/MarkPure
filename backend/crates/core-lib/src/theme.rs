@@ -76,7 +76,13 @@ impl std::fmt::Display for ThemeId {
 }
 
 /// 自定义主题的定义
+///
+/// `#[serde(default)]` 让**缺失**的字段回落到 [`Theme::default`]：
+/// 用户手写的主题 JSON（或旧版本导出的文件）通常只写少数几个颜色，
+/// 没有它的话导入会直接失败——「导入自定义主题」对用户来说就是
+/// 完全不能用。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Theme {
     pub id: String,
     pub name: String,
@@ -87,7 +93,11 @@ pub struct Theme {
 }
 
 /// 主题配色
+///
+/// `#[serde(default)]` 让缺失的颜色回落到 [`ThemeColors::default`]，
+/// 这样只写少数几个颜色的主题文件也能导入成功。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ThemeColors {
     // === UI 颜色 ===
     pub bg: String,
@@ -211,12 +221,12 @@ impl Default for Theme {
 
 /// 获取主题存放目录
 pub fn themes_dir() -> PathBuf {
-    let config_dir = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("markpure")
-        .join("themes");
-    fs::create_dir_all(&config_dir).ok();
-    config_dir
+    // 走 `app_config_dir()`：它尊重 `MARKPURE_CONFIG_DIR`，测试 harness
+    // 因此可以把自定义主题隔离到临时目录。
+    let config_dir = crate::dirs::app_config_dir().unwrap_or_else(|| PathBuf::from("."));
+    let themes = config_dir.join("themes");
+    fs::create_dir_all(&themes).ok();
+    themes
 }
 
 /// 加载全部自定义主题

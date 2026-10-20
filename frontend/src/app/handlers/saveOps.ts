@@ -28,8 +28,10 @@ export function createSaveOps(ctx: SaveOpsDeps) {
     try {
       const editor = getEditor()
       const content = editor ? getMarkdown(editor) : tab.content
+      // 源文档的存储格式——另存为到新路径时沿用它（GBK / CRLF 不被改写）。
+      const format = { encoding: tab.encoding, lineEnding: tab.lineEnding }
       if (!tab.path) {
-        const newPath = await saveFileAs(content)
+        const newPath = await saveFileAs(content, format)
         if (newPath) {
           tab.path = newPath
           tab.name = newPath.split(/[/\\]/).pop() ?? i18n.t('tab.untitled')
@@ -37,7 +39,7 @@ export function createSaveOps(ctx: SaveOpsDeps) {
           app.savedAt = Date.now()
         }
       } else {
-        await saveFile(tab.path, content)
+        await saveFile(tab.path, content, format)
         tab.dirty = false
         app.savedAt = Date.now()
       }
@@ -54,7 +56,8 @@ export function createSaveOps(ctx: SaveOpsDeps) {
     try {
       const editor = getEditor()
       const content = editor ? getMarkdown(editor) : tab.content
-      const newPath = await saveFileAs(content)
+      const format = { encoding: tab.encoding, lineEnding: tab.lineEnding }
+      const newPath = await saveFileAs(content, format)
       if (newPath) {
         tab.path = newPath
         tab.name = newPath.split(/[/\\]/).pop() ?? i18n.t('tab.untitled')
