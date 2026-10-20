@@ -168,9 +168,17 @@ cd frontend && npm run check   # 前端类型检查（svelte-check + tsc）
 cargo check --workspace        # Rust 编译检查
 
 # 测试
-cargo test --workspace         # 运行所有 Rust 测试（9 个测试，分布在 5 个 crate 中）
-# 前端暂无测试框架
+npm test                       # 全部 11 套测试（后端 IPC + Markdown 往返 + 前端脚本）
+python3 scripts/test_backend.py  # 后端 IPC 全命令（经 mt_harness 驱动真实处理器）
+cargo test --workspace         # 运行所有 Rust 单元测试
 ```
+
+测试基础设施：Rust 侧用 `backend/apps/desktop/src/bin/mt_harness.rs`
+（stdin/stdout JSON-lines 协议，复用 `dispatch::execute_command` 的同一
+条路由表），Python 侧 `scripts/test_backend.py` 驱动它；显示层用
+`scripts/validate-*.ts`（tsx 运行）直接 import 仓库里的真实前端模块。
+`scripts/validate-file-format.ts` 把真实前端捕获到的 IPC 载荷原样喂给
+真实 Rust handler，验证「保存时保留存储格式」这条链路。
 
 ## 数据流
 
@@ -202,13 +210,13 @@ cargo test --workspace         # 运行所有 Rust 测试（9 个测试，分布
 | 命令 | 参数 | 返回值 |
 |------|------|--------|
 | `open_file` | `{ path }` | `FileInfo` |
-| `save_file` | `{ path, content }` 或 `{ path, doc_id }` | `void` |
+| `save_file` | `{ path, content, encoding?, line_ending? }` 或 `{ path, doc_id }` | `void` |
 | `get_doc_stats` | `{ content }` | `DocStats`（旧接口，保留兼容） |
 
 ### 文档注册表（Rust 持有文档 rope 副本）
 | 命令 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
-| `doc_open` | `{ doc_id, content }` | `void` | 注册文档到 Rust |
+| `doc_open` | `{ doc_id, content, encoding?, line_ending? }` | `void` | 注册文档到 Rust |
 | `doc_close` | `{ doc_id }` | `void` | 关闭标签页时注销 |
 | `doc_set_content` | `{ doc_id, content }` | `void` | 全量同步内容到 Rust |
 | `doc_get_stats` | `{ doc_id }` | `DocStats` | 零拷贝统计 |
@@ -385,10 +393,52 @@ CSS 变量还包括编辑器字体：`--editor-font-family`（默认系统字体
 - **文档注册表**：Rust `AppState.documents` 持有每个标签页的 Document（rope），`doc_get_stats` 和 `doc_search` 直接在 rope 上计算
 - **工作区搜索**：`backend/crates/search/src/lib.rs` 使用 `walkdir` 并行遍历 + `regex` 匹配，跳过二进制文件
 
+## 启动耗时
+
+应用从进程启动到窗口可见的耗时由两部分组成：
+
+| 阶段 | 耗时 | 说明 |
+|------|------|------|
+| tao 事件循环（NSApplication） | ~50-70ms | AppKit 固定开销 |
+| 窗口创建 | ~45-55ms | AppKit 固定开销 |
+| WKWebView 创建 | ~85ms | 拉起 WebKit 内容进程 |
+| 前端资源加载 + 解析 + 挂载 | ~160ms | 由首屏资源体积决定 |
+
+当前实测 **~260ms**（优化前 ~410ms）。两个主要杠杆：
+
+- **首屏资源体积**。KaTeX（257KB JS + 29KB CSS）、13 个 CodeMirror
+  语言包（330KB）、`html-to-image` 全部改为**按需加载**；首屏从
+  2089KB 降到 1212KB（−42%）。主 bundle 1765KB → 843KB。
+- **正式版不开 DevTools**。`with_devtools(true)` 会额外建立 WebKit 检查
+  通道，实测让 WebView 创建多花约 30ms、窗口创建多花约 50ms。
+  现在只有 `--dev` 模式才开；正式版需要排查时用
+  `MARKPURE_DEVTOOLS=1` 强制打开。
+
+调试启动耗时：
+
+```bash
+MARKPURE_STARTUP_LOG=1 cargo run --release
+# [startup] event loop built: 68ms
+# [startup] window built: 121ms
+# [startup] webview built: 203ms
+# [startup] entering event loop (page load starts now): 203ms
+```
+
+另一个容易踩的性能坑：`@tiptap/markdown` 的 MarkdownManager 构造时会把
+各扩展的 tokenizer 注册到 **marked 的全局实例**上，而本应用每打开一个
+文件就新建一个编辑器——全局实例上的扩展会越来越多，解析越来越慢
+（实测 154KB 文档：第 1 个编辑器 143ms，第 6 个 736ms）。
+`createEditor` 里在创建编辑器前会调用 `resetMarkedExtensions()` 清掉
+这些列表。
+
 ## 开发模式
 
 - `cargo run -- --dev`：Rust 后端连接 `http://localhost:5173`（Vite 开发服务器），支持前端热重载
 - 无 `--dev` 标志：Rust 后端通过 `rust-embed` 嵌入并服务 `dist/` 目录下的编译产物，使用自定义 `mt://` 协议
+- `MARKPURE_CONFIG_DIR`：配置目录（测试/便携模式用，优先于平台默认路径）
+- `MARKPURE_STARTUP_LOG=1`：打印启动各阶段耗时
+- `MARKPURE_DEVTOOLS=1`：正式版也开启 WebView DevTools
+
 
 ## 注意事项
 
@@ -402,6 +452,8 @@ CSS 变量还包括编辑器字体：`--editor-font-family`（默认系统字体
 - 表格使用 `resizable: true`，需要 `.tableWrapper`、`.selectedCell`、`.column-resize-handle` CSS 样式配合
 - 拼写检查目前仅支持英文（内置词典 `dict_en.txt`），中日韩文本自动跳过
 - 编码检测使用 `chardetng`，支持 UTF-8、GBK、Shift_JIS、Big5 等编码，写回时保留原始编码
+- **保存时保留存储格式**：前端交给 Rust 的内容永远是 UTF-8 + LF。`cmd_save_file` 在写盘前用 `fs::detect_format()` 探测**目标文件**自身的编码 / 行尾 / BOM，以磁盘上的文件为准；目标不存在（另存为到新路径）时沿用 `open_file` 返回的 `encoding` / `line_ending`，再退到 UTF-8 + LF
+- `Encoding::Utf8Bom` 在 `write_file` 时会写回 BOM；`Encoding::Other` 按 `encoding_rs` 的原始名称写回（EUC-JP 不会被错写成 Shift_JIS）
 - 图片粘贴支持三种模式：本地保存（`.assets/images/`）、base64 data URI、远程上传（multipart POST）
 
 ## AGENTS.md 导航体系

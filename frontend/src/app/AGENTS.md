@@ -58,6 +58,12 @@
 | `spellMenu.ts` | 拼写检查右键菜单条目 |
 | `helpers.ts` / `types.ts` | 共享工具（`pageNameFromPath` 等）与 `Tab` 类型 |
 
+## 存储格式
+
+`Tab` 携带 `encoding` / `lineEnding`（源文件的编码标签与行尾，来自
+`open_file` 的返回值）。保存时经 `saveOps.ts` / `vimOps.ts` 传给 Rust，
+另存为到新路径时沿用——否则 GBK / CRLF 文档另存后会被改写成 UTF-8 + LF。
+
 ## 规则
 
 - 新增功能逻辑放入 `handlers/` 对应模块（或新模块），不要内联回
