@@ -230,22 +230,49 @@ export const ImageWithAlign = Image.extend({
     // 一口吞掉（实测 CLAUDE.md 少了一半内容）。
     start: (src: string) => src.indexOf('!['),
     tokenize: (src: string) => {
-      const match =
-        /^!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"([^"]*)")?\s*\)\{([^{}]*)\}/.exec(src)
-      if (!match) return undefined
-      const [fullMatch, alt, href, title, attrText] = match
-      const attrs: Record<string, string> = {}
-      for (const seg of attrText.split(/\s+/)) {
-        const eq = seg.indexOf('=')
-        if (eq > 0) attrs[seg.slice(0, eq)] = seg.slice(eq + 1)
+      // ① 带属性段：`![alt](url){width=120 align=center}`
+      //
+      // URL 用懒惰匹配 `(.*?)` + 可选的 `"title"` + 要求 `)` 之后紧跟
+      // `{`——这样 URL 里含括号（`a(b).png`）或空格（`a b.png`）时也能
+      // 正确截断。若改用 `[^)\s]+`，这些 URL 会匹配失败，`{...}` 后缀
+      // 漏成裸文本，段落里混入块级图片，整篇文档变成非法。
+      const withAttrs =
+        /^!\[([^\]]*)\]\(\s*(.*?)\s*(?:"([^"]*)")?\s*\)\{([^{}]*)\}/.exec(src)
+      if (withAttrs) {
+        const [fullMatch, alt, href, title, attrText] = withAttrs
+        const attrs: Record<string, string> = {}
+        for (const seg of attrText.split(/\s+/)) {
+          const eq = seg.indexOf('=')
+          if (eq > 0) attrs[seg.slice(0, eq)] = seg.slice(eq + 1)
+        }
+        return {
+          type: 'image',
+          raw: fullMatch,
+          href,
+          title: title ?? null,
+          text: alt,
+          attrs,
+        } as never
       }
+
+      // ② 普通图片：`![alt](url)` / `![alt](url "title")`
+      //
+      // 这一支必须自己接管：marked 的默认 image token 在 **alt 里含 `[`**
+      // 时会把整张图片降级成纯文本——图片就此丢失（实测
+      // `![带 [ 的 alt](url)` 往返后变成 `![带  的 alt]`）。
+      //
+      // 规则与 marked 一致（URL 到第一个 `)`，可含空格），只是 alt
+      // 严格匹配到 `]`——`[` 在 alt 里是合法的。
+      const plain = /^!\[([^\]]*)\]\(\s*([^)]*?)\s*(?:"([^"]*)")?\s*\)/.exec(src)
+      if (!plain) return undefined
+      const [fullMatch, alt, href, title] = plain
       return {
         type: 'image',
         raw: fullMatch,
         href,
         title: title ?? null,
         text: alt,
-        attrs,
+        attrs: {},
       } as never
     },
   },

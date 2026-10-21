@@ -5,6 +5,8 @@
 | 文件 | 说明 |
 |------|------|
 | `editor.ts` | createEditor, getMarkdown, setContent |
+| `markdown-normalize.ts` | 解析前的文本级修正：列表续行缩进（按内容缩进栈向上回溯归属） |
+| `markdown-structure.ts` | 解析后的结构级修正：段落里的行内图片提升为块级、setext 标题拆行、容器里的裸文本包成段落 |
 | `outline-extract.ts` | 从 ProseMirror doc 提取标题节点（纯渲染逻辑） |
 | `slugify.ts` | 标题 ID 字符串 slug 化 |
 | `commands/` | IPC 命令封装，按主题拆分（file/editor/workspace/export/pngExport/ipc/types） |

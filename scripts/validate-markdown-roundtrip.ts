@@ -47,6 +47,7 @@ import { MarkdownTable } from '../frontend/src/extensions/blocks/table-extension
 import { MathExtension } from '../frontend/src/extensions/blocks/math-extension'
 import { ImageWithAlign } from '../frontend/src/extensions/blocks/image-extension'
 import { normalizeListContinuations } from '../frontend/src/editor/markdown-normalize'
+import { extractBlockImages } from '../frontend/src/editor/markdown-structure'
 
 /**
  * 与 `createEditor` 保持一致的扩展集（只保留影响 Markdown 往返的
@@ -165,8 +166,9 @@ const SCHEMA = getSchema(SCHEMA_EXTENSIONS)
 
 /** Markdown → ProseMirror JSON。 */
 function parse(md: string): any {
-  // 与应用一致：解析前先修正列表续行的缩进
-  return buildManager().parse(normalizeListContinuations(md))
+  // 与应用一致：解析前修正列表续行缩进，解析后做结构修正
+  // （把段落里的行内图片提升为块级）。
+  return extractBlockImages(buildManager().parse(normalizeListContinuations(md)))
 }
 
 /**

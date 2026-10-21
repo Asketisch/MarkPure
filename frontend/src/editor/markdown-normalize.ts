@@ -44,8 +44,26 @@ export function normalizeListContinuations(md: string): string {
   const lines = md.split('\n')
   const out: string[] = []
 
-  /** 当前列表项的内容缩进（列表标记之后的位置）；不在列表里时为 -1。 */
-  let contentIndent = -1
+  /**
+   * 列表项**内容缩进**的栈（外层 → 内层）。
+   *
+   * 不能只记住最近一个列表项：缩进比最近列表项浅的行并不属于它，
+   * 而是要向上回溯到真正包含它的那一层（CommonMark 的规则）。
+   * 只记最近一个会把内容归到错误的列表项上——例如
+   *
+   * ```text
+   * - [ ] A          ← 内容缩进 2
+   *   - B            ← 内容缩进 4
+   *
+   *     - [ ] C      ← 内容缩进 6
+   *
+   *    缩进的文本     ← 缩进 3：属于 A（2），不属于 B / C
+   * ```
+   *
+   * 这行若被归给 C，保存后就会变成 C 的续行——文档结构被改写。
+   */
+  const indentStack: number[] = []
+
   /** 当前是否位于围栏代码块内。 */
   let inFence = false
   /** 围栏的标记字符（``` 或 ~~~），用于判断闭合。 */
@@ -62,7 +80,7 @@ export function normalizeListContinuations(md: string): string {
         inFence = false
         fenceMarker = ''
       }
-      contentIndent = -1
+      indentStack.length = 0
       out.push(line)
       continue
     }
@@ -74,22 +92,46 @@ export function normalizeListContinuations(md: string): string {
 
     const item = LIST_ITEM_RE.exec(line)
     if (item) {
-      // 列表项本身：记录它的内容缩进 = 前导空白 + 标记 + 标记后的空白。
-      contentIndent = item[1].length + item[2].length + item[3].length
+      // 列表项本身：它的内容缩进 = 前导空白 + 标记 + 标记后的空白。
+      const thisIndent = item[1].length + item[2].length + item[3].length
+      // 同层（或更外层）的列表项出现时，把比它更深的那几层弹出。
+      while (
+        indentStack.length > 0 &&
+        indentStack[indentStack.length - 1] >= thisIndent
+      ) {
+        indentStack.pop()
+      }
+      indentStack.push(thisIndent)
       out.push(line)
       continue
     }
 
-    if (contentIndent >= 0 && line.trim() !== '') {
+    if (line.trim() !== '') {
       const indent = /^(\s*)/.exec(line)![1].length
-      if (indent > 0 && indent < contentIndent) {
-        // 懒续行：补齐到内容缩进，绕开 marked 的解析缺陷。
-        out.push(' '.repeat(contentIndent) + line.slice(indent))
+      if (indent === 0) {
+        // 顶格的非空行结束所有列表项。
+        indentStack.length = 0
+        out.push(line)
         continue
       }
-      if (indent === 0) {
-        // 顶格的非空行结束列表项。
-        contentIndent = -1
+      // 找出**包含**该行的层级：栈中内容缩进 ≤ 本行缩进的最大那一层。
+      //
+      // - 找到了（owner ≥ 0）且 indent > owner → 该行是那一层的正常
+      //   子内容（缩进够深），不需要动。
+      // - 找到了且 indent < owner → 懒续行，补齐到 owner。
+      // - 没找到（所有层都比它深）→ 按 marked 的懒续行行为归给最近的
+      //   列表项（栈顶），补齐到栈顶——这保留了单层列表的原有行为。
+      let owner = -1
+      for (const ci of indentStack) {
+        if (ci <= indent) owner = ci
+      }
+      if (owner < 0) {
+        owner = indentStack.length > 0 ? indentStack[indentStack.length - 1] : -1
+      }
+      if (owner >= 0 && indent < owner) {
+        // 懒续行：补齐到内容缩进，绕开 marked 的解析缺陷。
+        out.push(' '.repeat(owner) + line.slice(indent))
+        continue
       }
     }
 

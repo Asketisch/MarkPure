@@ -58,13 +58,21 @@ function renderTableCompactToMarkdown(node: JSONContent, h: MarkdownRendererHelp
     const cells: RenderedCell[] = []
     if (rowNode.content) {
       rowNode.content.forEach((cellNode) => {
-        let raw = ''
-        if (cellNode.content && Array.isArray(cellNode.content) && cellNode.content.length > 1) {
-          const parts = cellNode.content.map((child) => h.renderChildren(child))
-          raw = parts.join(DEFAULT_CELL_LINE_SEPARATOR)
-        } else {
-          raw = cellNode.content ? h.renderChildren(cellNode.content) : ''
+        // 上游用 `h.renderChildren(child)` 逐个渲染子节点——那个 API
+        // 只返回节点的**子内容**，对块级节点（如图片）会返回空串，
+        // 于是表格里的图片被**静默丢弃**。改用 `h.renderChild`，
+        // 它走节点自己的 `renderMarkdown`，图片因此能正确渲染成
+        // `![alt](url)`。
+        const children = Array.isArray(cellNode.content) ? cellNode.content : []
+        const parts: string[] = []
+        for (let i = 0; i < children.length; i++) {
+          const rendered = h.renderChild
+            ? h.renderChild(children[i], i)
+            : h.renderChildren(children[i])
+          // 跳过空片段：单元格里补的空段落不应留下分隔符。
+          if (rendered) parts.push(rendered)
         }
+        const raw = parts.join(DEFAULT_CELL_LINE_SEPARATOR)
         cells.push({
           text: collapseWhitespace(raw),
           isHeader: cellNode.type === 'tableHeader',

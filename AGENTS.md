@@ -32,9 +32,10 @@
 | `npx tsx scripts/validate-interactions.ts` | 显示层面板类交互（真实按键 / 鼠标事件） |
 | `npx tsx scripts/validate-editing.ts` | 显示层编辑类交互（拖拽 / 下拉 / 勾选 / 补全） |
 | `npx tsx scripts/validate-features.ts` | 显示层功能链路（命令面板 / 书签 / 搜索 / 拼写） |
+| `npx tsx scripts/validate-fuzz.ts` | Markdown 解析 / 序列化的随机化回归 |
 | `cargo test --workspace` | Rust 单元测试 |
 | `npm run check` | 前端类型检查 |
-| `npm test` | 以上全部（前端 14 个既有验证脚本也包含在内） |
+| `npm test` | 以上全部（前端 15 个既有验证脚本也包含在内） |
 
 浏览器端回归：用 `npx vite preview --port 4173` 起**生产构建**（附带
 `/__ipc` 桥，把浏览器 IPC 转发到 `mt_harness`），即可在浏览器里驱动

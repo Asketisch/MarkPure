@@ -8,7 +8,9 @@
  */
 
 import type { Editor } from '@tiptap/core'
+import type { JSONContent } from '@tiptap/core'
 import { normalizeListContinuations } from './markdown-normalize'
+import { extractBlockImages } from './markdown-structure'
 
 export function getMarkdown(editor: Editor): string {
   return editor.getMarkdown()
@@ -41,7 +43,7 @@ export function setContent(editor: Editor, markdown: string): void {
           ?? editor.markdown,
         normalized,
       )
-      editor.commands.setContent(parsed as object)
+      editor.commands.setContent(extractBlockImages(parsed as JSONContent))
       return
     }
   } catch (err) {
