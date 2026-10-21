@@ -838,6 +838,32 @@ class TestWorkspaceSearch(BackendTestCase):
         assert any(f.endswith("one.md") for f in files)
         assert any(f.endswith("three.md") for f in files)
 
+    def test_search_finds_chinese_content(self) -> None:
+        """中文文件必须能被搜到。
+
+        二进制判定曾把 0x80–0xFF 当作「不可打印」字节，于是**所有
+        中文文件都被判成二进制**跳过，工作区搜索对中文内容完全失效。
+        """
+        self.write_file("中文.md", "# 标题\n\n这是一段中文正文。\n")
+        self.write_file("mixed.md", "# 标题\n\n混着 english 单词的行。\n")
+
+        result = self.h.call(
+            "search_workspace",
+            {"path": str(self.workspace), "query": "中文正文"},
+        )
+        matches = result["matches"] if isinstance(result, dict) else result
+        assert len(matches) == 1, matches
+        assert matches[0]["file"].endswith("中文.md"), matches
+
+        # 英文词在中文文件里也要能搜到
+        result2 = self.h.call(
+            "search_workspace",
+            {"path": str(self.workspace), "query": "english"},
+        )
+        matches2 = result2["matches"] if isinstance(result2, dict) else result2
+        assert len(matches2) == 1, matches2
+        assert matches2[0]["file"].endswith("mixed.md"), matches2
+
     def test_case_sensitive_search(self) -> None:
         result = self.h.call(
             "search_workspace",
@@ -1417,6 +1443,30 @@ class TestSpellcheck(BackendTestCase):
             "check_spelling", {"text": "the quick brown fox", "lang": "en"}
         )
         assert result["errors"] == [], result
+
+    def test_detects_typo_next_to_long_cjk_run(self) -> None:
+        """长中文段落旁边的英文拼写错误必须能检出。
+
+        `NSSpellChecker` 会把较长的 CJK 段落整体当成一个「词」，
+        于是紧邻它的英文单词不再被逐词检查（实测连续 6 个中文字符
+        仍能检出，7 个就检不出了）。中文 Markdown 文档里一段中文
+        紧跟一个英文单词是常态，因此英文检查必须按 CJK 边界分段。
+        """
+        text = "探针这里有一个拼写错误 recieve 用来测试拼写检查。"
+        result = self.h.call("check_spelling", {"text": text, "lang": "en"})
+        words = {e["word"] for e in result["errors"]}
+        assert "recieve" in words, result
+
+        # 偏移必须相对**原文**（分段后要加回段起始偏移），
+        # 否则前端无法把错误映射回正确位置。
+        err = next(e for e in result["errors"] if e["word"] == "recieve")
+        assert text.encode("utf-8")[err["start"]:err["end"]] == b"recieve", err
+
+    def test_detects_typo_in_cjk_dense_line(self) -> None:
+        text = "中文中文中文 recieve 中文中文中文"
+        result = self.h.call("check_spelling", {"text": text, "lang": "en"})
+        words = {e["word"] for e in result["errors"]}
+        assert "recieve" in words, result
 
     def test_requires_text(self) -> None:
         self.h.expect_error("check_spelling", {"lang": "en"})

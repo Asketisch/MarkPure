@@ -95,7 +95,11 @@ class ImageFigureView implements NodeView {
     ev.preventDefault()
     ev.stopPropagation()
     const startX = ev.clientX
-    const startWidth = this.img.getBoundingClientRect().width
+    // 起始宽度取 figure（用户看到的尺寸），**不是**内部 <img> 的宽度。
+    // 图片通过 figure 的 width 样式缩放时，img 元素自身的渲染宽度仍是
+    // 它的**固有宽度**（1×1 的占位图只有 1px）。拿 img 的宽度做基准，
+    // 一次拖拽就会把图片缩小（实测 120px 的图拖 +60 变成 61px）。
+    const startWidth = this.dom.getBoundingClientRect().width
     const onMove = (e: MouseEvent) => {
       const delta = e.clientX - startX
       const next = Math.max(40, Math.min(2000, Math.round(startWidth + delta)))

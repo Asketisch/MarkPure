@@ -41,6 +41,82 @@ pub fn check_with_nsspellchecker(text: &str, lang: &str) -> Vec<SpellError> {
     if text.is_empty() {
         return Vec::new();
     }
+    // 英文按 CJK 边界分段检查，理由见 `check_english_segmented`。
+    if is_english(lang) {
+        return check_english_segmented(text);
+    }
+    check_text(text, lang)
+}
+
+/// 语言是否为英文（`en` / `en-US` / `en-GB` …）。
+fn is_english(lang: &str) -> bool {
+    lang.eq_ignore_ascii_case("en") || lang.to_ascii_lowercase().starts_with("en-")
+}
+
+/// 把文本按 **CJK 块**切开，只把非 CJK 的连续片段送去检查。
+///
+/// ## 为什么需要
+///
+/// `NSSpellChecker` 在遇到较长的 CJK 段落时会把整段当成一个「词」，
+/// 于是**紧邻长中文段的英文单词不再被逐词检查**。实测连续 6 个
+/// 中文字符仍能检出 `recieve`，7 个就检不出了——而中文 Markdown
+/// 文档里一段中文紧跟一个英文单词是常态。
+///
+/// 把 CJK 块从待检文本里剔除后，英文词所在的片段保持完整，英文
+/// 拼写检查得以正常工作。
+///
+/// 只有**英文**语言走这条路径：中文 / 日文界面下整段交给系统词典，
+/// 中文错别字检查不受影响。
+fn check_english_segmented(text: &str) -> Vec<SpellError> {
+    let mut errors = Vec::new();
+    for (offset, segment) in non_cjk_segments(text) {
+        for mut e in check_text(segment, "en") {
+            e.start += offset;
+            e.end += offset;
+            errors.push(e);
+        }
+    }
+    errors
+}
+
+/// 把文本切成若干**非 CJK 连续片段**，返回 (起始字节偏移, 片段)。
+///
+/// CJK 字符（含 CJK 标点与全角符号）充当分隔符，其余字符
+/// （ASCII 与其它 Unicode）保持原样——这样英文单词不会被切断。
+fn non_cjk_segments(text: &str) -> Vec<(usize, &str)> {
+    let mut segments = Vec::new();
+    let mut seg_start: Option<usize> = None;
+    for (byte_idx, ch) in text.char_indices() {
+        if is_cjk_char(ch) {
+            if let Some(start) = seg_start.take() {
+                segments.push((start, &text[start..byte_idx]));
+            }
+        } else if seg_start.is_none() {
+            seg_start = Some(byte_idx);
+        }
+    }
+    if let Some(start) = seg_start {
+        segments.push((start, &text[start..]));
+    }
+    segments
+}
+
+/// 是否为 CJK 字符（含 CJK 标点与全角形式）。
+fn is_cjk_char(ch: char) -> bool {
+    let c = ch as u32;
+    (0x4E00..=0x9FFF).contains(&c)      // 汉字
+        || (0x3400..=0x4DBF).contains(&c)  // 扩展 A
+        || (0x3040..=0x30FF).contains(&c)  // 日文假名
+        || (0xAC00..=0xD7AF).contains(&c)  // 韩文
+        || (0x3000..=0x303F).contains(&c)  // CJK 标点
+        || (0xFF00..=0xFFEF).contains(&c)  // 全角形式
+}
+
+/// 用系统 `NSSpellChecker` 检查**整段**文本。
+fn check_text(text: &str, lang: &str) -> Vec<SpellError> {
+    if text.is_empty() {
+        return Vec::new();
+    }
 
     // SAFETY: NSSpellChecker::sharedSpellChecker 是进程级单例的
     // 规范访问器；objc2 返回 +1 持有的句柄。
@@ -184,6 +260,58 @@ mod tests {
         let map = build_utf16_to_utf8_map("a你b");
         // 'a' 1 字节 1 单元；'你' 3 字节 1 单元；'b' 1 字节 1 单元
         assert_eq!(map, vec![0, 1, 4, 5]);
+    }
+
+    #[test]
+    fn segments_split_on_cjk_and_keep_ascii_words_intact() {
+        let text = "中文 recieve 中文";
+        let segs = non_cjk_segments(text);
+        // 前后的中文各自切一刀，中间只剩一段非 CJK：
+        // 「 recieve 」——英文单词完整保留，不会被切断。
+        assert_eq!(segs.len(), 1, "{segs:?}");
+        assert_eq!(segs[0].0, 6); // "中文" 之后
+        assert_eq!(segs[0].1, " recieve ");
+    }
+
+    #[test]
+    fn segments_offsets_are_byte_offsets_into_original() {
+        let text = "中文中文中文 recieve";
+        let segs = non_cjk_segments(text);
+        assert_eq!(segs.len(), 1);
+        let (offset, seg) = segs[0];
+        assert_eq!(&text[offset..offset + seg.len()], seg);
+        assert!(seg.contains("recieve"));
+    }
+
+    #[test]
+    fn pure_ascii_text_is_one_segment() {
+        let text = "hello recieve world";
+        let segs = non_cjk_segments(text);
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].0, 0);
+        assert_eq!(segs[0].1, text);
+    }
+
+    #[test]
+    fn cjk_punctuation_and_fullwidth_also_split() {
+        // 中文标点与全角符号同样是分隔符：
+        // "你好，" 被切掉，只剩 "world" 一段。
+        let segs = non_cjk_segments("你好，world");
+        assert_eq!(segs.len(), 1, "{segs:?}");
+        assert_eq!(segs[0].1, "world");
+        assert!(is_cjk_char('。'));
+        assert!(is_cjk_char('，'));
+        assert!(!is_cjk_char('a'));
+        assert!(!is_cjk_char('é'));
+    }
+
+    #[test]
+    fn english_language_detection() {
+        assert!(is_english("en"));
+        assert!(is_english("en-US"));
+        assert!(is_english("EN"));
+        assert!(!is_english("zh-CN"));
+        assert!(!is_english("ja"));
     }
 
     // 注意：真实的 NSSpellChecker 调用不纳入单元测试，因为它们需要

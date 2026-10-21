@@ -336,19 +336,27 @@ fn is_binary_file(path: &PathBuf) -> bool {
             if sample.contains(&0) {
                 return true;
             }
-            // 额外启发式：若超过 20% 的非空字节不可打印，
-            // 视为二进制
-            let mut non_printable = 0;
-            let mut ascii_count = 0;
+            // 额外启发式：控制字符占比过高视为二进制。
+            //
+            // **注意 0x80–0xFF 不能算作「不可打印」**：它们在 UTF-8 里
+            // 是中文 / 日文 / emoji 等多字节序列的组成部分。早期版本
+            // 把它们计入 non_printable，结果**所有中文文件都被判成
+            // 二进制**——工作区搜索因此完全搜不到中文内容（这对一个
+            // 中文 Markdown 编辑器是致命的）。
+            //
+            // 真正的二进制（PNG / zip / 可执行文件）几乎必然含 NUL，
+            // 那一条已经覆盖；控制字符只是辅助判据。
+            let mut suspicious = 0usize;
             for &b in sample {
-                if b == 0 { return true; }
-                if (32..127).contains(&b) {
-                    ascii_count += 1;
-                } else if b != b'\n' && b != b'\r' && b != b'\t' {
-                    non_printable += 1;
+                if b == 0 {
+                    return true;
+                }
+                let is_control = b < 0x20 && b != b'\n' && b != b'\r' && b != b'\t';
+                if is_control || b == 0x7f {
+                    suspicious += 1;
                 }
             }
-            if ascii_count > 0 && non_printable as f64 / (ascii_count + non_printable) as f64 > 0.3 {
+            if suspicious * 10 > sample.len() {
                 return true;
             }
         }
@@ -495,5 +503,48 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir_a);
         let _ = std::fs::remove_dir_all(&dir_b);
+    }
+
+    /// 中文文件不能被判成二进制——否则工作区搜索完全搜不到中文内容。
+    #[test]
+    fn utf8_chinese_file_is_not_binary() {
+        let dir = std::env::temp_dir().join(format!("markpure-search-cn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("中文.md");
+        std::fs::write(&file, "# 标题\n\n这是一段中文正文，混着 english 单词。\n").unwrap();
+
+        assert!(
+            !is_binary_file(&file),
+            "含中文的 Markdown 被误判成二进制文件"
+        );
+
+        let options = SearchOptions {
+            case_sensitive: false,
+            whole_word: false,
+            use_regex: false,
+            max_depth: Some(10),
+        };
+        let result = search_workspace(&dir, "中文正文", &options).unwrap();
+        assert_eq!(result.total_matches, 1, "中文内容搜不到：{:?}", result);
+        assert!(result.matches[0].file.ends_with("中文.md"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 真正的二进制文件（含 NUL）仍然要判成二进制并跳过。
+    #[test]
+    fn binary_file_with_nul_is_still_detected() {
+        let dir = std::env::temp_dir().join(format!("markpure-search-bin-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("blob.md");
+        let mut bytes = b"# header\n".to_vec();
+        bytes.extend_from_slice(&[0u8, 1, 2, 3, 0, 255]);
+        std::fs::write(&file, &bytes).unwrap();
+
+        assert!(is_binary_file(&file), "含 NUL 的文件应判为二进制");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
