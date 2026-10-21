@@ -1492,6 +1492,17 @@ html, body, #app {
   overflow: hidden;
 }
 
+/* 右侧面板（大纲 / 撤销树 / 标签 / 反链）在 DOM 里先于编辑器渲染
+   （AppPanels 早于 AppEditorViews），默认会落在编辑器**左边**。
+   它们的 `border-left` 表明设计意图是贴在编辑器**右侧**，因此用
+   `order` 把它们推到编辑器面板之后。 */
+.main-area > .sidebar-container { order: 0; }
+.main-area > .editor-panel { order: 1; }
+.main-area > .outline-panel,
+.main-area > .undo-tree-panel,
+.main-area > .tag-panel,
+.main-area > .backlinks-panel { order: 2; }
+
 .sidebar-container {
   display: flex;
   flex-shrink: 0;
@@ -1501,6 +1512,10 @@ html, body, #app {
   display: flex;
   flex-direction: column;
   flex: 1;
+  /* 允许它收缩到内容宽度以下。否则工具栏的 min-content 宽度
+     （一排不换行的按钮）会把编辑区挤成一条缝——这正是之前
+     `.editor-panel` 包装丢失时看到的现象。 */
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -1567,6 +1582,9 @@ html, body, #app {
   padding: 6px 8px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
+  /* 窗口较窄时按钮横向滚动，而不是把编辑区挤扁或溢出到窗口外。 */
+  overflow-x: auto;
+  flex-shrink: 0;
 }
 .tb-btn {
   background: none;

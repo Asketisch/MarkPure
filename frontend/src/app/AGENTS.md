@@ -58,6 +58,26 @@
 | `spellMenu.ts` | 拼写检查右键菜单条目 |
 | `helpers.ts` / `types.ts` | 共享工具（`pageNameFromPath` 等）与 `Tab` 类型 |
 
+## 布局骨架
+
+```
+.app-root (column)
+  ├── MenuBar / WorkspaceRootTabs
+  └── .main-area (row)
+        ├── .sidebar-container          ← 左侧文件树
+        ├── .editor-panel (column)      ← 编辑器列：标签栏 / 工具栏 / 编辑区 / 状态栏
+        └── 右侧面板（大纲 / 撤销树 / 标签 / 反链）
+```
+
+**`.editor-panel` 这层列容器不可省略。** `.main-area` 是 flex row，
+若编辑器视图直接输出多个根元素，它们会各自成为并列 flex item
+（标签栏 / 工具栏 / 编辑区 / 状态栏并排），布局彻底崩坏。右侧面板
+在 DOM 里先于编辑器渲染（`AppPanels` 早于 `AppEditorViews`），靠
+`app.css` 里的 `order` 规则推到编辑器右侧。
+
+`scripts/validate-layout.ts` 用无头 Chrome 断言这层结构与几何——
+改布局时先跑它。
+
 ## 存储格式
 
 `Tab` 携带 `encoding` / `lineEnding`（源文件的编码标签与行尾，来自

@@ -28,9 +28,10 @@
 | `npx tsx scripts/validate-markdown-roundtrip.ts` | 显示层的 Markdown 往返 + 全仓库文档语料扫描 |
 | `npx tsx scripts/validate-markdown-normalize.ts` | 列表续行缩进归一化 |
 | `npx tsx scripts/validate-file-format.ts` | 保存时的存储格式保真（真实前端 → 真实 Rust handler） |
+| `npx tsx scripts/validate-layout.ts` | 显示层布局（无头 Chrome + CDP 几何断言） |
 | `cargo test --workspace` | Rust 单元测试 |
 | `npm run check` | 前端类型检查 |
-| `npm test` | 以上全部（前端 10 个既有验证脚本也包含在内） |
+| `npm test` | 以上全部（前端 11 个既有验证脚本也包含在内） |
 
 浏览器端回归：用 `npx vite preview --port 4173` 起**生产构建**（附带
 `/__ipc` 桥，把浏览器 IPC 转发到 `mt_harness`），即可在浏览器里驱动
@@ -41,6 +42,15 @@
 载荷**原样**喂给 `mt_harness` 的真实 handler，最后检查磁盘字节。
 这样「前端传的格式」与「后端写盘的格式」在同一条链路上被验证——
 前端漏传 `encoding`、或后端不认这个编码，都会立刻失败。
+
+`scripts/validate-layout.ts` 补的是另一类盲区：**显示层布局**。
+`1568ffc` 那次组件拆分丢了包裹编辑器视图的 `.editor-panel` 列容器，
+`.main-area`（flex row）于是把标签栏 / 工具栏 / 编辑区 / 状态栏
+排成了一行——编辑器被挤成一条缝。后端 IPC 测试与纯函数测试都抓不到
+这类问题，手测又容易用窄视口而错过。该脚本用无头 Chrome（CDP）
+打开生产构建，在 1280 / 1900 / 2560 三个视口下断言 DOM 结构与几何，
+并额外验证大纲面板位于编辑器**右侧**。没有 Chrome 时它会跳过而不是
+失败。
 
 `scripts/validate-markdown-roundtrip.ts` 里的**语料扫描**值得特别
 一提：它把仓库里所有 `.md` 逐个解析、用真实 schema 校验、再往返一遍。

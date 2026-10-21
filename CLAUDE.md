@@ -168,7 +168,7 @@ cd frontend && npm run check   # 前端类型检查（svelte-check + tsc）
 cargo check --workspace        # Rust 编译检查
 
 # 测试
-npm test                       # 全部 11 套测试（后端 IPC + Markdown 往返 + 前端脚本）
+npm test                       # 全部 12 套测试（后端 IPC + Markdown 往返 + 前端脚本 + 布局）
 python3 scripts/test_backend.py  # 后端 IPC 全命令（经 mt_harness 驱动真实处理器）
 cargo test --workspace         # 运行所有 Rust 单元测试
 ```
@@ -178,7 +178,9 @@ cargo test --workspace         # 运行所有 Rust 单元测试
 条路由表），Python 侧 `scripts/test_backend.py` 驱动它；显示层用
 `scripts/validate-*.ts`（tsx 运行）直接 import 仓库里的真实前端模块。
 `scripts/validate-file-format.ts` 把真实前端捕获到的 IPC 载荷原样喂给
-真实 Rust handler，验证「保存时保留存储格式」这条链路。
+真实 Rust handler，验证「保存时保留存储格式」这条链路；
+`scripts/validate-layout.ts` 用无头 Chrome（CDP）在多个视口下断言
+显示层布局——纯函数测试抓不到 flex 布局错乱。
 
 ## 数据流
 
