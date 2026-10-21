@@ -110,6 +110,43 @@ writeFileSync(
   '# Layout Probe\n\n段落内容 body text.\n\n| 列 A | 列 B |\n| --- | --- |\n| 1 | 2 |\n',
 )
 
+// 「富内容」样本：宽表格 / 代码块 / 图片 / 任务列表 / 数学公式。
+//
+// 这些块各有自己的渲染路径（TableView、CodeMirror 6、figure NodeView、
+// TaskItem、KaTeX），也各有自己的宽度行为——宽表格尤其容易把整个
+// 布局撑破。这一组断言既检查「内容真的渲染出来了」，也检查
+// 「渲染出来之后布局没有被撑坏」。
+const WIDE_HEADERS = Array.from({ length: 18 }, (_, i) => `第${i + 1}列`).join(' | ')
+const WIDE_ROW = Array.from({ length: 18 }, (_, i) => `单元格${i + 1}`).join(' | ')
+writeFileSync(
+  join(wsDir, 'rich.md'),
+  [
+    '# 富内容',
+    '',
+    '段落文本。',
+    '',
+    `| ${WIDE_HEADERS} |`,
+    `| ${WIDE_ROW.split(' | ').map(() => '---').join(' | ')} |`,
+    `| ${WIDE_ROW} |`,
+    '',
+    '```js',
+    'const wide = "x".repeat(200)',
+    '```',
+    '',
+    '![占位图](data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7)',
+    '',
+    '- [ ] 待办事项',
+    '- [x] 已完成',
+    '',
+    '行内公式 $E = mc^2$ 与块级公式：',
+    '',
+    '$$',
+    '\\int_0^1 x^2 dx = \\frac{1}{3}',
+    '$$',
+    '',
+  ].join('\n'),
+)
+
 console.log('— validate-layout —')
 console.log('  正在构建生产产物 ...')
 execFileSync('npx', ['vite', 'build', '--outDir', outDir, '--emptyOutDir'], {
@@ -480,6 +517,79 @@ async function main() {
         `容器 ${sp.w}px / 面板 ${JSON.stringify(sp.panes)}`,
       )
     }
+  }
+
+  // 富内容：宽表格 / 代码块 / 图片 / 任务列表 / 数学公式。
+  //
+  // 两条主线：
+  // 1. 每种块**真的渲染出来了**（早前的 bug 里围栏代码块整个消失、
+  //    表格不认 markdown 钩子，都是这类问题）；
+  // 2. 渲染之后**布局没有被撑破**——编辑区宽度仍等于编辑器面板宽度，
+  //    页面没有出现横向滚动条（宽表格只应在编辑区内部滚动）。
+  {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width: 1900, height: 1180, deviceScaleFactor: 1, mobile: false,
+    })
+    await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` })
+    await new Promise((r) => setTimeout(r, 3500))
+    await evaluate(`(() => {
+      const all = [...document.querySelectorAll('*')].filter(
+        n => (n.textContent||'').trim() === 'rich.md' && n.children.length === 0)
+      const el = all[0]
+      if (el) (el.closest('[role=button], .tree-item, button') || el).click()
+      return !!el
+    })()`)
+    await new Promise((r) => setTimeout(r, 3000))
+
+    const rc = await evaluate(`(() => {
+      const rect = (sel) => {
+        const el = document.querySelector(sel)
+        if (!el) return null
+        const r = el.getBoundingClientRect()
+        return { x: Math.round(r.x), w: Math.round(r.width),
+                 right: Math.round(r.right), scrollW: el.scrollWidth,
+                 clientW: el.clientWidth }
+      }
+      return {
+        viewportW: innerWidth,
+        pageScrollW: document.documentElement.scrollWidth,
+        bodyScrollW: document.body.scrollWidth,
+        panel: rect('.editor-panel'),
+        editorArea: rect('.editor-area'),
+        hasTable: !!document.querySelector('.tableWrapper'),
+        tableRows: document.querySelectorAll('.tableWrapper tr').length,
+        hasCodeBlock: !!document.querySelector('.mw-code-block'),
+        hasFigure: !!document.querySelector('figure.image-figure'),
+        hasTaskItem: !!document.querySelector('ul[data-type="taskList"] > li[data-checked]'),
+        taskItemCount: document.querySelectorAll('ul[data-type="taskList"] > li[data-checked]').length,
+        hasMath: !!document.querySelector('.tiptap-mathematics-render'),
+      }
+    })()`)
+
+    ok('富内容文档已打开', !!rc.editorArea, '编辑区不存在')
+    ok('表格渲染出来了（.tableWrapper）', rc.hasTable)
+    ok('表格有内容行', rc.tableRows >= 2, `行数 ${rc.tableRows}`)
+    ok('围栏代码块渲染出来了（.mw-code-block）', rc.hasCodeBlock)
+    ok('图片渲染出来了（figure.image-figure）', rc.hasFigure)
+    ok('任务列表渲染出来了（taskList > li[data-checked]）', rc.hasTaskItem)
+    ok('任务列表有两项', rc.taskItemCount === 2, `实际 ${rc.taskItemCount} 项`)
+    ok('数学公式渲染出来了', rc.hasMath)
+
+    ok(
+      '富内容没有把编辑区撑宽',
+      rc.editorArea && rc.panel && rc.editorArea.w === rc.panel.w,
+      `editor-area ${rc.editorArea?.w}px vs panel ${rc.panel?.w}px`,
+    )
+    ok(
+      '编辑器面板没有超出视口',
+      rc.panel && rc.panel.right <= rc.viewportW + 1,
+      `panel right=${rc.panel?.right} 视口 ${rc.viewportW}`,
+    )
+    ok(
+      '页面没有出现横向滚动条',
+      rc.pageScrollW <= rc.viewportW + 1 && rc.bodyScrollW <= rc.viewportW + 1,
+      `documentElement.scrollWidth=${rc.pageScrollW} body.scrollWidth=${rc.bodyScrollW} 视口 ${rc.viewportW}`,
+    )
   }
 }
 
