@@ -73,6 +73,11 @@ export interface OutlineItem {
 // App config
 export interface AppConfig {
   theme: string
+  /**
+   * 配置加载警告（例如 config.toml 损坏、已回退到默认设置）。
+   * 存在时前端应当提示用户——否则用户只会看到「设置全没了」。
+   */
+  load_warning?: string | null
   language: string | null
   last_workspace: string | null
   // 字数统计目标。放在 AppConfig 顶层字段，设置面板

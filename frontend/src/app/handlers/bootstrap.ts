@@ -42,6 +42,9 @@ export function createBootstrap(ctx: BootstrapDeps) {
       // 2) 持久化配置（主题、上次工作区、编辑器设置）
       const configPromise = getConfig()
         .then(config => {
+          // 配置损坏时后端会带回一条警告——必须让用户知道，
+          // 否则「工作区没了、主题变了」看起来像应用出 bug。
+          if (config.load_warning) app.configWarning = config.load_warning
           if (config.theme) app.theme = config.theme
           if (config.last_workspace) app.workspacePath = config.last_workspace
           if (config.editor) {

@@ -34,3 +34,17 @@ Big5 / Other）与 `LineEnding`（LF / CRLF）描述文件在磁盘上的字节�
 
 `Encoding::from_label` / `LineEnding::from_label` 把 IPC 传参
 （`open_file` 返回的 `encoding` / `line_ending`）还原成枚举。
+
+## 配置的容错
+
+`config.toml` 里**任何一个字段解析失败，整份配置都会被丢弃**（回退
+到默认值，工作区根 / 最近文件 / 界面语言全部清空），原文件保留为
+`config.toml.broken`。因此：
+
+- `ThemeId` 的反序列化必须**同时认得 CSS class 名**（`theme-dark`、
+  空串表示浅色）、**枚举名**（`Dark`）与**人类可读标签**（`Cadmium
+  Light`）。文档与 `cmd_set_config` 都以 CSS class 名为准，用户照着
+  文档手改配置是最自然的行为——它不能导致整份设置作废。
+- 解析失败时 `AppConfig::load` 会把说明写进 `load_warning`，由
+  `get_config` 带回前端，启动时弹「Configuration Problem」对话框。
+  静默重置用户的全部设置而不给任何提示，比设置丢失本身更糟。

@@ -79,6 +79,8 @@ export class AppShellState {
   /** 导出失败时的错误信息。导出此前只往 console 写，用户看不到任何
    *  提示——PNG 导出失败会表现为「什么都没发生」。 */
   exportError = $state<string | null>(null)
+  /** 配置文件加载警告（例如 config.toml 损坏、已回退到默认设置）。 */
+  configWarning = $state<string | null>(null)
   unsavedClosePrompt = $state<UnsavedClosePrompt>(null)
   workspacePath = $state<string | null>(null)
   showSidebar = $state(true)

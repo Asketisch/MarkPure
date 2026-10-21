@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// 可用的主题标识符
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum ThemeId {
     Light,
     Dark,
@@ -54,18 +54,51 @@ impl ThemeId {
         all[(idx + 1) % all.len()]
     }
 
-    /// 根据字符串解析出对应的主题标识符
+    /// 根据字符串解析出对应的主题标识符。
+    ///
+    /// 同时接受三种写法：**CSS class 名**（`theme-dark`、空串表示
+    /// 浅色——前端 `<div class="app-root {theme}">` 用的就是它）、
+    /// **枚举名**（`Dark`）与**人类可读标签**（`Dark`/`Cadmium Light`）。
+    ///
+    /// 配置文件里的 `theme` 字段必须认得 CSS class 名：文档与
+    /// `cmd_set_config` 都以它为准，用户手改 config.toml 时自然
+    /// 会照着写。而这个字段一旦解析失败，整份配置都会被丢弃
+    /// （工作区根、最近文件、界面语言……全部回退默认值），代价
+    /// 远大于「主题认不出来」。
     pub fn from_id(s: &str) -> Option<Self> {
         match s {
-            "Light" | "Cadmium Light" => Some(ThemeId::Light),
-            "Dark" => Some(ThemeId::Dark),
-            "One Dark" => Some(ThemeId::OneDark),
-            "Graphite" => Some(ThemeId::Graphite),
-            "Ulysses" => Some(ThemeId::Ulysses),
-            "Material Dark" => Some(ThemeId::MaterialDark),
-            "Blue Topaz" => Some(ThemeId::BlueTopaz),
+            "" | "Light" | "Cadmium Light" => Some(ThemeId::Light),
+            "Dark" | "theme-dark" => Some(ThemeId::Dark),
+            "One Dark" | "OneDark" | "theme-one-dark" => Some(ThemeId::OneDark),
+            "Graphite" | "theme-graphite" => Some(ThemeId::Graphite),
+            "Ulysses" | "theme-ulysses" => Some(ThemeId::Ulysses),
+            "Material Dark" | "MaterialDark" | "theme-material-dark" => {
+                Some(ThemeId::MaterialDark)
+            }
+            "Blue Topaz" | "BlueTopaz" | "theme-blue-topaz" => Some(ThemeId::BlueTopaz),
             _ => None,
         }
+    }
+}
+
+/// 反序列化走 [`ThemeId::from_id`]，因此配置文件里写 CSS class 名
+/// （`theme-dark`）、枚举名（`Dark`）或标签都能识别。
+///
+/// 序列化仍输出枚举名——那是 `config.toml` 里既有的写法，改动它
+/// 只会让用户的配置文件无缘无故地变一次。
+impl<'de> Deserialize<'de> for ThemeId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        ThemeId::from_id(&raw).ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "unknown theme '{raw}' (expected one of: {}{})",
+                "'', 'Light', 'Dark', 'OneDark', 'Graphite', 'Ulysses', 'MaterialDark', 'BlueTopaz'",
+                " or the matching CSS class name (e.g. 'theme-dark')"
+            ))
+        })
     }
 }
 
@@ -328,4 +361,73 @@ fn generate_id() -> String {
         .as_nanos();
     let rand_suffix = (now as u64).wrapping_mul(2654435761).rotate_left(17);
     format!("{:x}{:08x}", now, rand_suffix & 0xFFFFFFFF)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_id_accepts_css_class_names() {
+        // 文档与 `cmd_set_config` 都以 CSS class 名为准，配置文件
+        // 必须同样认得——否则用户照文档手改配置就会让**整份配置**
+        // 解析失败（工作区、最近文件、语言全部回退默认值）。
+        assert_eq!(ThemeId::from_id(""), Some(ThemeId::Light));
+        assert_eq!(ThemeId::from_id("theme-dark"), Some(ThemeId::Dark));
+        assert_eq!(ThemeId::from_id("theme-one-dark"), Some(ThemeId::OneDark));
+        assert_eq!(ThemeId::from_id("theme-graphite"), Some(ThemeId::Graphite));
+        assert_eq!(ThemeId::from_id("theme-ulysses"), Some(ThemeId::Ulysses));
+        assert_eq!(
+            ThemeId::from_id("theme-material-dark"),
+            Some(ThemeId::MaterialDark)
+        );
+        assert_eq!(
+            ThemeId::from_id("theme-blue-topaz"),
+            Some(ThemeId::BlueTopaz)
+        );
+    }
+
+    #[test]
+    fn from_id_accepts_enum_names_and_labels() {
+        assert_eq!(ThemeId::from_id("Light"), Some(ThemeId::Light));
+        assert_eq!(ThemeId::from_id("Cadmium Light"), Some(ThemeId::Light));
+        assert_eq!(ThemeId::from_id("Dark"), Some(ThemeId::Dark));
+        assert_eq!(ThemeId::from_id("One Dark"), Some(ThemeId::OneDark));
+        assert_eq!(ThemeId::from_id("OneDark"), Some(ThemeId::OneDark));
+        assert_eq!(ThemeId::from_id("Graphite"), Some(ThemeId::Graphite));
+        assert_eq!(ThemeId::from_id("Ulysses"), Some(ThemeId::Ulysses));
+        assert_eq!(
+            ThemeId::from_id("Material Dark"),
+            Some(ThemeId::MaterialDark)
+        );
+        assert_eq!(ThemeId::from_id("Blue Topaz"), Some(ThemeId::BlueTopaz));
+        assert_eq!(ThemeId::from_id("nonsense"), None);
+    }
+
+    #[test]
+    fn deserializes_css_class_names() {
+        // 直接从 TOML 的形态反序列化。
+        #[derive(serde::Deserialize)]
+        struct ThemeOnly {
+            theme: ThemeId,
+        }
+        let cfg: ThemeOnly = toml::from_str("theme = \"theme-dark\"\n").expect("应能解析");
+        assert_eq!(cfg.theme, ThemeId::Dark);
+
+        let cfg: ThemeOnly = toml::from_str("theme = \"Dark\"\n").expect("应能解析");
+        assert_eq!(cfg.theme, ThemeId::Dark);
+
+        let cfg: ThemeOnly = toml::from_str("theme = \"\"\n").expect("应能解析");
+        assert_eq!(cfg.theme, ThemeId::Light);
+    }
+
+    #[test]
+    fn rejects_unknown_theme() {
+        #[derive(serde::Deserialize)]
+        struct ThemeOnly {
+            theme: ThemeId,
+        }
+        let err = toml::from_str::<ThemeOnly>("theme = \"no-such-theme\"\n");
+        assert!(err.is_err(), "未知主题应当解析失败");
+    }
 }

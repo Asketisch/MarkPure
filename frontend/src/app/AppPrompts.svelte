@@ -41,6 +41,19 @@
 <!-- 设置弹窗 -->
 <Settings bind:visible={app.showSettings} onConfigChange={onConfigChange} />
 
+<!-- 配置加载警告：配置文件损坏时后端会回退到默认设置，界面必须
+     说明原因，否则用户只会看到「设置全没了」。 -->
+{#if app.configWarning}
+  <Dialog
+    type="info"
+    title={i18n.t('dialog.config_warning_title')}
+    message={app.configWarning}
+    confirmText={i18n.t('action.ok')}
+    onConfirm={() => { app.configWarning = null }}
+    onClose={() => { app.configWarning = null }}
+  />
+{/if}
+
 <!-- 导出失败提示：导出此前只写 console，用户看不到任何反馈。 -->
 {#if app.exportError}
   <Dialog

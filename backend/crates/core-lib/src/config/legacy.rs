@@ -44,6 +44,14 @@ pub struct AppConfig {
     /// 方法是将条目归属到活动根目录。
     #[serde(default)]
     pub expanded_dirs: std::collections::HashMap<String, Vec<String>>,
+    /// 加载配置时遇到的问题（例如 TOML 解析失败，已回退到默认
+    /// 设置）。**不写入磁盘**——它描述的是「本次启动读配置出了什么
+    /// 问题」，属于运行时状态。
+    ///
+    /// 没有它的话，配置损坏时用户只会看到「工作区没了、主题变了、
+    /// 语言变英文」，却不知道发生了什么。
+    #[serde(default, skip_serializing)]
+    pub load_warning: Option<String>,
     /// Vim 模式开关。为 true 时编辑器接受
     /// NORMAL/INSERT/VISUAL 按键序列；为 false 时使用默认的
     /// Tiptap 键位。跨会话持久化；运行时通过 `Cmd+.` 或命令面板切换。
@@ -117,6 +125,7 @@ pub struct WindowConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            load_warning: None,
             editor: EditorConfig {
                 font_family: "monospace".to_string(),
                 font_size: 14,
@@ -187,7 +196,13 @@ impl AppConfig {
                 // 他们的设置。
                 let backup = path.with_extension("toml.broken");
                 let _ = std::fs::write(&backup, raw);
-                Self::default()
+                let mut cfg = Self::default();
+                // 把警告带给界面——否则用户只会看到「设置全没了」，
+                // 却不知道是配置文件出了问题。
+                cfg.load_warning = Some(format!(
+                    "配置文件解析失败，已回退到默认设置（原文件已保留为 config.toml.broken）：{e}"
+                ));
+                cfg
             }
         };
         cfg.migrate_workspace_roots();

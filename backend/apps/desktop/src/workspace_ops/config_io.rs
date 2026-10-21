@@ -17,6 +17,8 @@ fn config_to_json(config: &AppConfig) -> serde_json::Value {
         mt_core::ThemeId::BlueTopaz => "theme-blue-topaz",
     };
     serde_json::json!({
+        // 配置加载警告（例如文件损坏）。前端据此提示用户。
+        "load_warning": config.load_warning,
         "theme": theme_class,
         "language": config.language,
         "last_workspace": config.last_workspace,
