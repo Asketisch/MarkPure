@@ -113,10 +113,14 @@ impl AppConfig {
     }
 
     /// 便捷方法：读取当前活动根的展开目录。
+    ///
+    /// 没有活动根时读**空字符串键**下的那份——扁平的 deprecated
+    /// setter 在没有活动根时正是写到这个键（见 [`set_expanded_dirs`]）。
+    /// 两者必须对称，否则写进去的展开目录永远读不出来。
     pub fn get_expanded_dirs(&self) -> &[String] {
         match &self.active_workspace_root_id {
             Some(id) => self.get_expanded_dirs_for(id),
-            None => &[],
+            None => self.get_expanded_dirs_for(""),
         }
     }
 

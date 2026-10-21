@@ -10,6 +10,7 @@
    * 打开文件的副作用由宿主通过 `onOpen` 回调负责——本组件只是
    * 展示层。
    */
+  import { untrack } from 'svelte'
   import { getDirectoryTree } from '$lib/editor/commands'
   import { useI18n } from '$lib/stores/i18n.svelte'
 
@@ -36,14 +37,14 @@
   let loadSeq = 0
   let loadingPath = ''
 
-  async function loadFiles() {
-    if (!workspacePath) return
-    if (loading && loadingPath === workspacePath) return // 相同路径已在途
+  async function loadFiles(path: string) {
+    if (!path) return
+    if (loading && loadingPath === path) return // 相同路径已在途
     const seq = ++loadSeq
     loading = true
-    loadingPath = workspacePath
+    loadingPath = path
     try {
-      const tree = await getDirectoryTree(workspacePath, 10, false)
+      const tree = await getDirectoryTree(path, 10, false)
       if (seq !== loadSeq) return // 已有更新的加载请求
       const out: string[] = []
       const walk = (entries: typeof tree) => {
@@ -120,8 +121,15 @@
   })
 
   $effect(() => {
+    // 依赖只有 `visible` 与 `workspacePath`。
+    //
+    // `loadFiles()` 内部会读 `loading`（去重守卫），若不 untrack，
+    // `loading` 就成了这个 effect 的依赖：加载完成把它置回 false →
+    // effect 重跑 → 再次加载 → 无限循环。后果是面板永远停在
+    // 「加载中…」（功能完全不可用），且应用持续占用 50%+ CPU。
+    const path = workspacePath
     if (visible) {
-      loadFiles()
+      untrack(() => { void loadFiles(path) })
       queueMicrotask(() => inputEl?.focus())
     } else {
       query = ''
@@ -175,7 +183,7 @@
         bind:value={query}
         type="text"
         class="input"
-        placeholder={i18n.t('palette.placeholder')}
+        placeholder={i18n.t('palette.switcher_placeholder')}
         onkeydown={handleKeydown}
         autocomplete="off"
         spellcheck="false"

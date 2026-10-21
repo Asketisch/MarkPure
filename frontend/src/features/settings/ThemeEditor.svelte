@@ -139,8 +139,17 @@
     isModified = false
   }
 
+  /**
+   * 判断主题是不是内置主题。
+   *
+   * 判据是「在不在内置主题表里」，**不是 ID 前缀**：导入或保存的
+   * 自定义主题 ID 是任意的（`my-theme`、`我的主题`……），此前靠
+   * `custom_` 前缀判定，导致这类主题被误标成「Built-in」并且
+   * 无法直接编辑——用户明明导入了自己的主题，却只能看到一句
+   * 「内置主题不能直接编辑」。
+   */
   function isBuiltInTheme(themeId: string): boolean {
-    return !themeId.startsWith('custom_')
+    return themeId in builtinThemeColors
   }
 
   function cloneAndEdit(themeId: string) {
