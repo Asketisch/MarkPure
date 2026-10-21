@@ -242,8 +242,18 @@ def activate() -> None:
     time.sleep(0.4)
 
 
-def shot(path: str) -> None:
-    """截图（整个主屏）。"""
+def shot(path: str, front: bool = False) -> None:
+    """截图（整个主屏）。
+
+    默认**不**切前台——应用的自绘菜单（下拉、弹出层）会因失焦而
+    关闭，切前台就拍不到了。需要「确保拍到应用本身」时用
+    `front=True`。
+    """
+    if front:
+        try:
+            activate()
+        except Exception:
+            pass
     subprocess.run(
         ["screencapture", "-x", "-o", path],
         check=True,
@@ -253,7 +263,8 @@ def shot(path: str) -> None:
 
 
 def click(x: int, y: int, displayed: bool = False, double: bool = False) -> None:
-    """在屏幕坐标 (x, y) 处点击。
+    """在屏幕坐标 (x, y) 处点击。先把应用置前台——否则点击会落到
+    遮挡在上面的其他窗口上（真实桌面测试里很常见）。
 
     `displayed=True` 表示坐标取自截图（显示宽度 2000），会自动换算成
     逻辑点——这样可以直接用「看图 → 报坐标」的方式驱动。
@@ -262,6 +273,10 @@ def click(x: int, y: int, displayed: bool = False, double: bool = False) -> None
         k = display_scale()
         x = int(round(x * k))
         y = int(round(y * k))
+    try:
+        activate()
+    except Exception:
+        pass
     count = 2 if double else 1
     _osascript(
         _JXA_CLICK.replace("X", str(x))
@@ -300,6 +315,31 @@ def text(value: str) -> None:
         f'to keystroke "v" using command down'
     )
     time.sleep(0.4)
+
+
+def window_origin() -> tuple[float, float]:
+    """应用窗口左上角的**逻辑点**坐标。"""
+    script = (
+        f'tell application "System Events" to tell process "{APP_NAME}" '
+        "to get position of window 1"
+    )
+    raw = _osascript(script)
+    x, y = [float(v) for v in raw.split(",")[:2]]
+    return x, y
+
+
+def click_window(dx: float, dy: float) -> None:
+    """以**应用窗口左上角**为原点点击（坐标取自窗口截图）。
+
+    窗口位置会变（用户拖动、其他应用抢焦点），因此相对坐标比绝对
+    坐标可靠。`dx` / `dy` 是截图像素（显示宽度 2000 的那张图）里
+    相对于窗口左上角的偏移。
+    """
+    ox, oy = window_origin()
+    # 截图显示宽度 2000 ↔ 屏幕逻辑宽度（从窗口几何推不出来，用
+    # 主显示器宽度）。取 1.1574 是 2000/1728（Retina 逻辑宽）。
+    k = DISPLAY_IMAGE_WIDTH / 1728.0
+    click(int(round(ox + dx / k)), int(round(oy + dy / k)))
 
 
 def probe() -> dict:
@@ -342,6 +382,22 @@ def export(kind: str, filename: str) -> None:
     print(f"exported {kind} as {filename}")
 
 
+def command(query: str) -> None:
+    """通过命令面板执行一条命令（避开坐标依赖）。
+
+    流程：⌘⇧P 打开面板 → 粘贴查询 → 等候 → 回车（面板的首个候选
+    会被选中；查询会过滤到唯一命令时它就是唯一候选）。
+    """
+    activate()
+    key("cmd+shift+p")
+    time.sleep(1.0)
+    text(query)
+    time.sleep(1.2)
+    key("enter")
+    time.sleep(1.5)
+    print(f"command executed: {query}")
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         print(__doc__)
@@ -350,7 +406,14 @@ def main(argv: list[str]) -> int:
     if cmd == "launch":
         launch()
     elif cmd == "shot":
-        shot(argv[1] if len(argv) > 1 else "/tmp/markpure-shot.png")
+        shot(
+            argv[1] if len(argv) > 1 else "/tmp/markpure-shot.png",
+            front=(len(argv) > 2 and argv[2] == "front"),
+        )
+    elif cmd == "command":
+        command(argv[1])
+    elif cmd == "clickw":
+        click_window(float(argv[1]), float(argv[2]))
     elif cmd == "click":
         click(
             int(argv[1]),
