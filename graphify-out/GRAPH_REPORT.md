@@ -1,16 +1,16 @@
 # Graph Report - MarkPure  (2026-10-22)
 
 ## Corpus Check
-- 337 files · ~215,478 words
+- 339 files · ~218,673 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3800 nodes · 6179 edges · 244 communities (175 shown, 69 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 175 edges (avg confidence: 0.82)
+- 3873 nodes · 6434 edges · 247 communities (179 shown, 68 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 176 edges (avg confidence: 0.82)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7c75458c`
+- Built from commit: `97ee57e5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -184,6 +184,9 @@
 - [[_COMMUNITY_TypeScript Configuration|TypeScript Configuration]]
 - [[_COMMUNITY_Community 189|Community 189]]
 - [[_COMMUNITY_Claude Configuration|Claude Configuration]]
+- [[_COMMUNITY_Community 191|Community 191]]
+- [[_COMMUNITY_Community 192|Community 192]]
+- [[_COMMUNITY_Community 193|Community 193]]
 - [[_COMMUNITY_Application Entry Point|Application Entry Point]]
 - [[_COMMUNITY_I18n Store|I18n Store]]
 - [[_COMMUNITY_InstantRenderExtension|InstantRenderExtension]]
@@ -240,13 +243,13 @@
 1. `Synthetic 1k-block test document for P2-6 virtualization` - 251 edges
 2. `Section 250` - 251 edges
 3. `Subsection 250` - 251 edges
-4. `str` - 73 edges
-5. `ipc()` - 71 edges
-6. `lock_or_recover()` - 41 edges
-7. `$lib/stores/i18n.svelte` - 34 edges
-8. `BackendTestCase` - 31 edges
-9. `motionRange()` - 27 edges
-10. `AppConfig` - 26 edges
+4. `str` - 86 edges
+5. `str` - 76 edges
+6. `ipc()` - 71 edges
+7. `lock_or_recover()` - 41 edges
+8. `BackendTestCase` - 36 edges
+9. `$lib/stores/i18n.svelte` - 34 edges
+10. `motionRange()` - 27 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `flattenRectToCursors()` --calls--> `isHidden()`  [INFERRED]
@@ -290,31 +293,31 @@
 - **Multi-cursor + column-select fan-out editing chain** — multi_cursor_index_createmulticursorplugin, multi_cursor_state_applymulticursormeta, multi_cursor_column_select_flattenrecttocursors, editing_select_same_word_extension, scripts_validate_multi_cursor, scripts_validate_column_select [EXTRACTED 0.95]
 - **Branching undo tree: plugin state → extension → panel UI** — undo_tree_state_applyappend, undo_tree_state_applyswitch, undo_tree_state_gclru, editing_undo_tree_extension, workspace_undo_tree_panel, scripts_validate_undo_tree [EXTRACTED 0.95]
 
-## Communities (244 total, 69 thin omitted)
+## Communities (247 total, 68 thin omitted)
 
 ### Community 0 - "docJson snapshot storage model"
 Cohesion: 0.09
 Nodes (50): commandCatalog, CommandDef, UndoTreeExtension, after, capped, long, out, pruned (+42 more)
 
 ### Community 1 - "setContent"
-Cohesion: 0.04
-Nodes (49): CodeBlockCMExtension, DropHandlerExtension, DropHandlerOptions, dropHandlerPluginKey, Commands, FootnoteRefExtension, FootnoteRefOptions, FrontmatterExtension (+41 more)
+Cohesion: 0.05
+Nodes (43): Commands, FootnoteRefExtension, FootnoteRefOptions, FrontmatterExtension, HeadingIdExtension, TocExtension, @tiptap/core, LinkSuggestionExtension (+35 more)
 
 ### Community 2 - "Top-Block Virtualization"
 Cohesion: 0.06
 Nodes (48): buildDecorations(), computeVisibleRange(), createVirtualizationPlugin(), reportBlockHeight(), SetConfigMeta, SetMeasuredHeightMeta, UpdateVisibleRangeMeta, VirtualizationMeta (+40 more)
 
 ### Community 3 - "if"
-Cohesion: 0.08
-Nodes (40): safePos, $lib/components/workspace/BacklinksPanel.svelte, $lib/features/bookmark/BookmarkSidebar.svelte, $lib/features/command-palette/CommandPalette.svelte, $lib/features/command-palette/commandRegistry, $lib/components/ui/ContextMenu.svelte, $lib/components/ui/Dialog.svelte, $lib/components/ui/EmptyState.svelte (+32 more)
+Cohesion: 0.07
+Nodes (42): safePos, app, $lib/components/workspace/BacklinksPanel.svelte, $lib/features/bookmark/BookmarkSidebar.svelte, $lib/features/command-palette/CommandPalette.svelte, $lib/features/command-palette/commandRegistry, $lib/components/ui/ContextMenu.svelte, $lib/components/ui/Dialog.svelte (+34 more)
 
 ### Community 5 - "Frontend<->Rust IPC protocol"
 Cohesion: 0.08
 Nodes (38): ipc(), addBookmark(), clearRecentFiles(), deleteTheme(), exportConfig(), exportTheme(), getAppInfo(), getBookmarks() (+30 more)
 
 ### Community 6 - "setVimExContext"
-Cohesion: 0.14
-Nodes (23): _onVimEx(), exitVisualCmd(), redoCmd(), buildVimDecorations(), makeBarCaret(), makeBlockCaret(), makeBlockHighlight(), makeLineHighlight() (+15 more)
+Cohesion: 0.22
+Nodes (8): _onVimEx(), VimExtension, ExecContext, executeEx(), ExResult, createVimPlugin(), isVimEnabled(), setVimEnabled()
 
 ### Community 7 - "svelte-i18n"
 Cohesion: 0.05
@@ -322,7 +325,7 @@ Nodes (39): dependencies, @codemirror/commands, @codemirror/lang-cpp, @codemirro
 
 ### Community 8 - "yankTextObject"
 Cohesion: 0.14
-Nodes (36): changeChar(), changeLineCmd(), changeMotion(), changeTextObject(), clampToDoc(), dedentLine(), deleteChar(), deleteLineCmd() (+28 more)
+Nodes (39): changeChar(), changeLineCmd(), changeMotion(), changeTextObject(), clampToDoc(), dedentLine(), deleteChar(), deleteLineCmd() (+31 more)
 
 ### Community 9 - "test_selection_range"
 Cohesion: 0.10
@@ -345,12 +348,12 @@ Cohesion: 0.08
 Nodes (35): find_delimited_end(), find_frontmatter(), find_json_end(), find_toml_end(), find_yaml_end(), get_frontmatter_completions(), get_json_completions(), get_toml_completions() (+27 more)
 
 ### Community 14 - "selectAllMatches"
-Cohesion: 0.14
-Nodes (30): SelectSameWordExtension, addCursor(), clearMultiCursors(), currentNeedle(), selectAllMatches(), selectNextMatch(), undoLastCursor(), buildCursorDecorations() (+22 more)
+Cohesion: 0.08
+Nodes (29): buildCursorDecorations(), addCursorToList(), applyClear(), applyMultiCursorMeta(), applySet(), applyUndoLast(), emptyState(), normalize() (+21 more)
 
 ### Community 15 - "watchAppTheme"
 Cohesion: 0.10
-Nodes (11): createThemeExtension(), detectDarkTheme(), $lib/extensions/blocks/cm-theme, @codemirror/lang-markdown, CodeBlockView, languageAliases, languageLoaders, languagePromises (+3 more)
+Nodes (13): createThemeExtension(), detectDarkTheme(), CodeBlockCMExtension, $lib/extensions/blocks/cm-theme, @codemirror/lang-markdown, CodeBlockView, languageAliases, languageLoaders (+5 more)
 
 ### Community 16 - "IPC Commands Pattern"
 Cohesion: 0.15
@@ -377,20 +380,20 @@ Cohesion: 0.09
 Nodes (37): Error, build_pattern(), compile_search_regex(), dir_key(), dir_key_from_meta(), DirKey, is_binary_file(), read_file_content() (+29 more)
 
 ### Community 22 - "Column-select plugin must register be..."
-Cohesion: 0.11
-Nodes (29): ActiveDrag, cancelActiveDrag(), commitColumnSelection(), defaultVirtualizationProbe(), detachOverlay(), emptyColumnState(), estimateLineHeight(), FlattenOptions (+21 more)
+Cohesion: 0.08
+Nodes (50): SelectSameWordExtension, ActiveDrag, cancelActiveDrag(), commitColumnSelection(), createColumnSelectPlugin(), detachOverlay(), emptyColumnState(), estimateLineHeight() (+42 more)
 
 ### Community 23 - "watchDirectory"
 Cohesion: 0.08
-Nodes (23): createDirectory(), deleteFile(), DroppedFile, openDroppedFiles(), renameFile(), revealInFinder(), saveFile(), saveFileAs() (+15 more)
+Nodes (24): handleFilesDropped(), createDirectory(), deleteFile(), DroppedFile, openDroppedFiles(), renameFile(), revealInFinder(), saveFile() (+16 more)
 
 ### Community 24 - "uploadImageRemote"
-Cohesion: 0.10
-Nodes (16): exportHtml(), exportPdf(), exportWord(), RemoteUploadResult, SavedImage, savePastedImage(), uploadImageRemote(), WorkspaceSearchOptions (+8 more)
+Cohesion: 0.11
+Nodes (15): exportHtml(), exportPdf(), exportWord(), RemoteUploadResult, SavedImage, uploadImageRemote(), WorkspaceSearchOptions, pending (+7 more)
 
 ### Community 25 - "Multi-root workspace (P2-4)"
 Cohesion: 0.10
-Nodes (30): createExportActions(), createBootstrap(), createCommandRun(), createConfigOps(), createEditorCommands(), createEditorInit(), createFileOps(), createFileWatch() (+22 more)
+Nodes (29): createExportActions(), createBootstrap(), createCommandRun(), createConfigOps(), createEditorCommands(), createEditorInit(), createFileOps(), createFileWatch() (+21 more)
 
 ### Community 26 - "validate_mermaid"
 Cohesion: 0.14
@@ -413,8 +416,8 @@ Cohesion: 0.19
 Nodes (14): is_under_root(), load_caps_excessive_tab_count(), load_handles_missing_workspace_root_id_field(), load_strips_trusted_content_field(), load_tabs(), rebind_finds_longest_matching_root(), rebind_preserves_unmatched_tab(), rebind_skips_untitled_tabs() (+6 more)
 
 ### Community 31 - "refresh"
-Cohesion: 0.07
-Nodes (22): app, active, flatIndex, haystack, needle, $lib/editor/commands, $lib/fileTreeFilters, ./FileContextMenu.svelte (+14 more)
+Cohesion: 0.05
+Nodes (38): $lib/components/ui/ColorPicker.svelte, active, flatIndex, haystack, needle, $lib/editor/commands, $lib/fileTreeFilters, ./FileContextMenu.svelte (+30 more)
 
 ### Community 32 - "Rationale: hand-rolled frontmatter pa..."
 Cohesion: 0.17
@@ -441,8 +444,8 @@ Cohesion: 0.10
 Nodes (19): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, lib, module, moduleDetection, moduleResolution, noEmit (+11 more)
 
 ### Community 39 - "headingId meta suppresses undo-tree a..."
-Cohesion: 0.14
-Nodes (10): HeadingIdExtension, TocExtension, extractOutline(), OutlineItem, slugifyBase(), slugifyWithSuffix(), assignNumbers(), renderTree() (+2 more)
+Cohesion: 0.20
+Nodes (6): extractOutline(), OutlineItem, assignNumbers(), renderTree(), TocNodeView, TreeItem
 
 ### Community 40 - "validate_theme_id"
 Cohesion: 0.14
@@ -458,7 +461,7 @@ Nodes (251): code:js (const example = () => {), code:js (const example = () => {
 
 ### Community 43 - "update_bookmark"
 Cohesion: 0.15
-Nodes (23): Error, add_bookmark(), app_config_dir(), Bookmark, bookmarks_path(), BookmarkStore, corrupted_store_recovers_with_backup(), Error (+15 more)
+Nodes (30): bool, float, int, RuntimeError, activate(), click(), display_scale(), ensure_workspace() (+22 more)
 
 ### Community 44 - "test_render_definition_list_html"
 Cohesion: 0.14
@@ -478,7 +481,7 @@ Nodes (16): add_page(), create_document(), embed_mermaid_png(), export_pdf(), ex
 
 ### Community 48 - "TabsDeps"
 Cohesion: 0.09
-Nodes (37): AppRef, AppShellState, EditorPrefs, LinkSuggestItem, UnsavedClosePrompt, ViewMode, ExportActions, ExportDeps (+29 more)
+Nodes (28): AppRef, AppShellState, EditorPrefs, LinkSuggestItem, UnsavedClosePrompt, ViewMode, ExportDeps, $lib/editor/editor (+20 more)
 
 ### Community 49 - "useDefineForClassFields"
 Cohesion: 0.12
@@ -597,8 +600,8 @@ Cohesion: 0.01
 Nodes (250): Section 250, Subsection 1, Subsection 10, Subsection 100, Subsection 101, Subsection 102, Subsection 103, Subsection 104 (+242 more)
 
 ### Community 79 - "Outline/heading extraction (shared co..."
-Cohesion: 0.50
-Nodes (4): AGENTS.md - Rust Desktop App Entry, build.rs - Cargo build script, Cargo.toml - desktop project configuration, main.rs - WebView creation, IPC dispatch, document registry
+Cohesion: 0.15
+Nodes (23): Error, add_bookmark(), app_config_dir(), Bookmark, bookmarks_path(), BookmarkStore, corrupted_store_recovers_with_backup(), Error (+15 more)
 
 ### Community 80 - "Spellcheck Main Thread Dispatch"
 Cohesion: 0.38
@@ -617,20 +620,20 @@ Cohesion: 0.50
 Nodes (7): default_keybindings(), KeyBinding, keybindings_path(), load_keybindings(), reset_keybindings(), save_keybindings(), update_keybinding()
 
 ### Community 84 - "save_bookmarks"
-Cohesion: 0.15
-Nodes (8): Path, RuntimeError, Harness, HarnessError, IPC 命令返回了 `error` 字段。, 发一条命令，返回原始响应字典（不抛异常）。, atomic_write(), atomic_write_replaces_existing_and_leaves_no_tmp()
+Cohesion: 0.13
+Nodes (9): Path, Harness, HarnessError, Path, 直接写一行原始文本（用于测试协议层容错）。, IPC 命令返回了 `error` 字段。, 发一条命令，返回原始响应字典（不抛异常）。, atomic_write() (+1 more)
 
 ### Community 85 - "handleTextInput"
-Cohesion: 0.07
-Nodes (10): object, 发一条命令并返回 `result`；出错时抛 [`HarnessError`]。, 长中文段落旁边的英文拼写错误必须能检出。          `NSSpellChecker` 会把较长的 CJK 段落整体当成一个「词」，         于是, TestAssets, TestConfig, TestFrontmatter, TestI18n, TestOutlineAndLinks (+2 more)
+Cohesion: 0.06
+Nodes (11): object, 发一条命令并返回 `result`；出错时抛 [`HarnessError`]。, 长中文段落旁边的英文拼写错误必须能检出。          `NSSpellChecker` 会把较长的 CJK 段落整体当成一个「词」，         于是, TestConfig, TestExpandedDirs, TestFrontmatter, TestI18n, TestKeybindings (+3 more)
 
 ### Community 86 - "newName"
 Cohesion: 0.10
 Nodes (21): i18n / 语言, IPC 命令, IPC 实现机制, Wiki 链接和 Tags, 主题管理, 书签, 图片 / 资源, 大纲（旧接口，保留兼容） (+13 more)
 
 ### Community 87 - "Community 87"
-Cohesion: 0.38
-Nodes (4): QuickInsertExtension, QuickInsertItem, quickInsertItems, searchQuickInsert()
+Cohesion: 0.36
+Nodes (7): buildVimDecorations(), makeBarCaret(), makeBlockCaret(), makeBlockHighlight(), makeLineHighlight(), rebuildVimDecorations(), vimPluginKey
 
 ### Community 88 - "cmd_save_file"
 Cohesion: 0.47
@@ -645,8 +648,8 @@ Cohesion: 0.05
 Nodes (37): 1.10 列选择（Column Selection，Alt+Drag）— P2-3（2026-06-15）✅, 1.16 Vim 模式 (Cmd+. 切换) — P2-7（2026-06-17）✅, 1.1 拆分视图（Split View）— P0-1（2026-06-08）✅, 1.2 Zen / 全屏专注模式 — P0-2（2026-06-08）✅, 1.3 Slash Command — P1-1（2026-06-08）✅, 1.4 块级拖拽手柄 — P1-2（2026-06-08）✅（轻量化）, 1.5 图片调整 / 对齐工具栏 — P1-3（2026-06-08）✅, 1.6 路径 / 文件自动补全 — P1-4（2026-06-08）✅ (+29 more)
 
 ### Community 91 - "Community 91"
-Cohesion: 0.08
-Nodes (21): after1, after2, after3, all, doc, dup, fresh, input (+13 more)
+Cohesion: 0.16
+Nodes (16): ExportActions, CommandRun, CommandRunDeps, EditorCommands, EditorCommandsDeps, FileOps, SaveOps, SaveOpsDeps (+8 more)
 
 ### Community 92 - "hasImageData"
 Cohesion: 0.07
@@ -697,24 +700,24 @@ Cohesion: 0.60
 Nodes (4): cmd_get_tabs(), cmd_save_tabs(), cmd_tearoff_tab(), generate_uuid()
 
 ### Community 109 - "Community 109"
-Cohesion: 0.12
-Nodes (8): str, 保存不得改写文件的字节级特征。      前端交给 Rust 的内容永远是 UTF-8 + LF（ProseMirror 内部规范化）。     若保存时不参考, 没带格式信息的新文件按 UTF-8 + LF 落盘。, doc_id 分支（文档注册表）同样不得改写编码。, GBK 无法表示 emoji——保存必须报错而不是静默写成 `?`。, 开启「保存时 lint」后，行尾风格仍必须保持 CRLF。, TestExports, TestFileFormatFidelity
+Cohesion: 0.09
+Nodes (13): str, 保存不得改写文件的字节级特征。      前端交给 Rust 的内容永远是 UTF-8 + LF（ProseMirror 内部规范化）。     若保存时不参考, 没带格式信息的新文件按 UTF-8 + LF 落盘。, doc_id 分支（文档注册表）同样不得改写编码。, GBK 无法表示 emoji——保存必须报错而不是静默写成 `?`。, 开启「保存时 lint」后，行尾风格仍必须保持 CRLF。, 中文文件必须能被搜到。          二进制判定曾把 0x80–0xFF 当作「不可打印」字节，于是**所有         中文文件都被判成二进制**跳过, TestExports (+5 more)
 
 ### Community 111 - "Upward chain propagation after changes"
 Cohesion: 0.40
 Nodes (5): Leaf-level function indexing rules (pub API only, <=10 entries), Three-tier AGENTS.md hierarchy (root -> navigation -> leaf), Trigger conditions for AGENTS.md updates, Upward chain propagation after changes, agents-md-guardian skill
 
 ### Community 112 - "Community 112"
-Cohesion: 0.09
-Nodes (12): BackendTestCase, ensure_harness(), 静态检查：前端调用的每条 IPC 命令都必须在后端路由表里。, 确保 harness 二进制存在且比源码新。, 所有后端用例的基类：每个用例一个隔离的 harness 进程。, TestAppInfo, TestFoldingAndTasks, TestKeybindings (+4 more)
+Cohesion: 0.10
+Nodes (12): BackendTestCase, ensure_harness(), 确保 harness 二进制存在且比源码新。, 静态检查：前端调用的每条 IPC 命令都必须在后端路由表里。, 所有后端用例的基类：每个用例一个隔离的 harness 进程。, TestAppInfo, TestDirectoryTree, TestFoldingAndTasks (+4 more)
 
 ### Community 113 - "Community 113"
 Cohesion: 0.08
 Nodes (17): after, captures, configDir, __dirname, dst, g, Harness, HARNESS_BIN (+9 more)
 
 ### Community 114 - "Community 114"
-Cohesion: 0.09
-Nodes (4): TestBookmarks, TestDocRegistry, TestTables, TestThemes
+Cohesion: 0.08
+Nodes (6): 自定义主题的保存（编辑器里改完主题直接存盘）。, TestBookmarks, TestDocRegistry, TestEnvelope, TestSaveTheme, TestThemes
 
 ### Community 115 - "Community 115"
 Cohesion: 0.22
@@ -726,31 +729,31 @@ Nodes (4): cmd_add_bookmark(), cmd_get_bookmarks(), cmd_remove_bookmark(), cmd_u
 
 ### Community 118 - "Community 118"
 Cohesion: 0.13
-Nodes (3): 把测试工作区注册为唯一的工作区根，返回 root id。, TestDirectoryTree, TestFileOps
+Nodes (3): 把测试工作区注册为唯一的工作区根，返回 root id。, TestAssets, TestFileOps
 
 ### Community 119 - "Community 119"
 Cohesion: 0.12
 Nodes (15): AGENTS.md 导航体系, CLAUDE.md — MarkPure, code:block1 (markpure/), code:bash (# 开发模式（两个终端）), graphify, 主题系统, 安全设计, 常用命令 (+7 more)
 
 ### Community 120 - "Community 120"
-Cohesion: 0.33
-Nodes (6): after, before, EXTS, firstItemInline(), manager(), md
+Cohesion: 0.29
+Nodes (3): DropHandlerExtension, DropHandlerOptions, dropHandlerPluginKey
 
 ### Community 122 - "home_dir"
 Cohesion: 0.83
 Nodes (3): app_config_dir(), config_dir(), home_dir()
 
 ### Community 123 - "Community 123"
-Cohesion: 0.12
-Nodes (16): $lib/components/ui/ColorPicker.svelte, ./ThemeEditor.svelte, downloadConfigAsJson(), readJsonFromFileInput(), acceleratorFromEvent(), formatAccelerator(), MODIFIER_KEYS, i18n (+8 more)
+Cohesion: 0.36
+Nodes (3): float, 文件监视——外部改动必须能被编辑器感知。      `watch_directory` 在桌面版把事件推给事件循环；harness 没有事件     循环，改为, TestFileWatching
 
 ### Community 124 - "hovered"
 Cohesion: 0.27
 Nodes (7): Harness, main(), write_response(), dispatch_slow(), execute_command(), handle_command(), run_slow_command()
 
 ### Community 125 - "Community 125"
-Cohesion: 0.21
-Nodes (10): activeTabName(), __dirname, Harness, HARNESS_BIN, openFileInTree(), REPO_ROOT, sleep(), startHarness() (+2 more)
+Cohesion: 0.19
+Nodes (11): __dirname, findChrome(), Harness, HARNESS_BIN, REPO_ROOT, startHarness(), stopProcessGroup(), before (+3 more)
 
 ### Community 126 - "Community 126"
 Cohesion: 0.36
@@ -759,6 +762,10 @@ Nodes (6): convertBlock(), convertInline(), convertList(), htmlToMarkdown(), Pas
 ### Community 127 - "Community 127"
 Cohesion: 0.10
 Nodes (18): after, box, chromePath, dragged, figure, fileName, handle, inputs (+10 more)
+
+### Community 128 - "Community 128"
+Cohesion: 0.38
+Nodes (4): QuickInsertExtension, QuickInsertItem, quickInsertItems, searchQuickInsert()
 
 ### Community 129 - "Community 129"
 Cohesion: 0.40
@@ -789,8 +796,8 @@ Cohesion: 0.50
 Nodes (4): 大纲提取, 数据流, 文件打开, 编辑流程
 
 ### Community 140 - "Community 140"
-Cohesion: 0.67
-Nodes (3): i18n 系统, 前端接入, 后端翻译表
+Cohesion: 0.50
+Nodes (4): i18n 系统, 前端接入, 后端翻译表, 新增 key
 
 ### Community 146 - "Community 146"
 Cohesion: 0.25
@@ -817,12 +824,16 @@ Cohesion: 0.22
 Nodes (12): getMarkdown(), setContent(), normalizeListContinuations(), BLOCK_CONTAINERS, CELL_NODES, expandChildren(), expandNode(), extractBlockImages() (+4 more)
 
 ### Community 158 - "Community 158"
-Cohesion: 0.24
-Nodes (8): findChrome(), chromePath, eq(), FILES, ok(), probe(), WIDE_HEADERS, WIDE_ROW
+Cohesion: 0.18
+Nodes (11): activeTabName(), openFileInTree(), sleep(), drag(), chromePath, eq(), FILES, ok() (+3 more)
 
 ### Community 159 - "Community 159"
-Cohesion: 0.12
-Nodes (15): FileDropDeps, handleFilesDropped(), handleImagesDropped(), WindowDragDeps, Bootstrap, BootstrapDeps, ConfigOps, EditorCommandsDeps (+7 more)
+Cohesion: 0.18
+Nodes (9): FileDropDeps, handleImagesDropped(), WindowDragDeps, savePastedImage(), WindowEvents, WindowEventsDeps, $lib/logger, $lib/extensions/quick-insert-config (+1 more)
+
+### Community 160 - "Community 160"
+Cohesion: 0.29
+Nodes (3): AutoCloseExtension, AutoClosePair, PAIRS
 
 ### Community 161 - "Community 161"
 Cohesion: 0.29
@@ -833,14 +844,22 @@ Cohesion: 0.36
 Nodes (4): cjk_font_candidate_is_codepoint_stable(), FontFile, latin_font_maps_ascii(), metrics_measure_text_width()
 
 ### Community 163 - "Community 163"
-Cohesion: 0.15
-Nodes (6): make_png_b64(), bytes, int, 导出的内容保真度。      之前的测试只断言「文件生成了」，导出内容本身从没被检查过——     于是 HTML 导出的图片 alt 全丢、宽度属性丢失、Wo, 生成一张真实的 PNG（base64）。      后端会解码并校验 PNG 字节（CRC / 块结构），因此测试必须用     真正合法的 PNG，而不是手写, TestExportFidelity
+Cohesion: 0.14
+Nodes (7): bytes, make_png_b64(), bytes, int, 导出的内容保真度。      之前的测试只断言「文件生成了」，导出内容本身从没被检查过——     于是 HTML 导出的图片 alt 全丢、宽度属性丢失、Wo, 生成一张真实的 PNG（base64）。      后端会解码并校验 PNG 字节（CRC / 块结构），因此测试必须用     真正合法的 PNG，而不是手写, TestExportFidelity
 
 ### Community 166 - "vite.config.ts"
 Cohesion: 0.20
 Nodes (4): HARNESS_BIN, HarnessClient, ipcDevBridge(), REPO_ROOT
 
 ### Community 189 - "Community 189"
+Cohesion: 0.43
+Nodes (6): VimMode, enterColumnMode(), enterVisualMode(), extendBlockSelection(), extendSelectionByMotion(), modeForKind()
+
+### Community 191 - "Community 191"
+Cohesion: 0.33
+Nodes (6): after, before, EXTS, firstItemInline(), manager(), md
+
+### Community 193 - "Community 193"
 Cohesion: 0.50
 Nodes (3): COLOR_CATEGORIES, ColorCategory, ColorCategoryItem
 
@@ -849,8 +868,8 @@ Cohesion: 0.22
 Nodes (6): i18n, CLASS_TO_I18N_KEY, getThemeLabel(), THEME_LABEL_TO_CLASS, THEME_OPTIONS, ./themes
 
 ### Community 307 - "Community 307"
-Cohesion: 0.33
-Nodes (5): AGENTS.md — MarkPure 项目导航, 一级导航, 导出保真度, 概述, 测试
+Cohesion: 0.25
+Nodes (7): AGENTS.md — MarkPure 项目导航, code:bash (python3 scripts/app_drive.py launch          # 启动应用（隔离配置目录 +), 一级导航, 导出保真度, 概述, 测试, 真实桌面应用测试
 
 ### Community 308 - "Community 308"
 Cohesion: 0.29
@@ -861,8 +880,8 @@ Cohesion: 0.50
 Nodes (3): AGENTS.md — assets/ 图片资源管理, 注意事项, 目录
 
 ### Community 310 - "Community 310"
-Cohesion: 0.40
-Nodes (4): AGENTS.md — Rust 桌面应用入口, 存储格式保真, 测试 harness, 目录
+Cohesion: 0.29
+Nodes (6): AGENTS.md — Rust 桌面应用入口, 原生对话框与 IPC 超时, 存储格式保真, 宿主 → 前端的推送载荷, 测试 harness, 目录
 
 ### Community 313 - "Community 313"
 Cohesion: 0.50
@@ -897,24 +916,24 @@ Cohesion: 0.22
 Nodes (8): AGENTS.md — app/（应用外壳）, code:block1 (.app-root (column)), handlers/ 模块, 存储格式, 布局骨架, 文件, 架构, 规则
 
 ## Knowledge Gaps
-- **1500 isolated node(s):** `tsBuildInfoFile`, `target`, `lib`, `module`, `types` (+1495 more)
+- **1508 isolated node(s):** `tsBuildInfoFile`, `target`, `lib`, `module`, `types` (+1503 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **69 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **68 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Path` connect `save_bookmarks` to `write_file`, `Community 162`, `walk_directory`, `vite.config.ts`, `update_bookmark`, `Community 109`, `Typora-Style Instant Render`, `is_hidden`, `Community 118`, `unwatch_drops_workspace_id`, `validate_mermaid`, `transparent_1x1_png`, `tabs_path`?**
-  _High betweenness centrality (0.092) - this node is a cross-community bridge._
+- **Why does `Path` connect `save_bookmarks` to `write_file`, `Community 162`, `walk_directory`, `vite.config.ts`, `update_bookmark`, `Community 109`, `Outline/heading extraction (shared co...`, `Typora-Style Instant Render`, `is_hidden`, `Community 118`, `unwatch_drops_workspace_id`, `validate_mermaid`, `transparent_1x1_png`, `tabs_path`?**
+  _High betweenness centrality (0.102) - this node is a cross-community bridge._
 - **Why does `cmd_save_tabs()` connect `generate_uuid` to `registry_snapshot`, `tabs_path`?**
-  _High betweenness centrality (0.076) - this node is a cross-community bridge._
+  _High betweenness centrality (0.083) - this node is a cross-community bridge._
 - **Why does `save_tabs()` connect `tabs_path` to `generate_uuid`?**
-  _High betweenness centrality (0.076) - this node is a cross-community bridge._
+  _High betweenness centrality (0.083) - this node is a cross-community bridge._
 - **What connects `tsBuildInfoFile`, `target`, `lib` to the rest of the system?**
-  _1524 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1543 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `docJson snapshot storage model` be split into smaller, more focused modules?**
   _Cohesion score 0.0907103825136612 - nodes in this community are weakly interconnected._
 - **Should `setContent` be split into smaller, more focused modules?**
-  _Cohesion score 0.040293040293040296 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04855769230769231 - nodes in this community are weakly interconnected._
 - **Should `Top-Block Virtualization` be split into smaller, more focused modules?**
   _Cohesion score 0.06233766233766234 - nodes in this community are weakly interconnected._
