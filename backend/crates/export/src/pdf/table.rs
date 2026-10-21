@@ -5,7 +5,9 @@
 //! 渲染辅助函数仍然接收活动的 `PdfDocumentReference` + 页码索引对，
 //! 以便调用方在不锁定整个文档的前提下自主控制分页流程。
 
-use printpdf::{IndirectFontRef, Mm, PdfDocumentReference, PdfLayerIndex, PdfPageIndex};
+use printpdf::{Mm, PdfDocumentReference, PdfLayerIndex, PdfPageIndex};
+
+use super::text::FontSet;
 
 /// 判断 `line` 是否为 Markdown 表格行：以 `|` 开头和结尾，
 /// 且内部至少再含一个 `|`。空单元格也是允许的。
@@ -39,17 +41,18 @@ pub fn parse_table_row(line: &str) -> Vec<String> {
 }
 
 /// 渲染单行表格。各列之间间隔 6mm，超宽内容会被截断以适配页面宽度。
-/// `font` 为常规或加粗字体（表头请使用加粗字体）。
+/// `bold` 标记表头行使用粗体。
 // 参数多是因为要透传 printpdf 的可变页面状态（doc/页/图层/y）与版式常量。
 #[allow(clippy::too_many_arguments)]
-pub fn render_table_row(
+pub(crate) fn render_table_row(
     doc: &mut PdfDocumentReference,
     current_page_idx: &mut PdfPageIndex,
     current_layer_idx: &mut PdfLayerIndex,
     y: &mut f32,
     margin: f32,
     content_width: f32,
-    font: &IndirectFontRef,
+    fonts: &FontSet,
+    bold: bool,
     cols: &[String],
 ) {
     use crate::pdf::add_page;
@@ -76,7 +79,7 @@ pub fn render_table_row(
         } else {
             cell.clone()
         };
-        layer.use_text(&text, 8.5, Mm(x), Mm(*y), font);
+        fonts.draw_line(&layer, &text, 8.5, x, *y, bold);
     }
     *y -= 5.5; // 比行高略大，为表格留出呼吸感间隔
 }

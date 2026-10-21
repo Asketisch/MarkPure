@@ -9,7 +9,15 @@ markdown = { path = "../markdown" }
 # `embedded_images` enables `Image::from_dynamic_image` and the
 # higher-level image-embedding helpers. Without it, callers have to
 # hand-construct `ImageXObject`s — a route we don't take.
-printpdf = { version = "0.7", features = ["embedded_images"] }
+#
+# `font_subsetting` embeds only the glyphs the document actually uses.
+# Without it a PDF carries the whole font file: Helvetica alone made
+# every export 4.8 MB, and a CJK font would have pushed it past 20 MB.
+printpdf = { version = "0.7", features = ["embedded_images", "font_subsetting"] }
+# 字体度量。混排时要知道每个字符的步进宽度，才能把 CJK 片段放到
+# 拉丁片段之后。printpdf 内部用的是同一个 crate，复用它可保证度量
+# 与实际渲染一致。
+owned_ttf_parser = "0.19"
 docx-rs = "0.4"
 zip = "2"
 image = { version = "0.25", default-features = false, features = ["png"] }

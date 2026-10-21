@@ -8,15 +8,19 @@
 //! - [`table`] —— Markdown 表格判断谓词与逐行 `render_table_row` 辅助函数。
 //! - [`wrap`] —— CJK 感知的 `wrap_text` 换行。
 //! - [`fonts`] —— 平台字体路径解析（`get_font_paths`）。
+//! - [`font_file`] —— 字体文件解析：度量、字形反向映射与码位稳定性检查。
+//! - [`text`] —— 混排文本渲染：按脚本切段，中文用 CJK 字体绘制。
 //!
 //! `export_pdf` 在此处重新导出，使公共 API（`crate::export_pdf`）保持稳定。
 //! 新增图片格式的支持或表格相关的调整，应落在对应功能的子模块中。
 
+mod font_file;
 mod fonts;
 pub mod images;
 mod orchestration;
 pub mod strip;
 pub mod table;
+pub mod text;
 pub mod wrap;
 
 #[allow(unused_imports)]

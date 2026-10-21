@@ -12,7 +12,8 @@ use printpdf::image_crate::load_from_memory;
 // 各功能子模块的重导出。编排器（本文件）仍持有逐行分发器；
 // 表格 / 图片辅助函数位于 `super::{images,table}`，在此引入后
 // 调用点无需改动。
-use super::{extract_inline_images, get_font_paths, is_table_row, is_table_separator,
+use super::text::{needs_cjk_font, FontSet};
+use super::{extract_inline_images, is_table_row, is_table_separator,
             load_image_bytes, parse_table_row, render_table_row, strip_markdown,
             substitute_footnote_refs, wrap_text};
 
@@ -29,14 +30,9 @@ pub fn export_pdf(
 ) -> Result<(), String> {
     let (mut doc, page_idx, layer_idx) = create_document(title);
 
-    let (regular_path, bold_path) = get_font_paths()?;
-
-    let font = doc
-        .add_external_font(File::open(&regular_path).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
-    let bold_font = doc
-        .add_external_font(File::open(&bold_path).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
+    // 字体集合：拉丁字体必备，文档含 CJK 字符时才额外加载 CJK 字体
+    // ——拉丁字体没有 CJK 字形，用它渲染中文只会得到空白。
+    let fonts = FontSet::load(&mut doc, markdown.chars().any(needs_cjk_font))?;
 
     let page_width = Mm(210.0).0;
     let margin = Mm(20.0).0;
@@ -120,7 +116,7 @@ pub fn export_pdf(
                         margin,
                         content_width,
                         line_height,
-                        &font,
+                        &fonts,
                         &format!("[Mermaid render error: {}]", e),
                     );
                 }
@@ -135,7 +131,7 @@ pub fn export_pdf(
                     margin,
                     content_width,
                     line_height,
-                    &font,
+                    &fonts,
                     "[Mermaid diagram unavailable: mmdc not installed or render failed]",
                 );
             }
@@ -166,7 +162,8 @@ pub fn export_pdf(
                             &mut y,
                             margin,
                             content_width,
-                            &bold_font,
+                            &fonts,
+                            true,
                             &cols,
                         );
                         continue;
@@ -180,7 +177,8 @@ pub fn export_pdf(
                 &mut y,
                 margin,
                 content_width,
-                &font,
+                &fonts,
+                false,
                 &cols,
             );
             continue;
@@ -219,7 +217,7 @@ pub fn export_pdf(
                         margin,
                         content_width,
                         line_height,
-                        &font,
+                        &fonts,
                         &format!("[Image embed error: {}]", e),
                     );
                 }
@@ -264,8 +262,7 @@ pub fn export_pdf(
 
             let layer = doc.get_page(current_page_idx).get_layer(current_layer_idx);
 
-            let use_font = if is_bold { &bold_font } else { &font };
-            layer.use_text(wrapped_line, size, Mm(margin), Mm(y), use_font);
+            fonts.draw_line(&layer, wrapped_line, size, margin, y, is_bold);
 
             y -= line_height;
         }
@@ -285,7 +282,7 @@ pub fn export_pdf(
         // 章节标题。
         y -= line_height;
         let layer = doc.get_page(current_page_idx).get_layer(current_layer_idx);
-        layer.use_text("Footnotes", 11.0, Mm(margin), Mm(y), &bold_font);
+        fonts.draw_line(&layer, "Footnotes", 11.0, margin, y, true);
         y -= line_height;
 
         for note in &footnotes {
@@ -299,7 +296,7 @@ pub fn export_pdf(
             let header = format!("[{}] {}", note.number, note.content);
             let chars_per_line = (content_width / (9.0 * 0.35)) as usize;
             for line in wrap_text(&header, chars_per_line.max(20)) {
-                layer.use_text(&line, 9.0, Mm(margin), Mm(y), &font);
+                fonts.draw_line(&layer, &line, 9.0, margin, y, false);
                 y -= line_height;
             }
             y -= line_height * 0.3;
@@ -394,7 +391,7 @@ fn render_fallback_text(
     margin: f32,
     content_width: f32,
     line_height: f32,
-    font: &IndirectFontRef,
+    fonts: &FontSet,
     text: &str,
 ) {
     let chars_per_line = (content_width / (9.0 * 0.35)) as usize;
@@ -407,7 +404,7 @@ fn render_fallback_text(
             *y = Mm(277.0).0;
         }
         let layer = doc.get_page(*current_page_idx).get_layer(*current_layer_idx);
-        layer.use_text(line, 9.0, Mm(margin), Mm(*y), font);
+        fonts.draw_line(&layer, line, 9.0, margin, *y, false);
         *y -= line_height;
     }
 }
