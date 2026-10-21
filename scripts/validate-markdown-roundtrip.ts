@@ -45,6 +45,7 @@ import { CodeBlockCMExtension } from '../frontend/src/extensions/blocks/code-blo
 import { FrontmatterExtension } from '../frontend/src/extensions/blocks/frontmatter-extension'
 import { MarkdownTable } from '../frontend/src/extensions/blocks/table-extension'
 import { MathExtension } from '../frontend/src/extensions/blocks/math-extension'
+import { ImageWithAlign } from '../frontend/src/extensions/blocks/image-extension'
 import { normalizeListContinuations } from '../frontend/src/editor/markdown-normalize'
 
 /**
@@ -89,6 +90,7 @@ function buildManager(): MarkdownManager {
       CodeBlockCMExtension,
       FrontmatterExtension,
       MathExtension,
+      ImageWithAlign,
     ],
   } as never)
 }
@@ -155,6 +157,7 @@ const SCHEMA_EXTENSIONS = [
   CodeBlockCMExtension,
   FrontmatterExtension,
   MathExtension,
+  ImageWithAlign,
 ] as never
 
 /** 编辑器真正使用的 schema。 */
@@ -339,6 +342,31 @@ test('任务列表往返', () => {
   assert.ok(out.includes('[x]') || out.includes('- [x]'), out)
   assert.ok(out.includes('done'), out)
   assert.ok(out.includes('todo'), out)
+})
+
+test('图片的宽度与对齐往返（曾经两个方向都丢失）', () => {
+  // 上游 `@tiptap/extension-image` 的 parseMarkdown / renderMarkdown
+  // 只认 src/alt/title：序列化时宽度与对齐消失，解析时
+  // `![alt](url){width=300}` 整个降级成一段纯文本（图片不见了）。
+  const md = '![alt](https://x/y.png){width=300 align=center}\n'
+  const out = roundtrip(md)
+  assert.ok(out.includes('![alt]'), `图片节点丢失:\n${out}`)
+  assert.ok(out.includes('width=300'), `宽度丢失:\n${out}`)
+  assert.ok(out.includes('align=center'), `对齐丢失:\n${out}`)
+})
+
+test('普通图片不被加上属性段', () => {
+  const md = '![alt](https://x/y.png)\n'
+  const out = roundtrip(md)
+  assert.ok(out.includes('![alt](https://x/y.png)'), out)
+  assert.ok(!out.includes('{'), `普通图片不应带属性段:\n${out}`)
+})
+
+test('带标题的图片往返', () => {
+  const md = '![alt](https://x/y.png "标题")\n'
+  const out = roundtrip(md)
+  assert.ok(out.includes('![alt]'), out)
+  assert.ok(out.includes('标题'), out)
 })
 
 test('标题、列表、引用、链接往返', () => {

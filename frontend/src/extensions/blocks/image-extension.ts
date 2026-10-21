@@ -169,6 +169,83 @@ export const ImageWithAlign = Image.extend({
     }
   },
 
+  // ---- Markdown 往返钩子 -----------------------------------------------
+  //
+  // 上游 `@tiptap/extension-image` 的 `parseMarkdown` / `renderMarkdown`
+  // 只认 `src` / `alt` / `title`——`width` 与 `align` 在**两个方向**都被
+  // 丢掉：
+  //
+  // - 序列化：用户拖拽手柄调好的宽度 / 对齐保存后消失（数据丢失）；
+  // - 解析：`![alt](url){width=300 align=center}` 不被识别为图片，
+  //   整个降级成一段纯文本，图片本身消失。
+  //
+  // 下面两个钩子把 `![alt](url){width=… align=…}` 这套扩展语法接上，
+  // 让宽度与对齐能原样往返。
+
+  /** 解析 `![alt](url){width=300 align=center}` 里的属性段。 */
+  parseMarkdown: (token: any, helpers: any) => {
+    const extra = token.attrs || {}
+    const width = Number.parseInt(String(extra.width ?? ''), 10)
+    const align = extra.align
+    return helpers.createNode('image', {
+      src: token.href,
+      title: token.title,
+      alt: token.text,
+      ...(Number.isFinite(width) && width > 0 ? { width } : {}),
+      ...(align && align !== 'inline' ? { align } : {}),
+    })
+  },
+
+  renderMarkdown: (node: any) => {
+    const src = node.attrs?.src ?? ''
+    const alt = node.attrs?.alt ?? ''
+    const title = node.attrs?.title ?? ''
+    const base = title ? `![${alt}](${src} "${title}")` : `![${alt}](${src})`
+    const width = node.attrs?.width
+    const align = node.attrs?.align
+    const parts: string[] = []
+    if (width) parts.push(`width=${width}`)
+    if (align && align !== 'inline') parts.push(`align=${align}`)
+    return parts.length ? `${base}{${parts.join(' ')}}` : base
+  },
+
+  /**
+   * 只接管**带属性段**的图片。
+   *
+   * marked 的扩展 tokenizer 优先于内置的 image tokenizer，所以这里
+   * 不匹配时（普通 `![alt](url)`）返回 `undefined`，marked 会继续
+   * 用内置实现——两条路径都正确。
+   */
+  markdownTokenizer: {
+    name: 'image',
+    level: 'inline',
+    // 必须显式给出 `start`。缺省时 `@tiptap/markdown` 会退化成
+    // 「探测式」实现——对每个 inline 位置调用 `tokenize` 再用
+    // `src.indexOf(result.raw)` 反推位置。marked 拿这个位置去截断
+    // inline 文本的匹配范围，位置算偏就会把大段正文当成 inlineText
+    // 一口吞掉（实测 CLAUDE.md 少了一半内容）。
+    start: (src: string) => src.indexOf('!['),
+    tokenize: (src: string) => {
+      const match =
+        /^!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"([^"]*)")?\s*\)\{([^{}]*)\}/.exec(src)
+      if (!match) return undefined
+      const [fullMatch, alt, href, title, attrText] = match
+      const attrs: Record<string, string> = {}
+      for (const seg of attrText.split(/\s+/)) {
+        const eq = seg.indexOf('=')
+        if (eq > 0) attrs[seg.slice(0, eq)] = seg.slice(eq + 1)
+      }
+      return {
+        type: 'image',
+        raw: fullMatch,
+        href,
+        title: title ?? null,
+        text: alt,
+        attrs,
+      } as never
+    },
+  },
+
   renderHTML({ node, HTMLAttributes }: any) {
     const { src, alt, title, width, align } = node.attrs
     const figureAttrs: Record<string, string> = {}

@@ -29,10 +29,11 @@
 | `npx tsx scripts/validate-markdown-normalize.ts` | 列表续行缩进归一化 |
 | `npx tsx scripts/validate-file-format.ts` | 保存时的存储格式保真（真实前端 → 真实 Rust handler） |
 | `npx tsx scripts/validate-layout.ts` | 显示层布局（无头 Chrome + CDP 几何断言） |
-| `npx tsx scripts/validate-interactions.ts` | 显示层交互（真实按键 / 鼠标事件） |
+| `npx tsx scripts/validate-interactions.ts` | 显示层面板类交互（真实按键 / 鼠标事件） |
+| `npx tsx scripts/validate-editing.ts` | 显示层编辑类交互（拖拽 / 下拉 / 勾选 / 补全） |
 | `cargo test --workspace` | Rust 单元测试 |
 | `npm run check` | 前端类型检查 |
-| `npm test` | 以上全部（前端 12 个既有验证脚本也包含在内） |
+| `npm test` | 以上全部（前端 13 个既有验证脚本也包含在内） |
 
 浏览器端回归：用 `npx vite preview --port 4173` 起**生产构建**（附带
 `/__ipc` 桥，把浏览器 IPC 转发到 `mt_harness`），即可在浏览器里驱动
@@ -71,7 +72,10 @@
 快速插入、命令面板、工作区搜索、另存为、撤销/重做、大纲跳转、
 表格列宽拖拽柄、图片缩放柄、代码块语言选择器。
 
-它和 `scripts/lib/browser-harness.ts` 共用一套设施：生产构建 →
+`scripts/validate-editing.ts` 覆盖**直接操作文档内容**的交互：表格列宽
+拖拽、图片缩放拖拽、代码块语言切换、任务列表勾选、链接自动补全。
+
+两个脚本和 `scripts/lib/browser-harness.ts` 共用一套设施：生产构建 →
 preview 服务（带 IPC 桥）→ 无头 Chrome。共用部分抽在 `lib/` 下，
 不要在两个脚本里各写一份 CDP 客户端。
 

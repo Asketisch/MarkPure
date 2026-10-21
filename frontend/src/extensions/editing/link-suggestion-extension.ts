@@ -97,6 +97,12 @@ export const LinkSuggestionExtension = Extension.create<LinkSuggestionOptions>({
         char: opts.char ?? '(',
         allowSpaces: opts.allowSpaces,
         startOfLine: false,
+        // 触发字符 `(` 的**前面**是 `]`（用户刚敲完 `[文本](`），
+        // 而 Tiptap v3 的 `allowedPrefixes` 默认是 `[" "]`——只接受
+        // 空格前缀。默认值下 `findSuggestionMatch` 直接返回 null，
+        // 链接自动补全因此完全无法触发。这里放开前缀限制，再由
+        // 下面的 `allow` 谓词按 `[文本](` 的形状把关。
+        allowedPrefixes: null,
         // 在用户打开链接 URL 槽位时触发。我们还在 `allow` 中
         // 进一步把关，确保弹窗只出现在 `[文本]` 之后。
         allow: ({ state, range }) => {
@@ -107,12 +113,17 @@ export const LinkSuggestionExtension = Extension.create<LinkSuggestionOptions>({
           // 会静默崩溃。
           const view = (this.editor as { view?: { composing?: boolean } } | undefined)?.view
           if (view?.composing) return false
+          // `range.from` 是**触发字符本身**的位置（Tiptap v3 的
+          // `findSuggestionMatch` 语义），因此要看的是它**前面**那个
+          // 字符。早前这里取「`(` 之前的两个字符」再匹配 `](`，
+          // 实际取到的是 `t]` 这样的内容，永远匹配不上——链接自动
+          // 补全因此完全无法触发（`onStart` 根本不会跑）。
           const from = range.from
-          const before = state.doc.textBetween(Math.max(0, from - 2), from, '\n', '\n')
-          // 当前面两个字符是 `](`（链接 URL 开头）时触发，
-          // 或者前一个字符是 `(` 且位于行首时也触发（少见，
-          // 但同样要处理）。
-          return /\]\($/.test(before) || /\($/.test(before) && from <= 2
+          const prev = state.doc.textBetween(Math.max(0, from - 1), from, '\n', '\n')
+          // `](` —— 用户刚敲完 `[文本](`，URL 槽位打开
+          if (prev === ']') return true
+          // `(` 出现在文档开头（少见，但同样要处理）
+          return from <= 2 && prev !== '('
         },
         items: ({ query }) => {
           // `Suggestion` 会在每次按键时调用 items 回调。
