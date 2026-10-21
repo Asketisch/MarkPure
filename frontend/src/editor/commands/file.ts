@@ -5,13 +5,13 @@
  * “工作区”的概念在 Rust 后端校验，这些封装只是
  * 纯粹的透传，不做任何业务判断。
  */
-import { ipc } from './ipc'
+import { ipc, NATIVE_DIALOG_TIMEOUT_MS } from './ipc'
 import type { DocStats, FileEntry, FileFormat, FileInfo } from './types'
 
 // ============================== 文件对话框 ==============================
 
 export async function openFile(): Promise<FileInfo | null> {
-  const path = await ipc<string>('pick_open_file')
+  const path = await ipc<string>('pick_open_file', {}, NATIVE_DIALOG_TIMEOUT_MS)
   if (!path) return null
   return await ipc<FileInfo>('open_file', { path })
 }
@@ -41,7 +41,7 @@ export async function saveFileAs(
   content: string,
   format?: FileFormat | null,
 ): Promise<string | null> {
-  const path = await ipc<string>('pick_save_file')
+  const path = await ipc<string>('pick_save_file', {}, NATIVE_DIALOG_TIMEOUT_MS)
   if (!path) return null
   await ipc('save_file', {
     path,
@@ -57,7 +57,7 @@ export async function getDocStats(content: string): Promise<DocStats> {
 }
 
 export async function pickDirectory(): Promise<string | null> {
-  return await ipc<string>('pick_directory')
+  return await ipc<string>('pick_directory', {}, NATIVE_DIALOG_TIMEOUT_MS)
 }
 
 // ============================== 目录树 ==============================

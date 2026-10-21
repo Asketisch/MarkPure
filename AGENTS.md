@@ -33,6 +33,7 @@
 | `npx tsx scripts/validate-editing.ts` | 显示层编辑类交互（拖拽 / 下拉 / 勾选 / 补全） |
 | `npx tsx scripts/validate-features.ts` | 显示层功能链路（命令面板 / 书签 / 搜索 / 拼写） |
 | `npx tsx scripts/validate-fuzz.ts` | Markdown 解析 / 序列化的随机化回归 |
+| `npx tsx scripts/validate-file-watch.ts` | 文件监视链路（外部修改 → 刷新 / 询问） |
 | `cargo test --workspace` | Rust 单元测试 |
 | `npm run check` | 前端类型检查 |
 | `npm test` | 以上全部（前端 15 个既有验证脚本也包含在内） |
@@ -93,6 +94,45 @@ preview 服务（带 IPC 桥）→ 无头 Chrome。共用部分抽在 `lib/` 下
 一提：它把仓库里所有 `.md` 逐个解析、用真实 schema 校验、再往返一遍。
 这类扫描能一次性抓出「某个块级语法没有 markdown 钩子」「节点没
 有声明 `group`」「列表续行缩进被弄坏」等单条用例想不到的问题。
+
+---
+
+## 真实桌面应用测试
+
+浏览器 harness 覆盖的是**前端逻辑**，绕开了整个原生壳：原生菜单、
+原生文件对话框、事件循环驱动的文件监视、`mt://` 协议、真实剪贴板……
+这些路径在浏览器里根本不存在。WKWebView 的 AX 树是空的，AppleScript
+读不到控件，所以只能靠**截图 + 坐标点击**驱动。
+
+`scripts/app_drive.py` 就是干这个的：
+
+```bash
+python3 scripts/app_drive.py launch          # 启动应用（隔离配置目录 + 测试工作区）
+python3 scripts/app_drive.py probe           # 打印窗口几何
+python3 scripts/app_drive.py shot out.png    # 截图
+python3 scripts/app_drive.py click 640 400 d # 点击（d = 截图显示坐标）
+python3 scripts/app_drive.py key cmd+shift+p # 按键
+python3 scripts/app_drive.py text "中文"      # 粘贴文字（走剪贴板，中文可靠）
+```
+
+坐标有两种：`d` 表示坐标取自**截图**（显示宽度 2000），脚本会按屏幕
+逻辑宽度换算成逻辑点；不带 `d` 则直接是逻辑点。
+
+点击必须**先移动再按下再抬起**（带真实间隔）——三个事件在同一瞬间投递
+时，AppKit 的按钮不响应（事件时间戳相同会被当成零时长的点击）。
+
+这套办法抓到的缺陷，浏览器 harness 一个都测不到：
+
+- **文件监视事件是 JSON 字符串，前端却当数组用** —— 已打开的文档在外部
+  被修改后**永不刷新**、也不弹「文件已外部修改」提示。浏览器桥传的是
+  真数组，因此掩盖了它。
+- **⌘P 快速切换器无限循环** —— `loadFiles()` 读的 `loading` 成了
+  `$effect` 的依赖，「加载完成 → 置 false → effect 重跑 → 再次加载」
+  自我循环。面板永远停在「加载中…」，应用持续占用 **54% CPU**。
+- **菜单里直接显示内部命令 ID**（`cmd.file.add_workspace_root`）——
+  翻译表里缺 key。
+- **原生保存面板停留超 30 秒被误报为「导出失败」**—— IPC 默认超时比
+  用户在面板上停留的时间短。
 
 ---
 

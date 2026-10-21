@@ -30,6 +30,19 @@ const TIMED_OUT_MAX = 100
 // IPC 请求的默认超时（30 秒）
 const DEFAULT_TIMEOUT_MS = 30000
 
+/**
+ * 会弹**原生文件对话框**的 IPC 命令专用的超时（10 分钟）。
+ *
+ * rfd 的保存 / 打开面板是**阻塞**的：Rust 处理器停在面板上，直到
+ * 用户选完才返回。用户完全可能花几分钟翻目录、想文件名——按默认的
+ * 30 秒算，前端会先一步判定「超时失败」，弹出错误对话框，而文件
+ * 其实随后还是被写好了。用户看到的是「导出失败」，磁盘上却多出
+ * 一个文件——比不报更让人困惑。
+ *
+ * 因此凡是会弹面板的命令都必须用这个更长的超时。
+ */
+export const NATIVE_DIALOG_TIMEOUT_MS = 10 * 60 * 1000
+
 // 由 Rust 通过 evaluate_script 调用
 window.__mt_dispatch = (json: string) => {
   try {

@@ -41,6 +41,18 @@
 <!-- 设置弹窗 -->
 <Settings bind:visible={app.showSettings} onConfigChange={onConfigChange} />
 
+<!-- 导出失败提示：导出此前只写 console，用户看不到任何反馈。 -->
+{#if app.exportError}
+  <Dialog
+    type="info"
+    title={i18n.t('dialog.export_failed_title')}
+    message={i18n.t('dialog.export_failed_message').replace('{error}', app.exportError)}
+    confirmText={i18n.t('action.ok')}
+    onConfirm={() => { app.exportError = null }}
+    onClose={() => { app.exportError = null }}
+  />
+{/if}
+
 <!-- 文件重载提示：活动脏标签页的磁盘内容变化时显示。 -->
 {#if app.fileReloadPrompt}
   <Dialog

@@ -36,6 +36,9 @@ export function wireApp(ctx: AppCtx) {
   const exportActions = createExportActions({
     getEditor: ctx.getEditor,
     getActiveTab: ctx.getActiveTab,
+    // 导出失败要让用户看见——此前只写 console，用户看到的是
+    // 「点了导出，什么都没发生」。
+    onError: (message: string) => { ctx.app.exportError = message },
   })
   let vimOps: VimOps
   let fileOps: FileOps

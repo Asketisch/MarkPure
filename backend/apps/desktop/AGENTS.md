@@ -35,3 +35,38 @@
 `cmd_doc_open` 接受同样的可选 `encoding` / `line_ending`，把源文件的格式
 记进文档注册表，供 `save_file` 的 `doc_id` 分支在写新路径时沿用。
 
+
+## 宿主 → 前端的推送载荷
+
+`main.rs` 的事件循环通过 `evaluate_script` 向 WebView 推送两类消息：
+
+| 目标函数 | 载荷形态 | 说明 |
+|---|---|---|
+| `window.__mt_dispatch(json)` | **字符串** | IPC 响应。`json` 是已 `escape_for_js` 的 JSON 文本 |
+| `window.__mt_on_file_changes(json)` | **字符串** | 文件变更事件数组，同上 |
+
+**两处都必须包在单引号里**（`'{escaped}'`）：`serde_json::to_string` 已经
+把 `\` 转义过一次，若把 JSON 直接内联进 JS，转义会被处理两遍，路径里的
+反斜杠就会变成双反斜杠。
+
+代价是前端拿到的是**字符串**而不是数组——前端必须自己 `JSON.parse`。
+`frontend/src/app/handlers/fileWatch.ts` 的 `normalizeFileChangeEvents`
+负责这件事，并且同时接受数组（浏览器 harness 的 IPC 桥传的是数组）。
+
+> 这个约定曾经出过一次严重问题：前端把字符串当数组用，
+> `event.path` 永远是 `undefined`，于是「已打开的文档在外部被修改后
+> 刷新」这条链路**完全失效**——既不静默刷新，也不弹「文件已外部修改」
+> 提示。浏览器 harness 传的是真数组，因此掩盖了它。回归测试见
+> `scripts/validate-file-watch.ts`。
+
+## 原生对话框与 IPC 超时
+
+`rfd` 的保存 / 打开面板是**阻塞**的：Rust 处理器停在面板上，直到用户
+选完才返回。前端的 IPC 默认超时是 30 秒，用户在面板上停留超过 30 秒
+就会被误报为「导出失败」——而文件其实随后还是被写好了。
+
+因此凡是会弹原生面板的命令（`export_html` / `export_pdf` /
+`export_word` / `export_png` / `pick_open_file` / `pick_save_file` /
+`pick_directory` / `pick_theme_file`）都必须用
+`NATIVE_DIALOG_TIMEOUT_MS`（10 分钟），见
+`frontend/src/editor/commands/ipc.ts`。

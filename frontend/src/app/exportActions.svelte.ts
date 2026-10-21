@@ -28,6 +28,13 @@ export interface ExportDeps {
   getEditor: () => Editor | null
   /** 活动标签页的读取器（标题 + 路径 + 兜底内容）。 */
   getActiveTab: () => Tab | undefined
+  /**
+   * 导出失败时的回调。
+   *
+   * 失败此前只写进 console——用户看到的是「点了导出，什么都没发生」。
+   * PNG 导出在 WKWebView 里就曾这样静默失败过。
+   */
+  onError?: (message: string) => void
 }
 
 export interface ExportActions {
@@ -45,8 +52,38 @@ export interface ExportActions {
  *  才开始提示用户等待。 */
 const LONG_DOC_BYTES = 100 * 1024
 
+/** PNG 快照的超时上限（毫秒）。 */
+const PNG_TIMEOUT_MS = 20_000
+
 export function createExportActions(deps: ExportDeps): ExportActions {
   let exportingPng = $state(false)
+
+  /** 报告导出失败：既写 console，也交给宿主显示。 */
+  function reportFailure(scope: string, e: unknown): void {
+    const message = e instanceof Error ? e.message : String(e)
+    console.error(`Failed to export ${scope}:`, e)
+    deps.onError?.(message)
+  }
+
+  /**
+   * 给一个 Promise 加超时。
+   *
+   * 超时不是「取消」——底层任务仍会继续跑完，但它不再阻塞用户：
+   * 错误提示会立刻出现，��明卡在哪一步。
+   */
+  function withTimeout<T>(
+    promise: Promise<T>,
+    ms: number,
+    message: () => string,
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(message())), ms)
+      promise.then(
+        (v) => { clearTimeout(timer); resolve(v) },
+        (e) => { clearTimeout(timer); reject(e) },
+      )
+    })
+  }
 
   /** 解析活动标签页要导出的 markdown，缺省时回退到标签页的
    *  磁盘内容。标题去掉 `.md` 后缀，用作保存对话框的默认文件名。 */
@@ -85,7 +122,7 @@ export function createExportActions(deps: ExportDeps): ExportActions {
       const { serializeActiveTheme } = await import('$lib/editor/commands/pngExport')
       await exportHtmlIpc(snap.content, snap.title, serializeActiveTheme())
     } catch (e) {
-      console.error('Failed to export HTML:', e)
+      reportFailure('HTML', e)
     }
   }
 
@@ -98,7 +135,7 @@ export function createExportActions(deps: ExportDeps): ExportActions {
       // （例如 ![](./images/foo.png)）。
       await exportPdfIpc(snap.content, snap.title, tab.path)
     } catch (e) {
-      console.error('Failed to export PDF:', e)
+      reportFailure('PDF', e)
     }
   }
 
@@ -108,7 +145,7 @@ export function createExportActions(deps: ExportDeps): ExportActions {
     try {
       await exportWordIpc(snap.content, snap.title)
     } catch (e) {
-      console.error('Failed to export Word:', e)
+      reportFailure('Word', e)
     }
   }
 
@@ -121,6 +158,7 @@ export function createExportActions(deps: ExportDeps): ExportActions {
     // 用户会看到一条控制台消息，而不是一个空 PNG 文件。
     if (!snap.content || !snap.content.trim()) {
       console.warn('PNG export: document is empty')
+      deps.onError?.('EMPTY_DOCUMENT')
       return
     }
     if (snap.content.length > LONG_DOC_BYTES) {
@@ -130,19 +168,31 @@ export function createExportActions(deps: ExportDeps): ExportActions {
     }
 
     exportingPng = true
+    // 记录快照走到哪一步——出错时告诉用户卡在哪，而不是「没反应」。
+    let stage = 'import'
     try {
-      const { snapshotHtmlToPng } = await import('$lib/editor/commands/pngExport')
-      // 给实时编辑器 DOM 截图。这搭的是既有 Tiptap 渲染的便车——
-      // KaTeX、Mermaid、CodeMirror 高亮与工作区图片都已存在于
-      // DOM 中，因此生成的 PNG 与用户屏幕上的内容逐像素一致。
-      const host = document.querySelector('.ProseMirror') as HTMLElement | null
-      if (!host) {
-        console.warn('PNG export: editor DOM not found')
-        return
-      }
-      // 传入实时编辑器的宽度，让导出镜像用户正在看的栏宽
-      // （侧边栏 / 大纲面板会改变可用宽度；固定 800px 会裁剪）。
-      const dataUrl = await snapshotHtmlToPng(host.outerHTML, host.offsetWidth)
+      // 整条流水线都套上超时：动态 import 本身也可能挂住（分块
+      // 加载失败时不会 reject，只是永远不 resolve）。
+      const dataUrl = await withTimeout(
+        (async () => {
+          const { snapshotHtmlToPng } = await import('$lib/editor/commands/pngExport')
+          // 给实时编辑器 DOM 截图。这搭的是既有 Tiptap 渲染的便车——
+          // KaTeX、Mermaid、CodeMirror 高亮与工作区图片都已存在于
+          // DOM 中，因此生成的 PNG 与用户屏幕上的内容逐像素一致。
+          const host = document.querySelector('.ProseMirror') as HTMLElement | null
+          if (!host) {
+            console.warn('PNG export: editor DOM not found')
+            deps.onError?.('EDITOR_DOM_NOT_FOUND')
+            throw new Error('EDITOR_DOM_NOT_FOUND')
+          }
+          // 传入实时编辑器的宽度，让导出镜像用户正在看的栏宽
+          // （侧边栏 / 大纲面板会改变可用宽度；固定 800px 会裁剪）。
+          stage = 'snapshot'
+          return await snapshotHtmlToPng(host.outerHTML, host.offsetWidth, (s) => { stage = s })
+        })(),
+        PNG_TIMEOUT_MS,
+        () => `timeout at stage '${stage}'`,
+      )
       // 去掉 `data:image/png;base64,` 前缀——Rust 端解码纯 base64。
       const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
       try {
@@ -152,10 +202,10 @@ export function createExportActions(deps: ExportDeps): ExportActions {
         // 流程，不该向控制台刷错误堆栈。
         const msg = e instanceof Error ? e.message : String(e)
         if (msg.toLowerCase().includes('cancel')) return
-        console.error('Failed to export PNG:', e)
+        reportFailure('PNG', e)
       }
     } catch (e) {
-      console.error('Failed to export PNG:', e)
+      reportFailure('PNG', e)
     } finally {
       exportingPng = false
     }

@@ -11,7 +11,7 @@
     "test:backend": "python3 scripts/test_backend.py",
     "test:markdown": "tsx scripts/validate-markdown-roundtrip.ts && tsx scripts/validate-markdown-normalize.ts",
     "test": "npm run test:backend && npm run test:markdown && npm run test:frontend",
-    "test:frontend": "tsx scripts/validate-vim.ts && tsx scripts/validate-undo-tree.ts && tsx scripts/validate-multi-cursor.ts && tsx scripts/validate-column-select.ts && tsx scripts/validate-move-block.ts && tsx scripts/validate-virtualization.ts && tsx scripts/validate-emoji-shortcode.ts && tsx scripts/validate-png-export.ts && tsx scripts/validate-lint-on-save.ts && tsx scripts/validate-file-format.ts && tsx scripts/validate-layout.ts && tsx scripts/validate-interactions.ts && tsx scripts/validate-editing.ts && tsx scripts/validate-features.ts && tsx scripts/validate-fuzz.ts"
+    "test:frontend": "tsx scripts/validate-vim.ts && tsx scripts/validate-undo-tree.ts && tsx scripts/validate-multi-cursor.ts && tsx scripts/validate-column-select.ts && tsx scripts/validate-move-block.ts && tsx scripts/validate-virtualization.ts && tsx scripts/validate-emoji-shortcode.ts && tsx scripts/validate-png-export.ts && tsx scripts/validate-lint-on-save.ts && tsx scripts/validate-file-format.ts && tsx scripts/validate-layout.ts && tsx scripts/validate-interactions.ts && tsx scripts/validate-editing.ts && tsx scripts/validate-features.ts && tsx scripts/validate-fuzz.ts && tsx scripts/validate-file-watch.ts"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",

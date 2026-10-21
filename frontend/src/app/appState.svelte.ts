@@ -76,6 +76,9 @@ export class AppShellState {
   zenMode = $state(false)
   /** 文件重载提示：设置后弹出对话框询问是否用磁盘版本覆盖。 */
   fileReloadPrompt = $state<{ tabId: number; path: string; fileName: string } | null>(null)
+  /** 导出失败时的错误信息。导出此前只往 console 写，用户看不到任何
+   *  提示——PNG 导出失败会表现为「什么都没发生」。 */
+  exportError = $state<string | null>(null)
   unsavedClosePrompt = $state<UnsavedClosePrompt>(null)
   workspacePath = $state<string | null>(null)
   showSidebar = $state(true)

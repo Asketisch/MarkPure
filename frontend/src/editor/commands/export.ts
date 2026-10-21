@@ -5,7 +5,7 @@
  * 粘贴 / 图片上传助手。导出的保存对话框由 Rust 宿主（rfd）驱动，
  * 因此每个导出都返回用户选择的落盘路径。
  */
-import { ipc } from './ipc'
+import { ipc, NATIVE_DIALOG_TIMEOUT_MS } from './ipc'
 import type { SearchMatch, WorkspaceSearchResult } from './types'
 
 // ============================== 导出 ==============================
@@ -22,7 +22,7 @@ export async function exportHtml(
     // （或不导入 `pngExport` 的调用方）不传，Rust 侧回退到内置
     // 的浅色 CSS。
     theme_css: themeCss ?? null,
-  })
+  }, NATIVE_DIALOG_TIMEOUT_MS)
 }
 
 export async function exportPdf(
@@ -30,14 +30,18 @@ export async function exportPdf(
   title: string,
   sourcePath?: string | null,
 ): Promise<{ path: string }> {
-  return await ipc('export_pdf', { content, title, source_path: sourcePath ?? null })
+  return await ipc(
+    'export_pdf',
+    { content, title, source_path: sourcePath ?? null },
+    NATIVE_DIALOG_TIMEOUT_MS,
+  )
 }
 
 export async function exportWord(
   content: string,
   title: string,
 ): Promise<{ path: string }> {
-  return await ipc('export_word', { content, title })
+  return await ipc('export_word', { content, title }, NATIVE_DIALOG_TIMEOUT_MS)
 }
 
 /**
@@ -50,7 +54,7 @@ export async function exportPng(
   dataUrl: string,
   title: string,
 ): Promise<{ path: string }> {
-  return await ipc('export_png', { bytes_b64: dataUrl, title })
+  return await ipc('export_png', { bytes_b64: dataUrl, title }, NATIVE_DIALOG_TIMEOUT_MS)
 }
 
 // ============================== 工作区搜索 ==============================

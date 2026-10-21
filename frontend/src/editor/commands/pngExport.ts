@@ -105,6 +105,7 @@ export function serializeActiveTheme(): string {
 export async function snapshotHtmlToPng(
   html: string,
   width: number = 800,
+  onStage?: (stage: string) => void,
 ): Promise<string> {
   const node = document.createElement('div')
   // 钉在视口内（top:0/left:0），配 `z-index:-1` 和
@@ -129,6 +130,7 @@ export async function snapshotHtmlToPng(
   ].join(';')
   node.innerHTML = html
   document.body.appendChild(node)
+  onStage?.('container')
 
   // 双保险覆盖：即使容器位于 (0, 0)，上千个块的文档尾部仍会
   // 掉出视口，从而让 `content-visibility: auto` 跳过它们。
@@ -148,12 +150,14 @@ export async function snapshotHtmlToPng(
   try {
     // KaTeX 的字形以 woff2 打包在 npm bundle 里。在浏览器完成
     // 下载与解析之前，公式会渲染成方框。
+    onStage?.('fonts')
     if (typeof (document as any).fonts?.ready?.then === 'function') {
       await (document as any).fonts.ready
     }
     // 两个动画帧覆盖大多数布局 / 绘制稳定过程；再补一个 50ms
     // 超时覆盖 Mermaid SVG 节点的插入（渲染器已经内联缓存了它，
     // 这只是针对迟到绘制的廉价保险）。
+    onStage?.('layout')
     await new Promise<void>((r) =>
       requestAnimationFrame(() => requestAnimationFrame(() => r())),
     )
@@ -163,10 +167,12 @@ export async function snapshotHtmlToPng(
     // 的 `var(--bg,…)` 值就是实际显示的颜色——浅色主题为白色、
     // 深色主题为深色。显式传入 `backgroundColor` 会覆盖它，
     // 导致每次导出都强制同一种颜色。
+    onStage?.('rasterize')
     const dataUrl = await toPng(node, {
       pixelRatio: 2,
       cacheBust: false,
     })
+    onStage?.('done')
     return dataUrl
   } finally {
     if (styleEl) styleEl.remove()

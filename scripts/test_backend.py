@@ -40,6 +40,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 
@@ -1704,7 +1705,254 @@ class TestTabs(BackendTestCase):
         assert again[0]["window_id"] == "main", again
 
 
+# ==================================================== 文件监视 / 工作区状态
+
+
+class TestFileWatching(BackendTestCase):
+    """文件监视——外部改动必须能被编辑器感知。
+
+    `watch_directory` 在桌面版把事件推给事件循环；harness 没有事件
+    循环，改为用 `__poll_file_changes` 轮询同一条通道。
+    """
+
+    def poll_changes(self, timeout: float = 10.0) -> list[dict]:
+        """轮询直到有事件到达或超时。"""
+        deadline = time.monotonic() + timeout
+        events: list[dict] = []
+        while True:
+            events = self.h.call("__poll_file_changes") or []
+            if events or time.monotonic() >= deadline:
+                return events
+            time.sleep(0.05)
+
+    def watch(self) -> None:
+        self.h.call(
+            "watch_directory",
+            {"path": str(self.workspace), "workspace_id": "ws-1"},
+        )
+
+    def test_watch_reports_created_file(self) -> None:
+        self.watch()
+        target = self.workspace / "new.md"
+        target.write_text("hello\n", encoding="utf-8")
+        events = self.poll_changes()
+        assert events, "创建文件后应当收到变更事件"
+        kinds = {e["kind"] for e in events}
+        assert "created" in kinds, events
+        assert any(e["path"].endswith("new.md") for e in events), events
+
+    def test_watch_reports_modified_file(self) -> None:
+        target = self.workspace / "doc.md"
+        target.write_text("first\n", encoding="utf-8")
+        self.watch()
+        self.poll_changes()  # 清掉创建事件
+        target.write_text("second\n", encoding="utf-8")
+        events = self.poll_changes()
+        assert events, "修改文件后应当收到变更事件"
+        assert any(e["kind"] == "modified" for e in events), events
+
+    def test_watch_reports_deleted_file(self) -> None:
+        target = self.workspace / "gone.md"
+        target.write_text("bye\n", encoding="utf-8")
+        self.watch()
+        self.poll_changes()
+        target.unlink()
+        events = self.poll_changes()
+        assert events, "删除文件后应当收到变更事件"
+        assert any(e["kind"] == "deleted" for e in events), events
+
+    def test_watch_event_carries_workspace_id(self) -> None:
+        # 多根目录下前端靠 workspace_id 把刷新范围限定到正确的文件树。
+        self.watch()
+        (self.workspace / "id.md").write_text("x\n", encoding="utf-8")
+        events = self.poll_changes()
+        assert events
+        assert all(e["workspace_id"] == "ws-1" for e in events), events
+
+    def test_unwatch_stops_events(self) -> None:
+        self.watch()
+        (self.workspace / "a.md").write_text("a\n", encoding="utf-8")
+        self.poll_changes()
+        self.h.call("unwatch_directory", {"workspace_id": "ws-1"})
+        # 监听器已释放，通道不会再有事件。
+        (self.workspace / "b.md").write_text("b\n", encoding="utf-8")
+        time.sleep(0.5)
+        assert not self.h.call("__poll_file_changes"), "取消监听后不应再收到事件"
+
+    def test_watch_requires_path(self) -> None:
+        self.h.expect_error("watch_directory", {"workspace_id": "ws-1"})
+
+
+class TestExpandedDirs(BackendTestCase):
+    """目录树展开状态——应随配置持久化。"""
+
+    def test_expanded_dirs_roundtrip(self) -> None:
+        result = self.h.call("get_expanded_dirs")
+        assert isinstance(result, dict), result
+        self.h.call("set_expanded_dirs", {"expanded_dirs": ["/a/b", "/c"]})
+        again = self.h.call("get_expanded_dirs")
+        assert isinstance(again, dict), again
+        dirs = again["expanded_dirs"]
+        assert "/a/b" in dirs, dirs
+        assert "/c" in dirs, dirs
+
+    def test_expanded_dirs_persist_across_restart(self) -> None:
+        self.h.call("set_expanded_dirs", {"expanded_dirs": ["/keep/me"]})
+        self.h.close()
+        # 重开一个 harness，配置目录相同。
+        self.h = Harness(self.config_dir, cwd=self.tmp_path)
+        again = self.h.call("get_expanded_dirs")
+        assert "/keep/me" in again["expanded_dirs"], again
+
+    def test_set_expanded_dirs_ignores_non_string_entries(self) -> None:
+        self.h.call("set_expanded_dirs", {"expanded_dirs": ["/ok", 42, None, "/also-ok"]})
+        dirs = self.h.call("get_expanded_dirs")["expanded_dirs"]
+        assert "/ok" in dirs and "/also-ok" in dirs, dirs
+        assert all(isinstance(d, str) for d in dirs), dirs
+
+    def test_set_expanded_dirs_accepts_missing_param(self) -> None:
+        # 缺参数不应报错——只是不改变任何东西。
+        self.h.call("set_expanded_dirs", {})
+
+
+class TestSaveTheme(BackendTestCase):
+    """自定义主题的保存（编辑器里改完主题直接存盘）。"""
+
+    THEME = {
+        "id": "my-theme",
+        "name": "我的主题",
+        "author": "Tester",
+        "description": "端到端测试主题",
+        "is_dark": True,
+        "colors": {"bg": "#123456", "text": "#ffffff", "accent": "#ff8800"},
+    }
+
+    def test_save_theme_persists_and_shows_up_in_list(self) -> None:
+        saved = self.h.call("save_theme", self.THEME)
+        assert saved["id"] == "my-theme", saved
+        assert saved["name"] == "我的主题", saved
+        themes = self.h.call("get_themes")
+        ids = [t["id"] for t in themes]
+        assert "my-theme" in ids, themes
+
+    def test_saved_theme_survives_restart(self) -> None:
+        self.h.call("save_theme", self.THEME)
+        self.h.close()
+        self.h = Harness(self.config_dir, cwd=self.tmp_path)
+        themes = self.h.call("get_themes")
+        found = [t for t in themes if t["id"] == "my-theme"]
+        assert found, themes
+        assert found[0]["colors"]["bg"] == "#123456", found
+
+    def test_save_theme_rejects_traversal_id(self) -> None:
+        bad = dict(self.THEME, id="../escape")
+        self.h.expect_error("save_theme", bad)
+
+    def test_save_theme_rejects_empty_id(self) -> None:
+        bad = dict(self.THEME, id="")
+        self.h.expect_error("save_theme", bad)
+
+    def test_save_theme_fills_defaults_for_partial_payload(self) -> None:
+        # `Theme` 的字段带 `#[serde(default)]`——只写少数几个字段的
+        # 主题文件也应当能存下来，缺失的颜色回落到默认值。
+        saved = self.h.call("save_theme", {"id": "partial"})
+        assert saved["id"] == "partial", saved
+        assert saved["colors"]["bg"], saved
+        ids = [t["id"] for t in self.h.call("get_themes")]
+        assert "partial" in ids, ids
+
+
+class TestTearoffTab(BackendTestCase):
+    """把标签页撕下成独立窗口。"""
+
+    TAB = {
+        "id": "tab-1",
+        "name": "a.md",
+        "path": "/tmp/a.md",
+        "is_modified": False,
+    }
+
+    def test_tearoff_returns_a_new_window_id(self) -> None:
+        result = self.h.call("tearoff_tab", self.TAB)
+        assert isinstance(result, dict), result
+        window_id = result["window_id"]
+        assert isinstance(window_id, str) and window_id, result
+
+    def test_tearoff_moves_the_tab_into_the_new_window(self) -> None:
+        self.h.call(
+            "save_tabs",
+            [
+                {
+                    "window_id": "main",
+                    "active_tab_id": "tab-1",
+                    "tabs": [self.TAB],
+                }
+            ],
+        )
+        result = self.h.call("tearoff_tab", self.TAB)
+        new_window = result["window_id"]
+        windows = self.h.call("get_tabs")
+        by_id = {w["window_id"]: w for w in windows}
+        assert new_window in by_id, windows
+        assert [t["id"] for t in by_id[new_window]["tabs"]] == ["tab-1"], by_id
+        # 原窗口里不应还留着这个标签页。
+        assert "tab-1" not in [t["id"] for t in by_id["main"]["tabs"]], by_id
+
+    def test_tearoff_rejects_incomplete_tab(self) -> None:
+        self.h.expect_error("tearoff_tab", {"id": "tab-1"})
+
+
 # ==================================================================== 代码片段
+
+
+class TestI18nKeyCoverage(BackendTestCase):
+    """前端用到的 i18n key 必须都存在于翻译表。
+
+    漏补一个 key，界面就会**直接显示原始 key**——菜单里出现
+    `cmd.file.add_workspace_root`、主题编辑器里出现
+    `settings.theme_editor.category.heading`。这类问题在截图里很显眼，
+    却没有任何自动化检查能拦住：现有的 `test_all_languages_have_same_keys`
+    只保证三张表**彼此一致**，不保证**前端用到的 key 都存在**。
+    """
+
+    # 提取前端 key 的模式。刻意只认「确定的 key 位置」——
+    # `key:` 这类通用属性名会撞上 CSS 变量名（`bg` / `accent` …）
+    # 和 Vim 按键名（`c` / `down` …），全量匹配会产生大量误报。
+    PATTERNS = (
+        r"i18n\.t\(\s*['\"]([a-z0-9_.]+)['\"]",
+        r"(?:titleKey|categoryKey|labelKey|nameKey|placeholderKey|descriptionKey):\s*['\"]([a-z0-9_.]+)['\"]",
+    )
+
+    def translation_keys(self, lang: str) -> set[str]:
+        path = REPO_ROOT / "backend" / "crates" / "core-lib" / "src" / "i18n" / f"{lang}.rs"
+        text = path.read_text(encoding="utf-8")
+        return set(re.findall(r'\("([^"]+)"\s*,', text))
+
+    def frontend_keys(self) -> dict[str, list[str]]:
+        used: dict[str, list[str]] = {}
+        for path in sorted((REPO_ROOT / "frontend" / "src").rglob("*")):
+            if path.suffix not in (".ts", ".svelte"):
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for pattern in self.PATTERNS:
+                for key in re.findall(pattern, text):
+                    used.setdefault(key, []).append(str(path.relative_to(REPO_ROOT)))
+        return used
+
+    def test_frontend_keys_exist_in_translation_tables(self) -> None:
+        table = self.translation_keys("en")
+        used = self.frontend_keys()
+        assert len(used) > 100, f"提取到的 key 太少（{len(used)}），正则可能失效"
+        missing = {k: v for k, v in used.items() if k not in table}
+        assert not missing, "前端引用了翻译表里不存在的 key（界面会显示原始 key）:\n" + "\n".join(
+            f"  {k}  ← {', '.join(sorted(set(files))[:3])}" for k, files in sorted(missing.items())
+        )
+
+    def test_frontend_keys_exist_in_all_languages(self) -> None:
+        for lang in ("zh_cn", "ja"):
+            table = self.translation_keys(lang)
+            missing = sorted(k for k in self.frontend_keys() if k not in table)
+            assert not missing, f"{lang} 翻译表缺少前端用到的 key: {missing}"
 
 
 class TestSnippets(BackendTestCase):

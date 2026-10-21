@@ -355,10 +355,19 @@ CSS 变量还包括编辑器字体：`--editor-font-family`（默认系统字体
 
 ## i18n 系统
 
-支持 3 种语言（`backend/crates/core/src/i18n.rs`，71 个翻译 key）：
+支持 3 种语言（`backend/crates/core-lib/src/i18n/`，约 460 个翻译 key）：
 - `en` — English
 - `zh-CN` — 简体中文
 - `ja` — 日本語
+
+### 新增 key
+
+**三张表必须同时补**（`en.rs` / `zh_cn.rs` / `ja.rs`）。漏补的 key 会让
+菜单、命令面板、主题编辑器**直接显示原始 key**（例如
+`cmd.file.add_workspace_root`、`settings.theme_editor.category.heading`）
+——用户看到的是内部实现细节。`scripts/test_backend.py` 的
+`test_all_languages_have_same_keys` 只保证三张表**彼此一致**，不保证
+**前端用到的 key 都存在**；后者靠人工核对。
 
 ### 前端接入
 
