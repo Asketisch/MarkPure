@@ -18,7 +18,7 @@
 //! 并作为内联图片嵌入。
 
 use docx_rs::{
-    AlignmentType, Docx, Paragraph, Pic, Run,
+    AlignmentType, Docx, Paragraph, Pic, Run, Table, TableCell, TableRow,
 };
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -26,6 +26,93 @@ use std::io::Cursor;
 /// 从文档正文收集的脚注。我们使用公开的 `markdown::FootnoteDef` 类型，
 /// 它已按文档顺序排列（见 `footnote::collect_footnotes`）。
 type Footnote = markdown::FootnoteDef;
+
+
+/// 表格行判定：以 `|` 开头且以 `|` 结尾。
+fn is_table_row(trimmed: &str) -> bool {
+    trimmed.len() > 1 && trimmed.starts_with('|') && trimmed.ends_with('|')
+}
+
+/// 表格的对齐分隔行单元格（`---` / `:---` / `---:` / `:---:`）。
+fn is_alignment_cell(cell: &str) -> bool {
+    let c = cell.trim();
+    !c.is_empty() && c.chars().all(|ch| ch == '-' || ch == ':') && c.contains('-')
+}
+
+/// 把一行表格切成单元格文本。
+///
+/// 按**未转义**的 `|` 分割——单元格里写 `\|` 表示字面竖线。
+fn split_table_row(line: &str) -> Vec<String> {
+    let inner = line.trim();
+    let inner = inner.strip_prefix('|').unwrap_or(inner);
+    let inner = inner.strip_suffix('|').unwrap_or(inner);
+
+    let mut cells: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('|') => cur.push('|'),
+                Some('\\') => cur.push('\\'),
+                Some(other) => {
+                    cur.push('\\');
+                    cur.push(other);
+                }
+                None => cur.push('\\'),
+            }
+            continue;
+        }
+        if c == '|' {
+            cells.push(std::mem::take(&mut cur));
+            continue;
+        }
+        cur.push(c);
+    }
+    cells.push(cur);
+    cells
+}
+
+/// 把收集到的表格行冲刷成真正的 Word 表格。
+fn flush_table(rows: &mut Vec<Vec<String>>, docx: Docx) -> Docx {
+    if rows.is_empty() {
+        return docx;
+    }
+    let collected = std::mem::take(rows);
+    let mut iter = collected.into_iter();
+    let Some(header) = iter.next() else {
+        return docx;
+    };
+    let rest: Vec<Vec<String>> = iter.collect();
+
+    let mut data = vec![header];
+    // 第二行若全是对齐分隔行（`| --- | --- |`），它不是数据行。
+    if let Some(second) = rest.first() {
+        if second.iter().all(|c| is_alignment_cell(c)) {
+            data.extend(rest.into_iter().skip(1));
+        } else {
+            data.extend(rest);
+        }
+    }
+
+    let table_rows: Vec<TableRow> = data
+        .into_iter()
+        .map(|cells| {
+            TableRow::new(
+                cells
+                    .iter()
+                    .map(|c| {
+                        TableCell::new().add_paragraph(
+                            Paragraph::new().add_run(Run::new().add_text(c.trim())),
+                        )
+                    })
+                    .collect(),
+            )
+        })
+        .collect();
+
+    docx.add_table(Table::new(table_rows))
+}
 
 /// 把 Markdown 内容导出为 Word（.docx）文件的字节向量。
 pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
@@ -67,9 +154,27 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
 
     let mut code_buffer: Vec<String> = Vec::new();
 
+    // 收集中的表格行（每项是一行的单元格文本）。
+    let mut table_rows: Vec<Vec<String>> = Vec::new();
+
     for (idx, line) in markdown.lines().enumerate() {
         let line_number = idx + 1;
         let trimmed = line.trim();
+
+        // ---- 表格 ----
+        // 表格行以 `|` 开头且以 `|` 结尾；连续的行组成一张表。
+        // 必须在这里（所有其它块类型之前）处理：表格后面的标题、
+        // 列表等都要排在表格**之后**，而收集表格的过程中不能把
+        // 表格行当成普通段落。
+        if is_table_row(trimmed) {
+            docx = flush_paragraph(&current_paragraph.join(" "), docx);
+            current_paragraph.clear();
+            table_rows.push(split_table_row(trimmed));
+            continue;
+        }
+        if !table_rows.is_empty() {
+            docx = flush_table(&mut table_rows, docx);
+        }
 
         // ---- Mermaid 块优先于通用代码块 ----
         if trimmed.starts_with("```mermaid") {
@@ -259,6 +364,8 @@ pub fn export_word(markdown: &str, title: &str) -> Result<Vec<u8>, String> {
         }
     }
 
+    // 冲刷残留表格。
+    docx = flush_table(&mut table_rows, docx);
     // 冲刷残留文本。
     docx = flush_paragraph(&current_paragraph.join(" "), docx);
     // 冲刷残留代码块。
@@ -431,5 +538,37 @@ mod tests {
             "fallback message missing: {}",
             &s[..s.len().min(2000)]
         );
+    }
+
+    #[test]
+    fn export_word_table_becomes_a_real_table() {
+        // 表格此前被降级成一段段普通文本——结构丢失。
+        let md = "| 列 A | 列 B |\n| --- | --- |\n| 值 1 | 值 2 |\n";
+        let bytes = export_word(md, "T").expect("should produce bytes");
+        let s = String::from_utf8_lossy(&bytes);
+        assert!(s.contains("<w:tbl>"), "no table in output");
+        assert!(s.contains("列 A") && s.contains("值 2"), "cell text missing");
+        // 表头 + 一行数据 = 两行；分隔行不算数据行。
+        assert_eq!(s.matches("<w:tr>").count(), 2, "unexpected row count");
+    }
+
+    #[test]
+    fn export_word_table_keeps_escaped_pipe_in_cell() {
+        // 单元格里写 `a\|b` 表示字面竖线——不能被当成列分隔符。
+        let md = "| 表头 |\n| --- |\n| a\\|b |\n";
+        let bytes = export_word(md, "T").expect("should produce bytes");
+        let s = String::from_utf8_lossy(&bytes);
+        assert_eq!(s.matches("<w:tr>").count(), 2, "escaped pipe split the row");
+        assert!(s.contains("a|b"), "escaped pipe lost");
+    }
+
+    #[test]
+    fn export_word_table_followed_by_heading_keeps_order() {
+        let md = "| A |\n| --- |\n| 1 |\n\n## 之后的标题\n";
+        let bytes = export_word(md, "T").expect("should produce bytes");
+        let s = String::from_utf8_lossy(&bytes);
+        let tbl = s.find("<w:tbl>").expect("no table");
+        let heading = s.find("Heading2").expect("no heading");
+        assert!(tbl < heading, "heading must come after the table");
     }
 }
