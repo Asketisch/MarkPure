@@ -201,7 +201,7 @@
       {/if}
       <span class="ws-stats">
         {#if totalMatches > 0}
-          {totalMatches} {i18n.t('search.matches')} {i18n.t('search.in_files')} {totalFiles} {i18n.t('search.files')}
+          {totalMatches} {i18n.t('search.matches')} {i18n.t('search.in_files')} {totalFiles} {totalFiles === 1 ? i18n.t('search.file') : i18n.t('search.files')}
         {:else if query && !searching}
           {i18n.t('search.no_results')}
         {/if}

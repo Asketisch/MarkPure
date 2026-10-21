@@ -488,4 +488,6 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.category.block", "Blocks"),
     ("settings.theme_editor.category.table", "Tables"),
     ("settings.theme_editor.category.menu", "Menus"),
+    ("dialog.config_warning_title", "Configuration Problem"),
+    ("search.file", "file"),
 ];

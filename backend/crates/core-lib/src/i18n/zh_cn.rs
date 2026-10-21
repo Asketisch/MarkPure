@@ -42,8 +42,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("search.placeholder", "搜索文件..."),
     ("search.no_results", "无结果"),
     ("search.matches", "个匹配"),
-    ("search.in_files", "在"),
-    ("search.files", "个文件中"),
+    ("search.in_files", "，位于"),
+    ("search.files", "个文件"),
     ("search.workspace_title", "在工作区中搜索"),
     ("search.find_in_file", "在文件中查找"),
     ("search.match_case", "区分大小写"),
@@ -485,4 +485,6 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.category.block", "块"),
     ("settings.theme_editor.category.table", "表格"),
     ("settings.theme_editor.category.menu", "菜单"),
+    ("dialog.config_warning_title", "配置文件问题"),
+    ("search.file", "个文件"),
 ];

@@ -42,8 +42,8 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("search.placeholder", "ファイルを検索..."),
     ("search.no_results", "結果なし"),
     ("search.matches", "件の一致"),
-    ("search.in_files", "ファイル"),
-    ("search.files", "ファイル"),
+    ("search.in_files", "（"),
+    ("search.files", "ファイル内"),
     ("search.workspace_title", "ワークスペース内を検索"),
     ("search.find_in_file", "ファイル内検索"),
     ("search.match_case", "大文字小文字を区別"),
@@ -485,4 +485,6 @@ pub const ENTRIES: &[(&str, &str)] = &[
     ("settings.theme_editor.category.block", "ブロック"),
     ("settings.theme_editor.category.table", "テーブル"),
     ("settings.theme_editor.category.menu", "メニュー"),
+    ("dialog.config_warning_title", "設定ファイルの問題"),
+    ("search.file", "ファイル内"),
 ];
