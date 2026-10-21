@@ -1,16 +1,16 @@
 # Graph Report - MarkPure  (2026-10-22)
 
 ## Corpus Check
-- 327 files · ~202,436 words
+- 327 files · ~203,331 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3578 nodes · 5727 edges · 243 communities (173 shown, 70 thin omitted)
+- 3580 nodes · 5729 edges · 234 communities (164 shown, 70 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 163 edges (avg confidence: 0.82)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `22d7c24d`
+- Built from commit: `343a2a61`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -102,7 +102,6 @@
 - [[_COMMUNITY_save_bookmarks|save_bookmarks]]
 - [[_COMMUNITY_handleTextInput|handleTextInput]]
 - [[_COMMUNITY_newName|newName]]
-- [[_COMMUNITY_searchWorkspace|searchWorkspace]]
 - [[_COMMUNITY_cmd_save_file|cmd_save_file]]
 - [[_COMMUNITY_stringify|stringify]]
 - [[_COMMUNITY_useSpellcheck|useSpellcheck]]
@@ -128,16 +127,13 @@
 - [[_COMMUNITY_Community 112|Community 112]]
 - [[_COMMUNITY_Community 113|Community 113]]
 - [[_COMMUNITY_Community 114|Community 114]]
-- [[_COMMUNITY_Community 115|Community 115]]
 - [[_COMMUNITY_cmd_update_bookmark|cmd_update_bookmark]]
 - [[_COMMUNITY_Community 118|Community 118]]
 - [[_COMMUNITY_Community 119|Community 119]]
 - [[_COMMUNITY_Community 120|Community 120]]
 - [[_COMMUNITY_cmd_set_locale|cmd_set_locale]]
 - [[_COMMUNITY_home_dir|home_dir]]
-- [[_COMMUNITY_Community 123|Community 123]]
 - [[_COMMUNITY_hovered|hovered]]
-- [[_COMMUNITY_Community 125|Community 125]]
 - [[_COMMUNITY_Community 126|Community 126]]
 - [[_COMMUNITY_Community 127|Community 127]]
 - [[_COMMUNITY_Community 128|Community 128]]
@@ -157,19 +153,14 @@
 - [[_COMMUNITY_Community 146|Community 146]]
 - [[_COMMUNITY_PasteHandlerExtension (Tiptap)|PasteHandlerExtension (Tiptap)]]
 - [[_COMMUNITY_PAIRS (autoclose pair list)|PAIRS (autoclose pair list)]]
-- [[_COMMUNITY_Community 149|Community 149]]
-- [[_COMMUNITY_Community 150|Community 150]]
 - [[_COMMUNITY_walk_dir_sync|walk_dir_sync]]
 - [[_COMMUNITY_Community 152|Community 152]]
 - [[_COMMUNITY_Community 153|Community 153]]
-- [[_COMMUNITY_Community 154|Community 154]]
 - [[_COMMUNITY_SIZES|SIZES]]
 - [[_COMMUNITY_Error|Error]]
 - [[_COMMUNITY_.from|.from]]
 - [[_COMMUNITY_Community 158|Community 158]]
 - [[_COMMUNITY_Community 159|Community 159]]
-- [[_COMMUNITY_Community 160|Community 160]]
-- [[_COMMUNITY_Community 161|Community 161]]
 - [[_COMMUNITY_Community 162|Community 162]]
 - [[_COMMUNITY_vite.config.ts|vite.config.ts]]
 - [[_COMMUNITY_$libeditorcommands|$lib/editor/commands]]
@@ -289,39 +280,39 @@
 - **Multi-cursor + column-select fan-out editing chain** — multi_cursor_index_createmulticursorplugin, multi_cursor_state_applymulticursormeta, multi_cursor_column_select_flattenrecttocursors, editing_select_same_word_extension, scripts_validate_multi_cursor, scripts_validate_column_select [EXTRACTED 0.95]
 - **Branching undo tree: plugin state → extension → panel UI** — undo_tree_state_applyappend, undo_tree_state_applyswitch, undo_tree_state_gclru, editing_undo_tree_extension, workspace_undo_tree_panel, scripts_validate_undo_tree [EXTRACTED 0.95]
 
-## Communities (243 total, 70 thin omitted)
+## Communities (234 total, 70 thin omitted)
 
 ### Community 0 - "docJson snapshot storage model"
 Cohesion: 0.09
 Nodes (50): commandCatalog, CommandDef, UndoTreeExtension, after, capped, long, out, pruned (+42 more)
 
 ### Community 1 - "setContent"
-Cohesion: 0.08
-Nodes (23): ImageWithAlign, LinkSuggestionExtension, LinkSuggestionItem, LinkSuggestionOptions, linkSuggestionPluginKey, MoveBlockExtension, SearchExtension, applyEditorPrefs() (+15 more)
+Cohesion: 0.05
+Nodes (41): Commands, FootnoteRefExtension, FootnoteRefOptions, ImageWithAlign, convertBlock(), convertInline(), convertList(), htmlToMarkdown() (+33 more)
 
 ### Community 2 - "Top-Block Virtualization"
 Cohesion: 0.06
-Nodes (50): defaultVirtualizationProbe(), buildDecorations(), computeVisibleRange(), createVirtualizationPlugin(), reportBlockHeight(), SetConfigMeta, SetMeasuredHeightMeta, UpdateVisibleRangeMeta (+42 more)
+Nodes (48): buildDecorations(), computeVisibleRange(), createVirtualizationPlugin(), reportBlockHeight(), SetConfigMeta, SetMeasuredHeightMeta, UpdateVisibleRangeMeta, VirtualizationMeta (+40 more)
 
 ### Community 3 - "if"
 Cohesion: 0.07
-Nodes (40): safePos, app, $lib/components/workspace/BacklinksPanel.svelte, $lib/features/bookmark/BookmarkSidebar.svelte, $lib/features/command-palette/CommandPalette.svelte, $lib/features/command-palette/commandRegistry, $lib/components/ui/ContextMenu.svelte, $lib/components/ui/Dialog.svelte (+32 more)
+Nodes (43): safePos, $lib/components/workspace/BacklinksPanel.svelte, $lib/features/bookmark/BookmarkSidebar.svelte, $lib/features/command-palette/CommandPalette.svelte, $lib/features/command-palette/commandRegistry, $lib/components/ui/ContextMenu.svelte, @tiptap/core, $lib/components/ui/Dialog.svelte (+35 more)
 
 ### Community 5 - "Frontend<->Rust IPC protocol"
 Cohesion: 0.08
 Nodes (38): ipc(), addBookmark(), clearRecentFiles(), deleteTheme(), exportConfig(), exportTheme(), getAppInfo(), getBookmarks() (+30 more)
 
 ### Community 6 - "setVimExContext"
-Cohesion: 0.22
-Nodes (8): _onVimEx(), VimExtension, ExecContext, executeEx(), ExResult, createVimPlugin(), isVimEnabled(), setVimEnabled()
+Cohesion: 0.14
+Nodes (23): _onVimEx(), exitVisualCmd(), redoCmd(), buildVimDecorations(), makeBarCaret(), makeBlockCaret(), makeBlockHighlight(), makeLineHighlight() (+15 more)
 
 ### Community 7 - "svelte-i18n"
 Cohesion: 0.05
-Nodes (39): dependencies, @codemirror/commands, @codemirror/lang-cpp, @codemirror/lang-css, @codemirror/lang-go, @codemirror/lang-html, @codemirror/lang-java, @codemirror/lang-javascript (+31 more)
+Nodes (40): dependencies, @codemirror/commands, @codemirror/lang-cpp, @codemirror/lang-css, @codemirror/lang-go, @codemirror/lang-html, @codemirror/lang-java, @codemirror/lang-javascript (+32 more)
 
 ### Community 8 - "yankTextObject"
 Cohesion: 0.14
-Nodes (39): changeChar(), changeLineCmd(), changeMotion(), changeTextObject(), clampToDoc(), dedentLine(), deleteChar(), deleteLineCmd() (+31 more)
+Nodes (36): changeChar(), changeLineCmd(), changeMotion(), changeTextObject(), clampToDoc(), dedentLine(), deleteChar(), deleteLineCmd() (+28 more)
 
 ### Community 9 - "test_selection_range"
 Cohesion: 0.10
@@ -344,12 +335,12 @@ Cohesion: 0.08
 Nodes (35): find_delimited_end(), find_frontmatter(), find_json_end(), find_toml_end(), find_yaml_end(), get_frontmatter_completions(), get_json_completions(), get_toml_completions() (+27 more)
 
 ### Community 14 - "selectAllMatches"
-Cohesion: 0.19
+Cohesion: 0.17
 Nodes (21): SelectSameWordExtension, addCursor(), clearMultiCursors(), currentNeedle(), selectAllMatches(), selectNextMatch(), undoLastCursor(), setBlinkPhase() (+13 more)
 
 ### Community 15 - "watchAppTheme"
-Cohesion: 0.11
-Nodes (12): createThemeExtension(), detectDarkTheme(), $lib/extensions/blocks/cm-theme, @codemirror/lang-markdown, CodeBlockView, languageAliases, languageLoaders, languagePromises (+4 more)
+Cohesion: 0.12
+Nodes (9): createThemeExtension(), detectDarkTheme(), CodeBlockCMExtension, CodeBlockView, languageAliases, languageLoaders, languagePromises, loadLanguageExtension() (+1 more)
 
 ### Community 16 - "IPC Commands Pattern"
 Cohesion: 0.15
@@ -368,28 +359,28 @@ Cohesion: 0.20
 Nodes (5): FolderInfo, test_workspace_add_folder(), test_workspace_remove_folder(), test_workspace_state_split(), Workspace
 
 ### Community 20 - "is_hidden"
-Cohesion: 0.11
-Nodes (18): cmd_get_outline(), cmd_get_tags(), cmd_get_wikilinks(), $lib/plugins/spellcheck, cmd_export_html(), cmd_export_pdf(), cmd_export_png(), cmd_export_word() (+10 more)
+Cohesion: 0.12
+Nodes (17): cmd_get_outline(), cmd_get_tags(), cmd_get_wikilinks(), cmd_export_html(), cmd_export_pdf(), cmd_export_png(), cmd_export_word(), cmd_save_pasted_image() (+9 more)
 
 ### Community 21 - "test_search_options_default"
 Cohesion: 0.10
 Nodes (36): Error, build_pattern(), compile_search_regex(), dir_key(), dir_key_from_meta(), DirKey, is_binary_file(), read_file_content() (+28 more)
 
 ### Community 22 - "Column-select plugin must register be..."
-Cohesion: 0.12
-Nodes (27): ActiveDrag, cancelActiveDrag(), commitColumnSelection(), detachOverlay(), emptyColumnState(), estimateLineHeight(), FlattenOptions, flattenRectToCursors() (+19 more)
+Cohesion: 0.10
+Nodes (30): ActiveDrag, cancelActiveDrag(), commitColumnSelection(), createColumnSelectPlugin(), defaultVirtualizationProbe(), detachOverlay(), emptyColumnState(), estimateLineHeight() (+22 more)
 
 ### Community 23 - "watchDirectory"
-Cohesion: 0.08
-Nodes (23): createDirectory(), deleteFile(), DroppedFile, openDroppedFiles(), renameFile(), revealInFinder(), saveFile(), saveFileAs() (+15 more)
+Cohesion: 0.09
+Nodes (22): createDirectory(), deleteFile(), DroppedFile, renameFile(), revealInFinder(), saveFile(), saveFileAs(), unwatchDirectory() (+14 more)
 
 ### Community 24 - "uploadImageRemote"
-Cohesion: 0.10
-Nodes (16): exportHtml(), exportPdf(), exportWord(), RemoteUploadResult, SavedImage, savePastedImage(), uploadImageRemote(), WorkspaceSearchOptions (+8 more)
+Cohesion: 0.11
+Nodes (15): exportHtml(), exportPdf(), exportWord(), RemoteUploadResult, SavedImage, uploadImageRemote(), WorkspaceSearchOptions, pending (+7 more)
 
 ### Community 25 - "Multi-root workspace (P2-4)"
-Cohesion: 0.09
-Nodes (32): createExportActions(), Bootstrap, BootstrapDeps, createBootstrap(), createCommandRun(), ConfigOps, createConfigOps(), createEditorCommands() (+24 more)
+Cohesion: 0.10
+Nodes (30): createExportActions(), createBootstrap(), createCommandRun(), ConfigOps, createConfigOps(), createEditorCommands(), createEditorInit(), createFileOps() (+22 more)
 
 ### Community 26 - "validate_mermaid"
 Cohesion: 0.14
@@ -412,16 +403,16 @@ Cohesion: 0.19
 Nodes (14): is_under_root(), load_caps_excessive_tab_count(), load_handles_missing_workspace_root_id_field(), load_strips_trusted_content_field(), load_tabs(), rebind_finds_longest_matching_root(), rebind_preserves_unmatched_tab(), rebind_skips_untitled_tabs() (+6 more)
 
 ### Community 31 - "refresh"
-Cohesion: 0.08
-Nodes (21): active, flatIndex, haystack, needle, $lib/editor/commands, $lib/fileTreeFilters, ./FileContextMenu.svelte, ./WorkspaceSearchResult.svelte (+13 more)
+Cohesion: 0.04
+Nodes (39): app, $lib/components/ui/ColorPicker.svelte, active, flatIndex, haystack, needle, $lib/editor/commands, ./FileContextMenu.svelte (+31 more)
 
 ### Community 32 - "Rationale: hand-rolled frontmatter pa..."
 Cohesion: 0.17
 Nodes (7): CompletionKind, Frontmatter, FrontmatterBounds, FrontmatterCompletion, FrontmatterError, FrontmatterFormat, FrontmatterValue
 
 ### Community 34 - "SpellcheckStore module-scoped global ..."
-Cohesion: 0.08
-Nodes (19): checkSpelling(), SpellError, Commands, SpellcheckExtension, applySpellSuggestion(), checkSeq, createSpellcheckPlugin(), forceSpellcheckRecheck() (+11 more)
+Cohesion: 0.06
+Nodes (28): checkSpelling(), SpellError, Commands, SpellcheckExtension, createInstantRenderPlugin(), createMarkerWidget(), decorateNode(), findAffectedRange() (+20 more)
 
 ### Community 35 - "Primary selection vs secondary cursor..."
 Cohesion: 0.21
@@ -464,8 +455,8 @@ Cohesion: 0.14
 Nodes (15): DefinitionItem, ExampleItem, ExtendedCellAlign, parse_definition_list(), parse_markdown_extensions(), parse_task_items(), ParsedExtensions, RawHtmlBlock (+7 more)
 
 ### Community 45 - "updateSearch"
-Cohesion: 0.15
-Nodes (9): escapeRegex(), findMatches(), findNext(), findPrev(), getDocText(), scrollCurrentMatchIntoView(), SearchOptions, searchPluginKey (+1 more)
+Cohesion: 0.13
+Nodes (11): SearchExtension, createSearchPlugin(), escapeRegex(), findMatches(), findNext(), findPrev(), getDocText(), scrollCurrentMatchIntoView() (+3 more)
 
 ### Community 46 - "Vim Key-Sequence FSM"
 Cohesion: 0.13
@@ -476,8 +467,8 @@ Cohesion: 0.24
 Nodes (16): add_page(), create_document(), embed_mermaid_png(), export_pdf(), extract_inline_images(), get_font_paths(), is_table_row(), is_table_separator() (+8 more)
 
 ### Community 48 - "TabsDeps"
-Cohesion: 0.08
-Nodes (38): AppRef, AppShellState, EditorPrefs, LinkSuggestItem, UnsavedClosePrompt, ViewMode, ExportActions, ExportDeps (+30 more)
+Cohesion: 0.10
+Nodes (27): AppRef, AppShellState, EditorPrefs, LinkSuggestItem, UnsavedClosePrompt, ViewMode, ExportDeps, $lib/editor/editor (+19 more)
 
 ### Community 49 - "useDefineForClassFields"
 Cohesion: 0.12
@@ -501,7 +492,7 @@ Nodes (22): cmd_unwatch_directory(), cmd_watch_directory(), lock_or_recover(), b
 
 ### Community 54 - "Mermaid soft fallback HTML/PDF/DOCX"
 Cohesion: 0.09
-Nodes (26): CodeBlockCMExtension, FrontmatterExtension, after, assertValidDocument(), before, blockCounts(), buildManager(), doc (+18 more)
+Nodes (25): FrontmatterExtension, after, assertValidDocument(), before, blockCounts(), buildManager(), doc, docOnce (+17 more)
 
 ### Community 55 - "unwatch_drops_workspace_id"
 Cohesion: 0.24
@@ -512,8 +503,8 @@ Cohesion: 0.17
 Nodes (10): claude-hud 插件, enabledPlugins 启用的 Claude 插件, enabledPlugins, claude-hud@claude-hud, superpowers@claude-plugins-official, hooks, PreToolUse, enabledPlugins (+2 more)
 
 ### Community 57 - "useI18n"
-Cohesion: 0.18
-Nodes (7): getLocale(), getTranslations(), setLocale(), getThemeLabel(), I18n, I18N_KEY, Translations
+Cohesion: 0.21
+Nodes (6): getLocale(), getTranslations(), setLocale(), I18n, I18N_KEY, Translations
 
 ### Community 58 - "SEARXNG_URL"
 Cohesion: 0.15
@@ -536,8 +527,8 @@ Cohesion: 0.30
 Nodes (12): MarkPure Brand Identity, MarkPure Icon 1024x1024 PNG, MarkPure Icon 128x128 PNG, MarkPure Icon 16x16 PNG, MarkPure Icon 22x22 PNG, MarkPure Icon 24x24 PNG, MarkPure Icon 256x256 PNG, MarkPure Icon 32x32 PNG (+4 more)
 
 ### Community 63 - "getMermaid"
-Cohesion: 0.23
-Nodes (3): getMermaid(), MermaidExtension, MermaidNodeView
+Cohesion: 0.11
+Nodes (11): $lib/extensions/blocks/cm-theme, @codemirror/lang-markdown, getMermaid(), MermaidExtension, MermaidNodeView, @codemirror/view, Commands, FocusModeExtension (+3 more)
 
 ### Community 64 - "write_file"
 Cohesion: 0.15
@@ -576,8 +567,8 @@ Cohesion: 0.18
 Nodes (8): DEFAULT_SHORTCODES, EmojiOptions, EmojiShortcodeExtension, Case, cases, ext, m, { regex, lookup }
 
 ### Community 73 - "validate_file_name"
-Cohesion: 0.29
-Nodes (3): i18n, inputValue, isOpen
+Cohesion: 0.18
+Nodes (15): ExportActions, CommandRun, CommandRunDeps, EditorCommands, EditorCommandsDeps, FileOps, SaveOps, SaveOpsDeps (+7 more)
 
 ### Community 74 - "version"
 Cohesion: 0.22
@@ -592,8 +583,8 @@ Cohesion: 0.22
 Nodes (6): $lib/plugins/undo-tree, cmds, currentPathSet, d, i18n, sub
 
 ### Community 77 - "SSRF protection mechanism"
-Cohesion: 0.16
-Nodes (14): joinPath(), pathSeparator(), ActionOutcome, ContextMenuTarget, isSafeName(), newFile(), newFolder(), parentDir() (+6 more)
+Cohesion: 0.15
+Nodes (15): $lib/fileTreeFilters, joinPath(), pathSeparator(), ActionOutcome, ContextMenuTarget, isSafeName(), newFile(), newFolder() (+7 more)
 
 ### Community 78 - "resolveWikiLinkInWorkspace"
 Cohesion: 0.01
@@ -631,10 +622,6 @@ Nodes (7): object, 发一条命令并返回 `result`；出错时抛 [`HarnessErr
 Cohesion: 0.10
 Nodes (21): i18n / 语言, IPC 命令, IPC 实现机制, Wiki 链接和 Tags, 主题管理, 书签, 图片 / 资源, 大纲（旧接口，保留兼容） (+13 more)
 
-### Community 87 - "searchWorkspace"
-Cohesion: 0.36
-Nodes (6): convertBlock(), convertInline(), convertList(), htmlToMarkdown(), PasteHandlerExtension, pasteHandlerPluginKey
-
 ### Community 88 - "cmd_save_file"
 Cohesion: 0.47
 Nodes (4): cmd_open_dropped_files(), cmd_open_file(), cmd_save_file(), lint_rules()
@@ -649,7 +636,7 @@ Nodes (37): 1.10 列选择（Column Selection，Alt+Drag）— P2-3（2026-06-15
 
 ### Community 91 - "Community 91"
 Cohesion: 0.08
-Nodes (21): after1, after2, after3, all, doc, dup, fresh, input (+13 more)
+Nodes (29): buildCursorDecorations(), addCursorToList(), applyClear(), applyMultiCursorMeta(), applySet(), applyUndoLast(), emptyState(), normalize() (+21 more)
 
 ### Community 92 - "hasImageData"
 Cohesion: 0.07
@@ -719,10 +706,6 @@ Nodes (17): after, captures, configDir, __dirname, dst, g, Harness, HARNESS_BIN 
 Cohesion: 0.10
 Nodes (4): TestBookmarks, TestEnvelope, TestTables, TestThemes
 
-### Community 115 - "Community 115"
-Cohesion: 0.12
-Nodes (16): $lib/components/ui/ColorPicker.svelte, ./ThemeEditor.svelte, downloadConfigAsJson(), readJsonFromFileInput(), acceleratorFromEvent(), formatAccelerator(), MODIFIER_KEYS, i18n (+8 more)
-
 ### Community 116 - "cmd_update_bookmark"
 Cohesion: 0.60
 Nodes (4): cmd_add_bookmark(), cmd_get_bookmarks(), cmd_remove_bookmark(), cmd_update_bookmark()
@@ -743,17 +726,9 @@ Nodes (9): getMarkdown(), setContent(), normalizeListContinuations(), after, bef
 Cohesion: 0.83
 Nodes (3): app_config_dir(), config_dir(), home_dir()
 
-### Community 123 - "Community 123"
-Cohesion: 0.11
-Nodes (14): @tiptap/core, Subscript, Superscript, SupSubExtension, Commands, TagExtension, TagOptions, tagPluginKey (+6 more)
-
 ### Community 124 - "hovered"
 Cohesion: 0.27
 Nodes (7): Harness, main(), write_response(), dispatch_slow(), execute_command(), handle_command(), run_slow_command()
-
-### Community 125 - "Community 125"
-Cohesion: 0.29
-Nodes (3): AutoCloseExtension, AutoClosePair, PAIRS
 
 ### Community 129 - "Community 129"
 Cohesion: 0.40
@@ -788,20 +763,12 @@ Cohesion: 0.67
 Nodes (3): i18n 系统, 前端接入, 后端翻译表
 
 ### Community 146 - "Community 146"
-Cohesion: 0.17
-Nodes (13): chromePath, configDir, __dirname, eq(), HARNESS_BIN, main(), ok(), outDir (+5 more)
+Cohesion: 0.15
+Nodes (15): chromePath, configDir, __dirname, eq(), HARNESS_BIN, main(), ok(), outDir (+7 more)
 
 ### Community 147 - "PasteHandlerExtension (Tiptap)"
 Cohesion: 0.25
 Nodes (5): cases, __dirname, LintReport, LintResult, r
-
-### Community 149 - "Community 149"
-Cohesion: 0.24
-Nodes (9): createInstantRenderPlugin(), createMarkerWidget(), decorateNode(), findAffectedRange(), instantRenderPluginKey, InstantRenderState, isNearCursor(), WidgetDecorationSpec (+1 more)
-
-### Community 150 - "Community 150"
-Cohesion: 0.32
-Nodes (9): buildCursorDecorations(), addCursorToList(), applyClear(), applyMultiCursorMeta(), applySet(), applyUndoLast(), emptyState(), normalize() (+1 more)
 
 ### Community 152 - "Community 152"
 Cohesion: 0.25
@@ -811,10 +778,6 @@ Nodes (8): BlockMath, InlineMath, KatexModule, KatexOptions, loadKatex(), MathEx
 Cohesion: 0.25
 Nodes (3): CellAlign, MarkdownTable, RenderedCell
 
-### Community 154 - "Community 154"
-Cohesion: 0.36
-Nodes (7): buildVimDecorations(), makeBarCaret(), makeBlockCaret(), makeBlockHighlight(), makeLineHighlight(), rebuildVimDecorations(), vimPluginKey
-
 ### Community 158 - "Community 158"
 Cohesion: 0.29
 Nodes (3): DropHandlerExtension, DropHandlerOptions, dropHandlerPluginKey
@@ -822,14 +785,6 @@ Nodes (3): DropHandlerExtension, DropHandlerOptions, dropHandlerPluginKey
 ### Community 159 - "Community 159"
 Cohesion: 0.38
 Nodes (4): QuickInsertExtension, QuickInsertItem, quickInsertItems, searchQuickInsert()
-
-### Community 160 - "Community 160"
-Cohesion: 0.43
-Nodes (6): VimMode, enterColumnMode(), enterVisualMode(), extendBlockSelection(), extendSelectionByMotion(), modeForKind()
-
-### Community 161 - "Community 161"
-Cohesion: 0.40
-Nodes (3): Commands, FootnoteRefExtension, FootnoteRefOptions
 
 ### Community 162 - "Community 162"
 Cohesion: 0.50
@@ -840,8 +795,8 @@ Cohesion: 0.20
 Nodes (4): HARNESS_BIN, HarnessClient, ipcDevBridge(), REPO_ROOT
 
 ### Community 305 - "components/workspace/AGENTS.md"
-Cohesion: 0.29
-Nodes (5): i18n, CLASS_TO_I18N_KEY, THEME_LABEL_TO_CLASS, THEME_OPTIONS, ./themes
+Cohesion: 0.22
+Nodes (6): i18n, CLASS_TO_I18N_KEY, getThemeLabel(), THEME_LABEL_TO_CLASS, THEME_OPTIONS, ./themes
 
 ### Community 307 - "Community 307"
 Cohesion: 0.40
@@ -876,8 +831,8 @@ Cohesion: 0.50
 Nodes (3): AGENTS.md — editor/ 编辑器核心, 存储格式, 目录
 
 ### Community 336 - "Community 336"
-Cohesion: 0.17
-Nodes (11): FileDropDeps, handleFilesDropped(), handleImagesDropped(), WindowDragDeps, EditorCommandsDeps, EditorInitDeps, WindowEvents, WindowEventsDeps (+3 more)
+Cohesion: 0.15
+Nodes (11): FileDropDeps, handleFilesDropped(), handleImagesDropped(), WindowDragDeps, savePastedImage(), openDroppedFiles(), WindowEvents, WindowEventsDeps (+3 more)
 
 ### Community 337 - "Community 337"
 Cohesion: 0.60
@@ -888,7 +843,7 @@ Cohesion: 0.22
 Nodes (8): AGENTS.md — app/（应用外壳）, code:block1 (.app-root (column)), handlers/ 模块, 存储格式, 布局骨架, 文件, 架构, 规则
 
 ## Knowledge Gaps
-- **1443 isolated node(s):** `概述`, `一级导航`, `测试`, `架构原则（铁律）`, `Rust 模块拆分阈值` (+1438 more)
+- **1445 isolated node(s):** `概述`, `一级导航`, `测试`, `__dirname`, `REPO_ROOT` (+1440 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **70 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -896,16 +851,16 @@ Nodes (8): AGENTS.md — app/（应用外壳）, code:block1 (.app-root (column)
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Path` connect `save_bookmarks` to `write_file`, `walk_directory`, `vite.config.ts`, `update_bookmark`, `Community 109`, `Typora-Style Instant Render`, `is_hidden`, `Community 118`, `unwatch_drops_workspace_id`, `validate_mermaid`, `transparent_1x1_png`, `tabs_path`?**
-  _High betweenness centrality (0.066) - this node is a cross-community bridge._
+  _High betweenness centrality (0.070) - this node is a cross-community bridge._
 - **Why does `cmd_save_tabs()` connect `generate_uuid` to `registry_snapshot`, `tabs_path`?**
-  _High betweenness centrality (0.053) - this node is a cross-community bridge._
+  _High betweenness centrality (0.056) - this node is a cross-community bridge._
 - **Why does `save_tabs()` connect `tabs_path` to `generate_uuid`?**
-  _High betweenness centrality (0.052) - this node is a cross-community bridge._
+  _High betweenness centrality (0.056) - this node is a cross-community bridge._
 - **What connects `概述`, `一级导航`, `测试` to the rest of the system?**
-  _1457 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1459 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `docJson snapshot storage model` be split into smaller, more focused modules?**
   _Cohesion score 0.0907103825136612 - nodes in this community are weakly interconnected._
 - **Should `setContent` be split into smaller, more focused modules?**
-  _Cohesion score 0.08333333333333333 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0480225988700565 - nodes in this community are weakly interconnected._
 - **Should `Top-Block Virtualization` be split into smaller, more focused modules?**
-  _Cohesion score 0.05928614640048397 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06233766233766234 - nodes in this community are weakly interconnected._

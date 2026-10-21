@@ -29,9 +29,10 @@
 | `npx tsx scripts/validate-markdown-normalize.ts` | 列表续行缩进归一化 |
 | `npx tsx scripts/validate-file-format.ts` | 保存时的存储格式保真（真实前端 → 真实 Rust handler） |
 | `npx tsx scripts/validate-layout.ts` | 显示层布局（无头 Chrome + CDP 几何断言） |
+| `npx tsx scripts/validate-interactions.ts` | 显示层交互（真实按键 / 鼠标事件） |
 | `cargo test --workspace` | Rust 单元测试 |
 | `npm run check` | 前端类型检查 |
-| `npm test` | 以上全部（前端 11 个既有验证脚本也包含在内） |
+| `npm test` | 以上全部（前端 12 个既有验证脚本也包含在内） |
 
 浏览器端回归：用 `npx vite preview --port 4173` 起**生产构建**（附带
 `/__ipc` 桥，把浏览器 IPC 转发到 `mt_harness`），即可在浏览器里驱动
@@ -64,6 +65,19 @@
 > 断言选择器随 Tiptap 版本变化：v3 的任务列表渲染成
 > `<ul data-type="taskList"><li data-checked="false">`，
 > **不是**老版本的 `li[data-type="taskItem"]`。
+
+`scripts/validate-interactions.ts` 覆盖**交互**——静态 DOM 与纯函数测试
+都测不到的部分。它用 CDP 派发真实按键与鼠标事件，断言查找替换、
+快速插入、命令面板、工作区搜索、另存为、撤销/重做、大纲跳转、
+表格列宽拖拽柄、图片缩放柄、代码块语言选择器。
+
+它和 `scripts/lib/browser-harness.ts` 共用一套设施：生产构建 →
+preview 服务（带 IPC 桥）→ 无头 Chrome。共用部分抽在 `lib/` 下，
+不要在两个脚本里各写一份 CDP 客户端。
+
+> 快捷键断言要用**大写**字母（`pressKey('P', ['Meta','Shift'])`）：
+> 按住 Shift 时真实浏览器的 `KeyboardEvent.key` 是大写，
+> 应用侧必须 `e.key.toLowerCase()` 才能匹配到。
 
 `scripts/validate-markdown-roundtrip.ts` 里的**语料扫描**值得特别
 一提：它把仓库里所有 `.md` 逐个解析、用真实 schema 校验、再往返一遍。

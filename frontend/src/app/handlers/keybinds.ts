@@ -10,6 +10,8 @@ export interface KeybindsDeps extends AppCtx {
   newTab: () => void
   handleOpen: () => Promise<void>
   handleSave: () => void
+  /** ⌘⇧S → 另存为（keymap 里的 `file.save_as`）。 */
+  handleSaveAs: () => void
   toggleSidebar: () => void
   toggleSourceMode: () => void
   handleUndo: () => void
@@ -46,7 +48,10 @@ export function createKeybinds(ctx: KeybindsDeps) {
       return
     }
     if (e.metaKey || e.ctrlKey) {
-      switch (e.key) {
+      // 按住 Shift 时 `KeyboardEvent.key` 是**大写**（'P' / 'F' / 'Z'），
+      // 不归一化的话 ⌘⇧P（命令面板）、⌘⇧F（工作区搜索）、⌘⇧Z（重做）
+      // 这些分支永远匹配不上——快捷键看起来注册了，按下去却毫无反应。
+      switch (e.key.toLowerCase()) {
         case 'n':
           e.preventDefault()
           ctx.newTab()
@@ -57,7 +62,13 @@ export function createKeybinds(ctx: KeybindsDeps) {
           break
         case 's':
           e.preventDefault()
-          ctx.handleSave()
+          // ⌘S 保存 / ⌘⇧S 另存为（keymap 里的 `file.save_as`）。
+          // 之前只有命令面板能触发另存为，键盘上按 ⌘⇧S 什么都不会发生。
+          if (e.shiftKey) {
+            ctx.handleSaveAs()
+          } else {
+            ctx.handleSave()
+          }
           break
         case 'b':
           e.preventDefault()

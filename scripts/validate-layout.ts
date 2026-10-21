@@ -16,40 +16,36 @@
  *
  * ## 这个脚本做什么
  *
- * 它用 Chrome DevTools Protocol 驱动**无头 Chrome**打开**生产构建**
- * （`vite preview` + `mt_harness` 的 IPC 桥），然后在多个视口宽度
- * 下断言 DOM 结构与几何：
+ * 它用无头 Chrome（CDP）打开**生产构建**，在多个视口宽度下断言
+ * DOM 结构与几何：
  *
  * - `.main-area` 的直接子元素里有 `.editor-panel`，且它是 `column`；
  * - 标签栏 / 工具栏 / 编辑区 / 状态栏的**父元素**都是 `.editor-panel`
  *   （即它们是竖直堆叠的，不是并排的 flex item）；
  * - 编辑区宽度 ≥ 视口宽度的 40%（没被挤成一条缝）；
  * - 标签栏在顶部、工具栏在标签栏下方、状态栏在底部；
- * - 打开大纲面板后，它位于编辑器的**右侧**。
+ * - 打开大纲面板后，它位于编辑器的**右侧**；
+ * - 禅模式：chrome 全部不可见，编辑区宽度 = 820px 阅读宽度且居中；
+ * - 分屏视图：两个面板都在，且宽度都 ≥ 容器的 20%；
+ * - 富内容（宽表格 / 代码块 / 图片 / 任务列表 / 公式）：每种块真的
+ *   渲染出来了，且**没有把布局撑破**。
  *
  * 这些断言正是上面那个 bug 会全部违反的。
  *
- * ## 环境
- *
- * 需要一个 Chrome / Chromium。查找顺序：
- * `$MARKPURE_CHROME` → macOS 应用路径 → Linux 的 `google-chrome` /
- * `chromium` / `chromium-browser` → Windows 的 Chrome。
- * 找不到时脚本**跳过**（退出码 0）并打印说明——布局测试需要真实
- * 排版引擎，纯函数测试做不到这件事。
+ * 设施（生产构建 → preview 服务 → 无头 Chrome）见
+ * `scripts/lib/browser-harness.ts`。没有 Chrome 时脚本**跳过**
+ * （退出码 0）并打印说明——布局断言需要真实排版引擎。
  *
  * 运行：npx tsx scripts/validate-layout.ts
  */
-import { spawn, execFileSync, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const REPO_ROOT = resolve(__dirname, '..')
-const HARNESS_BIN = join(REPO_ROOT, 'target', 'debug', 'mt_harness')
-
-// ---- 断言 ---------------------------------------------------------------
+import {
+  CdpClient,
+  findChrome,
+  harnessReady,
+  openFileInTree,
+  sleep,
+  startHarness,
+} from './lib/browser-harness'
 
 let failures = 0
 function ok(label: string, cond: boolean, detail = ''): void {
@@ -64,24 +60,6 @@ function eq(label: string, got: unknown, expected: unknown): void {
   ok(label, JSON.stringify(got) === JSON.stringify(expected), `expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`)
 }
 
-// ---- 找 Chrome ----------------------------------------------------------
-
-function findChrome(): string | null {
-  const candidates = [
-    process.env.MARKPURE_CHROME,
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Chromium.app/Contents/MacOS/Chromium',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-  ].filter((c): c is string => Boolean(c))
-  for (const c of candidates) {
-    if (existsSync(c)) return c
-  }
-  return null
-}
-
 const chromePath = findChrome()
 if (!chromePath) {
   console.log('— validate-layout —')
@@ -90,25 +68,12 @@ if (!chromePath) {
   console.log('   MARKPURE_CHROME=/path/to/chrome 指定路径。')
   process.exit(0)
 }
-
-if (!existsSync(HARNESS_BIN)) {
-  console.error(`✘ 找不到 harness 二进制 ${HARNESS_BIN}`)
-  console.error('   请先执行：cargo build --bin mt_harness')
+if (!harnessReady()) {
+  console.error('✘ 找不到 mt_harness 二进制，请先执行：cargo build --bin mt_harness')
   process.exit(1)
 }
 
-// ---- 准备：临时工作区 + 生产构建 + preview 服务 -----------------------
-
-const workDir = mkdtempSync(join(tmpdir(), 'markpure-layout-'))
-const configDir = join(workDir, 'config')
-const wsDir = join(workDir, 'ws')
-const outDir = join(workDir, 'dist')
-mkdirSync(configDir, { recursive: true })
-mkdirSync(wsDir, { recursive: true })
-writeFileSync(
-  join(wsDir, 'sample.md'),
-  '# Layout Probe\n\n段落内容 body text.\n\n| 列 A | 列 B |\n| --- | --- |\n| 1 | 2 |\n',
-)
+// ---- 测试样本 ------------------------------------------------------------
 
 // 「富内容」样本：宽表格 / 代码块 / 图片 / 任务列表 / 数学公式。
 //
@@ -118,9 +83,10 @@ writeFileSync(
 // 「渲染出来之后布局没有被撑坏」。
 const WIDE_HEADERS = Array.from({ length: 18 }, (_, i) => `第${i + 1}列`).join(' | ')
 const WIDE_ROW = Array.from({ length: 18 }, (_, i) => `单元格${i + 1}`).join(' | ')
-writeFileSync(
-  join(wsDir, 'rich.md'),
-  [
+
+const FILES = {
+  'sample.md': '# Layout Probe\n\n段落内容 body text.\n\n| 列 A | 列 B |\n| --- | --- |\n| 1 | 2 |\n',
+  'rich.md': [
     '# 富内容',
     '',
     '段落文本。',
@@ -145,155 +111,40 @@ writeFileSync(
     '$$',
     '',
   ].join('\n'),
-)
+}
 
 console.log('— validate-layout —')
 console.log('  正在构建生产产物 ...')
-execFileSync('npx', ['vite', 'build', '--outDir', outDir, '--emptyOutDir'], {
-  cwd: REPO_ROOT,
-  stdio: 'ignore',
-})
-
-const PORT = 4200 + Math.floor(Math.random() * 400)
-const preview: ChildProcess = spawn(
-  'npx',
-  // `--host 127.0.0.1`：显式绑 IPv4。默认绑 `localhost` 时 macOS 会
-  // 优先解析到 ::1，测试脚本用 127.0.0.1 连就会连接失败。
-  ['vite', 'preview', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1', '--outDir', outDir],
-  {
-    cwd: REPO_ROOT,
-    env: {
-      ...process.env,
-      MARKPURE_CONFIG_DIR: configDir,
-      MARKPURE_DEV_WORKSPACE: wsDir,
-      MARKPURE_IPC_POLL: '0',
-    },
-    stdio: 'ignore',
-  },
+const harness = await startHarness({ files: FILES })
+const cdp = await CdpClient.launch(
+  chromePath,
+  `${harness.workspaceDir}/chrome-profile`,
+  4500 + Math.floor(Math.random() * 300),
 )
 
-const CDP_PORT = PORT + 1000
-let chrome: ChildProcess | null = null
-let ws: WebSocket | null = null
+try {
+  // ---- 采集布局快照 -------------------------------------------------------
 
-async function waitFor<T>(fn: () => Promise<T | null>, ms = 20000): Promise<T> {
-  const deadline = Date.now() + ms
-  while (Date.now() < deadline) {
-    try {
-      const v = await fn()
-      if (v) return v
-    } catch { /* 还没就绪 */ }
-    await new Promise((r) => setTimeout(r, 250))
-  }
-  throw new Error('timeout')
-}
-
-async function main() {
-  // 等 preview 服务起来
-  await waitFor(async () => {
-    const r = await fetch(`http://127.0.0.1:${PORT}/`).catch(() => null)
-    return r && r.ok ? true : null
-  })
-  // preview 起来后 bridge 会自动注册工作区；给它一点时间
-  await new Promise((r) => setTimeout(r, 1500))
-
-  chrome = spawn(
-    chromePath,
-    [
-      '--headless=new',
-      '--disable-gpu',
-      '--no-sandbox',
-      '--hide-scrollbars',
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${join(workDir, 'chrome-profile')}`,
-      'about:blank',
-    ],
-    { stdio: 'ignore' },
-  )
-
-  const target = await waitFor(async () => {
-    const list = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`)).json()
-    return (list.find((t: { type: string }) => t.type === 'page') as { webSocketDebuggerUrl: string }) ?? null
-  })
-
-  ws = new WebSocket(target.webSocketDebuggerUrl)
-  await new Promise<void>((res, rej) => {
-    ws!.addEventListener('open', () => res(), { once: true })
-    ws!.addEventListener('error', rej, { once: true })
-  })
-
-  let nextId = 1
-  const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>()
-  ws.addEventListener('message', (ev) => {
-    const m = JSON.parse((ev as MessageEvent).data)
-    const p = pending.get(m.id)
-    if (!p) return
-    pending.delete(m.id)
-    m.error ? p.reject(new Error(JSON.stringify(m.error))) : p.resolve(m.result)
-  })
-  const send = (method: string, params: Record<string, unknown> = {}): Promise<any> => {
-    const id = nextId++
-    return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject })
-      ws!.send(JSON.stringify({ id, method, params }))
-      setTimeout(() => {
-        if (pending.delete(id)) reject(new Error(`timeout ${method}`))
-      }, 30000)
-    })
-  }
-  const evaluate = async (expression: string): Promise<any> => {
-    const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
-    return r.result?.value
-  }
-
-  await send('Page.enable')
-  await send('Runtime.enable')
-
-  /** 打开样本文件并返回布局快照。 */
+  /** 打开文件并返回布局快照。 */
   async function probe(width: number, height: number, openOutline: boolean) {
-    await send('Emulation.setDeviceMetricsOverride', {
-      width, height, deviceScaleFactor: 1, mobile: false,
-    })
-    await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` })
-    await new Promise((r) => setTimeout(r, 3500))
+    await cdp.setViewport(width, height)
+    await cdp.navigate(harness.url)
+    await sleep(3500)
 
-    // 在文件树里点开样本文件。
-    //
-    // 布局崩坏时（例如 `.editor-panel` 包装丢失）文件树可能被挤到
-    // 视口外而点不到——这本身就是缺陷。因此这里重试几次，并把
-    // 「打不开」当成一个**断言失败**而不是让整个脚本崩掉：后面的
-    // 结构断言不依赖文件是否打开，仍然要跑。
-    let opened = false
-    for (let attempt = 0; attempt < 4 && !opened; attempt++) {
-      const clicked = await evaluate(`(() => {
-        const all = [...document.querySelectorAll('*')].filter(
-          n => (n.textContent||'').trim() === 'sample.md' && n.children.length === 0)
-        const el = all[0]
-        if (!el) return 'not-found'
-        const t = el.closest('[role=button], .tree-item, button') || el
-        t.click()
-        return 'clicked'
-      })()`)
-      if (clicked === 'clicked') {
-        await new Promise((r) => setTimeout(r, 1800))
-        opened = !!await evaluate(`!!document.querySelector('.ProseMirror')`)
-      } else {
-        await new Promise((r) => setTimeout(r, 800))
-      }
-    }
+    const opened = await openFileInTree(cdp, 'sample.md')
     ok(`${width}×${height}: 能在文件树里打开文档`, opened, '文件树点不到 / 编辑器没渲染')
 
     if (openOutline) {
-      await evaluate(`(() => {
+      await cdp.evaluate(`(() => {
         const btns = [...document.querySelectorAll('.toolbar button')]
         const hit = btns.find(b => (b.title||'').toLowerCase().includes('outline') || (b.title||'').includes('大纲'))
         if (hit) hit.click()
         return !!hit
       })()`)
-      await new Promise((r) => setTimeout(r, 1200))
+      await sleep(1200)
     }
 
-    const snap = await evaluate(`(() => {
+    const snap = await cdp.evaluate(`(() => {
       const main = document.querySelector('.main-area')
       const panel = document.querySelector('.editor-panel')
       const rect = (sel) => {
@@ -324,7 +175,7 @@ async function main() {
     return { ...snap, opened }
   }
 
-  // ---- 断言 -------------------------------------------------------------
+  // ---- 结构与几何 ---------------------------------------------------------
 
   for (const [width, height] of [[1280, 900], [1900, 1180], [2560, 1400]] as const) {
     const tag = `${width}×${height}`
@@ -373,7 +224,8 @@ async function main() {
     )
   }
 
-  // 大纲面板必须在编辑器右侧
+  // ---- 大纲面板 -----------------------------------------------------------
+
   {
     const d = await probe(1900, 1180, true)
     ok('大纲面板已打开', !!d.outline, '未找到 .outline-panel')
@@ -391,29 +243,22 @@ async function main() {
     }
   }
 
-  // 禅模式：隐藏标签栏 / 工具栏 / 状态栏，编辑器占满。
+  // ---- 禅模式 -------------------------------------------------------------
+  //
   // 禅模式的 CSS 依赖 `.editor-panel`——它曾经丢失过，所以单独覆盖。
   {
-    await send('Emulation.setDeviceMetricsOverride', {
-      width: 1900, height: 1180, deviceScaleFactor: 1, mobile: false,
-    })
-    await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` })
-    await new Promise((r) => setTimeout(r, 3500))
-    await evaluate(`(() => {
-      const all = [...document.querySelectorAll('*')].filter(
-        n => (n.textContent||'').trim() === 'sample.md' && n.children.length === 0)
-      const el = all[0]
-      if (el) (el.closest('[role=button], .tree-item, button') || el).click()
-      return !!el
-    })()`)
-    await new Promise((r) => setTimeout(r, 2000))
+    await cdp.setViewport(1900, 1180)
+    await cdp.navigate(harness.url)
+    await sleep(3500)
+    await openFileInTree(cdp, 'sample.md')
+    await sleep(500)
 
     // 「视图」菜单 → 「切换专注模式」。菜单文案随语言变化，两种都匹配。
     //
     // 关键：菜单项是 `{#if showViewMenu}` 条件渲染的，Svelte 5 的 DOM
     // 更新是异步的——点完菜单按钮后必须**另起一轮** evaluate 去查
     // dropdown 项，否则查到的还是空列表。
-    const viewMenuOpened = await evaluate(`(() => {
+    const viewMenuOpened = await cdp.evaluate(`(() => {
       const viewBtn = [...document.querySelectorAll('.menu-btn')]
         .find(b => /^(视图|View)$/.test((b.textContent||'').trim()))
       if (!viewBtn) return false
@@ -421,9 +266,9 @@ async function main() {
       return true
     })()`)
     ok('「视图」菜单可打开', !!viewMenuOpened)
-    await new Promise((r) => setTimeout(r, 500))
+    await sleep(500)
 
-    const zenClicked = await evaluate(`(() => {
+    const zenClicked = await cdp.evaluate(`(() => {
       const zen = [...document.querySelectorAll('.dropdown-item')]
         .find(b => /专注模式|Zen Mode/i.test(b.textContent||''))
       if (!zen) return 'no-zen-item'
@@ -431,9 +276,9 @@ async function main() {
       return 'clicked'
     })()`)
     ok('禅模式可切换', zenClicked === 'clicked', String(zenClicked))
-    await new Promise((r) => setTimeout(r, 1200))
+    await sleep(1200)
 
-    const z = await evaluate(`(() => {
+    const z = await cdp.evaluate(`(() => {
       const vis = (sel) => {
         const el = document.querySelector(sel)
         if (!el) return null
@@ -470,25 +315,17 @@ async function main() {
     )
   }
 
-  // 分屏视图：源码编辑器与所见即所得并排，两栏都不能被挤没。
+  // ---- 分屏视图 -----------------------------------------------------------
   {
-    await send('Emulation.setDeviceMetricsOverride', {
-      width: 1900, height: 1180, deviceScaleFactor: 1, mobile: false,
-    })
-    await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` })
-    await new Promise((r) => setTimeout(r, 3500))
-    await evaluate(`(() => {
-      const all = [...document.querySelectorAll('*')].filter(
-        n => (n.textContent||'').trim() === 'sample.md' && n.children.length === 0)
-      const el = all[0]
-      if (el) (el.closest('[role=button], .tree-item, button') || el).click()
-      return !!el
-    })()`)
-    await new Promise((r) => setTimeout(r, 2000))
+    await cdp.setViewport(1900, 1180)
+    await cdp.navigate(harness.url)
+    await sleep(3500)
+    await openFileInTree(cdp, 'sample.md')
+    await sleep(500)
 
     // 工具栏的「切换视图模式」按钮。循环顺序是
     // wysiwyg → split → source → wysiwyg，所以**点一次**就是分屏。
-    const cycled = await evaluate(`(() => {
+    const cycled = await cdp.evaluate(`(() => {
       const btn = [...document.querySelectorAll('.toolbar button')]
         .find(b => /切换视图模式|Cycle View Mode/i.test(b.title||''))
       if (!btn) return false
@@ -496,9 +333,9 @@ async function main() {
       return true
     })()`)
     ok('视图模式可循环切换', !!cycled, '找不到「切换视图模式」按钮')
-    await new Promise((r) => setTimeout(r, 1500))
+    await sleep(1500)
 
-    const sp = await evaluate(`(() => {
+    const sp = await cdp.evaluate(`(() => {
       const cont = document.querySelector('.split-container')
       if (!cont) return { hasSplit: false }
       const r = cont.getBoundingClientRect()
@@ -519,7 +356,7 @@ async function main() {
     }
   }
 
-  // 富内容：宽表格 / 代码块 / 图片 / 任务列表 / 数学公式。
+  // ---- 富内容 -------------------------------------------------------------
   //
   // 两条主线：
   // 1. 每种块**真的渲染出来了**（早前的 bug 里围栏代码块整个消失、
@@ -527,21 +364,13 @@ async function main() {
   // 2. 渲染之后**布局没有被撑破**——编辑区宽度仍等于编辑器面板宽度，
   //    页面没有出现横向滚动条（宽表格只应在编辑区内部滚动）。
   {
-    await send('Emulation.setDeviceMetricsOverride', {
-      width: 1900, height: 1180, deviceScaleFactor: 1, mobile: false,
-    })
-    await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` })
-    await new Promise((r) => setTimeout(r, 3500))
-    await evaluate(`(() => {
-      const all = [...document.querySelectorAll('*')].filter(
-        n => (n.textContent||'').trim() === 'rich.md' && n.children.length === 0)
-      const el = all[0]
-      if (el) (el.closest('[role=button], .tree-item, button') || el).click()
-      return !!el
-    })()`)
-    await new Promise((r) => setTimeout(r, 3000))
+    await cdp.setViewport(1900, 1180)
+    await cdp.navigate(harness.url)
+    await sleep(3500)
+    await openFileInTree(cdp, 'rich.md')
+    await sleep(1500)
 
-    const rc = await evaluate(`(() => {
+    const rc = await cdp.evaluate(`(() => {
       const rect = (sel) => {
         const el = document.querySelector(sel)
         if (!el) return null
@@ -591,18 +420,12 @@ async function main() {
       `documentElement.scrollWidth=${rc.pageScrollW} body.scrollWidth=${rc.bodyScrollW} 视口 ${rc.viewportW}`,
     )
   }
-}
-
-try {
-  await main()
 } catch (e) {
   failures++
   console.error(`✘ 布局测试异常终止: ${String(e)}`)
 } finally {
-  try { ws?.close() } catch { /* ignore */ }
-  chrome?.kill()
-  preview.kill()
-  rmSync(workDir, { recursive: true, force: true })
+  await cdp.close()
+  harness.stop()
 }
 
 console.log(failures ? `\nFAILED (${failures})` : '\nOK')

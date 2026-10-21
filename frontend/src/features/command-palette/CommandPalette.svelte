@@ -12,7 +12,6 @@
    * （文件操作、主题循环等），因为面板不应直接 import
    * editor/commands——它保持为纯展示组件。
    */
-  import { onMount } from 'svelte'
   import { useI18n } from '$lib/stores/i18n.svelte'
 
   export interface Command {
@@ -127,19 +126,6 @@
   function handleBackdropClick() {
     visible = false
   }
-
-  onMount(() => {
-    // 全局快捷键：Cmd+Shift+P / Ctrl+Shift+P 开合面板。宿主也会
-    // 绑定；这里防御性地监听，避免宿主绑定遗漏导致面板无法唤起。
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
-        e.preventDefault()
-        visible = !visible
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  })
 
   // 按类别分组，用于分区视图。
   let grouped = $derived.by(() => {

@@ -381,7 +381,9 @@ export function createEditor(opts: EditorOptions): Editor {
         // 只要按下上述任一快捷键，组合输入窗口就会立即崩溃。
         if (view.composing || event.isComposing) return false
 
-        if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+        // Cmd+S 保存。**排除 Shift**：⌘⇧S 是「另存为」，由 window
+        // 层的 keybinds 处理——两处都响应会让一次按键触发两个动作。
+        if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 's') {
           // 保存时同时清除任何活动的多光标状态。
           clearMultiCursors(view)
           event.preventDefault()

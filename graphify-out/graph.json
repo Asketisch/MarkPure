@@ -487,1248 +487,6 @@
       "norm_label": "\u6d4b\u8bd5"
     },
     {
-      "label": "CLAUDE.md",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L1",
-      "id": "claude_md",
-      "community": 119,
-      "norm_label": "claude.md"
-    },
-    {
-      "label": "CLAUDE.md \u2014 MarkPure",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L1",
-      "id": "markpure_claude_claude_md_markpure",
-      "community": 119,
-      "norm_label": "claude.md \u2014 markpure"
-    },
-    {
-      "label": "\u67b6\u6784\u539f\u5219\uff08\u94c1\u5f8b\uff09",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L5",
-      "id": "markpure_claude_\u67b6\u6784\u539f\u5219_\u94c1\u5f8b",
-      "community": 119,
-      "norm_label": "\u67b6\u6784\u539f\u5219(\u94c1\u5f8b)"
-    },
-    {
-      "label": "\u4ee3\u7801\u7ec4\u7ec7\u539f\u5219\uff08\u94c1\u5f8b\uff09",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L32",
-      "id": "markpure_claude_\u4ee3\u7801\u7ec4\u7ec7\u539f\u5219_\u94c1\u5f8b",
-      "community": 138,
-      "norm_label": "\u4ee3\u7801\u7ec4\u7ec7\u539f\u5219(\u94c1\u5f8b)"
-    },
-    {
-      "label": "Rust \u6a21\u5757\u62c6\u5206\u9608\u503c",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L36",
-      "id": "markpure_claude_rust_\u6a21\u5757\u62c6\u5206\u9608\u503c",
-      "community": 138,
-      "norm_label": "rust \u6a21\u5757\u62c6\u5206\u9608\u503c"
-    },
-    {
-      "label": "\u524d\u7aef\u6a21\u5757\u62c6\u5206\u9608\u503c",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L50",
-      "id": "markpure_claude_\u524d\u7aef\u6a21\u5757\u62c6\u5206\u9608\u503c",
-      "community": 138,
-      "norm_label": "\u524d\u7aef\u6a21\u5757\u62c6\u5206\u9608\u503c"
-    },
-    {
-      "label": "\u4e3a\u4ec0\u4e48\u91cd\u8981",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L65",
-      "id": "markpure_claude_\u4e3a\u4ec0\u4e48\u91cd\u8981",
-      "community": 138,
-      "norm_label": "\u4e3a\u4ec0\u4e48\u91cd\u8981"
-    },
-    {
-      "label": "\u67b6\u6784\u6982\u89c8",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L74",
-      "id": "markpure_claude_\u67b6\u6784\u6982\u89c8",
-      "community": 119,
-      "norm_label": "\u67b6\u6784\u6982\u89c8"
-    },
-    {
-      "label": "code:block1 (markpure/)",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L76",
-      "id": "markpure_claude_codeblock_1",
-      "community": 119,
-      "norm_label": "code:block1 (markpure/)"
-    },
-    {
-      "label": "\u6280\u672f\u6808",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L123",
-      "id": "markpure_claude_\u6280\u672f\u6808",
-      "community": 119,
-      "norm_label": "\u6280\u672f\u6808"
-    },
-    {
-      "label": "\u5e38\u7528\u547d\u4ee4",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L150",
-      "id": "markpure_claude_\u5e38\u7528\u547d\u4ee4",
-      "community": 119,
-      "norm_label": "\u5e38\u7528\u547d\u4ee4"
-    },
-    {
-      "label": "code:bash (# \u5f00\u53d1\u6a21\u5f0f\uff08\u4e24\u4e2a\u7ec8\u7aef\uff09)",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L152",
-      "id": "markpure_claude_codeblock_2",
-      "community": 119,
-      "norm_label": "code:bash (# \u5f00\u53d1\u6a21\u5f0f(\u4e24\u4e2a\u7ec8\u7aef))"
-    },
-    {
-      "label": "\u6570\u636e\u6d41",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L185",
-      "id": "markpure_claude_\u6570\u636e\u6d41",
-      "community": 139,
-      "norm_label": "\u6570\u636e\u6d41"
-    },
-    {
-      "label": "\u7f16\u8f91\u6d41\u7a0b",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L187",
-      "id": "markpure_claude_\u7f16\u8f91\u6d41\u7a0b",
-      "community": 139,
-      "norm_label": "\u7f16\u8f91\u6d41\u7a0b"
-    },
-    {
-      "label": "\u6587\u4ef6\u6253\u5f00",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L194",
-      "id": "markpure_claude_\u6587\u4ef6\u6253\u5f00",
-      "community": 139,
-      "norm_label": "\u6587\u4ef6\u6253\u5f00"
-    },
-    {
-      "label": "\u5927\u7eb2\u63d0\u53d6",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L199",
-      "id": "markpure_claude_\u5927\u7eb2\u63d0\u53d6",
-      "community": 139,
-      "norm_label": "\u5927\u7eb2\u63d0\u53d6"
-    },
-    {
-      "label": "IPC \u547d\u4ee4",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L202",
-      "id": "markpure_claude_ipc_\u547d\u4ee4",
-      "community": 86,
-      "norm_label": "ipc \u547d\u4ee4"
-    },
-    {
-      "label": "\u6587\u4ef6\u5bf9\u8bdd\u6846",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L204",
-      "id": "markpure_claude_\u6587\u4ef6\u5bf9\u8bdd\u6846",
-      "community": 86,
-      "norm_label": "\u6587\u4ef6\u5bf9\u8bdd\u6846"
-    },
-    {
-      "label": "\u6587\u4ef6\u64cd\u4f5c",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L211",
-      "id": "markpure_claude_\u6587\u4ef6\u64cd\u4f5c",
-      "community": 86,
-      "norm_label": "\u6587\u4ef6\u64cd\u4f5c"
-    },
-    {
-      "label": "\u6587\u6863\u6ce8\u518c\u8868\uff08Rust \u6301\u6709\u6587\u6863 rope \u526f\u672c\uff09",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L218",
-      "id": "markpure_claude_\u6587\u6863\u6ce8\u518c\u8868_rust_\u6301\u6709\u6587\u6863_rope_\u526f\u672c",
-      "community": 86,
-      "norm_label": "\u6587\u6863\u6ce8\u518c\u8868(rust \u6301\u6709\u6587\u6863 rope \u526f\u672c)"
-    },
-    {
-      "label": "\u76ee\u5f55\u6811",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L227",
-      "id": "markpure_claude_\u76ee\u5f55\u6811",
-      "community": 86,
-      "norm_label": "\u76ee\u5f55\u6811"
-    },
-    {
-      "label": "\u6587\u4ef6 CRUD",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L234",
-      "id": "markpure_claude_\u6587\u4ef6_crud",
-      "community": 86,
-      "norm_label": "\u6587\u4ef6 crud"
-    },
-    {
-      "label": "\u5927\u7eb2\uff08\u65e7\u63a5\u53e3\uff0c\u4fdd\u7559\u517c\u5bb9\uff09",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L242",
-      "id": "markpure_claude_\u5927\u7eb2_\u65e7\u63a5\u53e3_\u4fdd\u7559\u517c\u5bb9",
-      "community": 86,
-      "norm_label": "\u5927\u7eb2(\u65e7\u63a5\u53e3,\u4fdd\u7559\u517c\u5bb9)"
-    },
-    {
-      "label": "Wiki \u94fe\u63a5\u548c Tags",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L247",
-      "id": "markpure_claude_wiki_\u94fe\u63a5\u548c_tags",
-      "community": 86,
-      "norm_label": "wiki \u94fe\u63a5\u548c tags"
-    },
-    {
-      "label": "\u6587\u4ef6\u62d6\u62fd",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L253",
-      "id": "markpure_claude_\u6587\u4ef6\u62d6\u62fd",
-      "community": 86,
-      "norm_label": "\u6587\u4ef6\u62d6\u62fd"
-    },
-    {
-      "label": "\u6700\u8fd1\u6587\u4ef6 / Tab \u72b6\u6001 / \u914d\u7f6e",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L258",
-      "id": "markpure_claude_\u6700\u8fd1\u6587\u4ef6_tab_\u72b6\u6001_\u914d\u7f6e",
-      "community": 86,
-      "norm_label": "\u6700\u8fd1\u6587\u4ef6 / tab \u72b6\u6001 / \u914d\u7f6e"
-    },
-    {
-      "label": "\u5bfc\u51fa",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L265",
-      "id": "markpure_claude_\u5bfc\u51fa",
-      "community": 86,
-      "norm_label": "\u5bfc\u51fa"
-    },
-    {
-      "label": "\u6587\u4ef6\u76d1\u89c6",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L273",
-      "id": "markpure_claude_\u6587\u4ef6\u76d1\u89c6",
-      "community": 86,
-      "norm_label": "\u6587\u4ef6\u76d1\u89c6"
-    },
-    {
-      "label": "\u5de5\u4f5c\u533a\u641c\u7d22",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L278",
-      "id": "markpure_claude_\u5de5\u4f5c\u533a\u641c\u7d22",
-      "community": 86,
-      "norm_label": "\u5de5\u4f5c\u533a\u641c\u7d22"
-    },
-    {
-      "label": "\u4e66\u7b7e",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L283",
-      "id": "markpure_claude_\u4e66\u7b7e",
-      "community": 86,
-      "norm_label": "\u4e66\u7b7e"
-    },
-    {
-      "label": "i18n / \u8bed\u8a00",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L291",
-      "id": "markpure_claude_i18n_\u8bed\u8a00",
-      "community": 86,
-      "norm_label": "i18n / \u8bed\u8a00"
-    },
-    {
-      "label": "\u5feb\u6377\u952e",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L298",
-      "id": "markpure_claude_\u5feb\u6377\u952e",
-      "community": 86,
-      "norm_label": "\u5feb\u6377\u952e"
-    },
-    {
-      "label": "\u4e3b\u9898\u7ba1\u7406",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L306",
-      "id": "markpure_claude_\u4e3b\u9898\u7ba1\u7406",
-      "community": 86,
-      "norm_label": "\u4e3b\u9898\u7ba1\u7406"
-    },
-    {
-      "label": "\u56fe\u7247 / \u8d44\u6e90",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L314",
-      "id": "markpure_claude_\u56fe\u7247_\u8d44\u6e90",
-      "community": 86,
-      "norm_label": "\u56fe\u7247 / \u8d44\u6e90"
-    },
-    {
-      "label": "\u62fc\u5199\u68c0\u67e5",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L320",
-      "id": "markpure_claude_\u62fc\u5199\u68c0\u67e5",
-      "community": 86,
-      "norm_label": "\u62fc\u5199\u68c0\u67e5"
-    },
-    {
-      "label": "\u5e94\u7528\u4fe1\u606f",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L325",
-      "id": "markpure_claude_\u5e94\u7528\u4fe1\u606f",
-      "community": 86,
-      "norm_label": "\u5e94\u7528\u4fe1\u606f"
-    },
-    {
-      "label": "IPC \u5b9e\u73b0\u673a\u5236",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L330",
-      "id": "markpure_claude_ipc_\u5b9e\u73b0\u673a\u5236",
-      "community": 86,
-      "norm_label": "ipc \u5b9e\u73b0\u673a\u5236"
-    },
-    {
-      "label": "\u4e3b\u9898\u7cfb\u7edf",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L338",
-      "id": "markpure_claude_\u4e3b\u9898\u7cfb\u7edf",
-      "community": 119,
-      "norm_label": "\u4e3b\u9898\u7cfb\u7edf"
-    },
-    {
-      "label": "i18n \u7cfb\u7edf",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L356",
-      "id": "markpure_claude_i18n_\u7cfb\u7edf",
-      "community": 140,
-      "norm_label": "i18n \u7cfb\u7edf"
-    },
-    {
-      "label": "\u524d\u7aef\u63a5\u5165",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L363",
-      "id": "markpure_claude_\u524d\u7aef\u63a5\u5165",
-      "community": 140,
-      "norm_label": "\u524d\u7aef\u63a5\u5165"
-    },
-    {
-      "label": "\u540e\u7aef\u7ffb\u8bd1\u8868",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L374",
-      "id": "markpure_claude_\u540e\u7aef\u7ffb\u8bd1\u8868",
-      "community": 140,
-      "norm_label": "\u540e\u7aef\u7ffb\u8bd1\u8868"
-    },
-    {
-      "label": "\u5feb\u6377\u952e\u7cfb\u7edf",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L378",
-      "id": "markpure_claude_\u5feb\u6377\u952e\u7cfb\u7edf",
-      "community": 119,
-      "norm_label": "\u5feb\u6377\u952e\u7cfb\u7edf"
-    },
-    {
-      "label": "\u5b89\u5168\u8bbe\u8ba1",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L382",
-      "id": "markpure_claude_\u5b89\u5168\u8bbe\u8ba1",
-      "community": 119,
-      "norm_label": "\u5b89\u5168\u8bbe\u8ba1"
-    },
-    {
-      "label": "\u6027\u80fd\u4f18\u5316\u8981\u70b9",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L390",
-      "id": "markpure_claude_\u6027\u80fd\u4f18\u5316\u8981\u70b9",
-      "community": 119,
-      "norm_label": "\u6027\u80fd\u4f18\u5316\u8981\u70b9"
-    },
-    {
-      "label": "\u542f\u52a8\u8017\u65f6",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L398",
-      "id": "markpure_claude_\u542f\u52a8\u8017\u65f6",
-      "community": 143,
-      "norm_label": "\u542f\u52a8\u8017\u65f6"
-    },
-    {
-      "label": "code:bash (MARKPURE_STARTUP_LOG=1 cargo run --release)",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L421",
-      "id": "markpure_claude_codeblock_3",
-      "community": 143,
-      "norm_label": "code:bash (markpure_startup_log=1 cargo run --release)"
-    },
-    {
-      "label": "\u5f00\u53d1\u6a21\u5f0f",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L436",
-      "id": "markpure_claude_\u5f00\u53d1\u6a21\u5f0f",
-      "community": 119,
-      "norm_label": "\u5f00\u53d1\u6a21\u5f0f"
-    },
-    {
-      "label": "\u6ce8\u610f\u4e8b\u9879",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L445",
-      "id": "markpure_claude_\u6ce8\u610f\u4e8b\u9879",
-      "community": 119,
-      "norm_label": "\u6ce8\u610f\u4e8b\u9879"
-    },
-    {
-      "label": "AGENTS.md \u5bfc\u822a\u4f53\u7cfb",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L461",
-      "id": "markpure_claude_agents_md_\u5bfc\u822a\u4f53\u7cfb",
-      "community": 119,
-      "norm_label": "agents.md \u5bfc\u822a\u4f53\u7cfb"
-    },
-    {
-      "label": "graphify",
-      "file_type": "document",
-      "source_file": "CLAUDE.md",
-      "source_location": "L473",
-      "id": "markpure_claude_graphify",
-      "community": 119,
-      "norm_label": "graphify"
-    },
-    {
-      "label": "AGENTS.md",
-      "file_type": "document",
-      "source_file": "frontend/src/app/AGENTS.md",
-      "source_location": "L1",
-      "id": "frontend_src_app_agents_md",
-      "community": 343,
-      "norm_label": "agents.md"
-    },
-    {
-      "label": "AGENTS.md \u2014 app/\uff08\u5e94\u7528\u5916\u58f3\uff09",
-      "file_type": "document",
-      "source_file": "frontend/src/app/AGENTS.md",
-      "source_location": "L1",
-      "id": "app_agents_agents_md_app_\u5e94\u7528\u5916\u58f3",
-      "community": 343,
-      "norm_label": "agents.md \u2014 app/(\u5e94\u7528\u5916\u58f3)"
-    },
-    {
-      "label": "\u67b6\u6784",
-      "file_type": "document",
-      "source_file": "frontend/src/app/AGENTS.md",
-      "source_location": "L3",
-      "id": "app_agents_\u67b6\u6784",
-      "community": 343,
-      "norm_label": "\u67b6\u6784"
-    },
-    {
-      "label": "\u6587\u4ef6",
-      "file_type": "document",
-      "source_file": "frontend/src/app/AGENTS.md",
-      "source_location": "L18",
-      "id": "app_agents_\u6587\u4ef6",
-      "community": 343,
-      "norm_label": "\u6587\u4ef6"
-    },
-    {
-      "label": "handlers/ \u6a21\u5757",
-      "file_type": "document",
-      "source_file": "frontend/src/app/AGENTS.md",
-      "source_location": "L35",
-      "id": "app_agents_handlers_\u6a21\u5757",
-      "community": 343,
-      "norm_label": "handlers/ \u6a21\u5757"
-    },
-    {
-      "label": "\u5e03\u5c40\u9aa8\u67b6",
-      "file_type": "document",
-      "source_file": "frontend/src/app/AGENTS.md",
-      "source_location": "L61",
-      "id": "app_agents_\u5e03\u5c40\u9aa8\u67b6",
-      "community": 343,
-      "norm_label": "\u5e03\u5c40\u9aa8\u67b6"
-    },
-    {
-      "label": "code:block1 (.app-root (column))",
-      "file_type": "document",
-      "source_file": "frontend/src/app/AGENTS.md",
-      "source_location": "L63",
-      "id": "app_agents_codeblock_1",
-      "community": 343,
-      "norm_label": "code:block1 (.app-root (column))"
-    },
-    {
-      "label": "\u5b58\u50a8\u683c\u5f0f",
-      "file_type": "document",
-      "source_file": "frontend/src/app/AGENTS.md",
-      "source_location": "L81",
-      "id": "app_agents_\u5b58\u50a8\u683c\u5f0f",
-      "community": 343,
-      "norm_label": "\u5b58\u50a8\u683c\u5f0f"
-    },
-    {
-      "label": "\u89c4\u5219",
-      "file_type": "document",
-      "source_file": "frontend/src/app/AGENTS.md",
-      "source_location": "L87",
-      "id": "app_agents_\u89c4\u5219",
-      "community": 343,
-      "norm_label": "\u89c4\u5219"
-    },
-    {
-      "label": "AppEditorViews.svelte",
-      "file_type": "code",
-      "source_file": "frontend/src/app/AppEditorViews.svelte",
-      "source_location": "L1",
-      "id": "frontend_src_app_appeditorviews_svelte",
-      "community": 3,
-      "norm_label": "appeditorviews.svelte"
-    },
-    {
-      "label": "@tiptap/core",
-      "file_type": "code",
-      "source_file": "@tiptap/core",
-      "confidence": "EXTRACTED",
-      "id": "core",
-      "community": 123,
-      "norm_label": "@tiptap/core"
-    },
-    {
-      "label": "$lib/components/ui/EmptyState.svelte",
-      "file_type": "code",
-      "source_file": "$lib/components/ui/EmptyState.svelte",
-      "confidence": "EXTRACTED",
-      "id": "emptystate_svelte",
-      "community": 3,
-      "norm_label": "$lib/components/ui/emptystate.svelte"
-    },
-    {
-      "label": "$lib/components/layout/Tabs.svelte",
-      "file_type": "code",
-      "source_file": "$lib/components/layout/Tabs.svelte",
-      "confidence": "EXTRACTED",
-      "id": "tabs_svelte",
-      "community": 3,
-      "norm_label": "$lib/components/layout/tabs.svelte"
-    },
-    {
-      "label": "$lib/components/layout/TabContextMenu.svelte",
-      "file_type": "code",
-      "source_file": "$lib/components/layout/TabContextMenu.svelte",
-      "confidence": "EXTRACTED",
-      "id": "tabcontextmenu_svelte",
-      "community": 3,
-      "norm_label": "$lib/components/layout/tabcontextmenu.svelte"
-    },
-    {
-      "label": "$lib/components/workspace/SearchBar.svelte",
-      "file_type": "code",
-      "source_file": "$lib/components/workspace/SearchBar.svelte",
-      "confidence": "EXTRACTED",
-      "id": "searchbar_svelte",
-      "community": 3,
-      "norm_label": "$lib/components/workspace/searchbar.svelte"
-    },
-    {
-      "label": "$lib/components/workspace/SourceEditor.svelte",
-      "file_type": "code",
-      "source_file": "$lib/components/workspace/SourceEditor.svelte",
-      "confidence": "EXTRACTED",
-      "id": "sourceeditor_svelte",
-      "community": 3,
-      "norm_label": "$lib/components/workspace/sourceeditor.svelte"
-    },
-    {
-      "label": "$lib/components/layout/StatusBar.svelte",
-      "file_type": "code",
-      "source_file": "$lib/components/layout/StatusBar.svelte",
-      "confidence": "EXTRACTED",
-      "id": "statusbar_svelte",
-      "community": 3,
-      "norm_label": "$lib/components/layout/statusbar.svelte"
-    },
-    {
-      "label": "$lib/components/ui/ResizeHandle.svelte",
-      "file_type": "code",
-      "source_file": "$lib/components/ui/ResizeHandle.svelte",
-      "confidence": "EXTRACTED",
-      "id": "resizehandle_svelte",
-      "community": 3,
-      "norm_label": "$lib/components/ui/resizehandle.svelte"
-    },
-    {
-      "label": "lucide-svelte",
-      "file_type": "code",
-      "source_file": "lucide-svelte",
-      "confidence": "EXTRACTED",
-      "id": "lucide_svelte",
-      "community": 3,
-      "norm_label": "lucide-svelte"
-    },
-    {
-      "label": "$lib/stores/i18n.svelte",
-      "file_type": "code",
-      "source_file": "$lib/stores/i18n.svelte",
-      "confidence": "EXTRACTED",
-      "id": "i18n_svelte",
-      "community": 31,
-      "norm_label": "$lib/stores/i18n.svelte"
-    },
-    {
-      "label": "./appState.svelte",
-      "file_type": "code",
-      "source_file": "frontend/src/app/appState.svelte",
-      "confidence": "EXTRACTED",
-      "id": "users_admin_code_cnb_markpure_frontend_src_app_appstate_svelte",
-      "community": 3,
-      "norm_label": "./appstate.svelte"
-    },
-    {
-      "label": "./handlers/editorCommands",
-      "file_type": "code",
-      "source_file": "frontend/src/app/handlers/editorCommands",
-      "confidence": "EXTRACTED",
-      "id": "users_admin_code_cnb_markpure_frontend_src_app_handlers_editorcommands",
-      "community": 3,
-      "norm_label": "./handlers/editorcommands"
-    },
-    {
-      "label": "./handlers/ctx",
-      "file_type": "code",
-      "source_file": "frontend/src/app/handlers/ctx",
-      "confidence": "EXTRACTED",
-      "id": "users_admin_code_cnb_markpure_frontend_src_app_handlers_ctx",
-      "community": 3,
-      "norm_label": "./handlers/ctx"
-    },
-    {
-      "label": "./AppToolbar.svelte",
-      "file_type": "code",
-      "source_file": "frontend/src/app/AppToolbar.svelte",
-      "confidence": "EXTRACTED",
-      "id": "users_admin_code_cnb_markpure_frontend_src_app_apptoolbar_svelte",
-      "community": 3,
-      "norm_label": "./apptoolbar.svelte"
-    },
-    {
-      "label": "package.json",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L1",
-      "id": "package_json",
-      "community": 136,
-      "norm_label": "package.json"
-    },
-    {
-      "label": "name",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L2",
-      "id": "markpure_package_name",
-      "community": 136,
-      "norm_label": "name"
-    },
-    {
-      "label": "private",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L3",
-      "id": "markpure_package_private",
-      "community": 136,
-      "norm_label": "private"
-    },
-    {
-      "label": "version",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L4",
-      "id": "markpure_package_version",
-      "community": 136,
-      "norm_label": "version"
-    },
-    {
-      "label": "type",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L5",
-      "id": "markpure_package_type",
-      "community": 136,
-      "norm_label": "type"
-    },
-    {
-      "label": "scripts",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L6",
-      "id": "markpure_package_scripts",
-      "community": 74,
-      "norm_label": "scripts"
-    },
-    {
-      "label": "dev",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L7",
-      "id": "markpure_package_scripts_dev",
-      "community": 74,
-      "norm_label": "dev"
-    },
-    {
-      "label": "build",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L8",
-      "id": "markpure_package_scripts_build",
-      "community": 74,
-      "norm_label": "build"
-    },
-    {
-      "label": "preview",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L9",
-      "id": "markpure_package_scripts_preview",
-      "community": 74,
-      "norm_label": "preview"
-    },
-    {
-      "label": "check",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L10",
-      "id": "markpure_package_scripts_check",
-      "community": 74,
-      "norm_label": "check"
-    },
-    {
-      "label": "test:backend",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L11",
-      "id": "markpure_package_scripts_test_backend",
-      "community": 74,
-      "norm_label": "test:backend"
-    },
-    {
-      "label": "test:markdown",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L12",
-      "id": "markpure_package_scripts_test_markdown",
-      "community": 74,
-      "norm_label": "test:markdown"
-    },
-    {
-      "label": "test",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L13",
-      "id": "markpure_package_scripts_test",
-      "community": 74,
-      "norm_label": "test"
-    },
-    {
-      "label": "test:frontend",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L14",
-      "id": "markpure_package_scripts_test_frontend",
-      "community": 74,
-      "norm_label": "test:frontend"
-    },
-    {
-      "label": "devDependencies",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L16",
-      "id": "markpure_package_devdependencies",
-      "community": 82,
-      "norm_label": "devdependencies"
-    },
-    {
-      "label": "@sveltejs/vite-plugin-svelte",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L17",
-      "id": "markpure_package_devdependencies_sveltejs_vite_plugin_svelte",
-      "community": 82,
-      "norm_label": "@sveltejs/vite-plugin-svelte"
-    },
-    {
-      "label": "@tsconfig/svelte",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L18",
-      "id": "markpure_package_devdependencies_tsconfig_svelte",
-      "community": 82,
-      "norm_label": "@tsconfig/svelte"
-    },
-    {
-      "label": "@types/node",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L19",
-      "id": "markpure_package_devdependencies_types_node",
-      "community": 82,
-      "norm_label": "@types/node"
-    },
-    {
-      "label": "svelte",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L20",
-      "id": "markpure_package_devdependencies_svelte",
-      "community": 82,
-      "norm_label": "svelte"
-    },
-    {
-      "label": "svelte-check",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L21",
-      "id": "markpure_package_devdependencies_svelte_check",
-      "community": 82,
-      "norm_label": "svelte-check"
-    },
-    {
-      "label": "tsx",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L22",
-      "id": "markpure_package_devdependencies_tsx",
-      "community": 82,
-      "norm_label": "tsx"
-    },
-    {
-      "label": "typescript",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L23",
-      "id": "markpure_package_devdependencies_typescript",
-      "community": 82,
-      "norm_label": "typescript"
-    },
-    {
-      "label": "vite",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L24",
-      "id": "markpure_package_devdependencies_vite",
-      "community": 82,
-      "norm_label": "vite"
-    },
-    {
-      "label": "dependencies",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L26",
-      "id": "markpure_package_dependencies",
-      "community": 7,
-      "norm_label": "dependencies"
-    },
-    {
-      "label": "@codemirror/commands",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L27",
-      "id": "markpure_package_dependencies_codemirror_commands",
-      "community": 7,
-      "norm_label": "@codemirror/commands"
-    },
-    {
-      "label": "@codemirror/lang-cpp",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L28",
-      "id": "markpure_package_dependencies_codemirror_lang_cpp",
-      "community": 7,
-      "norm_label": "@codemirror/lang-cpp"
-    },
-    {
-      "label": "@codemirror/lang-css",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L29",
-      "id": "markpure_package_dependencies_codemirror_lang_css",
-      "community": 7,
-      "norm_label": "@codemirror/lang-css"
-    },
-    {
-      "label": "@codemirror/lang-go",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L30",
-      "id": "markpure_package_dependencies_codemirror_lang_go",
-      "community": 7,
-      "norm_label": "@codemirror/lang-go"
-    },
-    {
-      "label": "@codemirror/lang-html",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L31",
-      "id": "markpure_package_dependencies_codemirror_lang_html",
-      "community": 7,
-      "norm_label": "@codemirror/lang-html"
-    },
-    {
-      "label": "@codemirror/lang-java",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L32",
-      "id": "markpure_package_dependencies_codemirror_lang_java",
-      "community": 7,
-      "norm_label": "@codemirror/lang-java"
-    },
-    {
-      "label": "@codemirror/lang-javascript",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L33",
-      "id": "markpure_package_dependencies_codemirror_lang_javascript",
-      "community": 7,
-      "norm_label": "@codemirror/lang-javascript"
-    },
-    {
-      "label": "@codemirror/lang-json",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L34",
-      "id": "markpure_package_dependencies_codemirror_lang_json",
-      "community": 7,
-      "norm_label": "@codemirror/lang-json"
-    },
-    {
-      "label": "@codemirror/lang-markdown",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L35",
-      "id": "markpure_package_dependencies_codemirror_lang_markdown",
-      "community": 7,
-      "norm_label": "@codemirror/lang-markdown"
-    },
-    {
-      "label": "@codemirror/lang-python",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L36",
-      "id": "markpure_package_dependencies_codemirror_lang_python",
-      "community": 7,
-      "norm_label": "@codemirror/lang-python"
-    },
-    {
-      "label": "@codemirror/lang-rust",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L37",
-      "id": "markpure_package_dependencies_codemirror_lang_rust",
-      "community": 7,
-      "norm_label": "@codemirror/lang-rust"
-    },
-    {
-      "label": "@codemirror/lang-sql",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L38",
-      "id": "markpure_package_dependencies_codemirror_lang_sql",
-      "community": 7,
-      "norm_label": "@codemirror/lang-sql"
-    },
-    {
-      "label": "@codemirror/lang-xml",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L39",
-      "id": "markpure_package_dependencies_codemirror_lang_xml",
-      "community": 7,
-      "norm_label": "@codemirror/lang-xml"
-    },
-    {
-      "label": "@codemirror/lang-yaml",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L40",
-      "id": "markpure_package_dependencies_codemirror_lang_yaml",
-      "community": 7,
-      "norm_label": "@codemirror/lang-yaml"
-    },
-    {
-      "label": "@codemirror/language",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L41",
-      "id": "markpure_package_dependencies_codemirror_language",
-      "community": 7,
-      "norm_label": "@codemirror/language"
-    },
-    {
-      "label": "@codemirror/state",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L42",
-      "id": "markpure_package_dependencies_codemirror_state",
-      "community": 7,
-      "norm_label": "@codemirror/state"
-    },
-    {
-      "label": "@codemirror/view",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L43",
-      "id": "markpure_package_dependencies_codemirror_view",
-      "community": 7,
-      "norm_label": "@codemirror/view"
-    },
-    {
-      "label": "@lezer/highlight",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L44",
-      "id": "markpure_package_dependencies_lezer_highlight",
-      "community": 7,
-      "norm_label": "@lezer/highlight"
-    },
-    {
-      "label": "@tiptap/core",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L45",
-      "id": "markpure_package_dependencies_tiptap_core",
-      "community": 7,
-      "norm_label": "@tiptap/core"
-    },
-    {
-      "label": "@tiptap/extension-highlight",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L46",
-      "id": "markpure_package_dependencies_tiptap_extension_highlight",
-      "community": 7,
-      "norm_label": "@tiptap/extension-highlight"
-    },
-    {
-      "label": "@tiptap/extension-image",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L47",
-      "id": "markpure_package_dependencies_tiptap_extension_image",
-      "community": 7,
-      "norm_label": "@tiptap/extension-image"
-    },
-    {
-      "label": "@tiptap/extension-link",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L48",
-      "id": "markpure_package_dependencies_tiptap_extension_link",
-      "community": 7,
-      "norm_label": "@tiptap/extension-link"
-    },
-    {
-      "label": "@tiptap/extension-mathematics",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L49",
-      "id": "markpure_package_dependencies_tiptap_extension_mathematics",
-      "community": 7,
-      "norm_label": "@tiptap/extension-mathematics"
-    },
-    {
-      "label": "@tiptap/extension-placeholder",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L50",
-      "id": "markpure_package_dependencies_tiptap_extension_placeholder",
-      "community": 7,
-      "norm_label": "@tiptap/extension-placeholder"
-    },
-    {
-      "label": "@tiptap/extension-table",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L51",
-      "id": "markpure_package_dependencies_tiptap_extension_table",
-      "community": 7,
-      "norm_label": "@tiptap/extension-table"
-    },
-    {
-      "label": "@tiptap/extension-table-cell",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L52",
-      "id": "markpure_package_dependencies_tiptap_extension_table_cell",
-      "community": 7,
-      "norm_label": "@tiptap/extension-table-cell"
-    },
-    {
-      "label": "@tiptap/extension-table-header",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L53",
-      "id": "markpure_package_dependencies_tiptap_extension_table_header",
-      "community": 7,
-      "norm_label": "@tiptap/extension-table-header"
-    },
-    {
-      "label": "@tiptap/extension-table-row",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L54",
-      "id": "markpure_package_dependencies_tiptap_extension_table_row",
-      "community": 7,
-      "norm_label": "@tiptap/extension-table-row"
-    },
-    {
-      "label": "@tiptap/extension-task-item",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L55",
-      "id": "markpure_package_dependencies_tiptap_extension_task_item",
-      "community": 7,
-      "norm_label": "@tiptap/extension-task-item"
-    },
-    {
-      "label": "@tiptap/extension-task-list",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L56",
-      "id": "markpure_package_dependencies_tiptap_extension_task_list",
-      "community": 7,
-      "norm_label": "@tiptap/extension-task-list"
-    },
-    {
-      "label": "@tiptap/markdown",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L57",
-      "id": "markpure_package_dependencies_tiptap_markdown",
-      "community": 7,
-      "norm_label": "@tiptap/markdown"
-    },
-    {
-      "label": "@tiptap/pm",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L58",
-      "id": "markpure_package_dependencies_tiptap_pm",
-      "community": 7,
-      "norm_label": "@tiptap/pm"
-    },
-    {
-      "label": "@tiptap/starter-kit",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L59",
-      "id": "markpure_package_dependencies_tiptap_starter_kit",
-      "community": 7,
-      "norm_label": "@tiptap/starter-kit"
-    },
-    {
-      "label": "@tiptap/suggestion",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L60",
-      "id": "markpure_package_dependencies_tiptap_suggestion",
-      "community": 7,
-      "norm_label": "@tiptap/suggestion"
-    },
-    {
-      "label": "codemirror",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L61",
-      "id": "markpure_package_dependencies_codemirror",
-      "community": 141,
-      "norm_label": "codemirror"
-    },
-    {
-      "label": "html-to-image",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L62",
-      "id": "markpure_package_dependencies_html_to_image",
-      "community": 7,
-      "norm_label": "html-to-image"
-    },
-    {
-      "label": "katex",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L63",
-      "id": "markpure_package_dependencies_katex",
-      "community": 7,
-      "norm_label": "katex"
-    },
-    {
-      "label": "lucide-svelte",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L64",
-      "id": "markpure_package_dependencies_lucide_svelte",
-      "community": 3,
-      "norm_label": "lucide-svelte"
-    },
-    {
-      "label": "mermaid",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L65",
-      "id": "markpure_package_dependencies_mermaid",
-      "community": 7,
-      "norm_label": "mermaid"
-    },
-    {
-      "label": "svelte-i18n",
-      "file_type": "code",
-      "source_file": "package.json",
-      "source_location": "L66",
-      "id": "markpure_package_dependencies_svelte_i18n",
-      "community": 7,
-      "norm_label": "svelte-i18n"
-    },
-    {
       "label": "validate-layout.ts",
       "file_type": "code",
       "source_file": "scripts/validate-layout.ts",
@@ -1837,10 +595,28 @@
       "norm_label": "outdir"
     },
     {
+      "label": "WIDE_HEADERS",
+      "file_type": "code",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L119",
+      "id": "scripts_validate_layout_wide_headers",
+      "community": 146,
+      "norm_label": "wide_headers"
+    },
+    {
+      "label": "WIDE_ROW",
+      "file_type": "code",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L120",
+      "id": "scripts_validate_layout_wide_row",
+      "community": 146,
+      "norm_label": "wide_row"
+    },
+    {
       "label": "preview",
       "file_type": "code",
       "source_file": "scripts/validate-layout.ts",
-      "source_location": "L121",
+      "source_location": "L158",
       "id": "scripts_validate_layout_preview",
       "community": 146,
       "norm_label": "preview"
@@ -1849,7 +625,7 @@
       "label": "waitFor()",
       "file_type": "code",
       "source_file": "scripts/validate-layout.ts",
-      "source_location": "L142",
+      "source_location": "L179",
       "id": "scripts_validate_layout_waitfor",
       "community": 146,
       "norm_label": "waitfor()"
@@ -1858,10 +634,1252 @@
       "label": "main()",
       "file_type": "code",
       "source_file": "scripts/validate-layout.ts",
-      "source_location": "L154",
+      "source_location": "L191",
       "id": "scripts_validate_layout_main",
       "community": 146,
       "norm_label": "main()"
+    },
+    {
+      "label": "CLAUDE.md",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L1",
+      "community": 119,
+      "norm_label": "claude.md",
+      "id": "claude_md"
+    },
+    {
+      "label": "CLAUDE.md \u2014 MarkPure",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L1",
+      "community": 119,
+      "norm_label": "claude.md \u2014 markpure",
+      "id": "markpure_claude_claude_md_markpure"
+    },
+    {
+      "label": "\u67b6\u6784\u539f\u5219\uff08\u94c1\u5f8b\uff09",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L5",
+      "community": 119,
+      "norm_label": "\u67b6\u6784\u539f\u5219(\u94c1\u5f8b)",
+      "id": "markpure_claude_\u67b6\u6784\u539f\u5219_\u94c1\u5f8b"
+    },
+    {
+      "label": "\u4ee3\u7801\u7ec4\u7ec7\u539f\u5219\uff08\u94c1\u5f8b\uff09",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L32",
+      "community": 138,
+      "norm_label": "\u4ee3\u7801\u7ec4\u7ec7\u539f\u5219(\u94c1\u5f8b)",
+      "id": "markpure_claude_\u4ee3\u7801\u7ec4\u7ec7\u539f\u5219_\u94c1\u5f8b"
+    },
+    {
+      "label": "Rust \u6a21\u5757\u62c6\u5206\u9608\u503c",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L36",
+      "community": 138,
+      "norm_label": "rust \u6a21\u5757\u62c6\u5206\u9608\u503c",
+      "id": "markpure_claude_rust_\u6a21\u5757\u62c6\u5206\u9608\u503c"
+    },
+    {
+      "label": "\u524d\u7aef\u6a21\u5757\u62c6\u5206\u9608\u503c",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L50",
+      "community": 138,
+      "norm_label": "\u524d\u7aef\u6a21\u5757\u62c6\u5206\u9608\u503c",
+      "id": "markpure_claude_\u524d\u7aef\u6a21\u5757\u62c6\u5206\u9608\u503c"
+    },
+    {
+      "label": "\u4e3a\u4ec0\u4e48\u91cd\u8981",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L65",
+      "community": 138,
+      "norm_label": "\u4e3a\u4ec0\u4e48\u91cd\u8981",
+      "id": "markpure_claude_\u4e3a\u4ec0\u4e48\u91cd\u8981"
+    },
+    {
+      "label": "\u67b6\u6784\u6982\u89c8",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L74",
+      "community": 119,
+      "norm_label": "\u67b6\u6784\u6982\u89c8",
+      "id": "markpure_claude_\u67b6\u6784\u6982\u89c8"
+    },
+    {
+      "label": "code:block1 (markpure/)",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L76",
+      "community": 119,
+      "norm_label": "code:block1 (markpure/)",
+      "id": "markpure_claude_codeblock_1"
+    },
+    {
+      "label": "\u6280\u672f\u6808",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L123",
+      "community": 119,
+      "norm_label": "\u6280\u672f\u6808",
+      "id": "markpure_claude_\u6280\u672f\u6808"
+    },
+    {
+      "label": "\u5e38\u7528\u547d\u4ee4",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L150",
+      "community": 119,
+      "norm_label": "\u5e38\u7528\u547d\u4ee4",
+      "id": "markpure_claude_\u5e38\u7528\u547d\u4ee4"
+    },
+    {
+      "label": "code:bash (# \u5f00\u53d1\u6a21\u5f0f\uff08\u4e24\u4e2a\u7ec8\u7aef\uff09)",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L152",
+      "community": 119,
+      "norm_label": "code:bash (# \u5f00\u53d1\u6a21\u5f0f(\u4e24\u4e2a\u7ec8\u7aef))",
+      "id": "markpure_claude_codeblock_2"
+    },
+    {
+      "label": "\u6570\u636e\u6d41",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L185",
+      "community": 139,
+      "norm_label": "\u6570\u636e\u6d41",
+      "id": "markpure_claude_\u6570\u636e\u6d41"
+    },
+    {
+      "label": "\u7f16\u8f91\u6d41\u7a0b",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L187",
+      "community": 139,
+      "norm_label": "\u7f16\u8f91\u6d41\u7a0b",
+      "id": "markpure_claude_\u7f16\u8f91\u6d41\u7a0b"
+    },
+    {
+      "label": "\u6587\u4ef6\u6253\u5f00",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L194",
+      "community": 139,
+      "norm_label": "\u6587\u4ef6\u6253\u5f00",
+      "id": "markpure_claude_\u6587\u4ef6\u6253\u5f00"
+    },
+    {
+      "label": "\u5927\u7eb2\u63d0\u53d6",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L199",
+      "community": 139,
+      "norm_label": "\u5927\u7eb2\u63d0\u53d6",
+      "id": "markpure_claude_\u5927\u7eb2\u63d0\u53d6"
+    },
+    {
+      "label": "IPC \u547d\u4ee4",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L202",
+      "community": 86,
+      "norm_label": "ipc \u547d\u4ee4",
+      "id": "markpure_claude_ipc_\u547d\u4ee4"
+    },
+    {
+      "label": "\u6587\u4ef6\u5bf9\u8bdd\u6846",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L204",
+      "community": 86,
+      "norm_label": "\u6587\u4ef6\u5bf9\u8bdd\u6846",
+      "id": "markpure_claude_\u6587\u4ef6\u5bf9\u8bdd\u6846"
+    },
+    {
+      "label": "\u6587\u4ef6\u64cd\u4f5c",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L211",
+      "community": 86,
+      "norm_label": "\u6587\u4ef6\u64cd\u4f5c",
+      "id": "markpure_claude_\u6587\u4ef6\u64cd\u4f5c"
+    },
+    {
+      "label": "\u6587\u6863\u6ce8\u518c\u8868\uff08Rust \u6301\u6709\u6587\u6863 rope \u526f\u672c\uff09",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L218",
+      "community": 86,
+      "norm_label": "\u6587\u6863\u6ce8\u518c\u8868(rust \u6301\u6709\u6587\u6863 rope \u526f\u672c)",
+      "id": "markpure_claude_\u6587\u6863\u6ce8\u518c\u8868_rust_\u6301\u6709\u6587\u6863_rope_\u526f\u672c"
+    },
+    {
+      "label": "\u76ee\u5f55\u6811",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L227",
+      "community": 86,
+      "norm_label": "\u76ee\u5f55\u6811",
+      "id": "markpure_claude_\u76ee\u5f55\u6811"
+    },
+    {
+      "label": "\u6587\u4ef6 CRUD",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L234",
+      "community": 86,
+      "norm_label": "\u6587\u4ef6 crud",
+      "id": "markpure_claude_\u6587\u4ef6_crud"
+    },
+    {
+      "label": "\u5927\u7eb2\uff08\u65e7\u63a5\u53e3\uff0c\u4fdd\u7559\u517c\u5bb9\uff09",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L242",
+      "community": 86,
+      "norm_label": "\u5927\u7eb2(\u65e7\u63a5\u53e3,\u4fdd\u7559\u517c\u5bb9)",
+      "id": "markpure_claude_\u5927\u7eb2_\u65e7\u63a5\u53e3_\u4fdd\u7559\u517c\u5bb9"
+    },
+    {
+      "label": "Wiki \u94fe\u63a5\u548c Tags",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L247",
+      "community": 86,
+      "norm_label": "wiki \u94fe\u63a5\u548c tags",
+      "id": "markpure_claude_wiki_\u94fe\u63a5\u548c_tags"
+    },
+    {
+      "label": "\u6587\u4ef6\u62d6\u62fd",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L253",
+      "community": 86,
+      "norm_label": "\u6587\u4ef6\u62d6\u62fd",
+      "id": "markpure_claude_\u6587\u4ef6\u62d6\u62fd"
+    },
+    {
+      "label": "\u6700\u8fd1\u6587\u4ef6 / Tab \u72b6\u6001 / \u914d\u7f6e",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L258",
+      "community": 86,
+      "norm_label": "\u6700\u8fd1\u6587\u4ef6 / tab \u72b6\u6001 / \u914d\u7f6e",
+      "id": "markpure_claude_\u6700\u8fd1\u6587\u4ef6_tab_\u72b6\u6001_\u914d\u7f6e"
+    },
+    {
+      "label": "\u5bfc\u51fa",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L265",
+      "community": 86,
+      "norm_label": "\u5bfc\u51fa",
+      "id": "markpure_claude_\u5bfc\u51fa"
+    },
+    {
+      "label": "\u6587\u4ef6\u76d1\u89c6",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L273",
+      "community": 86,
+      "norm_label": "\u6587\u4ef6\u76d1\u89c6",
+      "id": "markpure_claude_\u6587\u4ef6\u76d1\u89c6"
+    },
+    {
+      "label": "\u5de5\u4f5c\u533a\u641c\u7d22",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L278",
+      "community": 86,
+      "norm_label": "\u5de5\u4f5c\u533a\u641c\u7d22",
+      "id": "markpure_claude_\u5de5\u4f5c\u533a\u641c\u7d22"
+    },
+    {
+      "label": "\u4e66\u7b7e",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L283",
+      "community": 86,
+      "norm_label": "\u4e66\u7b7e",
+      "id": "markpure_claude_\u4e66\u7b7e"
+    },
+    {
+      "label": "i18n / \u8bed\u8a00",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L291",
+      "community": 86,
+      "norm_label": "i18n / \u8bed\u8a00",
+      "id": "markpure_claude_i18n_\u8bed\u8a00"
+    },
+    {
+      "label": "\u5feb\u6377\u952e",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L298",
+      "community": 86,
+      "norm_label": "\u5feb\u6377\u952e",
+      "id": "markpure_claude_\u5feb\u6377\u952e"
+    },
+    {
+      "label": "\u4e3b\u9898\u7ba1\u7406",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L306",
+      "community": 86,
+      "norm_label": "\u4e3b\u9898\u7ba1\u7406",
+      "id": "markpure_claude_\u4e3b\u9898\u7ba1\u7406"
+    },
+    {
+      "label": "\u56fe\u7247 / \u8d44\u6e90",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L314",
+      "community": 86,
+      "norm_label": "\u56fe\u7247 / \u8d44\u6e90",
+      "id": "markpure_claude_\u56fe\u7247_\u8d44\u6e90"
+    },
+    {
+      "label": "\u62fc\u5199\u68c0\u67e5",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L320",
+      "community": 86,
+      "norm_label": "\u62fc\u5199\u68c0\u67e5",
+      "id": "markpure_claude_\u62fc\u5199\u68c0\u67e5"
+    },
+    {
+      "label": "\u5e94\u7528\u4fe1\u606f",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L325",
+      "community": 86,
+      "norm_label": "\u5e94\u7528\u4fe1\u606f",
+      "id": "markpure_claude_\u5e94\u7528\u4fe1\u606f"
+    },
+    {
+      "label": "IPC \u5b9e\u73b0\u673a\u5236",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L330",
+      "community": 86,
+      "norm_label": "ipc \u5b9e\u73b0\u673a\u5236",
+      "id": "markpure_claude_ipc_\u5b9e\u73b0\u673a\u5236"
+    },
+    {
+      "label": "\u4e3b\u9898\u7cfb\u7edf",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L338",
+      "community": 119,
+      "norm_label": "\u4e3b\u9898\u7cfb\u7edf",
+      "id": "markpure_claude_\u4e3b\u9898\u7cfb\u7edf"
+    },
+    {
+      "label": "i18n \u7cfb\u7edf",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L356",
+      "community": 140,
+      "norm_label": "i18n \u7cfb\u7edf",
+      "id": "markpure_claude_i18n_\u7cfb\u7edf"
+    },
+    {
+      "label": "\u524d\u7aef\u63a5\u5165",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L363",
+      "community": 140,
+      "norm_label": "\u524d\u7aef\u63a5\u5165",
+      "id": "markpure_claude_\u524d\u7aef\u63a5\u5165"
+    },
+    {
+      "label": "\u540e\u7aef\u7ffb\u8bd1\u8868",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L374",
+      "community": 140,
+      "norm_label": "\u540e\u7aef\u7ffb\u8bd1\u8868",
+      "id": "markpure_claude_\u540e\u7aef\u7ffb\u8bd1\u8868"
+    },
+    {
+      "label": "\u5feb\u6377\u952e\u7cfb\u7edf",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L378",
+      "community": 119,
+      "norm_label": "\u5feb\u6377\u952e\u7cfb\u7edf",
+      "id": "markpure_claude_\u5feb\u6377\u952e\u7cfb\u7edf"
+    },
+    {
+      "label": "\u5b89\u5168\u8bbe\u8ba1",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L382",
+      "community": 119,
+      "norm_label": "\u5b89\u5168\u8bbe\u8ba1",
+      "id": "markpure_claude_\u5b89\u5168\u8bbe\u8ba1"
+    },
+    {
+      "label": "\u6027\u80fd\u4f18\u5316\u8981\u70b9",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L390",
+      "community": 119,
+      "norm_label": "\u6027\u80fd\u4f18\u5316\u8981\u70b9",
+      "id": "markpure_claude_\u6027\u80fd\u4f18\u5316\u8981\u70b9"
+    },
+    {
+      "label": "\u542f\u52a8\u8017\u65f6",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L398",
+      "community": 143,
+      "norm_label": "\u542f\u52a8\u8017\u65f6",
+      "id": "markpure_claude_\u542f\u52a8\u8017\u65f6"
+    },
+    {
+      "label": "code:bash (MARKPURE_STARTUP_LOG=1 cargo run --release)",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L421",
+      "community": 143,
+      "norm_label": "code:bash (markpure_startup_log=1 cargo run --release)",
+      "id": "markpure_claude_codeblock_3"
+    },
+    {
+      "label": "\u5f00\u53d1\u6a21\u5f0f",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L436",
+      "community": 119,
+      "norm_label": "\u5f00\u53d1\u6a21\u5f0f",
+      "id": "markpure_claude_\u5f00\u53d1\u6a21\u5f0f"
+    },
+    {
+      "label": "\u6ce8\u610f\u4e8b\u9879",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L445",
+      "community": 119,
+      "norm_label": "\u6ce8\u610f\u4e8b\u9879",
+      "id": "markpure_claude_\u6ce8\u610f\u4e8b\u9879"
+    },
+    {
+      "label": "AGENTS.md \u5bfc\u822a\u4f53\u7cfb",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L461",
+      "community": 119,
+      "norm_label": "agents.md \u5bfc\u822a\u4f53\u7cfb",
+      "id": "markpure_claude_agents_md_\u5bfc\u822a\u4f53\u7cfb"
+    },
+    {
+      "label": "graphify",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L473",
+      "community": 119,
+      "norm_label": "graphify",
+      "id": "markpure_claude_graphify"
+    },
+    {
+      "label": "AGENTS.md",
+      "file_type": "document",
+      "source_file": "frontend/src/app/AGENTS.md",
+      "source_location": "L1",
+      "community": 343,
+      "norm_label": "agents.md",
+      "id": "frontend_src_app_agents_md"
+    },
+    {
+      "label": "AGENTS.md \u2014 app/\uff08\u5e94\u7528\u5916\u58f3\uff09",
+      "file_type": "document",
+      "source_file": "frontend/src/app/AGENTS.md",
+      "source_location": "L1",
+      "community": 343,
+      "norm_label": "agents.md \u2014 app/(\u5e94\u7528\u5916\u58f3)",
+      "id": "app_agents_agents_md_app_\u5e94\u7528\u5916\u58f3"
+    },
+    {
+      "label": "\u67b6\u6784",
+      "file_type": "document",
+      "source_file": "frontend/src/app/AGENTS.md",
+      "source_location": "L3",
+      "community": 343,
+      "norm_label": "\u67b6\u6784",
+      "id": "app_agents_\u67b6\u6784"
+    },
+    {
+      "label": "\u6587\u4ef6",
+      "file_type": "document",
+      "source_file": "frontend/src/app/AGENTS.md",
+      "source_location": "L18",
+      "community": 343,
+      "norm_label": "\u6587\u4ef6",
+      "id": "app_agents_\u6587\u4ef6"
+    },
+    {
+      "label": "handlers/ \u6a21\u5757",
+      "file_type": "document",
+      "source_file": "frontend/src/app/AGENTS.md",
+      "source_location": "L35",
+      "community": 343,
+      "norm_label": "handlers/ \u6a21\u5757",
+      "id": "app_agents_handlers_\u6a21\u5757"
+    },
+    {
+      "label": "\u5e03\u5c40\u9aa8\u67b6",
+      "file_type": "document",
+      "source_file": "frontend/src/app/AGENTS.md",
+      "source_location": "L61",
+      "community": 343,
+      "norm_label": "\u5e03\u5c40\u9aa8\u67b6",
+      "id": "app_agents_\u5e03\u5c40\u9aa8\u67b6"
+    },
+    {
+      "label": "code:block1 (.app-root (column))",
+      "file_type": "document",
+      "source_file": "frontend/src/app/AGENTS.md",
+      "source_location": "L63",
+      "community": 343,
+      "norm_label": "code:block1 (.app-root (column))",
+      "id": "app_agents_codeblock_1"
+    },
+    {
+      "label": "\u5b58\u50a8\u683c\u5f0f",
+      "file_type": "document",
+      "source_file": "frontend/src/app/AGENTS.md",
+      "source_location": "L81",
+      "community": 343,
+      "norm_label": "\u5b58\u50a8\u683c\u5f0f",
+      "id": "app_agents_\u5b58\u50a8\u683c\u5f0f"
+    },
+    {
+      "label": "\u89c4\u5219",
+      "file_type": "document",
+      "source_file": "frontend/src/app/AGENTS.md",
+      "source_location": "L87",
+      "community": 343,
+      "norm_label": "\u89c4\u5219",
+      "id": "app_agents_\u89c4\u5219"
+    },
+    {
+      "label": "AppEditorViews.svelte",
+      "file_type": "code",
+      "source_file": "frontend/src/app/AppEditorViews.svelte",
+      "source_location": "L1",
+      "community": 3,
+      "norm_label": "appeditorviews.svelte",
+      "id": "frontend_src_app_appeditorviews_svelte"
+    },
+    {
+      "label": "@tiptap/core",
+      "file_type": "code",
+      "source_file": "@tiptap/core",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "@tiptap/core",
+      "id": "core"
+    },
+    {
+      "label": "$lib/components/ui/EmptyState.svelte",
+      "file_type": "code",
+      "source_file": "$lib/components/ui/EmptyState.svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "$lib/components/ui/emptystate.svelte",
+      "id": "emptystate_svelte"
+    },
+    {
+      "label": "$lib/components/layout/Tabs.svelte",
+      "file_type": "code",
+      "source_file": "$lib/components/layout/Tabs.svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "$lib/components/layout/tabs.svelte",
+      "id": "tabs_svelte"
+    },
+    {
+      "label": "$lib/components/layout/TabContextMenu.svelte",
+      "file_type": "code",
+      "source_file": "$lib/components/layout/TabContextMenu.svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "$lib/components/layout/tabcontextmenu.svelte",
+      "id": "tabcontextmenu_svelte"
+    },
+    {
+      "label": "$lib/components/workspace/SearchBar.svelte",
+      "file_type": "code",
+      "source_file": "$lib/components/workspace/SearchBar.svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "$lib/components/workspace/searchbar.svelte",
+      "id": "searchbar_svelte"
+    },
+    {
+      "label": "$lib/components/workspace/SourceEditor.svelte",
+      "file_type": "code",
+      "source_file": "$lib/components/workspace/SourceEditor.svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "$lib/components/workspace/sourceeditor.svelte",
+      "id": "sourceeditor_svelte"
+    },
+    {
+      "label": "$lib/components/layout/StatusBar.svelte",
+      "file_type": "code",
+      "source_file": "$lib/components/layout/StatusBar.svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "$lib/components/layout/statusbar.svelte",
+      "id": "statusbar_svelte"
+    },
+    {
+      "label": "$lib/components/ui/ResizeHandle.svelte",
+      "file_type": "code",
+      "source_file": "$lib/components/ui/ResizeHandle.svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "$lib/components/ui/resizehandle.svelte",
+      "id": "resizehandle_svelte"
+    },
+    {
+      "label": "lucide-svelte",
+      "file_type": "code",
+      "source_file": "lucide-svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "lucide-svelte",
+      "id": "lucide_svelte"
+    },
+    {
+      "label": "$lib/stores/i18n.svelte",
+      "file_type": "code",
+      "source_file": "$lib/stores/i18n.svelte",
+      "confidence": "EXTRACTED",
+      "community": 31,
+      "norm_label": "$lib/stores/i18n.svelte",
+      "id": "i18n_svelte"
+    },
+    {
+      "label": "./appState.svelte",
+      "file_type": "code",
+      "source_file": "frontend/src/app/appState.svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "./appstate.svelte",
+      "id": "users_admin_code_cnb_markpure_frontend_src_app_appstate_svelte"
+    },
+    {
+      "label": "./handlers/editorCommands",
+      "file_type": "code",
+      "source_file": "frontend/src/app/handlers/editorCommands",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "./handlers/editorcommands",
+      "id": "users_admin_code_cnb_markpure_frontend_src_app_handlers_editorcommands"
+    },
+    {
+      "label": "./handlers/ctx",
+      "file_type": "code",
+      "source_file": "frontend/src/app/handlers/ctx",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "./handlers/ctx",
+      "id": "users_admin_code_cnb_markpure_frontend_src_app_handlers_ctx"
+    },
+    {
+      "label": "./AppToolbar.svelte",
+      "file_type": "code",
+      "source_file": "frontend/src/app/AppToolbar.svelte",
+      "confidence": "EXTRACTED",
+      "community": 3,
+      "norm_label": "./apptoolbar.svelte",
+      "id": "users_admin_code_cnb_markpure_frontend_src_app_apptoolbar_svelte"
+    },
+    {
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L1",
+      "community": 136,
+      "norm_label": "package.json",
+      "id": "package_json"
+    },
+    {
+      "label": "name",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L2",
+      "community": 136,
+      "norm_label": "name",
+      "id": "markpure_package_name"
+    },
+    {
+      "label": "private",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L3",
+      "community": 136,
+      "norm_label": "private",
+      "id": "markpure_package_private"
+    },
+    {
+      "label": "version",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L4",
+      "community": 136,
+      "norm_label": "version",
+      "id": "markpure_package_version"
+    },
+    {
+      "label": "type",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L5",
+      "community": 136,
+      "norm_label": "type",
+      "id": "markpure_package_type"
+    },
+    {
+      "label": "scripts",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L6",
+      "community": 74,
+      "norm_label": "scripts",
+      "id": "markpure_package_scripts"
+    },
+    {
+      "label": "dev",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L7",
+      "community": 74,
+      "norm_label": "dev",
+      "id": "markpure_package_scripts_dev"
+    },
+    {
+      "label": "build",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L8",
+      "community": 74,
+      "norm_label": "build",
+      "id": "markpure_package_scripts_build"
+    },
+    {
+      "label": "preview",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "community": 74,
+      "norm_label": "preview",
+      "id": "markpure_package_scripts_preview"
+    },
+    {
+      "label": "check",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L10",
+      "community": 74,
+      "norm_label": "check",
+      "id": "markpure_package_scripts_check"
+    },
+    {
+      "label": "test:backend",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L11",
+      "community": 74,
+      "norm_label": "test:backend",
+      "id": "markpure_package_scripts_test_backend"
+    },
+    {
+      "label": "test:markdown",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L12",
+      "community": 74,
+      "norm_label": "test:markdown",
+      "id": "markpure_package_scripts_test_markdown"
+    },
+    {
+      "label": "test",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L13",
+      "community": 74,
+      "norm_label": "test",
+      "id": "markpure_package_scripts_test"
+    },
+    {
+      "label": "test:frontend",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L14",
+      "community": 74,
+      "norm_label": "test:frontend",
+      "id": "markpure_package_scripts_test_frontend"
+    },
+    {
+      "label": "devDependencies",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L16",
+      "community": 82,
+      "norm_label": "devdependencies",
+      "id": "markpure_package_devdependencies"
+    },
+    {
+      "label": "@sveltejs/vite-plugin-svelte",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L17",
+      "community": 82,
+      "norm_label": "@sveltejs/vite-plugin-svelte",
+      "id": "markpure_package_devdependencies_sveltejs_vite_plugin_svelte"
+    },
+    {
+      "label": "@tsconfig/svelte",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L18",
+      "community": 82,
+      "norm_label": "@tsconfig/svelte",
+      "id": "markpure_package_devdependencies_tsconfig_svelte"
+    },
+    {
+      "label": "@types/node",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L19",
+      "community": 82,
+      "norm_label": "@types/node",
+      "id": "markpure_package_devdependencies_types_node"
+    },
+    {
+      "label": "svelte",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L20",
+      "community": 82,
+      "norm_label": "svelte",
+      "id": "markpure_package_devdependencies_svelte"
+    },
+    {
+      "label": "svelte-check",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L21",
+      "community": 82,
+      "norm_label": "svelte-check",
+      "id": "markpure_package_devdependencies_svelte_check"
+    },
+    {
+      "label": "tsx",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L22",
+      "community": 82,
+      "norm_label": "tsx",
+      "id": "markpure_package_devdependencies_tsx"
+    },
+    {
+      "label": "typescript",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L23",
+      "community": 82,
+      "norm_label": "typescript",
+      "id": "markpure_package_devdependencies_typescript"
+    },
+    {
+      "label": "vite",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L24",
+      "community": 82,
+      "norm_label": "vite",
+      "id": "markpure_package_devdependencies_vite"
+    },
+    {
+      "label": "dependencies",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L26",
+      "community": 7,
+      "norm_label": "dependencies",
+      "id": "markpure_package_dependencies"
+    },
+    {
+      "label": "@codemirror/commands",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L27",
+      "community": 7,
+      "norm_label": "@codemirror/commands",
+      "id": "markpure_package_dependencies_codemirror_commands"
+    },
+    {
+      "label": "@codemirror/lang-cpp",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L28",
+      "community": 7,
+      "norm_label": "@codemirror/lang-cpp",
+      "id": "markpure_package_dependencies_codemirror_lang_cpp"
+    },
+    {
+      "label": "@codemirror/lang-css",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L29",
+      "community": 7,
+      "norm_label": "@codemirror/lang-css",
+      "id": "markpure_package_dependencies_codemirror_lang_css"
+    },
+    {
+      "label": "@codemirror/lang-go",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L30",
+      "community": 7,
+      "norm_label": "@codemirror/lang-go",
+      "id": "markpure_package_dependencies_codemirror_lang_go"
+    },
+    {
+      "label": "@codemirror/lang-html",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L31",
+      "community": 7,
+      "norm_label": "@codemirror/lang-html",
+      "id": "markpure_package_dependencies_codemirror_lang_html"
+    },
+    {
+      "label": "@codemirror/lang-java",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L32",
+      "community": 7,
+      "norm_label": "@codemirror/lang-java",
+      "id": "markpure_package_dependencies_codemirror_lang_java"
+    },
+    {
+      "label": "@codemirror/lang-javascript",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L33",
+      "community": 7,
+      "norm_label": "@codemirror/lang-javascript",
+      "id": "markpure_package_dependencies_codemirror_lang_javascript"
+    },
+    {
+      "label": "@codemirror/lang-json",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L34",
+      "community": 7,
+      "norm_label": "@codemirror/lang-json",
+      "id": "markpure_package_dependencies_codemirror_lang_json"
+    },
+    {
+      "label": "@codemirror/lang-markdown",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L35",
+      "community": 7,
+      "norm_label": "@codemirror/lang-markdown",
+      "id": "markpure_package_dependencies_codemirror_lang_markdown"
+    },
+    {
+      "label": "@codemirror/lang-python",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L36",
+      "community": 7,
+      "norm_label": "@codemirror/lang-python",
+      "id": "markpure_package_dependencies_codemirror_lang_python"
+    },
+    {
+      "label": "@codemirror/lang-rust",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L37",
+      "community": 7,
+      "norm_label": "@codemirror/lang-rust",
+      "id": "markpure_package_dependencies_codemirror_lang_rust"
+    },
+    {
+      "label": "@codemirror/lang-sql",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L38",
+      "community": 7,
+      "norm_label": "@codemirror/lang-sql",
+      "id": "markpure_package_dependencies_codemirror_lang_sql"
+    },
+    {
+      "label": "@codemirror/lang-xml",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L39",
+      "community": 7,
+      "norm_label": "@codemirror/lang-xml",
+      "id": "markpure_package_dependencies_codemirror_lang_xml"
+    },
+    {
+      "label": "@codemirror/lang-yaml",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L40",
+      "community": 7,
+      "norm_label": "@codemirror/lang-yaml",
+      "id": "markpure_package_dependencies_codemirror_lang_yaml"
+    },
+    {
+      "label": "@codemirror/language",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L41",
+      "community": 7,
+      "norm_label": "@codemirror/language",
+      "id": "markpure_package_dependencies_codemirror_language"
+    },
+    {
+      "label": "@codemirror/state",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L42",
+      "community": 7,
+      "norm_label": "@codemirror/state",
+      "id": "markpure_package_dependencies_codemirror_state"
+    },
+    {
+      "label": "@codemirror/view",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L43",
+      "community": 7,
+      "norm_label": "@codemirror/view",
+      "id": "markpure_package_dependencies_codemirror_view"
+    },
+    {
+      "label": "@lezer/highlight",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L44",
+      "community": 7,
+      "norm_label": "@lezer/highlight",
+      "id": "markpure_package_dependencies_lezer_highlight"
+    },
+    {
+      "label": "@tiptap/core",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L45",
+      "community": 7,
+      "norm_label": "@tiptap/core",
+      "id": "markpure_package_dependencies_tiptap_core"
+    },
+    {
+      "label": "@tiptap/extension-highlight",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L46",
+      "community": 7,
+      "norm_label": "@tiptap/extension-highlight",
+      "id": "markpure_package_dependencies_tiptap_extension_highlight"
+    },
+    {
+      "label": "@tiptap/extension-image",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L47",
+      "community": 7,
+      "norm_label": "@tiptap/extension-image",
+      "id": "markpure_package_dependencies_tiptap_extension_image"
+    },
+    {
+      "label": "@tiptap/extension-link",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L48",
+      "community": 7,
+      "norm_label": "@tiptap/extension-link",
+      "id": "markpure_package_dependencies_tiptap_extension_link"
+    },
+    {
+      "label": "@tiptap/extension-mathematics",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L49",
+      "community": 7,
+      "norm_label": "@tiptap/extension-mathematics",
+      "id": "markpure_package_dependencies_tiptap_extension_mathematics"
+    },
+    {
+      "label": "@tiptap/extension-placeholder",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L50",
+      "community": 7,
+      "norm_label": "@tiptap/extension-placeholder",
+      "id": "markpure_package_dependencies_tiptap_extension_placeholder"
+    },
+    {
+      "label": "@tiptap/extension-table",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L51",
+      "community": 7,
+      "norm_label": "@tiptap/extension-table",
+      "id": "markpure_package_dependencies_tiptap_extension_table"
+    },
+    {
+      "label": "@tiptap/extension-table-cell",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L52",
+      "community": 7,
+      "norm_label": "@tiptap/extension-table-cell",
+      "id": "markpure_package_dependencies_tiptap_extension_table_cell"
+    },
+    {
+      "label": "@tiptap/extension-table-header",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L53",
+      "community": 7,
+      "norm_label": "@tiptap/extension-table-header",
+      "id": "markpure_package_dependencies_tiptap_extension_table_header"
+    },
+    {
+      "label": "@tiptap/extension-table-row",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L54",
+      "community": 7,
+      "norm_label": "@tiptap/extension-table-row",
+      "id": "markpure_package_dependencies_tiptap_extension_table_row"
+    },
+    {
+      "label": "@tiptap/extension-task-item",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L55",
+      "community": 7,
+      "norm_label": "@tiptap/extension-task-item",
+      "id": "markpure_package_dependencies_tiptap_extension_task_item"
+    },
+    {
+      "label": "@tiptap/extension-task-list",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L56",
+      "community": 7,
+      "norm_label": "@tiptap/extension-task-list",
+      "id": "markpure_package_dependencies_tiptap_extension_task_list"
+    },
+    {
+      "label": "@tiptap/markdown",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L57",
+      "community": 7,
+      "norm_label": "@tiptap/markdown",
+      "id": "markpure_package_dependencies_tiptap_markdown"
+    },
+    {
+      "label": "@tiptap/pm",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L58",
+      "community": 7,
+      "norm_label": "@tiptap/pm",
+      "id": "markpure_package_dependencies_tiptap_pm"
+    },
+    {
+      "label": "@tiptap/starter-kit",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L59",
+      "community": 7,
+      "norm_label": "@tiptap/starter-kit",
+      "id": "markpure_package_dependencies_tiptap_starter_kit"
+    },
+    {
+      "label": "@tiptap/suggestion",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L60",
+      "community": 7,
+      "norm_label": "@tiptap/suggestion",
+      "id": "markpure_package_dependencies_tiptap_suggestion"
+    },
+    {
+      "label": "codemirror",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L61",
+      "community": 141,
+      "norm_label": "codemirror",
+      "id": "markpure_package_dependencies_codemirror"
+    },
+    {
+      "label": "html-to-image",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L62",
+      "community": 7,
+      "norm_label": "html-to-image",
+      "id": "markpure_package_dependencies_html_to_image"
+    },
+    {
+      "label": "katex",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L63",
+      "community": 7,
+      "norm_label": "katex",
+      "id": "markpure_package_dependencies_katex"
+    },
+    {
+      "label": "lucide-svelte",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L64",
+      "community": 7,
+      "norm_label": "lucide-svelte",
+      "id": "markpure_package_dependencies_lucide_svelte"
+    },
+    {
+      "label": "mermaid",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L65",
+      "community": 7,
+      "norm_label": "mermaid",
+      "id": "markpure_package_dependencies_mermaid"
+    },
+    {
+      "label": "svelte-i18n",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L66",
+      "community": 7,
+      "norm_label": "svelte-i18n",
+      "id": "markpure_package_dependencies_svelte_i18n"
     },
     {
       "label": "mt_harness.rs",
@@ -3740,7 +3758,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/editorCommands.ts",
       "source_location": "L1",
-      "community": 336,
+      "community": 73,
       "norm_label": "editorcommands.ts",
       "id": "frontend_src_app_handlers_editorcommands_ts"
     },
@@ -3749,7 +3767,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/editorCommands.ts",
       "source_location": "L11",
-      "community": 336,
+      "community": 73,
       "norm_label": "editorcommandsdeps",
       "id": "handlers_editorcommands_editorcommandsdeps"
     },
@@ -3767,7 +3785,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/editorCommands.ts",
       "source_location": "L198",
-      "community": 48,
+      "community": 73,
       "norm_label": "editorcommands",
       "id": "handlers_editorcommands_editorcommands"
     },
@@ -3776,7 +3794,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/editorInit.ts",
       "source_location": "L1",
-      "community": 336,
+      "community": 48,
       "norm_label": "editorinit.ts",
       "id": "frontend_src_app_handlers_editorinit_ts"
     },
@@ -3785,7 +3803,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/editorInit.ts",
       "source_location": "L23",
-      "community": 336,
+      "community": 48,
       "norm_label": "editorinitdeps",
       "id": "handlers_editorinit_editorinitdeps"
     },
@@ -3803,7 +3821,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/editorInit.ts",
       "source_location": "L258",
-      "community": 25,
+      "community": 48,
       "norm_label": "editorinit",
       "id": "handlers_editorinit_editorinit"
     },
@@ -3839,7 +3857,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/fileOps.ts",
       "source_location": "L231",
-      "community": 48,
+      "community": 73,
       "norm_label": "fileops",
       "id": "handlers_fileops_fileops"
     },
@@ -3848,7 +3866,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/saveOps.ts",
       "source_location": "L1",
-      "community": 48,
+      "community": 73,
       "norm_label": "saveops.ts",
       "id": "frontend_src_app_handlers_saveops_ts"
     },
@@ -3857,7 +3875,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/saveOps.ts",
       "source_location": "L14",
-      "community": 48,
+      "community": 73,
       "norm_label": "saveopsdeps",
       "id": "handlers_saveops_saveopsdeps"
     },
@@ -3875,7 +3893,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/saveOps.ts",
       "source_location": "L167",
-      "community": 48,
+      "community": 73,
       "norm_label": "saveops",
       "id": "handlers_saveops_saveops"
     },
@@ -3938,7 +3956,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/vimOps.ts",
       "source_location": "L141",
-      "community": 48,
+      "community": 73,
       "norm_label": "vimops",
       "id": "handlers_vimops_vimops"
     },
@@ -3947,7 +3965,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/workspace/SourceEditor.svelte",
       "source_location": "L1",
-      "community": 15,
+      "community": 63,
       "norm_label": "sourceeditor.svelte",
       "id": "frontend_src_components_workspace_sourceeditor_svelte"
     },
@@ -3956,7 +3974,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/workspace/SourceEditor.svelte",
       "source_location": "L114",
-      "community": 15,
+      "community": 63,
       "norm_label": "{ wordwrap }",
       "id": "workspace_sourceeditor_wordwrap"
     },
@@ -3974,7 +3992,7 @@
       "file_type": "code",
       "source_file": "@codemirror/lang-markdown",
       "confidence": "EXTRACTED",
-      "community": 15,
+      "community": 63,
       "norm_label": "@codemirror/lang-markdown",
       "id": "lang_markdown"
     },
@@ -3992,7 +4010,7 @@
       "file_type": "code",
       "source_file": "@codemirror/view",
       "confidence": "EXTRACTED",
-      "community": 150,
+      "community": 63,
       "norm_label": "@codemirror/view",
       "id": "view"
     },
@@ -4001,7 +4019,7 @@
       "file_type": "code",
       "source_file": "@codemirror/state",
       "confidence": "EXTRACTED",
-      "community": 15,
+      "community": 1,
       "norm_label": "@codemirror/state",
       "id": "state"
     },
@@ -4010,7 +4028,7 @@
       "file_type": "code",
       "source_file": "$lib/extensions/blocks/cm-theme",
       "confidence": "EXTRACTED",
-      "community": 15,
+      "community": 63,
       "norm_label": "$lib/extensions/blocks/cm-theme",
       "id": "cm_theme"
     },
@@ -4424,7 +4442,7 @@
       "file_type": "code",
       "source_file": "frontend/src/editor/commands/file.ts",
       "source_location": "L111",
-      "community": 23,
+      "community": 336,
       "norm_label": "opendroppedfiles()",
       "id": "commands_file_opendroppedfiles"
     },
@@ -4712,7 +4730,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/code-block-cm-extension.ts",
       "source_location": "L1",
-      "community": 54,
+      "community": 15,
       "norm_label": "code-block-cm-extension.ts",
       "id": "frontend_src_extensions_blocks_code_block_cm_extension_ts"
     },
@@ -4721,7 +4739,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/code-block-cm-extension.ts",
       "source_location": "L4",
-      "community": 54,
+      "community": 15,
       "norm_label": "codeblockcmextension",
       "id": "blocks_code_block_cm_extension_codeblockcmextension"
     },
@@ -8207,7 +8225,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/main.ts",
       "source_location": "L1",
-      "community": 3,
+      "community": 31,
       "norm_label": "main.ts",
       "id": "frontend_src_app_main_ts"
     },
@@ -8216,7 +8234,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/main.ts",
       "source_location": "L5",
-      "community": 3,
+      "community": 31,
       "norm_label": "app",
       "id": "app_main_app"
     },
@@ -8243,7 +8261,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/exportActions.svelte.ts",
       "source_location": "L33",
-      "community": 48,
+      "community": 73,
       "norm_label": "exportactions",
       "id": "app_exportactions_svelte_exportactions"
     },
@@ -8596,7 +8614,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/viewOps.ts",
       "source_location": "L1",
-      "community": 48,
+      "community": 73,
       "norm_label": "viewops.ts",
       "id": "frontend_src_app_handlers_viewops_ts"
     },
@@ -8605,7 +8623,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/viewOps.ts",
       "source_location": "L10",
-      "community": 48,
+      "community": 73,
       "norm_label": "viewopsdeps",
       "id": "handlers_viewops_viewopsdeps"
     },
@@ -8614,7 +8632,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/viewOps.ts",
       "source_location": "L17",
-      "community": 48,
+      "community": 73,
       "norm_label": "themes",
       "id": "handlers_viewops_themes"
     },
@@ -8632,7 +8650,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/viewOps.ts",
       "source_location": "L150",
-      "community": 48,
+      "community": 73,
       "norm_label": "viewops",
       "id": "handlers_viewops_viewops"
     },
@@ -8713,7 +8731,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/snippetOps.ts",
       "source_location": "L1",
-      "community": 48,
+      "community": 73,
       "norm_label": "snippetops.ts",
       "id": "frontend_src_app_handlers_snippetops_ts"
     },
@@ -8731,7 +8749,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/snippetOps.ts",
       "source_location": "L54",
-      "community": 48,
+      "community": 73,
       "norm_label": "snippetops",
       "id": "handlers_snippetops_snippetops"
     },
@@ -8830,7 +8848,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/workspaceOps.ts",
       "source_location": "L197",
-      "community": 48,
+      "community": 73,
       "norm_label": "workspaceops",
       "id": "handlers_workspaceops_workspaceops"
     },
@@ -8929,7 +8947,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/tabOps.ts",
       "source_location": "L233",
-      "community": 48,
+      "community": 73,
       "norm_label": "tabops",
       "id": "handlers_tabops_tabops"
     },
@@ -9037,7 +9055,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/bootstrap.ts",
       "source_location": "L1",
-      "community": 25,
+      "community": 48,
       "norm_label": "bootstrap.ts",
       "id": "frontend_src_app_handlers_bootstrap_ts"
     },
@@ -9046,7 +9064,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/bootstrap.ts",
       "source_location": "L13",
-      "community": 25,
+      "community": 48,
       "norm_label": "bootstrapdeps",
       "id": "handlers_bootstrap_bootstrapdeps"
     },
@@ -9064,7 +9082,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/bootstrap.ts",
       "source_location": "L125",
-      "community": 25,
+      "community": 48,
       "norm_label": "bootstrap",
       "id": "handlers_bootstrap_bootstrap"
     },
@@ -9073,7 +9091,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/commandRun.ts",
       "source_location": "L1",
-      "community": 48,
+      "community": 73,
       "norm_label": "commandrun.ts",
       "id": "frontend_src_app_handlers_commandrun_ts"
     },
@@ -9082,7 +9100,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/commandRun.ts",
       "source_location": "L22",
-      "community": 48,
+      "community": 73,
       "norm_label": "commandrundeps",
       "id": "handlers_commandrun_commandrundeps"
     },
@@ -9100,7 +9118,7 @@
       "file_type": "code",
       "source_file": "frontend/src/app/handlers/commandRun.ts",
       "source_location": "L173",
-      "community": 48,
+      "community": 73,
       "norm_label": "commandrun",
       "id": "handlers_commandrun_commandrun"
     },
@@ -9109,7 +9127,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L1",
-      "community": 149,
+      "community": 34,
       "norm_label": "instant-render.ts",
       "id": "frontend_src_plugins_instant_render_ts"
     },
@@ -9118,7 +9136,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L17",
-      "community": 149,
+      "community": 34,
       "norm_label": "widgetdecorationspec",
       "id": "plugins_instant_render_widgetdecorationspec"
     },
@@ -9127,7 +9145,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L23",
-      "community": 149,
+      "community": 34,
       "norm_label": "instantrenderstate",
       "id": "plugins_instant_render_instantrenderstate"
     },
@@ -9136,7 +9154,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L28",
-      "community": 149,
+      "community": 34,
       "norm_label": "instantrenderpluginkey",
       "id": "plugins_instant_render_instantrenderpluginkey"
     },
@@ -9145,7 +9163,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L31",
-      "community": 149,
+      "community": 34,
       "norm_label": "isnearcursor()",
       "id": "plugins_instant_render_isnearcursor"
     },
@@ -9154,7 +9172,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L36",
-      "community": 149,
+      "community": 34,
       "norm_label": "createmarkerwidget()",
       "id": "plugins_instant_render_createmarkerwidget"
     },
@@ -9163,7 +9181,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L53",
-      "community": 149,
+      "community": 34,
       "norm_label": "decoratenode()",
       "id": "plugins_instant_render_decoratenode"
     },
@@ -9172,7 +9190,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L109",
-      "community": 149,
+      "community": 34,
       "norm_label": "computesyntaxdecorations()",
       "id": "plugins_instant_render_computesyntaxdecorations"
     },
@@ -9181,7 +9199,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L121",
-      "community": 149,
+      "community": 34,
       "norm_label": "findaffectedrange()",
       "id": "plugins_instant_render_findaffectedrange"
     },
@@ -9190,7 +9208,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/instant-render.ts",
       "source_location": "L134",
-      "community": 149,
+      "community": 34,
       "norm_label": "createinstantrenderplugin()",
       "id": "plugins_instant_render_createinstantrenderplugin"
     },
@@ -9280,7 +9298,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/search.ts",
       "source_location": "L144",
-      "community": 1,
+      "community": 45,
       "norm_label": "createsearchplugin()",
       "id": "plugins_search_createsearchplugin"
     },
@@ -9982,7 +10000,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/commands.ts",
       "source_location": "L186",
-      "community": 8,
+      "community": 6,
       "norm_label": "redocmd()",
       "id": "vim_commands_redocmd"
     },
@@ -10081,7 +10099,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/commands.ts",
       "source_location": "L277",
-      "community": 8,
+      "community": 6,
       "norm_label": "exitvisualcmd()",
       "id": "vim_commands_exitvisualcmd"
     },
@@ -10414,7 +10432,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/visual.ts",
       "source_location": "L1",
-      "community": 160,
+      "community": 6,
       "norm_label": "visual.ts",
       "id": "frontend_src_plugins_vim_visual_ts"
     },
@@ -10423,7 +10441,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/visual.ts",
       "source_location": "L40",
-      "community": 160,
+      "community": 6,
       "norm_label": "entervisualmode()",
       "id": "vim_visual_entervisualmode"
     },
@@ -10432,7 +10450,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/visual.ts",
       "source_location": "L64",
-      "community": 160,
+      "community": 6,
       "norm_label": "extendselectionbymotion()",
       "id": "vim_visual_extendselectionbymotion"
     },
@@ -10441,7 +10459,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/visual.ts",
       "source_location": "L99",
-      "community": 8,
+      "community": 6,
       "norm_label": "exitvisualmode()",
       "id": "vim_visual_exitvisualmode"
     },
@@ -10450,7 +10468,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/visual.ts",
       "source_location": "L109",
-      "community": 160,
+      "community": 6,
       "norm_label": "entercolumnmode()",
       "id": "vim_visual_entercolumnmode"
     },
@@ -10459,7 +10477,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/visual.ts",
       "source_location": "L134",
-      "community": 160,
+      "community": 6,
       "norm_label": "modeforkind()",
       "id": "vim_visual_modeforkind"
     },
@@ -10468,7 +10486,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/visual.ts",
       "source_location": "L140",
-      "community": 160,
+      "community": 6,
       "norm_label": "extendblockselection()",
       "id": "vim_visual_extendblockselection"
     },
@@ -10549,7 +10567,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/decorations.ts",
       "source_location": "L1",
-      "community": 154,
+      "community": 6,
       "norm_label": "decorations.ts",
       "id": "frontend_src_plugins_vim_decorations_ts"
     },
@@ -10558,7 +10576,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/decorations.ts",
       "source_location": "L27",
-      "community": 154,
+      "community": 6,
       "norm_label": "rebuildvimdecorations()",
       "id": "vim_decorations_rebuildvimdecorations"
     },
@@ -10567,7 +10585,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/decorations.ts",
       "source_location": "L56",
-      "community": 154,
+      "community": 6,
       "norm_label": "buildvimdecorations()",
       "id": "vim_decorations_buildvimdecorations"
     },
@@ -10576,7 +10594,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/decorations.ts",
       "source_location": "L62",
-      "community": 154,
+      "community": 6,
       "norm_label": "makeblockcaret()",
       "id": "vim_decorations_makeblockcaret"
     },
@@ -10585,7 +10603,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/decorations.ts",
       "source_location": "L73",
-      "community": 154,
+      "community": 6,
       "norm_label": "makebarcaret()",
       "id": "vim_decorations_makebarcaret"
     },
@@ -10594,7 +10612,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/decorations.ts",
       "source_location": "L84",
-      "community": 154,
+      "community": 6,
       "norm_label": "makelinehighlight()",
       "id": "vim_decorations_makelinehighlight"
     },
@@ -10603,7 +10621,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/decorations.ts",
       "source_location": "L89",
-      "community": 154,
+      "community": 6,
       "norm_label": "makeblockhighlight()",
       "id": "vim_decorations_makeblockhighlight"
     },
@@ -10621,7 +10639,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/types.ts",
       "source_location": "L42",
-      "community": 160,
+      "community": 6,
       "norm_label": "vimmode",
       "id": "vim_types_vimmode"
     },
@@ -10720,7 +10738,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/types.ts",
       "source_location": "L183",
-      "community": 154,
+      "community": 6,
       "norm_label": "vimpluginkey",
       "id": "vim_types_vimpluginkey"
     },
@@ -10819,7 +10837,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/vim/index.ts",
       "source_location": "L1",
-      "community": 8,
+      "community": 6,
       "norm_label": "index.ts",
       "id": "frontend_src_plugins_vim_index_ts"
     },
@@ -11584,7 +11602,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L1",
-      "community": 150,
+      "community": 91,
       "norm_label": "state.ts",
       "id": "frontend_src_plugins_multi_cursor_state_ts"
     },
@@ -11593,7 +11611,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L28",
-      "community": 150,
+      "community": 91,
       "norm_label": "emptystate()",
       "id": "multi_cursor_state_emptystate"
     },
@@ -11602,7 +11620,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L38",
-      "community": 150,
+      "community": 91,
       "norm_label": "normalize()",
       "id": "multi_cursor_state_normalize"
     },
@@ -11611,7 +11629,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L63",
-      "community": 150,
+      "community": 91,
       "norm_label": "addcursortolist()",
       "id": "multi_cursor_state_addcursortolist"
     },
@@ -11620,7 +11638,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L76",
-      "community": 150,
+      "community": 91,
       "norm_label": "applyset()",
       "id": "multi_cursor_state_applyset"
     },
@@ -11629,7 +11647,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L97",
-      "community": 150,
+      "community": 91,
       "norm_label": "applyclear()",
       "id": "multi_cursor_state_applyclear"
     },
@@ -11638,7 +11656,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L106",
-      "community": 150,
+      "community": 91,
       "norm_label": "applyundolast()",
       "id": "multi_cursor_state_applyundolast"
     },
@@ -11647,7 +11665,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L133",
-      "community": 150,
+      "community": 91,
       "norm_label": "applymulticursormeta()",
       "id": "multi_cursor_state_applymulticursormeta"
     },
@@ -11854,7 +11872,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/column-select.ts",
       "source_location": "L86",
-      "community": 1,
+      "community": 22,
       "norm_label": "createcolumnselectplugin()",
       "id": "multi_cursor_column_select_createcolumnselectplugin"
     },
@@ -11926,7 +11944,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/column-select.ts",
       "source_location": "L335",
-      "community": 2,
+      "community": 22,
       "norm_label": "defaultvirtualizationprobe()",
       "id": "multi_cursor_column_select_defaultvirtualizationprobe"
     },
@@ -11989,7 +12007,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/decorations.ts",
       "source_location": "L1",
-      "community": 150,
+      "community": 14,
       "norm_label": "decorations.ts",
       "id": "frontend_src_plugins_multi_cursor_decorations_ts"
     },
@@ -12007,7 +12025,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/decorations.ts",
       "source_location": "L27",
-      "community": 150,
+      "community": 14,
       "norm_label": "makecursorwidget()",
       "id": "multi_cursor_decorations_makecursorwidget"
     },
@@ -12016,7 +12034,7 @@
       "file_type": "code",
       "source_file": "frontend/src/plugins/multi-cursor/decorations.ts",
       "source_location": "L39",
-      "community": 150,
+      "community": 91,
       "norm_label": "buildcursordecorations()",
       "id": "multi_cursor_decorations_buildcursordecorations"
     },
@@ -12133,7 +12151,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/configIO.ts",
       "source_location": "L1",
-      "community": 115,
+      "community": 31,
       "norm_label": "configio.ts",
       "id": "frontend_src_features_settings_configio_ts"
     },
@@ -12142,7 +12160,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/configIO.ts",
       "source_location": "L21",
-      "community": 115,
+      "community": 31,
       "norm_label": "downloadconfigasjson()",
       "id": "settings_configio_downloadconfigasjson"
     },
@@ -12151,7 +12169,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/configIO.ts",
       "source_location": "L42",
-      "community": 115,
+      "community": 31,
       "norm_label": "readjsonfromfileinput()",
       "id": "settings_configio_readjsonfromfileinput"
     },
@@ -12161,7 +12179,7 @@
       "source_file": "frontend/src/features/settings/ThemeEditor.svelte",
       "source_location": "L1",
       "confidence": "EXTRACTED",
-      "community": 115,
+      "community": 31,
       "norm_label": "./themeeditor.svelte",
       "id": "frontend_src_features_settings_themeeditor_svelte"
     },
@@ -12170,7 +12188,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/ThemeEditor.svelte",
       "source_location": "L200",
-      "community": 115,
+      "community": 31,
       "norm_label": "theme",
       "id": "settings_themeeditor_theme"
     },
@@ -12179,7 +12197,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/theme-editor.css",
       "confidence": "EXTRACTED",
-      "community": 115,
+      "community": 31,
       "norm_label": "./theme-editor.css",
       "id": "users_admin_code_cnb_markpure_frontend_src_features_settings_theme_editor_css"
     },
@@ -12188,7 +12206,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/themeCategories",
       "confidence": "EXTRACTED",
-      "community": 115,
+      "community": 31,
       "norm_label": "./themecategories",
       "id": "users_admin_code_cnb_markpure_frontend_src_features_settings_themecategories"
     },
@@ -12197,7 +12215,7 @@
       "file_type": "code",
       "source_file": "$lib/components/ui/ColorPicker.svelte",
       "confidence": "EXTRACTED",
-      "community": 115,
+      "community": 31,
       "norm_label": "$lib/components/ui/colorpicker.svelte",
       "id": "colorpicker_svelte"
     },
@@ -12216,7 +12234,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/Settings.svelte",
       "source_location": "L1",
-      "community": 115,
+      "community": 31,
       "norm_label": "settings.svelte",
       "id": "frontend_src_features_settings_settings_svelte"
     },
@@ -12225,7 +12243,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/Settings.svelte",
       "source_location": "L167",
-      "community": 115,
+      "community": 31,
       "norm_label": "if()",
       "id": "settings_settings_if"
     },
@@ -12234,7 +12252,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/settings.css",
       "confidence": "EXTRACTED",
-      "community": 115,
+      "community": 31,
       "norm_label": "./settings.css",
       "id": "users_admin_code_cnb_markpure_frontend_src_features_settings_settings_css"
     },
@@ -12243,7 +12261,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/keybindings",
       "confidence": "EXTRACTED",
-      "community": 115,
+      "community": 31,
       "norm_label": "./keybindings",
       "id": "users_admin_code_cnb_markpure_frontend_src_features_settings_keybindings"
     },
@@ -12252,7 +12270,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/configIO",
       "confidence": "EXTRACTED",
-      "community": 115,
+      "community": 31,
       "norm_label": "./configio",
       "id": "users_admin_code_cnb_markpure_frontend_src_features_settings_configio"
     },
@@ -12272,7 +12290,7 @@
       "source_file": "frontend/src/features/settings/ShortcutsSection.svelte",
       "confidence": "EXTRACTED",
       "source_location": "L1",
-      "community": 115,
+      "community": 31,
       "norm_label": "shortcutssection.svelte",
       "id": "frontend_src_features_settings_shortcutssection_svelte"
     },
@@ -12282,7 +12300,7 @@
       "source_file": "frontend/src/features/settings/AboutSection.svelte",
       "confidence": "EXTRACTED",
       "source_location": "L1",
-      "community": 115,
+      "community": 31,
       "norm_label": "aboutsection.svelte",
       "id": "frontend_src_features_settings_aboutsection_svelte"
     },
@@ -12291,7 +12309,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/ShortcutsSection.svelte",
       "source_location": "L16",
-      "community": 115,
+      "community": 31,
       "norm_label": "i18n",
       "id": "settings_shortcutssection_i18n"
     },
@@ -12300,7 +12318,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/keybindings.ts",
       "source_location": "L1",
-      "community": 115,
+      "community": 31,
       "norm_label": "keybindings.ts",
       "id": "frontend_src_features_settings_keybindings_ts"
     },
@@ -12309,7 +12327,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/keybindings.ts",
       "source_location": "L17",
-      "community": 115,
+      "community": 31,
       "norm_label": "modifier_keys",
       "id": "settings_keybindings_modifier_keys"
     },
@@ -12318,7 +12336,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/keybindings.ts",
       "source_location": "L22",
-      "community": 115,
+      "community": 31,
       "norm_label": "acceleratorfromevent()",
       "id": "settings_keybindings_acceleratorfromevent"
     },
@@ -12327,7 +12345,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/keybindings.ts",
       "source_location": "L37",
-      "community": 115,
+      "community": 31,
       "norm_label": "formataccelerator()",
       "id": "settings_keybindings_formataccelerator"
     },
@@ -12417,7 +12435,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/themes.ts",
       "source_location": "L41",
-      "community": 57,
+      "community": 305,
       "norm_label": "getthemelabel()",
       "id": "settings_themes_getthemelabel"
     },
@@ -12462,7 +12480,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/quick-insert/QuickInsertPopup.svelte",
       "source_location": "L1",
-      "community": 31,
+      "community": 336,
       "norm_label": "quickinsertpopup.svelte",
       "id": "frontend_src_features_quick_insert_quickinsertpopup_svelte"
     },
@@ -12471,7 +12489,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/quick-insert/QuickInsertPopup.svelte",
       "source_location": "L69",
-      "community": 31,
+      "community": 336,
       "norm_label": "el",
       "id": "quick_insert_quickinsertpopup_el"
     },
@@ -12894,7 +12912,7 @@
       "file_type": "code",
       "source_file": "frontend/src/stores/i18n.svelte.ts",
       "source_location": "L40",
-      "community": 57,
+      "community": 305,
       "norm_label": ".t()",
       "id": "stores_i18n_svelte_i18n_t"
     },
@@ -13056,7 +13074,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/paste-handler-extension.ts",
       "source_location": "L1",
-      "community": 87,
+      "community": 1,
       "norm_label": "paste-handler-extension.ts",
       "id": "frontend_src_extensions_blocks_paste_handler_extension_ts"
     },
@@ -13065,7 +13083,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/paste-handler-extension.ts",
       "source_location": "L4",
-      "community": 87,
+      "community": 1,
       "norm_label": "pastehandlerpluginkey",
       "id": "blocks_paste_handler_extension_pastehandlerpluginkey"
     },
@@ -13074,7 +13092,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/paste-handler-extension.ts",
       "source_location": "L16",
-      "community": 87,
+      "community": 1,
       "norm_label": "pastehandlerextension",
       "id": "blocks_paste_handler_extension_pastehandlerextension"
     },
@@ -13083,7 +13101,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/paste-handler-extension.ts",
       "source_location": "L101",
-      "community": 87,
+      "community": 1,
       "norm_label": "islikelyplaintext()",
       "id": "blocks_paste_handler_extension_islikelyplaintext"
     },
@@ -13092,7 +13110,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/paste-handler-extension.ts",
       "source_location": "L125",
-      "community": 87,
+      "community": 1,
       "norm_label": "htmltomarkdown()",
       "id": "blocks_paste_handler_extension_htmltomarkdown"
     },
@@ -13101,7 +13119,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/paste-handler-extension.ts",
       "source_location": "L156",
-      "community": 87,
+      "community": 1,
       "norm_label": "convertblock()",
       "id": "blocks_paste_handler_extension_convertblock"
     },
@@ -13110,7 +13128,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/paste-handler-extension.ts",
       "source_location": "L196",
-      "community": 87,
+      "community": 1,
       "norm_label": "convertlist()",
       "id": "blocks_paste_handler_extension_convertlist"
     },
@@ -13119,7 +13137,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/paste-handler-extension.ts",
       "source_location": "L208",
-      "community": 87,
+      "community": 1,
       "norm_label": "convertinline()",
       "id": "blocks_paste_handler_extension_convertinline"
     },
@@ -13155,7 +13173,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/footnote-extension.ts",
       "source_location": "L1",
-      "community": 161,
+      "community": 1,
       "norm_label": "footnote-extension.ts",
       "id": "frontend_src_extensions_blocks_footnote_extension_ts"
     },
@@ -13164,7 +13182,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/footnote-extension.ts",
       "source_location": "L19",
-      "community": 161,
+      "community": 1,
       "norm_label": "footnoterefoptions",
       "id": "blocks_footnote_extension_footnoterefoptions"
     },
@@ -13173,7 +13191,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/footnote-extension.ts",
       "source_location": "L24",
-      "community": 161,
+      "community": 1,
       "norm_label": "commands",
       "id": "blocks_footnote_extension_commands"
     },
@@ -13182,7 +13200,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/footnote-extension.ts",
       "source_location": "L42",
-      "community": 161,
+      "community": 1,
       "norm_label": "nextautolabel()",
       "id": "blocks_footnote_extension_nextautolabel"
     },
@@ -13191,7 +13209,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/blocks/footnote-extension.ts",
       "source_location": "L49",
-      "community": 161,
+      "community": 1,
       "norm_label": "footnoterefextension",
       "id": "blocks_footnote_extension_footnoterefextension"
     },
@@ -13263,7 +13281,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/search-extension.ts",
       "source_location": "L1",
-      "community": 1,
+      "community": 45,
       "norm_label": "search-extension.ts",
       "id": "frontend_src_extensions_editing_search_extension_ts"
     },
@@ -13272,7 +13290,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/search-extension.ts",
       "source_location": "L4",
-      "community": 1,
+      "community": 45,
       "norm_label": "searchextension",
       "id": "editing_search_extension_searchextension"
     },
@@ -13353,7 +13371,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L1",
-      "community": 125,
+      "community": 1,
       "norm_label": "auto-close-extension.ts",
       "id": "frontend_src_extensions_editing_auto_close_extension_ts"
     },
@@ -13362,7 +13380,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L4",
-      "community": 125,
+      "community": 1,
       "norm_label": "autoclosepair",
       "id": "editing_auto_close_extension_autoclosepair"
     },
@@ -13371,7 +13389,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L16",
-      "community": 125,
+      "community": 1,
       "norm_label": "pairs",
       "id": "editing_auto_close_extension_pairs"
     },
@@ -13380,7 +13398,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L35",
-      "community": 125,
+      "community": 1,
       "norm_label": "isinsidecode()",
       "id": "editing_auto_close_extension_isinsidecode"
     },
@@ -13389,7 +13407,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L50",
-      "community": 125,
+      "community": 1,
       "norm_label": "isclosingchar()",
       "id": "editing_auto_close_extension_isclosingchar"
     },
@@ -13398,7 +13416,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L59",
-      "community": 125,
+      "community": 1,
       "norm_label": "matchopenforclose()",
       "id": "editing_auto_close_extension_matchopenforclose"
     },
@@ -13407,7 +13425,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L77",
-      "community": 125,
+      "community": 1,
       "norm_label": "autocloseextension",
       "id": "editing_auto_close_extension_autocloseextension"
     },
@@ -13443,7 +13461,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/select-same-word-extension.ts",
       "source_location": "L1",
-      "community": 123,
+      "community": 14,
       "norm_label": "select-same-word-extension.ts",
       "id": "frontend_src_extensions_editing_select_same_word_extension_ts"
     },
@@ -13479,7 +13497,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/vim-extension.ts",
       "source_location": "L40",
-      "community": 6,
+      "community": 1,
       "norm_label": "vimextension",
       "id": "editing_vim_extension_vimextension"
     },
@@ -13524,7 +13542,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/sup-sub-extension.ts",
       "source_location": "L1",
-      "community": 123,
+      "community": 1,
       "norm_label": "sup-sub-extension.ts",
       "id": "frontend_src_extensions_editing_sup_sub_extension_ts"
     },
@@ -13533,7 +13551,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/sup-sub-extension.ts",
       "source_location": "L17",
-      "community": 123,
+      "community": 1,
       "norm_label": "superscript",
       "id": "editing_sup_sub_extension_superscript"
     },
@@ -13542,7 +13560,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/sup-sub-extension.ts",
       "source_location": "L27",
-      "community": 123,
+      "community": 1,
       "norm_label": "subscript",
       "id": "editing_sup_sub_extension_subscript"
     },
@@ -13551,7 +13569,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/sup-sub-extension.ts",
       "source_location": "L37",
-      "community": 123,
+      "community": 1,
       "norm_label": "supsubextension",
       "id": "editing_sup_sub_extension_supsubextension"
     },
@@ -13560,7 +13578,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/tag-extension.ts",
       "source_location": "L1",
-      "community": 123,
+      "community": 1,
       "norm_label": "tag-extension.ts",
       "id": "frontend_src_extensions_editing_tag_extension_ts"
     },
@@ -13569,7 +13587,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/tag-extension.ts",
       "source_location": "L5",
-      "community": 123,
+      "community": 1,
       "norm_label": "tagoptions",
       "id": "editing_tag_extension_tagoptions"
     },
@@ -13578,7 +13596,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/tag-extension.ts",
       "source_location": "L15",
-      "community": 123,
+      "community": 1,
       "norm_label": "commands",
       "id": "editing_tag_extension_commands"
     },
@@ -13587,7 +13605,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/tag-extension.ts",
       "source_location": "L23",
-      "community": 123,
+      "community": 1,
       "norm_label": "tagpluginkey",
       "id": "editing_tag_extension_tagpluginkey"
     },
@@ -13596,7 +13614,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/tag-extension.ts",
       "source_location": "L25",
-      "community": 123,
+      "community": 1,
       "norm_label": "tagextension",
       "id": "editing_tag_extension_tagextension"
     },
@@ -13659,7 +13677,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/wikilink-extension.ts",
       "source_location": "L1",
-      "community": 123,
+      "community": 1,
       "norm_label": "wikilink-extension.ts",
       "id": "frontend_src_extensions_editing_wikilink_extension_ts"
     },
@@ -13668,7 +13686,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/wikilink-extension.ts",
       "source_location": "L5",
-      "community": 123,
+      "community": 1,
       "norm_label": "wikilinkoptions",
       "id": "editing_wikilink_extension_wikilinkoptions"
     },
@@ -13677,7 +13695,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/wikilink-extension.ts",
       "source_location": "L20",
-      "community": 123,
+      "community": 1,
       "norm_label": "commands",
       "id": "editing_wikilink_extension_commands"
     },
@@ -13686,7 +13704,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/wikilink-extension.ts",
       "source_location": "L28",
-      "community": 123,
+      "community": 1,
       "norm_label": "wikilinkpluginkey",
       "id": "editing_wikilink_extension_wikilinkpluginkey"
     },
@@ -13695,7 +13713,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/editing/wikilink-extension.ts",
       "source_location": "L30",
-      "community": 123,
+      "community": 1,
       "norm_label": "wikilinkextension",
       "id": "editing_wikilink_extension_wikilinkextension"
     },
@@ -13704,7 +13722,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/view/instant-render-extension.ts",
       "source_location": "L1",
-      "community": 149,
+      "community": 34,
       "norm_label": "instant-render-extension.ts",
       "id": "frontend_src_extensions_view_instant_render_extension_ts"
     },
@@ -13713,7 +13731,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/view/instant-render-extension.ts",
       "source_location": "L4",
-      "community": 149,
+      "community": 34,
       "norm_label": "instantrenderextension",
       "id": "view_instant_render_extension_instantrenderextension"
     },
@@ -13722,7 +13740,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/view/focus-mode-extension.ts",
       "source_location": "L1",
-      "community": 1,
+      "community": 63,
       "norm_label": "focus-mode-extension.ts",
       "id": "frontend_src_extensions_view_focus_mode_extension_ts"
     },
@@ -13731,7 +13749,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/view/focus-mode-extension.ts",
       "source_location": "L5",
-      "community": 1,
+      "community": 63,
       "norm_label": "focusmodepluginkey",
       "id": "view_focus_mode_extension_focusmodepluginkey"
     },
@@ -13740,7 +13758,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/view/focus-mode-extension.ts",
       "source_location": "L7",
-      "community": 1,
+      "community": 63,
       "norm_label": "focusmodeoptions",
       "id": "view_focus_mode_extension_focusmodeoptions"
     },
@@ -13749,7 +13767,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/view/focus-mode-extension.ts",
       "source_location": "L13",
-      "community": 1,
+      "community": 63,
       "norm_label": "commands",
       "id": "view_focus_mode_extension_commands"
     },
@@ -13758,7 +13776,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/view/focus-mode-extension.ts",
       "source_location": "L20",
-      "community": 1,
+      "community": 63,
       "norm_label": "focusmodeextension",
       "id": "view_focus_mode_extension_focusmodeextension"
     },
@@ -13794,7 +13812,7 @@
       "file_type": "code",
       "source_file": "frontend/src/extensions/view/virtualization-extension.ts",
       "source_location": "L34",
-      "community": 2,
+      "community": 22,
       "norm_label": "virtualizationextension",
       "id": "view_virtualization_extension_virtualizationextension"
     },
@@ -13902,7 +13920,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/ui/ColorPicker.svelte",
       "source_location": "L1",
-      "community": 73,
+      "community": 31,
       "norm_label": "colorpicker.svelte",
       "id": "frontend_src_components_ui_colorpicker_svelte"
     },
@@ -13911,7 +13929,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/ui/ColorPicker.svelte",
       "source_location": "L12",
-      "community": 73,
+      "community": 31,
       "norm_label": "i18n",
       "id": "ui_colorpicker_i18n"
     },
@@ -13920,7 +13938,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/ui/ColorPicker.svelte",
       "source_location": "L14",
-      "community": 73,
+      "community": 31,
       "norm_label": "inputvalue",
       "id": "ui_colorpicker_inputvalue"
     },
@@ -13929,7 +13947,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/ui/ColorPicker.svelte",
       "source_location": "L15",
-      "community": 73,
+      "community": 31,
       "norm_label": "isopen",
       "id": "ui_colorpicker_isopen"
     },
@@ -13938,7 +13956,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/ui/ColorPicker.svelte",
       "source_location": "L22",
-      "community": 73,
+      "community": 31,
       "norm_label": "handlecolorinput()",
       "id": "ui_colorpicker_handlecolorinput"
     },
@@ -13947,7 +13965,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/ui/ColorPicker.svelte",
       "source_location": "L28",
-      "community": 73,
+      "community": 31,
       "norm_label": "handletextinput()",
       "id": "ui_colorpicker_handletextinput"
     },
@@ -13956,7 +13974,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/ui/ColorPicker.svelte",
       "source_location": "L41",
-      "community": 73,
+      "community": 31,
       "norm_label": "handletextblur()",
       "id": "ui_colorpicker_handletextblur"
     },
@@ -14166,7 +14184,7 @@
       "source_file": "frontend/src/components/workspace/Outline.svelte",
       "source_location": "L1",
       "confidence": "EXTRACTED",
-      "community": 123,
+      "community": 3,
       "norm_label": "./outline.svelte",
       "id": "frontend_src_components_workspace_outline_svelte"
     },
@@ -14175,7 +14193,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/workspace/Outline.svelte",
       "source_location": "L70",
-      "community": 123,
+      "community": 3,
       "norm_label": "if()",
       "id": "workspace_outline_if"
     },
@@ -14184,7 +14202,7 @@
       "file_type": "code",
       "source_file": "$lib/editor/outline-extract",
       "confidence": "EXTRACTED",
-      "community": 123,
+      "community": 3,
       "norm_label": "$lib/editor/outline-extract",
       "id": "outline_extract"
     },
@@ -14238,7 +14256,7 @@
       "file_type": "code",
       "source_file": "$lib/fileTreeFilters",
       "confidence": "EXTRACTED",
-      "community": 31,
+      "community": 77,
       "norm_label": "$lib/filetreefilters",
       "id": "filetreefilters"
     },
@@ -14275,7 +14293,7 @@
       "file_type": "code",
       "source_file": "frontend/src/components/workspace/OutlinePanel.svelte",
       "source_location": "L1",
-      "community": 123,
+      "community": 3,
       "norm_label": "outlinepanel.svelte",
       "id": "frontend_src_components_workspace_outlinepanel_svelte"
     },
@@ -15148,7 +15166,7 @@
       "file_type": "code",
       "source_file": "frontend/src/editor/commands/export.ts",
       "source_location": "L88",
-      "community": 24,
+      "community": 336,
       "norm_label": "savepastedimage()",
       "id": "commands_export_savepastedimage"
     },
@@ -31261,7 +31279,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/AppearanceSection.svelte",
       "confidence": "EXTRACTED",
-      "community": 115,
+      "community": 31,
       "norm_label": "./appearancesection.svelte",
       "id": "users_admin_code_cnb_markpure_frontend_src_features_settings_appearancesection_svelte"
     },
@@ -31270,7 +31288,7 @@
       "file_type": "code",
       "source_file": "frontend/src/features/settings/AboutSection.svelte",
       "confidence": "EXTRACTED",
-      "community": 115,
+      "community": 31,
       "norm_label": "./aboutsection.svelte",
       "id": "users_admin_code_cnb_markpure_frontend_src_features_settings_aboutsection_svelte"
     },
@@ -31279,7 +31297,7 @@
       "file_type": "code",
       "source_file": "$lib/plugins/multi-cursor",
       "confidence": "EXTRACTED",
-      "community": 336,
+      "community": 3,
       "norm_label": "$lib/plugins/multi-cursor",
       "id": "multi_cursor"
     },
@@ -31297,7 +31315,7 @@
       "file_type": "code",
       "source_file": "$lib/extensions/editing/vim-extension",
       "confidence": "EXTRACTED",
-      "community": 48,
+      "community": 3,
       "norm_label": "$lib/extensions/editing/vim-extension",
       "id": "vim_extension"
     },
@@ -31315,7 +31333,7 @@
       "file_type": "code",
       "source_file": "$lib/plugins/spellcheck",
       "confidence": "EXTRACTED",
-      "community": 20,
+      "community": 25,
       "norm_label": "$lib/plugins/spellcheck",
       "id": "spellcheck"
     },
@@ -33034,6 +33052,210 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L48",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_dirname"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L49",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_repo_root"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L50",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_harness_bin"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L55",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_ok"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L63",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_eq"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L69",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_findchrome"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L85",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_chromepath"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L102",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_workdir"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L103",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_configdir"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L104",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_wsdir"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L105",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_outdir"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L119",
+      "weight": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_wide_headers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L120",
+      "weight": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_wide_row",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L121",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_preview"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L142",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_waitfor"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L154",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_ts",
+      "target": "scripts_validate_layout_main"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L64",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_eq",
+      "target": "scripts_validate_layout_ok"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L296",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_main",
+      "target": "scripts_validate_layout_ok"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L301",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_main",
+      "target": "scripts_validate_layout_eq"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/validate-layout.ts",
+      "source_location": "L156",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_validate_layout_main",
+      "target": "scripts_validate_layout_waitfor"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "CLAUDE.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -33567,9 +33789,9 @@
       "source_file": "frontend/src/app/AGENTS.md",
       "source_location": "L61",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "app_agents_agents_md_app_\u5e94\u7528\u5916\u58f3",
-      "target": "app_agents_\u5e03\u5c40\u9aa8\u67b6",
-      "confidence_score": 1.0
+      "target": "app_agents_\u5e03\u5c40\u9aa8\u67b6"
     },
     {
       "relation": "contains",
@@ -33597,9 +33819,9 @@
       "source_file": "frontend/src/app/AGENTS.md",
       "source_location": "L63",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "app_agents_\u5e03\u5c40\u9aa8\u67b6",
-      "target": "app_agents_codeblock_1",
-      "confidence_score": 1.0
+      "target": "app_agents_codeblock_1"
     },
     {
       "relation": "imports_from",
@@ -33709,9 +33931,9 @@
       "relation": "imports_from",
       "confidence": "EXTRACTED",
       "source_file": "frontend/src/app/AppEditorViews.svelte",
+      "confidence_score": 1.0,
       "source": "frontend_src_app_appeditorviews_svelte",
-      "target": "users_admin_code_cnb_markpure_frontend_src_app_apptoolbar_svelte",
-      "confidence_score": 1.0
+      "target": "users_admin_code_cnb_markpure_frontend_src_app_apptoolbar_svelte"
     },
     {
       "relation": "imports_from",
@@ -35276,190 +35498,6 @@
       "confidence_score": 1.0,
       "source": "markpure_package_dependencies_codemirror",
       "target": "codemirror"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L48",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_dirname",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L49",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_repo_root",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L50",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_harness_bin",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L55",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_ok",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L63",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_eq",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L69",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_findchrome",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L85",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_chromepath",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L102",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_workdir",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L103",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_configdir",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L104",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_wsdir",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L105",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_outdir",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L121",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_preview",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L142",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_waitfor",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L154",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_ts",
-      "target": "scripts_validate_layout_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L64",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_eq",
-      "target": "scripts_validate_layout_ok",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L296",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_main",
-      "target": "scripts_validate_layout_ok",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L301",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_main",
-      "target": "scripts_validate_layout_eq",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/validate-layout.ts",
-      "source_location": "L156",
-      "weight": 1.0,
-      "source": "scripts_validate_layout_main",
-      "target": "scripts_validate_layout_waitfor",
-      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -92619,5 +92657,5 @@
       "source_file": "frontend/src/plugins/AGENTS.md"
     }
   ],
-  "built_at_commit": "22d7c24dc23d1a503e39d811cdbbd4b5256bef2c"
+  "built_at_commit": "343a2a610dc143e312528a15ca7885485ec9cbe0"
 }

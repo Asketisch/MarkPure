@@ -85,6 +85,7 @@ export function wireApp(ctx: AppCtx) {
     newTab: tabOps.newTab,
     handleOpen: fileOps.handleOpen,
     handleSave: () => { void saveOps.handleSave() },
+    handleSaveAs: () => { void saveOps.handleSaveAs() },
     toggleSidebar: viewOps.toggleSidebar,
     toggleSourceMode: viewOps.toggleSourceMode,
     handleUndo: commands.handleUndo,
