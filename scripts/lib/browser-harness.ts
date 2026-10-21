@@ -290,6 +290,13 @@ export async function startHarness(opts: {
   configToml?: string
   /** 端口；0 表示随机。 */
   port?: number
+  /**
+   * 是否开启文件变更轮询（IPC 桥每秒拉一次 `__poll_file_changes`）。
+   *
+   * 默认关闭：某些自动化工具会等「网络空闲」，一个永不停止的轮询
+   * 会让它们一直等。需要验证**文件监视**链路时必须打开。
+   */
+  ipcPoll?: boolean
 } = { files: {} }): Promise<Harness> {
   const workDir = mkdtempSync(join(tmpdir(), 'markpure-ui-'))
   const configDir = join(workDir, 'config')
@@ -331,7 +338,7 @@ export async function startHarness(opts: {
         ...process.env,
         MARKPURE_CONFIG_DIR: configDir,
         MARKPURE_DEV_WORKSPACE: wsDir,
-        MARKPURE_IPC_POLL: '0',
+        MARKPURE_IPC_POLL: opts.ipcPoll ? '1' : '0',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       // 独立进程组：`stop()` 时整组一起杀。IPC 桥会 spawn 一个

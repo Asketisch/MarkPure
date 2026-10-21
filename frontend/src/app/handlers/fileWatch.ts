@@ -14,7 +14,16 @@ export function createFileWatch(ctx: AppCtx) {
   const { app } = ctx
   let fileChangeTimer: ReturnType<typeof setTimeout> | null = null
 
-  function handleFileChanges(events: FileChangeEvent[]) {
+  function handleFileChanges(raw: FileChangeEvent[] | string) {
+    // 桌面宿主传的是 **JSON 字符串**：`window.__mt_on_file_changes('[{…}]')`。
+    // Rust 之所以包一层引号，是因为 JSON 直接内联进 JS 时转义会被
+    // 二次处理（serde_json 已经转义过一次）。
+    //
+    // 此前这里把字符串当数组用——`event.path` 永远是 undefined，
+    // 于是「已打开的文档在外部被修改」这条链路**完全失效**：既不
+    // 静默刷新，也不弹「文件已外部修改」提示。浏览器 harness 的
+    // IPC 桥传的是真数组，因此掩盖了这个缺陷。
+    const events = normalizeFileChangeEvents(raw)
     // 脏标签页处理：当用户已修改的标签页对应的磁盘内容变化时，
     // 我们不静默覆盖——而是弹出对话框询问用户怎么做。
     // 对非脏标签页保留旧的静默更新行为。
@@ -72,6 +81,24 @@ export function createFileWatch(ctx: AppCtx) {
   }
 
   return { handleFileChanges }
+}
+
+/** 把文件变更事件的载荷归一化成数组。
+ *
+ * 桌面宿主给的是 JSON 字符串，浏览器 harness 的 IPC 桥给的是数组——
+ * 两种都要支持。 */
+export function normalizeFileChangeEvents(
+  raw: FileChangeEvent[] | string,
+): FileChangeEvent[] {
+  if (Array.isArray(raw)) return raw
+  if (typeof raw !== 'string') return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? (parsed as FileChangeEvent[]) : []
+  } catch {
+    // 解析失败：宁可什么都不做，也不要用半截数据刷新界面。
+    return []
+  }
 }
 
 export type FileWatch = ReturnType<typeof createFileWatch>

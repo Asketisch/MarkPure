@@ -27,7 +27,12 @@ declare global {
     __mt_dispatch: (json: string) => void
     /** 渲染进程希望 Rust 开始推送文件监视事件时设置。Rust 以变更
      *  事件负载调用它。 */
-    __mt_on_file_changes: ((events: FileChangeEvent[]) => void) | null
+    /**
+     * 文件变更事件。桌面宿主传 **JSON 字符串**（Rust 侧用单引号包住
+     * 已转义的 JSON，避免二次转义问题）；浏览器 harness 的 IPC 桥传
+     * 的是数组。两种都要支持——见 `normalizeFileChangeEvents`。
+     */
+    __mt_on_file_changes: ((payload: FileChangeEvent[] | string) => void) | null
     /** 快速插入弹出层运行时（Tiptap suggestion）。严格来说不属于
      *  IPC 桥的一部分，但由编辑器的 QuickInsert 扩展注入。 */
     __qi_props?: unknown

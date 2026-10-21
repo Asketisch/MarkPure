@@ -5,7 +5,7 @@
  * 快捷键、i18n、应用信息、文件监听事件、剪贴板。
  * 也就是一切「应用长什么样」而非「这篇文档包含什么」的事。
  */
-import { ipc } from './ipc'
+import { ipc, NATIVE_DIALOG_TIMEOUT_MS } from './ipc'
 import type {
   AppConfig,
   FileChangeEvent,
@@ -140,7 +140,7 @@ export async function getThemes(): Promise<Theme[]> {
  */
 export async function pickThemeFile(): Promise<string | null> {
   try {
-    return (await ipc('pick_theme_file')) as string
+    return (await ipc('pick_theme_file', {}, NATIVE_DIALOG_TIMEOUT_MS)) as string
   } catch (e) {
     // 「Cancelled」是 Rust 对话框的常规返回流程，
     // 不应作为错误呈现给用户。
@@ -227,7 +227,9 @@ export async function getAppInfo(): Promise<AppInfo> {
 
 export type { FileChangeEvent }
 
-export function onFileChanges(handler: (events: FileChangeEvent[]) => void): void {
+export function onFileChanges(
+  handler: (payload: FileChangeEvent[] | string) => void,
+): void {
   window.__mt_on_file_changes = handler
 }
 
