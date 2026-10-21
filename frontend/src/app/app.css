@@ -1034,6 +1034,12 @@ html, body, #app {
   /* Center the editor content horizontally and let it breathe
      without the chrome squeezing it. */
   max-width: 820px;
+  /* `width: 100%` 是必需的：`.editor-area` 现在是 `.editor-panel`
+     （**列** flex 容器）的子元素，而 `margin: 0 auto` 在列容器里
+     会让元素按 fit-content 尺寸布局——编辑区会缩成正文那么宽
+     （实测 250px），而不是「820px 居中」。显式给出 100% 宽度后，
+     max-width 才能正确地把编辑区限制在 820px 并水平居中。 */
+  width: 100%;
   margin: 0 auto;
   padding: 32px 24px;
 }

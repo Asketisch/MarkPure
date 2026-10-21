@@ -484,7 +484,16 @@ export function ipcDevBridge(): Plugin {
       // `vite preview` 直接把 `dist/index.html` 当静态文件发出去，
       // 不会重新跑 `transformIndexHtml`——因此这里手动把桥脚本
       // 注入到首页里。
-      const indexPath = path.join(REPO_ROOT, 'dist', 'index.html')
+      //
+      // 注意：首页路径必须取**实际服务的 outDir**，不能硬编码
+      // `REPO_ROOT/dist`。构建到自定义 outDir 时（例如布局回归测试
+      // 用的临时目录），两边的资源哈希会不一致——注入旧 index.html
+      // 而服务新资源，页面会因 404 而白屏。
+      const outDir = path.resolve(
+        previewServer.config.root,
+        previewServer.config.build.outDir,
+      )
+      const indexPath = path.join(outDir, 'index.html')
       previewServer.middlewares.use((req, res, next) => {
         const url = req.url ?? ''
         if (req.method !== 'GET' || (url !== '/' && !url.startsWith('/index.html'))) {

@@ -353,6 +353,134 @@ async function main() {
       )
     }
   }
+
+  // 禅模式：隐藏标签栏 / 工具栏 / 状态栏，编辑器占满。
+  // 禅模式的 CSS 依赖 `.editor-panel`——它曾经丢失过，所以单独覆盖。
+  {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width: 1900, height: 1180, deviceScaleFactor: 1, mobile: false,
+    })
+    await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` })
+    await new Promise((r) => setTimeout(r, 3500))
+    await evaluate(`(() => {
+      const all = [...document.querySelectorAll('*')].filter(
+        n => (n.textContent||'').trim() === 'sample.md' && n.children.length === 0)
+      const el = all[0]
+      if (el) (el.closest('[role=button], .tree-item, button') || el).click()
+      return !!el
+    })()`)
+    await new Promise((r) => setTimeout(r, 2000))
+
+    // 「视图」菜单 → 「切换专注模式」。菜单文案随语言变化，两种都匹配。
+    //
+    // 关键：菜单项是 `{#if showViewMenu}` 条件渲染的，Svelte 5 的 DOM
+    // 更新是异步的——点完菜单按钮后必须**另起一轮** evaluate 去查
+    // dropdown 项，否则查到的还是空列表。
+    const viewMenuOpened = await evaluate(`(() => {
+      const viewBtn = [...document.querySelectorAll('.menu-btn')]
+        .find(b => /^(视图|View)$/.test((b.textContent||'').trim()))
+      if (!viewBtn) return false
+      viewBtn.click()
+      return true
+    })()`)
+    ok('「视图」菜单可打开', !!viewMenuOpened)
+    await new Promise((r) => setTimeout(r, 500))
+
+    const zenClicked = await evaluate(`(() => {
+      const zen = [...document.querySelectorAll('.dropdown-item')]
+        .find(b => /专注模式|Zen Mode/i.test(b.textContent||''))
+      if (!zen) return 'no-zen-item'
+      zen.click()
+      return 'clicked'
+    })()`)
+    ok('禅模式可切换', zenClicked === 'clicked', String(zenClicked))
+    await new Promise((r) => setTimeout(r, 1200))
+
+    const z = await evaluate(`(() => {
+      const vis = (sel) => {
+        const el = document.querySelector(sel)
+        if (!el) return null
+        const cs = getComputedStyle(el)
+        const r = el.getBoundingClientRect()
+        return { display: cs.display, w: Math.round(r.width), h: Math.round(r.height),
+                 x: Math.round(r.x) }
+      }
+      return {
+        zen: !!document.querySelector('.app-root.zen-mode'),
+        viewportW: innerWidth,
+        tabBar: vis('.tab-bar'), toolbar: vis('.toolbar'),
+        statusBar: vis('.status-bar'), editorArea: vis('.editor-area'),
+      }
+    })()`)
+    ok('禅模式下 .app-root 带 zen-mode', z.zen)
+    // 禅模式下这些元素是**不渲染**的（`{#if !app.zenMode}`），而不是
+    // 被 CSS 隐藏——两种情况都算「看不到」。
+    const gone = (v: { display: string } | null) => v === null || v.display === 'none'
+    ok('禅模式看不到标签栏', gone(z.tabBar), `display=${z.tabBar?.display}`)
+    ok('禅模式看不到工具栏', gone(z.toolbar), `display=${z.toolbar?.display}`)
+    ok('禅模式看不到状态栏', gone(z.statusBar), `display=${z.statusBar?.display}`)
+    // 阅读宽度上限 820px，且水平居中。
+    ok(
+      '禅模式编辑区宽度 = 820px（阅读宽度上限）',
+      z.editorArea && z.editorArea.w === 820,
+      `editor-area 宽 ${z.editorArea?.w}px`,
+    )
+    ok(
+      '禅模式编辑区水平居中',
+      z.editorArea &&
+        Math.abs(z.editorArea.x + z.editorArea.w / 2 - z.viewportW / 2) <= 2,
+      `editor-area x=${z.editorArea?.x} w=${z.editorArea?.w} 视口 ${z.viewportW}`,
+    )
+  }
+
+  // 分屏视图：源码编辑器与所见即所得并排，两栏都不能被挤没。
+  {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width: 1900, height: 1180, deviceScaleFactor: 1, mobile: false,
+    })
+    await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` })
+    await new Promise((r) => setTimeout(r, 3500))
+    await evaluate(`(() => {
+      const all = [...document.querySelectorAll('*')].filter(
+        n => (n.textContent||'').trim() === 'sample.md' && n.children.length === 0)
+      const el = all[0]
+      if (el) (el.closest('[role=button], .tree-item, button') || el).click()
+      return !!el
+    })()`)
+    await new Promise((r) => setTimeout(r, 2000))
+
+    // 工具栏的「切换视图模式」按钮。循环顺序是
+    // wysiwyg → split → source → wysiwyg，所以**点一次**就是分屏。
+    const cycled = await evaluate(`(() => {
+      const btn = [...document.querySelectorAll('.toolbar button')]
+        .find(b => /切换视图模式|Cycle View Mode/i.test(b.title||''))
+      if (!btn) return false
+      btn.click()
+      return true
+    })()`)
+    ok('视图模式可循环切换', !!cycled, '找不到「切换视图模式」按钮')
+    await new Promise((r) => setTimeout(r, 1500))
+
+    const sp = await evaluate(`(() => {
+      const cont = document.querySelector('.split-container')
+      if (!cont) return { hasSplit: false }
+      const r = cont.getBoundingClientRect()
+      const panes = [...document.querySelectorAll('.split-pane')].map(p => {
+        const pr = p.getBoundingClientRect()
+        return { w: Math.round(pr.width), h: Math.round(pr.height) }
+      })
+      return { hasSplit: true, w: Math.round(r.width), panes }
+    })()`)
+    ok('分屏视图已激活', sp.hasSplit, '未找到 .split-container')
+    if (sp.hasSplit) {
+      ok('分屏有两个面板', sp.panes?.length === 2, JSON.stringify(sp.panes))
+      ok(
+        '分屏两栏宽度都 ≥ 容器的 20%',
+        (sp.panes ?? []).every((p: { w: number }) => p.w >= sp.w * 0.2),
+        `容器 ${sp.w}px / 面板 ${JSON.stringify(sp.panes)}`,
+      )
+    }
+  }
 }
 
 try {
