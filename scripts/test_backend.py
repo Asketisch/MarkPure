@@ -41,11 +41,17 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 HARNESS_BIN = REPO_ROOT / "target" / "debug" / "mt_harness"
 DISPATCH_RS = REPO_ROOT / "backend" / "apps" / "desktop" / "src" / "dispatch.rs"
 FRONTEND_SRC = REPO_ROOT / "frontend" / "src"
+
+# PDF 文本提取器（`scripts/lib/pdf_extract.py`）——用于验证导出的 PDF
+# 里真的有中文，而不是只有一堆二进制。
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
+import pdf_extract  # noqa: E402  (路径注入后才能导入)
 
 
 class HarnessError(RuntimeError):
@@ -995,6 +1001,199 @@ class TestExports(BackendTestCase):
 
     def test_export_html_requires_content(self) -> None:
         self.h.expect_error("export_html", {"title": "Doc"})
+
+
+# ============================================================ 导出还原度
+
+
+class TestExportFidelity(BackendTestCase):
+    """导出的内容保真度。
+
+    之前的测试只断言「文件生成了」，导出内容本身从没被检查过——
+    于是 HTML 导出的图片 alt 全丢、宽度属性丢失、Word 导出的表格
+    降级成段落、PDF 导出丢掉全部中文，这些问题一个都没被发现。
+    """
+
+    RICH = """# 一级标题
+
+正文有 **粗体** 和 *斜体*，还有 `行内代码`，以及中文内容。
+
+## 二级标题
+
+- 列表项 A
+- 列表项 B
+
+1. 有序一
+2. 有序二
+
+- [ ] 未完成任务
+- [x] 已完成任务
+
+> 引用块
+
+```python
+print("hello")
+```
+
+| 列一 | 列二 |
+| --- | --- |
+| 值 A | 值 B |
+| 值 C | 值 D |
+
+![替代文字](https://example.com/a.png)
+
+![带宽度](https://example.com/b.png){width=300 align=center}
+
+[链接文字](https://example.com/link)
+
+脚注引用[^1]
+
+[^1]: 脚注内容
+"""
+
+    # ---------------------------------------------------------------- 工具
+
+    def export_html(self, content: str | None = None) -> str:
+        out = self.tmp_path / "fidelity.html"
+        self.h.call(
+            "export_html",
+            {
+                "content": self.RICH if content is None else content,
+                "title": "还原度",
+                "dest_path": str(out),
+            },
+        )
+        return out.read_text(encoding="utf-8")
+
+    def export_docx(self, content: str | None = None) -> str:
+        out = self.tmp_path / "fidelity.docx"
+        self.h.call(
+            "export_word",
+            {
+                "content": self.RICH if content is None else content,
+                "title": "还原度",
+                "dest_path": str(out),
+            },
+        )
+        with zipfile.ZipFile(out) as zf:
+            return zf.read("word/document.xml").decode("utf-8")
+
+    def export_pdf(self, content: str | None = None) -> bytes:
+        out = self.tmp_path / "fidelity.pdf"
+        self.h.call(
+            "export_pdf",
+            {
+                "content": self.RICH if content is None else content,
+                "title": "还原度",
+                "dest_path": str(out),
+            },
+        )
+        return out.read_bytes()
+
+    # ---------------------------------------------------------------- HTML
+
+    def test_html_keeps_image_alt_in_the_attribute(self) -> None:
+        # 旧实现逐事件调用 `push_html`，writer 状态被反复重置，
+        # 于是 alt 永远是空的，而 alt 文本被渲染到图片**外面**。
+        html = self.export_html()
+        assert 'alt="替代文字"' in html, html[:2000]
+        assert ">替代文字" not in html, "alt 文本不应跑到图片外面"
+
+    def test_html_applies_image_width_and_align(self) -> None:
+        # 图片的 `{width=300 align=center}` 是项目自研的扩展语法，
+        # 导出的 HTML 必须还原成对应属性，否则与编辑器里看到的不一致。
+        html = self.export_html()
+        assert 'width="300"' in html, html[:2000]
+        assert "text-align:center" in html, html[:2000]
+        assert "{width=" not in html, "扩展语法不应残留在 HTML 里"
+
+    def test_html_keeps_structure(self) -> None:
+        html = self.export_html()
+        for needle in (
+            "<h1>一级标题</h1>",
+            "<h2>二级标题</h2>",
+            "<strong>粗体</strong>",
+            "<em>斜体</em>",
+            "<code>行内代码</code>",
+            "<li>列表项 A</li>",
+            'type="checkbox"',
+            "<blockquote>",
+            'class="language-python"',
+            "<table>",
+            "<th>列一</th>",
+            "<td>值 A</td>",
+            'href="https://example.com/link"',
+            ">链接文字<",
+        ):
+            assert needle in html, f"HTML 缺少 {needle!r}"
+
+    def test_html_keeps_chinese_text(self) -> None:
+        html = self.export_html()
+        for needle in ("一级标题", "正文有", "引用块", "未完成任务", "脚注内容"):
+            assert needle in html, f"HTML 丢失中文 {needle!r}"
+
+    def test_html_renders_footnote_definition_once(self) -> None:
+        # 脚注定义曾在定义位置内联输出一次，文末 section 又输出一次——
+        # 同一段内容出现两遍，且内联那份是脱离 <ol> 的裸 <li>。
+        html = self.export_html()
+        assert html.count('id="fn-1"') == 1, html[:3000]
+        section_at = html.find('<section class="footnotes">')
+        def_at = html.find('id="fn-1"')
+        assert section_at != -1 and def_at > section_at, html[:3000]
+
+    # ---------------------------------------------------------------- Word
+
+    def test_word_renders_a_real_table(self) -> None:
+        # 旧实现的 Word 导出是手写行级解析器，不认识表格——
+        # 表格整块降级成普通段落。
+        doc = self.export_docx()
+        assert "<w:tbl>" in doc, doc[:2000]
+        assert doc.count("<w:tr>") == 3, doc.count("<w:tr>")
+        assert "<w:tc>" in doc
+
+    def test_word_keeps_headings_and_code(self) -> None:
+        doc = self.export_docx()
+        assert "Heading1" in doc, doc[:2000]
+        assert "Heading2" in doc, doc[:2000]
+        assert "CodeBlock" in doc, doc[:2000]
+        assert "print(&quot;hello&quot;)" in doc, doc[:2000]
+
+    def test_word_keeps_chinese_text(self) -> None:
+        doc = self.export_docx()
+        for needle in ("一级标题", "正文有", "列表项 A", "值 A", "脚注内容"):
+            assert needle in doc, f"Word 丢失中文 {needle!r}"
+
+    # ----------------------------------------------------------------- PDF
+
+    def test_pdf_has_valid_header(self) -> None:
+        data = self.export_pdf()
+        assert data.startswith(b"%PDF"), data[:16]
+        assert b"%%EOF" in data[-2048:], "PDF 缺少结束标记"
+
+    def test_pdf_keeps_chinese_text(self) -> None:
+        # PDF 之前用单一 Helvetica 渲染，中文字形根本不存在——
+        # 整段中文在导出结果里直接消失。
+        text = pdf_extract.extract_text(self.export_pdf())
+        for needle in ("一级标题", "正文有", "引用块", "未完成任务", "脚注内容"):
+            assert needle in text, f"PDF 丢失中文 {needle!r}"
+
+    def test_pdf_keeps_latin_text(self) -> None:
+        text = pdf_extract.extract_text(self.export_pdf())
+        for needle in ("hello", "print", "python"):
+            assert needle in text, f"PDF 丢失拉丁文本 {needle!r}"
+
+    def test_pdf_uses_standard_codepoints(self) -> None:
+        # 字体里「一」和康熙部首「⼀」共用同一个字形。PDF 的
+        # ToUnicode 只能选一个，于是常见字被写成兼容码位——复制出来
+        # 就变成了「⼀」，搜索也匹配不上。
+        text = pdf_extract.extract_text(self.export_pdf())
+        assert "一级标题" in text, f"码位失真: {text[:400]!r}"
+        assert "⼀" not in text, f"出现了康熙部首兼容码位: {text[:400]!r}"
+
+    def test_pdf_embeds_only_used_glyphs(self) -> None:
+        # 不开字体子集化的话，一个 CJK 字体会让 PDF 膨胀到 20 MB 以上。
+        data = self.export_pdf()
+        assert len(data) < 2_000_000, f"PDF 体积异常: {len(data)} 字节"
 
 
 # ==================================================================== 主题

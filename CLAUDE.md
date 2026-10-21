@@ -449,7 +449,10 @@ MARKPURE_STARTUP_LOG=1 cargo run --release
 - `createEditor()` 必须设置 `contentType: 'markdown'`，否则表格等语法不渲染
 - `mt-core::Document` 内部存储 LF 行尾，读写时自动转换
 - 词数统计支持 CJK：每个 CJK 字符（U+2E80 以上）计为一个词
-- PDF 导出硬编码 macOS 字体路径（Helvetica），Windows 用 Arial，Linux 用 DejaVu/Liberation
+- PDF 导出的拉丁字体：macOS 用 Helvetica，Windows 用 Arial，Linux 用 DejaVu/Liberation
+- **PDF 导出必须支持中文**：拉丁字体不含 CJK 字形，用它渲染中文会得到空白。导出时按脚本把一行切成 CJK 段与拉丁段，CJK 段用平台 CJK 字体（macOS 优先 Arial Unicode）绘制，段间按实际步进宽度累加横坐标
+- **PDF 字体子集化已开启**（printpdf 的 `font_subsetting`）：只嵌入文档用到的字形，否则一个 PDF 会带上整个字体文件（Helvetica 就 4.8 MB，CJK 字体超过 20 MB）
+- **CJK 字体要过码位稳定性检查**：字体里「一」和康熙部首「⼀」共用一个字形，PDF 的 `ToUnicode` 只能选一个码位，选错就有 30% 的常用汉字复制出来变成兼容码位。加载前用 `pdf/font_file.rs` 的检查过滤掉不合格的候选
 - PNG 导出走「前端 DOM 快照 → base64 → Rust 写盘」路径，依赖编辑器实例存在；KaTeX/Mermaid/CM6 高亮/worskpace 图片自动通过 DOM 继承
 - 表格使用 `resizable: true`，需要 `.tableWrapper`、`.selectedCell`、`.column-resize-handle` CSS 样式配合
 - 拼写检查目前仅支持英文（内置词典 `dict_en.txt`），中日韩文本自动跳过

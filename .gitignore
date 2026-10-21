@@ -24,6 +24,9 @@ npm-debug.log*
 # 测试
 coverage/
 package-lock.json
+# Python 字节码缓存（scripts/lib/pdf_extract.py 等模块被导入时生成）
+__pycache__/
+*.pyc
 
 
 # graphify — 机器特定 & 可重新生成的文件

@@ -94,3 +94,26 @@ preview 服务（带 IPC 桥）→ 无头 Chrome。共用部分抽在 `lib/` 下
 这类扫描能一次性抓出「某个块级语法没有 markdown 钩子」「节点没
 有声明 `group`」「列表续行缩进被弄坏」等单条用例想不到的问题。
 
+---
+
+## 导出保真度
+
+`scripts/test_backend.py::TestExportFidelity` 端到端验证 HTML / Word /
+PDF 三种导出的**内容**保真度——不只是「文件生成了」。它抓出过的缺陷：
+
+| 缺陷 | 根因 |
+|------|------|
+| HTML 导出的图片 alt 全丢，alt 文本跑到图片外面 | 渲染管线**逐事件**调用 `push_html`，writer 状态被反复重置（必须成段渲染） |
+| HTML 导出的图片丢失 `{width=300}` 扩展语法 | pulldown-cmark 不认识自研语法，需渲染后正则还原 |
+| HTML 导出的脚注定义出现两遍 | 定义位置内联输出一次，文末 section 又输出一次 |
+| Word 导出的表格降级成段落 | `word.rs` 是手写行级解析器，不支持表格 |
+| **PDF 导出丢掉全部中文** | 拉丁字体（Helvetica）不含 CJK 字形，中文渲染成空白 |
+
+PDF 文本用 `scripts/lib/pdf_extract.py` 提取——PDF 里的文字是 CID 编码，
+必须靠字体自带的 `ToUnicode` CMap 才能还原成可读文本。这个提取器同时
+用来断言**码位正确**：CJK 字体里「一」和康熙部首「⼀」共用同一个字形，
+PDF 的 `ToUnicode` 只能选一个码位，选错就有 30% 的常用汉字复制出来变成
+兼容码位（`pdf/font_file.rs` 的稳定性检查会跳过这类字体）。
+
+细节见 [`backend/crates/export/AGENTS.md`](./backend/crates/export/AGENTS.md)。
+
