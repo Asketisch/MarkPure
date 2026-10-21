@@ -130,7 +130,7 @@ function randTable(rng: () => number): string {
   const lines = [`| ${head.join(' | ')} |`, `| ${sep.join(' | ')} |`]
   for (let r = 0; r < rows; r++) {
     const cells: string[] = []
-    for (let c = 0; c < cols; c++) cells.push(pick(rng, ['值', '', '长'.repeat(10), 'a|b', '**粗**']))
+    for (let c = 0; c < cols; c++) cells.push(pick(rng, ['值', '', '长'.repeat(10), 'a\\|b', '**粗**']))
     lines.push(`| ${cells.join(' | ')} |`)
   }
   return lines.join('\n')
@@ -166,19 +166,142 @@ function randFrontmatter(rng: () => number): string {
   return ['---', 'title: 标题', 'tags: [a, b]', '---'].join('\n')
 }
 
+// ---------------------------------------------------------------------------
+// 第二批构造：引用链接、嵌套强调、转义序列、列表里的代码块……
+// 这些在真实文档里常见，而解析器对它们的处理往往最脆弱。
+// ---------------------------------------------------------------------------
+
+/** 引用式链接 + 它的定义（定义与引用可以分开很远）。 */
+function randReferenceLink(rng: () => number): string {
+  const ref = pick(rng, ['ref', 'a', '文档', 'x-1'])
+  const url = pick(rng, [
+    'https://example.com/a',
+    'https://example.com/a(b)',
+    './local.md',
+    '#anchor',
+  ])
+  const text = pick(rng, ['引用文本', '带 [ 的文本', '带 ` 的文本'])
+  const useTitle = rng() < 0.3
+  return [
+    `见 [${text}][${ref}]${useTitle ? '（标题）' : ''}。`,
+    '',
+    `[${ref}]: ${url}`,
+  ].join('\n')
+}
+
+/** 嵌套强调：三层 `***`、下划线变体、强调里套行内代码。 */
+function randEmphasis(rng: () => number): string {
+  return pick(rng, [
+    '***粗斜体***',
+    '**粗体** 和 *斜体*',
+    '__粗体__ 和 _斜体_',
+    '**粗体里有 `代码`**',
+    '*斜体里有 [链接](https://example.com)*',
+    '**粗体**中混`行内代码`',
+  ])
+}
+
+/** 转义序列——反斜杠转义的 markdown 记号。 */
+function randEscapes(rng: () => number): string {
+  return pick(rng, [
+    '\\*不是斜体\\*',
+    '反引号 \\` 不是代码',
+    '方括号 \\[ 不是链接',
+    '反斜杠 \\\\ 结尾',
+    '井号 \\# 不是标题',
+    '下划线 \\_ 不是斜体',
+  ])
+}
+
+/** 列表项里嵌代码块 / 公式 / 表格。 */
+function randListWithCode(rng: () => number): string {
+  const body = pick(rng, [
+    '```js\nconst x = 1\n```',
+    '$$\nE = mc^2\n$$',
+    '| a | b |\n| --- | --- |\n| 1 | 2 |',
+    '> 引用里的内容',
+  ])
+  const indent = '  '
+  return ['- 列表项', '', indent + body.replace(/\n/g, '\n' + indent)].join('\n')
+}
+
+/** 多层嵌套引用。 */
+function randNestedQuote(rng: () => number): string {
+  const depth = int(rng, 1, 3)
+  const prefix = '> '.repeat(depth)
+  const inner = randText(rng) || '内容'
+  const lines = [`${prefix}${inner}`]
+  if (rng() < 0.4) lines.push('', `${prefix}> 更深一层`)
+  return lines.join('\n')
+}
+
+/** 表格单元格里带 `<br>`、行内代码、竖线。 */
+function randTableWithBreak(rng: () => number): string {
+  const cell = pick(rng, [
+    'a<br>b',
+    '带 `代码` 的格',
+    'a\\|b',   // 转义竖线——单元格里含竖线的正确写法
+    '**粗**',
+    '',
+  ])
+  return [
+    '| 表头一 | 表头二 |',
+    '| --- | --- |',
+    `| ${cell} | y |`,
+  ].join('\n')
+}
+
+/** 中英 emoji 混排 + 密集空行 + 超长行。 */
+function randMixedLang(rng: () => number): string {
+  const parts: string[] = []
+  const n = int(rng, 1, 4)
+  for (let i = 0; i < n; i++) {
+    parts.push(pick(rng, [
+      '中文段落。',
+      'English paragraph.',
+      '混合 mixed 文本。',
+      '带 emoji 🎉🚀 的行',
+      '超长行' + '啊'.repeat(int(rng, 20, 120)),
+      '',
+    ]))
+  }
+  return parts.join('\n')
+}
+
+/** 标题里带行内代码 / 强调 / 尾部空格。 */
+function randHeadingWithMarkup(rng: () => number): string {
+  const level = int(rng, 1, 6)
+  const text = pick(rng, [
+    '带 `代码` 的标题',
+    '带 **粗体** 的标题',
+    '带 [链接](https://example.com) 的标题',
+    '普通标题',
+  ])
+  return `${'#'.repeat(level)} ${text}${rng() < 0.2 ? '   ' : ''}`
+}
+
 function randBlock(rng: () => number): string {
   const r = rng()
-  if (r < 0.14) return randHeading(rng)
-  if (r < 0.30) return randParagraph(rng)
-  if (r < 0.44) return randList(rng)
-  if (r < 0.52) return randQuote(rng)
-  if (r < 0.62) return randCodeBlock(rng)
-  if (r < 0.72) return randTable(rng)
-  if (r < 0.78) return randImage(rng)
-  if (r < 0.84) return randHtml(rng)
-  if (r < 0.92) return randMath(rng)
-  if (r < 0.96) return '---'
-  return randFrontmatter(rng)
+  if (r < 0.11) return randHeading(rng)
+  if (r < 0.11 + 0.13) return randParagraph(rng)
+  if (r < 0.11 + 0.25) return randList(rng)
+  if (r < 0.11 + 0.32) return randQuote(rng)
+  if (r < 0.11 + 0.41) return randCodeBlock(rng)
+  if (r < 0.11 + 0.50) return randTable(rng)
+  if (r < 0.11 + 0.55) return randImage(rng)
+  if (r < 0.11 + 0.60) return randHtml(rng)
+  if (r < 0.11 + 0.67) return randMath(rng)
+  if (r < 0.11 + 0.70) return '---'
+  if (r < 0.11 + 0.75) return randFrontmatter(rng)
+  // 第二批构造
+  if (r < 0.80) return randReferenceLink(rng)
+  if (r < 0.84) return randEmphasis(rng)
+  if (r < 0.87) return randEscapes(rng)
+  if (r < 0.90) return randListWithCode(rng)
+  if (r < 0.92) return randNestedQuote(rng)
+  if (r < 0.94) return randTableWithBreak(rng)
+  if (r < 0.96) return randMixedLang(rng)
+  return randHeadingWithMarkup(rng)
 }
 
 /** 生成一份随机文档（frontmatter 只在最开头出现一次）。 */

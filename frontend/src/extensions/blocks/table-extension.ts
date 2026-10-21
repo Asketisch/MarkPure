@@ -98,12 +98,21 @@ function renderTableCompactToMarkdown(node: JSONContent, h: MarkdownRendererHelp
     }
   })
 
+  let out = '\n'
   const headerRow = rows[0]!
   const hasHeader = headerRow.some((c) => c.isHeader)
 
-  let out = '\n'
+  /**
+   * 单元格内容里的 `|` 必须转义。
+   *
+   * 解析时 `a\|b` 是一个单元格（内容 "a|b"），但序列化时不转义就会
+   * 输出 `| a|b |` ——再解析时那个 `|` 成了列分隔符，**表格凭空多出
+   * 一列**。用户表格里含竖线的内容（`a\|b`）保存后结构就被改写了。
+   */
+  const escapeCell = (s: string): string => s.replace(/\|/g, '\\|')
+
   const cellText = (r: RenderedCell[] | undefined, i: number): string =>
-    (r && r[i] && r[i]!.text) || ''
+    escapeCell((r && r[i] && r[i]!.text) || '')
   const headerTexts = new Array(columnCount)
     .fill(0)
     .map((_, i) => (hasHeader ? cellText(headerRow, i) : ''))
