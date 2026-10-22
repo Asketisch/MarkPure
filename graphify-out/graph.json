@@ -1329,7 +1329,7 @@
       "source_file": "package.json",
       "source_location": "L64",
       "id": "markpure_package_dependencies_lucide_svelte",
-      "community": 3,
+      "community": 7,
       "norm_label": "lucide-svelte"
     },
     {
@@ -1699,7 +1699,7 @@
       "source_file": "@tiptap/core",
       "confidence": "EXTRACTED",
       "id": "core",
-      "community": 1,
+      "community": 31,
       "norm_label": "@tiptap/core"
     },
     {
@@ -1818,7 +1818,7 @@
       "source_file": "frontend/src/app/main.ts",
       "source_location": "L1",
       "id": "frontend_src_app_main_ts",
-      "community": 31,
+      "community": 3,
       "norm_label": "main.ts"
     },
     {
@@ -1827,7 +1827,7 @@
       "source_file": "frontend/src/app/main.ts",
       "source_location": "L5",
       "id": "app_main_app",
-      "community": 31,
+      "community": 3,
       "norm_label": "app"
     },
     {
@@ -1908,7 +1908,7 @@
       "source_file": "frontend/src/app/exportActions.svelte.ts",
       "source_location": "L40",
       "id": "app_exportactions_svelte_exportactions",
-      "community": 48,
+      "community": 63,
       "norm_label": "exportactions"
     },
     {
@@ -2244,7 +2244,7 @@
       "source_file": "$lib/extensions/quick-insert-config",
       "confidence": "EXTRACTED",
       "id": "quick_insert_config",
-      "community": 3,
+      "community": 159,
       "norm_label": "$lib/extensions/quick-insert-config"
     },
     {
@@ -2343,7 +2343,7 @@
       "source_file": "frontend/src/app/handlers/editorCommands.ts",
       "source_location": "L1",
       "id": "frontend_src_app_handlers_editorcommands_ts",
-      "community": 48,
+      "community": 159,
       "norm_label": "editorcommands.ts"
     },
     {
@@ -2352,7 +2352,7 @@
       "source_file": "frontend/src/app/handlers/editorCommands.ts",
       "source_location": "L11",
       "id": "handlers_editorcommands_editorcommandsdeps",
-      "community": 48,
+      "community": 159,
       "norm_label": "editorcommandsdeps"
     },
     {
@@ -2370,7 +2370,7 @@
       "source_file": "frontend/src/app/handlers/editorCommands.ts",
       "source_location": "L198",
       "id": "handlers_editorcommands_editorcommands",
-      "community": 48,
+      "community": 63,
       "norm_label": "editorcommands"
     },
     {
@@ -2406,7 +2406,7 @@
       "source_file": "frontend/src/app/handlers/vimOps.ts",
       "source_location": "L141",
       "id": "handlers_vimops_vimops",
-      "community": 48,
+      "community": 63,
       "norm_label": "vimops"
     },
     {
@@ -2451,7 +2451,7 @@
       "source_file": "frontend/src/app/handlers/viewOps.ts",
       "source_location": "L150",
       "id": "handlers_viewops_viewops",
-      "community": 48,
+      "community": 63,
       "norm_label": "viewops"
     },
     {
@@ -2532,7 +2532,7 @@
       "source_file": "frontend/src/app/handlers/snippetOps.ts",
       "source_location": "L1",
       "id": "frontend_src_app_handlers_snippetops_ts",
-      "community": 48,
+      "community": 63,
       "norm_label": "snippetops.ts"
     },
     {
@@ -2550,7 +2550,7 @@
       "source_file": "frontend/src/app/handlers/snippetOps.ts",
       "source_location": "L54",
       "id": "handlers_snippetops_snippetops",
-      "community": 48,
+      "community": 63,
       "norm_label": "snippetops"
     },
     {
@@ -2649,7 +2649,7 @@
       "source_file": "frontend/src/app/handlers/workspaceOps.ts",
       "source_location": "L197",
       "id": "handlers_workspaceops_workspaceops",
-      "community": 48,
+      "community": 63,
       "norm_label": "workspaceops"
     },
     {
@@ -2658,7 +2658,7 @@
       "source_file": "frontend/src/app/handlers/configOps.ts",
       "source_location": "L1",
       "id": "frontend_src_app_handlers_configops_ts",
-      "community": 159,
+      "community": 48,
       "norm_label": "configops.ts"
     },
     {
@@ -2676,7 +2676,7 @@
       "source_file": "frontend/src/app/handlers/configOps.ts",
       "source_location": "L93",
       "id": "handlers_configops_configops",
-      "community": 159,
+      "community": 48,
       "norm_label": "configops"
     },
     {
@@ -2685,7 +2685,7 @@
       "source_file": "frontend/src/app/handlers/editorInit.ts",
       "source_location": "L1",
       "id": "frontend_src_app_handlers_editorinit_ts",
-      "community": 159,
+      "community": 48,
       "norm_label": "editorinit.ts"
     },
     {
@@ -2712,7 +2712,7 @@
       "source_file": "frontend/src/app/handlers/editorInit.ts",
       "source_location": "L258",
       "id": "handlers_editorinit_editorinit",
-      "community": 159,
+      "community": 48,
       "norm_label": "editorinit"
     },
     {
@@ -2775,7 +2775,7 @@
       "source_file": "frontend/src/app/handlers/fileOps.ts",
       "source_location": "L231",
       "id": "handlers_fileops_fileops",
-      "community": 48,
+      "community": 63,
       "norm_label": "fileops"
     },
     {
@@ -2820,7 +2820,7 @@
       "source_file": "frontend/src/app/handlers/tabOps.ts",
       "source_location": "L1",
       "id": "frontend_src_app_handlers_tabops_ts",
-      "community": 48,
+      "community": 63,
       "norm_label": "tabops.ts"
     },
     {
@@ -2829,7 +2829,7 @@
       "source_file": "frontend/src/app/handlers/tabOps.ts",
       "source_location": "L14",
       "id": "handlers_tabops_tabopsdeps",
-      "community": 48,
+      "community": 63,
       "norm_label": "tabopsdeps"
     },
     {
@@ -2847,7 +2847,7 @@
       "source_file": "frontend/src/app/handlers/tabOps.ts",
       "source_location": "L233",
       "id": "handlers_tabops_tabops",
-      "community": 48,
+      "community": 63,
       "norm_label": "tabops"
     },
     {
@@ -2856,7 +2856,7 @@
       "source_file": "frontend/src/app/handlers/saveOps.ts",
       "source_location": "L1",
       "id": "frontend_src_app_handlers_saveops_ts",
-      "community": 48,
+      "community": 63,
       "norm_label": "saveops.ts"
     },
     {
@@ -2865,7 +2865,7 @@
       "source_file": "frontend/src/app/handlers/saveOps.ts",
       "source_location": "L14",
       "id": "handlers_saveops_saveopsdeps",
-      "community": 48,
+      "community": 63,
       "norm_label": "saveopsdeps"
     },
     {
@@ -2883,7 +2883,7 @@
       "source_file": "frontend/src/app/handlers/saveOps.ts",
       "source_location": "L167",
       "id": "handlers_saveops_saveops",
-      "community": 48,
+      "community": 63,
       "norm_label": "saveops"
     },
     {
@@ -2964,7 +2964,7 @@
       "source_file": "frontend/src/app/handlers/fileWatch.ts",
       "source_location": "L1",
       "id": "frontend_src_app_handlers_filewatch_ts",
-      "community": 25,
+      "community": 48,
       "norm_label": "filewatch.ts"
     },
     {
@@ -2982,7 +2982,7 @@
       "source_file": "frontend/src/app/handlers/fileWatch.ts",
       "source_location": "L90",
       "id": "handlers_filewatch_normalizefilechangeevents",
-      "community": 25,
+      "community": 48,
       "norm_label": "normalizefilechangeevents()"
     },
     {
@@ -2991,7 +2991,7 @@
       "source_file": "frontend/src/app/handlers/fileWatch.ts",
       "source_location": "L104",
       "id": "handlers_filewatch_filewatch",
-      "community": 25,
+      "community": 48,
       "norm_label": "filewatch"
     },
     {
@@ -3000,7 +3000,7 @@
       "source_file": "frontend/src/app/handlers/bootstrap.ts",
       "source_location": "L1",
       "id": "frontend_src_app_handlers_bootstrap_ts",
-      "community": 159,
+      "community": 48,
       "norm_label": "bootstrap.ts"
     },
     {
@@ -3009,7 +3009,7 @@
       "source_file": "frontend/src/app/handlers/bootstrap.ts",
       "source_location": "L13",
       "id": "handlers_bootstrap_bootstrapdeps",
-      "community": 159,
+      "community": 48,
       "norm_label": "bootstrapdeps"
     },
     {
@@ -3027,7 +3027,7 @@
       "source_file": "frontend/src/app/handlers/bootstrap.ts",
       "source_location": "L128",
       "id": "handlers_bootstrap_bootstrap",
-      "community": 159,
+      "community": 48,
       "norm_label": "bootstrap"
     },
     {
@@ -3036,7 +3036,7 @@
       "source_file": "frontend/src/app/handlers/commandRun.ts",
       "source_location": "L1",
       "id": "frontend_src_app_handlers_commandrun_ts",
-      "community": 48,
+      "community": 63,
       "norm_label": "commandrun.ts"
     },
     {
@@ -3045,7 +3045,7 @@
       "source_file": "frontend/src/app/handlers/commandRun.ts",
       "source_location": "L22",
       "id": "handlers_commandrun_commandrundeps",
-      "community": 48,
+      "community": 63,
       "norm_label": "commandrundeps"
     },
     {
@@ -3063,7 +3063,7 @@
       "source_file": "frontend/src/app/handlers/commandRun.ts",
       "source_location": "L173",
       "id": "handlers_commandrun_commandrun",
-      "community": 48,
+      "community": 63,
       "norm_label": "commandrun"
     },
     {
@@ -5547,7 +5547,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L1",
       "id": "frontend_src_plugins_multi_cursor_state_ts",
-      "community": 14,
+      "community": 148,
       "norm_label": "state.ts"
     },
     {
@@ -5556,7 +5556,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L28",
       "id": "multi_cursor_state_emptystate",
-      "community": 14,
+      "community": 148,
       "norm_label": "emptystate()"
     },
     {
@@ -5565,7 +5565,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L38",
       "id": "multi_cursor_state_normalize",
-      "community": 14,
+      "community": 148,
       "norm_label": "normalize()"
     },
     {
@@ -5574,7 +5574,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L63",
       "id": "multi_cursor_state_addcursortolist",
-      "community": 14,
+      "community": 148,
       "norm_label": "addcursortolist()"
     },
     {
@@ -5583,7 +5583,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L76",
       "id": "multi_cursor_state_applyset",
-      "community": 14,
+      "community": 148,
       "norm_label": "applyset()"
     },
     {
@@ -5592,7 +5592,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L97",
       "id": "multi_cursor_state_applyclear",
-      "community": 14,
+      "community": 148,
       "norm_label": "applyclear()"
     },
     {
@@ -5601,7 +5601,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L106",
       "id": "multi_cursor_state_applyundolast",
-      "community": 14,
+      "community": 148,
       "norm_label": "applyundolast()"
     },
     {
@@ -5610,7 +5610,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/state.ts",
       "source_location": "L133",
       "id": "multi_cursor_state_applymulticursormeta",
-      "community": 14,
+      "community": 148,
       "norm_label": "applymulticursormeta()"
     },
     {
@@ -5979,7 +5979,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/decorations.ts",
       "source_location": "L39",
       "id": "multi_cursor_decorations_buildcursordecorations",
-      "community": 14,
+      "community": 148,
       "norm_label": "buildcursordecorations()"
     },
     {
@@ -6033,7 +6033,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/types.ts",
       "source_location": "L1",
       "id": "frontend_src_plugins_multi_cursor_types_ts",
-      "community": 22,
+      "community": 148,
       "norm_label": "types.ts"
     },
     {
@@ -6042,7 +6042,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/types.ts",
       "source_location": "L24",
       "id": "multi_cursor_types_cursor",
-      "community": 22,
+      "community": 148,
       "norm_label": "cursor"
     },
     {
@@ -6051,7 +6051,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/types.ts",
       "source_location": "L35",
       "id": "multi_cursor_types_multicursorstate",
-      "community": 22,
+      "community": 148,
       "norm_label": "multicursorstate"
     },
     {
@@ -6060,7 +6060,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/types.ts",
       "source_location": "L50",
       "id": "multi_cursor_types_multicursormeta",
-      "community": 22,
+      "community": 148,
       "norm_label": "multicursormeta"
     },
     {
@@ -6069,7 +6069,7 @@
       "source_file": "frontend/src/plugins/multi-cursor/types.ts",
       "source_location": "L67",
       "id": "multi_cursor_types_multicursorpluginkey",
-      "community": 22,
+      "community": 148,
       "norm_label": "multicursorpluginkey"
     },
     {
@@ -6170,7 +6170,7 @@
       "source_location": "L1",
       "confidence": "EXTRACTED",
       "id": "frontend_src_features_settings_generalsection_svelte",
-      "community": 31,
+      "community": 120,
       "norm_label": "./generalsection.svelte"
     },
     {
@@ -6380,7 +6380,7 @@
       "source_file": "frontend/src/features/settings/themes.ts",
       "source_location": "L41",
       "id": "settings_themes_getthemelabel",
-      "community": 57,
+      "community": 305,
       "norm_label": "getthemelabel()"
     },
     {
@@ -6425,7 +6425,7 @@
       "source_file": "frontend/src/features/quick-insert/QuickInsertPopup.svelte",
       "source_location": "L1",
       "id": "frontend_src_features_quick_insert_quickinsertpopup_svelte",
-      "community": 3,
+      "community": 159,
       "norm_label": "quickinsertpopup.svelte"
     },
     {
@@ -6434,7 +6434,7 @@
       "source_file": "frontend/src/features/quick-insert/QuickInsertPopup.svelte",
       "source_location": "L69",
       "id": "quick_insert_quickinsertpopup_el",
-      "community": 3,
+      "community": 159,
       "norm_label": "el"
     },
     {
@@ -6857,7 +6857,7 @@
       "source_file": "frontend/src/stores/i18n.svelte.ts",
       "source_location": "L40",
       "id": "stores_i18n_svelte_i18n_t",
-      "community": 57,
+      "community": 305,
       "norm_label": ".t()"
     },
     {
@@ -6920,7 +6920,7 @@
       "source_file": "frontend/src/extensions/blocks/drop-handler-extension.ts",
       "source_location": "L1",
       "id": "frontend_src_extensions_blocks_drop_handler_extension_ts",
-      "community": 91,
+      "community": 1,
       "norm_label": "drop-handler-extension.ts"
     },
     {
@@ -6929,7 +6929,7 @@
       "source_file": "frontend/src/extensions/blocks/drop-handler-extension.ts",
       "source_location": "L4",
       "id": "blocks_drop_handler_extension_drophandlerpluginkey",
-      "community": 91,
+      "community": 1,
       "norm_label": "drophandlerpluginkey"
     },
     {
@@ -6938,7 +6938,7 @@
       "source_file": "frontend/src/extensions/blocks/drop-handler-extension.ts",
       "source_location": "L9",
       "id": "blocks_drop_handler_extension_hasfiledata",
-      "community": 91,
+      "community": 1,
       "norm_label": "hasfiledata()"
     },
     {
@@ -6947,7 +6947,7 @@
       "source_file": "frontend/src/extensions/blocks/drop-handler-extension.ts",
       "source_location": "L23",
       "id": "blocks_drop_handler_extension_hasimagedata",
-      "community": 91,
+      "community": 1,
       "norm_label": "hasimagedata()"
     },
     {
@@ -6956,7 +6956,7 @@
       "source_file": "frontend/src/extensions/blocks/drop-handler-extension.ts",
       "source_location": "L37",
       "id": "blocks_drop_handler_extension_filetobase64",
-      "community": 91,
+      "community": 1,
       "norm_label": "filetobase64()"
     },
     {
@@ -6965,7 +6965,7 @@
       "source_file": "frontend/src/extensions/blocks/drop-handler-extension.ts",
       "source_location": "L46",
       "id": "blocks_drop_handler_extension_drophandleroptions",
-      "community": 91,
+      "community": 1,
       "norm_label": "drophandleroptions"
     },
     {
@@ -6974,7 +6974,7 @@
       "source_file": "frontend/src/extensions/blocks/drop-handler-extension.ts",
       "source_location": "L57",
       "id": "blocks_drop_handler_extension_drophandlerextension",
-      "community": 91,
+      "community": 1,
       "norm_label": "drophandlerextension"
     },
     {
@@ -7154,7 +7154,7 @@
       "source_file": "frontend/src/extensions/blocks/frontmatter-extension.ts",
       "source_location": "L1",
       "id": "frontend_src_extensions_blocks_frontmatter_extension_ts",
-      "community": 1,
+      "community": 54,
       "norm_label": "frontmatter-extension.ts"
     },
     {
@@ -7163,7 +7163,7 @@
       "source_file": "frontend/src/extensions/blocks/frontmatter-extension.ts",
       "source_location": "L31",
       "id": "blocks_frontmatter_extension_frontmatterextension",
-      "community": 1,
+      "community": 54,
       "norm_label": "frontmatterextension"
     },
     {
@@ -7172,7 +7172,7 @@
       "source_file": "frontend/src/extensions/blocks/toc-extension.ts",
       "source_location": "L1",
       "id": "frontend_src_extensions_blocks_toc_extension_ts",
-      "community": 1,
+      "community": 39,
       "norm_label": "toc-extension.ts"
     },
     {
@@ -7181,7 +7181,7 @@
       "source_file": "frontend/src/extensions/blocks/toc-extension.ts",
       "source_location": "L20",
       "id": "blocks_toc_extension_tocextension",
-      "community": 1,
+      "community": 39,
       "norm_label": "tocextension"
     },
     {
@@ -7316,7 +7316,7 @@
       "source_file": "frontend/src/extensions/blocks/code-block-cm-extension.ts",
       "source_location": "L1",
       "id": "frontend_src_extensions_blocks_code_block_cm_extension_ts",
-      "community": 1,
+      "community": 137,
       "norm_label": "code-block-cm-extension.ts"
     },
     {
@@ -7325,7 +7325,7 @@
       "source_file": "frontend/src/extensions/blocks/code-block-cm-extension.ts",
       "source_location": "L4",
       "id": "blocks_code_block_cm_extension_codeblockcmextension",
-      "community": 1,
+      "community": 137,
       "norm_label": "codeblockcmextension"
     },
     {
@@ -7379,7 +7379,7 @@
       "source_file": "frontend/src/extensions/blocks/image-extension.ts",
       "source_location": "L1",
       "id": "frontend_src_extensions_blocks_image_extension_ts",
-      "community": 148,
+      "community": 137,
       "norm_label": "image-extension.ts"
     },
     {
@@ -7388,7 +7388,7 @@
       "source_file": "frontend/src/extensions/blocks/image-extension.ts",
       "source_location": "L28",
       "id": "blocks_image_extension_imagefigureview",
-      "community": 148,
+      "community": 91,
       "norm_label": "imagefigureview"
     },
     {
@@ -7397,7 +7397,7 @@
       "source_file": "frontend/src/extensions/blocks/image-extension.ts",
       "source_location": "L34",
       "id": "blocks_image_extension_imagefigureview_constructor",
-      "community": 148,
+      "community": 91,
       "norm_label": ".constructor()"
     },
     {
@@ -7406,7 +7406,7 @@
       "source_file": "frontend/src/extensions/blocks/image-extension.ts",
       "source_location": "L94",
       "id": "blocks_image_extension_imagefigureview_startresize",
-      "community": 148,
+      "community": 91,
       "norm_label": ".startresize()"
     },
     {
@@ -7415,7 +7415,7 @@
       "source_file": "frontend/src/extensions/blocks/image-extension.ts",
       "source_location": "L126",
       "id": "blocks_image_extension_imagefigureview_update",
-      "community": 148,
+      "community": 91,
       "norm_label": ".update()"
     },
     {
@@ -7424,7 +7424,7 @@
       "source_file": "frontend/src/extensions/blocks/image-extension.ts",
       "source_location": "L142",
       "id": "blocks_image_extension_imagefigureview_destroy",
-      "community": 148,
+      "community": 91,
       "norm_label": ".destroy()"
     },
     {
@@ -7433,7 +7433,7 @@
       "source_file": "frontend/src/extensions/blocks/image-extension.ts",
       "source_location": "L147",
       "id": "blocks_image_extension_imagewithalign",
-      "community": 148,
+      "community": 137,
       "norm_label": "imagewithalign"
     },
     {
@@ -7532,7 +7532,7 @@
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L1",
       "id": "frontend_src_extensions_editing_auto_close_extension_ts",
-      "community": 160,
+      "community": 1,
       "norm_label": "auto-close-extension.ts"
     },
     {
@@ -7541,7 +7541,7 @@
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L4",
       "id": "editing_auto_close_extension_autoclosepair",
-      "community": 160,
+      "community": 1,
       "norm_label": "autoclosepair"
     },
     {
@@ -7550,7 +7550,7 @@
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L16",
       "id": "editing_auto_close_extension_pairs",
-      "community": 160,
+      "community": 1,
       "norm_label": "pairs"
     },
     {
@@ -7559,7 +7559,7 @@
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L35",
       "id": "editing_auto_close_extension_isinsidecode",
-      "community": 160,
+      "community": 1,
       "norm_label": "isinsidecode()"
     },
     {
@@ -7568,7 +7568,7 @@
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L50",
       "id": "editing_auto_close_extension_isclosingchar",
-      "community": 160,
+      "community": 1,
       "norm_label": "isclosingchar()"
     },
     {
@@ -7577,7 +7577,7 @@
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L59",
       "id": "editing_auto_close_extension_matchopenforclose",
-      "community": 160,
+      "community": 1,
       "norm_label": "matchopenforclose()"
     },
     {
@@ -7586,7 +7586,7 @@
       "source_file": "frontend/src/extensions/editing/auto-close-extension.ts",
       "source_location": "L77",
       "id": "editing_auto_close_extension_autocloseextension",
-      "community": 160,
+      "community": 1,
       "norm_label": "autocloseextension"
     },
     {
@@ -7883,7 +7883,7 @@
       "source_file": "frontend/src/extensions/view/instant-render-extension.ts",
       "source_location": "L1",
       "id": "frontend_src_extensions_view_instant_render_extension_ts",
-      "community": 1,
+      "community": 34,
       "norm_label": "instant-render-extension.ts"
     },
     {
@@ -7892,7 +7892,7 @@
       "source_file": "frontend/src/extensions/view/instant-render-extension.ts",
       "source_location": "L4",
       "id": "view_instant_render_extension_instantrenderextension",
-      "community": 1,
+      "community": 34,
       "norm_label": "instantrenderextension"
     },
     {
@@ -8345,7 +8345,7 @@
       "source_location": "L1",
       "confidence": "EXTRACTED",
       "id": "frontend_src_components_workspace_outline_svelte",
-      "community": 1,
+      "community": 31,
       "norm_label": "./outline.svelte"
     },
     {
@@ -8354,7 +8354,7 @@
       "source_file": "frontend/src/components/workspace/Outline.svelte",
       "source_location": "L70",
       "id": "workspace_outline_if",
-      "community": 1,
+      "community": 31,
       "norm_label": "if()"
     },
     {
@@ -8363,7 +8363,7 @@
       "source_file": "$lib/editor/outline-extract",
       "confidence": "EXTRACTED",
       "id": "outline_extract",
-      "community": 1,
+      "community": 31,
       "norm_label": "$lib/editor/outline-extract"
     },
     {
@@ -8454,7 +8454,7 @@
       "source_file": "frontend/src/components/workspace/OutlinePanel.svelte",
       "source_location": "L1",
       "id": "frontend_src_components_workspace_outlinepanel_svelte",
-      "community": 1,
+      "community": 31,
       "norm_label": "outlinepanel.svelte"
     },
     {
@@ -8706,7 +8706,7 @@
       "source_file": "@codemirror/view",
       "confidence": "EXTRACTED",
       "id": "view",
-      "community": 148,
+      "community": 0,
       "norm_label": "@codemirror/view"
     },
     {
@@ -8715,7 +8715,7 @@
       "source_file": "@codemirror/state",
       "confidence": "EXTRACTED",
       "id": "state",
-      "community": 22,
+      "community": 1,
       "norm_label": "@codemirror/state"
     },
     {
@@ -10443,7 +10443,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L1",
       "id": "frontend_src_nodeviews_mermaid_view_ts",
-      "community": 63,
+      "community": 0,
       "norm_label": "mermaid-view.ts"
     },
     {
@@ -10452,7 +10452,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L17",
       "id": "nodeviews_mermaid_view_escapehtml",
-      "community": 63,
+      "community": 0,
       "norm_label": "escapehtml()"
     },
     {
@@ -10461,7 +10461,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L25",
       "id": "nodeviews_mermaid_view_getmermaid",
-      "community": 63,
+      "community": 0,
       "norm_label": "getmermaid()"
     },
     {
@@ -10470,7 +10470,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L45",
       "id": "nodeviews_mermaid_view_mermaidnodeview",
-      "community": 63,
+      "community": 0,
       "norm_label": "mermaidnodeview"
     },
     {
@@ -10479,7 +10479,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L52",
       "id": "nodeviews_mermaid_view_mermaidnodeview_constructor",
-      "community": 63,
+      "community": 0,
       "norm_label": ".constructor()"
     },
     {
@@ -10488,7 +10488,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L59",
       "id": "nodeviews_mermaid_view_mermaidnodeview_update",
-      "community": 63,
+      "community": 0,
       "norm_label": ".update()"
     },
     {
@@ -10497,7 +10497,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L68",
       "id": "nodeviews_mermaid_view_mermaidnodeview_selectnode",
-      "community": 63,
+      "community": 0,
       "norm_label": ".selectnode()"
     },
     {
@@ -10506,7 +10506,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L69",
       "id": "nodeviews_mermaid_view_mermaidnodeview_deselectnode",
-      "community": 63,
+      "community": 0,
       "norm_label": ".deselectnode()"
     },
     {
@@ -10515,7 +10515,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L71",
       "id": "nodeviews_mermaid_view_mermaidnodeview_destroy",
-      "community": 63,
+      "community": 0,
       "norm_label": ".destroy()"
     },
     {
@@ -10524,7 +10524,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L73",
       "id": "nodeviews_mermaid_view_mermaidnodeview_render",
-      "community": 63,
+      "community": 0,
       "norm_label": ".render()"
     },
     {
@@ -10533,7 +10533,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L82",
       "id": "nodeviews_mermaid_view_mermaidnodeview_fetchandpaint",
-      "community": 63,
+      "community": 0,
       "norm_label": ".fetchandpaint()"
     },
     {
@@ -10542,7 +10542,7 @@
       "source_file": "frontend/src/nodeviews/mermaid-view.ts",
       "source_location": "L144",
       "id": "nodeviews_mermaid_view_mermaidextension",
-      "community": 63,
+      "community": 0,
       "norm_label": "mermaidextension"
     },
     {
@@ -14448,7 +14448,7 @@
       "source_file": "backend/crates/core-lib/src/atomic.rs",
       "source_location": "L1",
       "id": "backend_crates_core_lib_src_atomic_rs",
-      "community": 84,
+      "community": 118,
       "norm_label": "atomic.rs"
     },
     {
@@ -14457,7 +14457,7 @@
       "source_file": "backend/crates/core-lib/src/atomic.rs",
       "source_location": "L14",
       "id": "src_atomic_atomic_write",
-      "community": 84,
+      "community": 118,
       "norm_label": "atomic_write()"
     },
     {
@@ -14466,7 +14466,7 @@
       "source_file": "backend/crates/core-lib/src/atomic.rs",
       "source_location": "L35",
       "id": "src_atomic_atomic_write_replaces_existing_and_leaves_no_tmp",
-      "community": 84,
+      "community": 118,
       "norm_label": "atomic_write_replaces_existing_and_leaves_no_tmp()"
     },
     {
@@ -18984,7 +18984,7 @@
       "source_file": "scripts/test_backend.py",
       "source_location": "L65",
       "id": "scripts_test_backend_harness_init",
-      "community": 84,
+      "community": 118,
       "norm_label": ".__init__()"
     },
     {
@@ -18993,7 +18993,7 @@
       "source_file": "scripts/test_backend.py",
       "source_location": "L65",
       "id": "scripts_test_backend_py_path",
-      "community": 84,
+      "community": 118,
       "norm_label": "path"
     },
     {
@@ -19119,7 +19119,7 @@
       "source_file": "scripts/test_backend.py",
       "source_location": "L218",
       "id": "scripts_test_backend_backendtestcase_setup",
-      "community": 84,
+      "community": 118,
       "norm_label": ".setup()"
     },
     {
@@ -20172,7 +20172,7 @@
       "source_file": "scripts/test_backend.py",
       "source_location": "L1254",
       "id": "scripts_test_backend_testkeybindings",
-      "community": 85,
+      "community": 112,
       "norm_label": "testkeybindings"
     },
     {
@@ -20181,7 +20181,7 @@
       "source_file": "scripts/test_backend.py",
       "source_location": "L1255",
       "id": "scripts_test_backend_testkeybindings_test_defaults_present",
-      "community": 85,
+      "community": 112,
       "norm_label": ".test_defaults_present()"
     },
     {
@@ -20190,7 +20190,7 @@
       "source_file": "scripts/test_backend.py",
       "source_location": "L1262",
       "id": "scripts_test_backend_testkeybindings_test_update_and_reset",
-      "community": 85,
+      "community": 112,
       "norm_label": ".test_update_and_reset()"
     },
     {
@@ -20199,7 +20199,7 @@
       "source_file": "scripts/test_backend.py",
       "source_location": "L1276",
       "id": "scripts_test_backend_testkeybindings_test_set_keybindings_replaces_all",
-      "community": 85,
+      "community": 112,
       "norm_label": ".test_set_keybindings_replaces_all()"
     },
     {
@@ -20550,7 +20550,7 @@
       "source_file": "scripts/test_backend.py",
       "source_location": "L1574",
       "id": "scripts_test_backend_testassets_test_save_pasted_image",
-      "community": 84,
+      "community": 118,
       "norm_label": ".test_save_pasted_image()"
     },
     {
@@ -22047,7 +22047,7 @@
       "source_file": "scripts/validate-markdown-normalize.ts",
       "source_location": "L1",
       "id": "scripts_validate_markdown_normalize_ts",
-      "community": 128,
+      "community": 154,
       "norm_label": "validate-markdown-normalize.ts"
     },
     {
@@ -22056,7 +22056,7 @@
       "source_file": "scripts/validate-markdown-normalize.ts",
       "source_location": "L21",
       "id": "scripts_validate_markdown_normalize_exts",
-      "community": 128,
+      "community": 154,
       "norm_label": "exts"
     },
     {
@@ -22065,7 +22065,7 @@
       "source_file": "scripts/validate-markdown-normalize.ts",
       "source_location": "L36",
       "id": "scripts_validate_markdown_normalize_manager",
-      "community": 128,
+      "community": 154,
       "norm_label": "manager()"
     },
     {
@@ -22074,7 +22074,7 @@
       "source_file": "scripts/validate-markdown-normalize.ts",
       "source_location": "L48",
       "id": "scripts_validate_markdown_normalize_firstiteminline",
-      "community": 128,
+      "community": 154,
       "norm_label": "firstiteminline()"
     },
     {
@@ -22083,7 +22083,7 @@
       "source_file": "scripts/validate-markdown-normalize.ts",
       "source_location": "L57",
       "id": "scripts_validate_markdown_normalize_before",
-      "community": 128,
+      "community": 154,
       "norm_label": "before"
     },
     {
@@ -22092,7 +22092,7 @@
       "source_file": "scripts/validate-markdown-normalize.ts",
       "source_location": "L58",
       "id": "scripts_validate_markdown_normalize_after",
-      "community": 128,
+      "community": 154,
       "norm_label": "after"
     },
     {
@@ -22101,7 +22101,7 @@
       "source_file": "scripts/validate-markdown-normalize.ts",
       "source_location": "L89",
       "id": "scripts_validate_markdown_normalize_md",
-      "community": 128,
+      "community": 154,
       "norm_label": "md"
     },
     {
@@ -23359,7 +23359,7 @@
       "label": "_osascript()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L110",
+      "source_location": "L129",
       "id": "scripts_app_drive_osascript",
       "community": 43,
       "norm_label": "_osascript()"
@@ -23368,7 +23368,7 @@
       "label": "str",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L110",
+      "source_location": "L129",
       "id": "scripts_app_drive_py_str",
       "community": 43,
       "norm_label": "str"
@@ -23377,7 +23377,7 @@
       "label": "_key_script()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L127",
+      "source_location": "L146",
       "id": "scripts_app_drive_key_script",
       "community": 43,
       "norm_label": "_key_script()"
@@ -23386,7 +23386,7 @@
       "label": "ensure_workspace()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L173",
+      "source_location": "L192",
       "id": "scripts_app_drive_ensure_workspace",
       "community": 43,
       "norm_label": "ensure_workspace()"
@@ -23395,7 +23395,7 @@
       "label": "Path",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L173",
+      "source_location": "L192",
       "id": "scripts_app_drive_py_path",
       "community": 43,
       "norm_label": "path"
@@ -23404,7 +23404,7 @@
       "label": "launch()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L219",
+      "source_location": "L238",
       "id": "scripts_app_drive_launch",
       "community": 43,
       "norm_label": "launch()"
@@ -23413,34 +23413,34 @@
       "label": "activate()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L237",
+      "source_location": "L256",
       "id": "scripts_app_drive_activate",
       "community": 43,
       "norm_label": "activate()"
     },
     {
-      "label": "shot()",
-      "file_type": "code",
-      "source_file": "scripts/app_drive.py",
-      "source_location": "L245",
-      "id": "scripts_app_drive_shot",
-      "community": 43,
-      "norm_label": "shot()"
-    },
-    {
       "label": "bool",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L245",
+      "source_location": "L256",
       "id": "bool",
       "community": 43,
       "norm_label": "bool"
     },
     {
+      "label": "shot()",
+      "file_type": "code",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L268",
+      "id": "scripts_app_drive_shot",
+      "community": 43,
+      "norm_label": "shot()"
+    },
+    {
       "label": "click()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L265",
+      "source_location": "L288",
       "id": "scripts_app_drive_click",
       "community": 43,
       "norm_label": "click()"
@@ -23449,16 +23449,25 @@
       "label": "int",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L265",
+      "source_location": "L288",
       "id": "scripts_app_drive_py_int",
       "community": 43,
       "norm_label": "int"
     },
     {
+      "label": "rightclick()",
+      "file_type": "code",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L313",
+      "id": "scripts_app_drive_rightclick",
+      "community": 43,
+      "norm_label": "rightclick()"
+    },
+    {
       "label": "scroll()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L290",
+      "source_location": "L330",
       "id": "scripts_app_drive_scroll",
       "community": 43,
       "norm_label": "scroll()"
@@ -23467,7 +23476,7 @@
       "label": "key()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L299",
+      "source_location": "L339",
       "id": "scripts_app_drive_key",
       "community": 43,
       "norm_label": "key()"
@@ -23476,7 +23485,7 @@
       "label": "text()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L308",
+      "source_location": "L348",
       "id": "scripts_app_drive_text",
       "community": 43,
       "norm_label": "text()"
@@ -23485,7 +23494,7 @@
       "label": "window_origin()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L320",
+      "source_location": "L360",
       "id": "scripts_app_drive_window_origin",
       "community": 43,
       "norm_label": "window_origin()"
@@ -23494,7 +23503,7 @@
       "label": "click_window()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L331",
+      "source_location": "L371",
       "id": "scripts_app_drive_click_window",
       "community": 43,
       "norm_label": "click_window()"
@@ -23503,7 +23512,7 @@
       "label": "probe()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L345",
+      "source_location": "L385",
       "id": "scripts_app_drive_probe",
       "community": 43,
       "norm_label": "probe()"
@@ -23512,7 +23521,7 @@
       "label": "export()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L367",
+      "source_location": "L407",
       "id": "scripts_app_drive_export",
       "community": 43,
       "norm_label": "export()"
@@ -23521,7 +23530,7 @@
       "label": "command()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L385",
+      "source_location": "L425",
       "id": "scripts_app_drive_command",
       "community": 43,
       "norm_label": "command()"
@@ -23530,7 +23539,7 @@
       "label": "main()",
       "file_type": "code",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L401",
+      "source_location": "L441",
       "id": "scripts_app_drive_main",
       "community": 43,
       "norm_label": "main()"
@@ -23548,8 +23557,8 @@
       "label": "\u6267\u884c AppleScript\uff08\u9ed8\u8ba4\uff09\u6216 JXA\uff08`lang=\"JavaScript\"`\uff09\u3002      \u6ce8\u610f `osascript -e` **\u9ed8\u8ba4\u6309 Apple",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L111",
-      "id": "scripts_app_drive_rationale_111",
+      "source_location": "L130",
+      "id": "scripts_app_drive_rationale_130",
       "community": 43,
       "norm_label": "\u6267\u884c applescript(\u9ed8\u8ba4)\u6216 jxa(`lang=\"javascript\"`)\u3002      \u6ce8\u610f `osascript -e` **\u9ed8\u8ba4\u6309 apple"
     },
@@ -23557,8 +23566,8 @@
       "label": "\u628a `cmd+shift+p` \u8fd9\u6837\u7684\u7ec4\u5408\u952e\u8f6c\u6210 AppleScript `keystroke` \u7247\u6bb5\u3002",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L128",
-      "id": "scripts_app_drive_rationale_128",
+      "source_location": "L147",
+      "id": "scripts_app_drive_rationale_147",
       "community": 43,
       "norm_label": "\u628a `cmd+shift+p` \u8fd9\u6837\u7684\u7ec4\u5408\u952e\u8f6c\u6210 applescript `keystroke` \u7247\u6bb5\u3002"
     },
@@ -23566,17 +23575,26 @@
       "label": "\u542f\u52a8\u771f\u5b9e\u5e94\u7528\uff08\u540e\u53f0\uff09\uff0c\u4f7f\u7528\u9694\u79bb\u7684\u914d\u7f6e\u76ee\u5f55\u3002",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L220",
-      "id": "scripts_app_drive_rationale_220",
+      "source_location": "L239",
+      "id": "scripts_app_drive_rationale_239",
       "community": 43,
       "norm_label": "\u542f\u52a8\u771f\u5b9e\u5e94\u7528(\u540e\u53f0),\u4f7f\u7528\u9694\u79bb\u7684\u914d\u7f6e\u76ee\u5f55\u3002"
+    },
+    {
+      "label": "\u628a\u5e94\u7528\u5207\u5230\u524d\u53f0\u3002\u5e94\u7528\u6ca1\u5728\u8fd0\u884c\u65f6\u8fd4\u56de False\uff08\u4e0d\u629b\u5f02\u5e38\uff09\u3002",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L257",
+      "id": "scripts_app_drive_rationale_257",
+      "community": 43,
+      "norm_label": "\u628a\u5e94\u7528\u5207\u5230\u524d\u53f0\u3002\u5e94\u7528\u6ca1\u5728\u8fd0\u884c\u65f6\u8fd4\u56de false(\u4e0d\u629b\u5f02\u5e38)\u3002"
     },
     {
       "label": "\u622a\u56fe\uff08\u6574\u4e2a\u4e3b\u5c4f\uff09\u3002      \u9ed8\u8ba4**\u4e0d**\u5207\u524d\u53f0\u2014\u2014\u5e94\u7528\u7684\u81ea\u7ed8\u83dc\u5355\uff08\u4e0b\u62c9\u3001\u5f39\u51fa\u5c42\uff09\u4f1a\u56e0\u5931\u7126\u800c     \u5173\u95ed\uff0c\u5207\u524d\u53f0\u5c31\u62cd\u4e0d\u5230\u4e86\u3002\u9700\u8981\u300c\u786e\u4fdd\u62cd\u5230\u5e94\u7528\u672c\u8eab\u300d\u65f6\u7528",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L246",
-      "id": "scripts_app_drive_rationale_246",
+      "source_location": "L269",
+      "id": "scripts_app_drive_rationale_269",
       "community": 43,
       "norm_label": "\u622a\u56fe(\u6574\u4e2a\u4e3b\u5c4f)\u3002      \u9ed8\u8ba4**\u4e0d**\u5207\u524d\u53f0\u2014\u2014\u5e94\u7528\u7684\u81ea\u7ed8\u83dc\u5355(\u4e0b\u62c9\u3001\u5f39\u51fa\u5c42)\u4f1a\u56e0\u5931\u7126\u800c     \u5173\u95ed,\u5207\u524d\u53f0\u5c31\u62cd\u4e0d\u5230\u4e86\u3002\u9700\u8981\u300c\u786e\u4fdd\u62cd\u5230\u5e94\u7528\u672c\u8eab\u300d\u65f6\u7528"
     },
@@ -23584,8 +23602,8 @@
       "label": "\u5728\u5c4f\u5e55\u5750\u6807 (x, y) \u5904\u70b9\u51fb\u3002\u5148\u628a\u5e94\u7528\u7f6e\u524d\u53f0\u2014\u2014\u5426\u5219\u70b9\u51fb\u4f1a\u843d\u5230     \u906e\u6321\u5728\u4e0a\u9762\u7684\u5176\u4ed6\u7a97\u53e3\u4e0a\uff08\u771f\u5b9e\u684c\u9762\u6d4b\u8bd5\u91cc\u5f88\u5e38\u89c1\uff09\u3002      `displayed=T",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L266",
-      "id": "scripts_app_drive_rationale_266",
+      "source_location": "L289",
+      "id": "scripts_app_drive_rationale_289",
       "community": 43,
       "norm_label": "\u5728\u5c4f\u5e55\u5750\u6807 (x, y) \u5904\u70b9\u51fb\u3002\u5148\u628a\u5e94\u7528\u7f6e\u524d\u53f0\u2014\u2014\u5426\u5219\u70b9\u51fb\u4f1a\u843d\u5230     \u906e\u6321\u5728\u4e0a\u9762\u7684\u5176\u4ed6\u7a97\u53e3\u4e0a(\u771f\u5b9e\u684c\u9762\u6d4b\u8bd5\u91cc\u5f88\u5e38\u89c1)\u3002      `displayed=t"
     },
@@ -23593,8 +23611,8 @@
       "label": "\u5728 (x, y) \u5904\u6eda\u8f6e\u3002direction=-1 \u5411\u4e0b\u3002",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L291",
-      "id": "scripts_app_drive_rationale_291",
+      "source_location": "L331",
+      "id": "scripts_app_drive_rationale_331",
       "community": 43,
       "norm_label": "\u5728 (x, y) \u5904\u6eda\u8f6e\u3002direction=-1 \u5411\u4e0b\u3002"
     },
@@ -23602,8 +23620,8 @@
       "label": "\u6309\u952e\uff0c\u5982 `cmd+p`\u3001`escape`\u3001`f5`\u3002",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L300",
-      "id": "scripts_app_drive_rationale_300",
+      "source_location": "L340",
+      "id": "scripts_app_drive_rationale_340",
       "community": 43,
       "norm_label": "\u6309\u952e,\u5982 `cmd+p`\u3001`escape`\u3001`f5`\u3002"
     },
@@ -23611,8 +23629,8 @@
       "label": "\u4ee5**\u5e94\u7528\u7a97\u53e3\u5de6\u4e0a\u89d2**\u4e3a\u539f\u70b9\u70b9\u51fb\uff08\u5750\u6807\u53d6\u81ea\u7a97\u53e3\u622a\u56fe\uff09\u3002      \u7a97\u53e3\u4f4d\u7f6e\u4f1a\u53d8\uff08\u7528\u6237\u62d6\u52a8\u3001\u5176\u4ed6\u5e94\u7528\u62a2\u7126\u70b9\uff09\uff0c\u56e0\u6b64\u76f8\u5bf9\u5750\u6807\u6bd4\u7edd\u5bf9     \u5750\u6807\u53ef\u9760\u3002`dx` /",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L332",
-      "id": "scripts_app_drive_rationale_332",
+      "source_location": "L372",
+      "id": "scripts_app_drive_rationale_372",
       "community": 43,
       "norm_label": "\u4ee5**\u5e94\u7528\u7a97\u53e3\u5de6\u4e0a\u89d2**\u4e3a\u539f\u70b9\u70b9\u51fb(\u5750\u6807\u53d6\u81ea\u7a97\u53e3\u622a\u56fe)\u3002      \u7a97\u53e3\u4f4d\u7f6e\u4f1a\u53d8(\u7528\u6237\u62d6\u52a8\u3001\u5176\u4ed6\u5e94\u7528\u62a2\u7126\u70b9),\u56e0\u6b64\u76f8\u5bf9\u5750\u6807\u6bd4\u7edd\u5bf9     \u5750\u6807\u53ef\u9760\u3002`dx` /"
     },
@@ -23620,8 +23638,8 @@
       "label": "\u8d70\u4e00\u904d\u5b8c\u6574\u5bfc\u51fa\u6d41\u7a0b\uff1aFile \u2192 Export \u2192 \u586b\u6587\u4ef6\u540d \u2192 Save\u3002",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L368",
-      "id": "scripts_app_drive_rationale_368",
+      "source_location": "L408",
+      "id": "scripts_app_drive_rationale_408",
       "community": 43,
       "norm_label": "\u8d70\u4e00\u904d\u5b8c\u6574\u5bfc\u51fa\u6d41\u7a0b:file \u2192 export \u2192 \u586b\u6587\u4ef6\u540d \u2192 save\u3002"
     },
@@ -23629,8 +23647,8 @@
       "label": "\u901a\u8fc7\u547d\u4ee4\u9762\u677f\u6267\u884c\u4e00\u6761\u547d\u4ee4\uff08\u907f\u5f00\u5750\u6807\u4f9d\u8d56\uff09\u3002      \u6d41\u7a0b\uff1a\u2318\u21e7P \u6253\u5f00\u9762\u677f \u2192 \u7c98\u8d34\u67e5\u8be2 \u2192 \u7b49\u5019 \u2192 \u56de\u8f66\uff08\u9762\u677f\u7684\u9996\u4e2a\u5019\u9009     \u4f1a\u88ab\u9009\u4e2d\uff1b\u67e5\u8be2\u4f1a\u8fc7\u6ee4\u5230\u552f",
       "file_type": "rationale",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L386",
-      "id": "scripts_app_drive_rationale_386",
+      "source_location": "L426",
+      "id": "scripts_app_drive_rationale_426",
       "community": 43,
       "norm_label": "\u901a\u8fc7\u547d\u4ee4\u9762\u677f\u6267\u884c\u4e00\u6761\u547d\u4ee4(\u907f\u5f00\u5750\u6807\u4f9d\u8d56)\u3002      \u6d41\u7a0b:\u2318\u21e7p \u6253\u5f00\u9762\u677f \u2192 \u7c98\u8d34\u67e5\u8be2 \u2192 \u7b49\u5019 \u2192 \u56de\u8f66(\u9762\u677f\u7684\u9996\u4e2a\u5019\u9009     \u4f1a\u88ab\u9009\u4e2d;\u67e5\u8be2\u4f1a\u8fc7\u6ee4\u5230\u552f"
     },
@@ -25264,10 +25282,28 @@
       "norm_label": "\u771f\u5b9e\u5e94\u7528\u6d4b\u8bd5\u7684\u4e09\u4e2a\u5751"
     },
     {
+      "label": "\u771f\u5b9e\u5e94\u7528\u91cc\u9a8c\u8bc1\u8fc7\u7684\u529f\u80fd",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L158",
+      "id": "markpure_agents_\u771f\u5b9e\u5e94\u7528\u91cc\u9a8c\u8bc1\u8fc7\u7684\u529f\u80fd",
+      "community": 307,
+      "norm_label": "\u771f\u5b9e\u5e94\u7528\u91cc\u9a8c\u8bc1\u8fc7\u7684\u529f\u80fd"
+    },
+    {
+      "label": "\u5df2\u77e5\u9650\u5236\uff1a\u6807\u7b7e\u6495\u79bb\u6ca1\u6709\u63a5\u7ebf",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L167",
+      "id": "markpure_agents_\u5df2\u77e5\u9650\u5236_\u6807\u7b7e\u6495\u79bb\u6ca1\u6709\u63a5\u7ebf",
+      "community": 307,
+      "norm_label": "\u5df2\u77e5\u9650\u5236:\u6807\u7b7e\u6495\u79bb\u6ca1\u6709\u63a5\u7ebf"
+    },
+    {
       "label": "\u5bfc\u51fa\u4fdd\u771f\u5ea6",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L160",
+      "source_location": "L181",
       "id": "markpure_agents_\u5bfc\u51fa\u4fdd\u771f\u5ea6",
       "community": 307,
       "norm_label": "\u5bfc\u51fa\u4fdd\u771f\u5ea6"
@@ -27271,6 +27307,96 @@
       "norm_label": "\u9644\u5f55:\u5b9e\u73b0\u65f6\u95f4\u7ebf"
     },
     {
+      "label": "\u6267\u884c AppleScript\uff08\u9ed8\u8ba4\uff09\u6216 JXA\uff08`lang=\"JavaScript\"`\uff09\u3002      \u6ce8\u610f `osascript -e` **\u9ed8\u8ba4\u6309 Apple",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L111",
+      "community": 43,
+      "norm_label": "\u6267\u884c applescript(\u9ed8\u8ba4)\u6216 jxa(`lang=\"javascript\"`)\u3002      \u6ce8\u610f `osascript -e` **\u9ed8\u8ba4\u6309 apple",
+      "id": "scripts_app_drive_rationale_111"
+    },
+    {
+      "label": "\u628a `cmd+shift+p` \u8fd9\u6837\u7684\u7ec4\u5408\u952e\u8f6c\u6210 AppleScript `keystroke` \u7247\u6bb5\u3002",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L128",
+      "community": 43,
+      "norm_label": "\u628a `cmd+shift+p` \u8fd9\u6837\u7684\u7ec4\u5408\u952e\u8f6c\u6210 applescript `keystroke` \u7247\u6bb5\u3002",
+      "id": "scripts_app_drive_rationale_128"
+    },
+    {
+      "label": "\u542f\u52a8\u771f\u5b9e\u5e94\u7528\uff08\u540e\u53f0\uff09\uff0c\u4f7f\u7528\u9694\u79bb\u7684\u914d\u7f6e\u76ee\u5f55\u3002",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L220",
+      "community": 43,
+      "norm_label": "\u542f\u52a8\u771f\u5b9e\u5e94\u7528(\u540e\u53f0),\u4f7f\u7528\u9694\u79bb\u7684\u914d\u7f6e\u76ee\u5f55\u3002",
+      "id": "scripts_app_drive_rationale_220"
+    },
+    {
+      "label": "\u622a\u56fe\uff08\u6574\u4e2a\u4e3b\u5c4f\uff09\u3002      \u9ed8\u8ba4**\u4e0d**\u5207\u524d\u53f0\u2014\u2014\u5e94\u7528\u7684\u81ea\u7ed8\u83dc\u5355\uff08\u4e0b\u62c9\u3001\u5f39\u51fa\u5c42\uff09\u4f1a\u56e0\u5931\u7126\u800c     \u5173\u95ed\uff0c\u5207\u524d\u53f0\u5c31\u62cd\u4e0d\u5230\u4e86\u3002\u9700\u8981\u300c\u786e\u4fdd\u62cd\u5230\u5e94\u7528\u672c\u8eab\u300d\u65f6\u7528",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L246",
+      "community": 43,
+      "norm_label": "\u622a\u56fe(\u6574\u4e2a\u4e3b\u5c4f)\u3002      \u9ed8\u8ba4**\u4e0d**\u5207\u524d\u53f0\u2014\u2014\u5e94\u7528\u7684\u81ea\u7ed8\u83dc\u5355(\u4e0b\u62c9\u3001\u5f39\u51fa\u5c42)\u4f1a\u56e0\u5931\u7126\u800c     \u5173\u95ed,\u5207\u524d\u53f0\u5c31\u62cd\u4e0d\u5230\u4e86\u3002\u9700\u8981\u300c\u786e\u4fdd\u62cd\u5230\u5e94\u7528\u672c\u8eab\u300d\u65f6\u7528",
+      "id": "scripts_app_drive_rationale_246"
+    },
+    {
+      "label": "\u5728\u5c4f\u5e55\u5750\u6807 (x, y) \u5904\u70b9\u51fb\u3002\u5148\u628a\u5e94\u7528\u7f6e\u524d\u53f0\u2014\u2014\u5426\u5219\u70b9\u51fb\u4f1a\u843d\u5230     \u906e\u6321\u5728\u4e0a\u9762\u7684\u5176\u4ed6\u7a97\u53e3\u4e0a\uff08\u771f\u5b9e\u684c\u9762\u6d4b\u8bd5\u91cc\u5f88\u5e38\u89c1\uff09\u3002      `displayed=T",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L266",
+      "community": 43,
+      "norm_label": "\u5728\u5c4f\u5e55\u5750\u6807 (x, y) \u5904\u70b9\u51fb\u3002\u5148\u628a\u5e94\u7528\u7f6e\u524d\u53f0\u2014\u2014\u5426\u5219\u70b9\u51fb\u4f1a\u843d\u5230     \u906e\u6321\u5728\u4e0a\u9762\u7684\u5176\u4ed6\u7a97\u53e3\u4e0a(\u771f\u5b9e\u684c\u9762\u6d4b\u8bd5\u91cc\u5f88\u5e38\u89c1)\u3002      `displayed=t",
+      "id": "scripts_app_drive_rationale_266"
+    },
+    {
+      "label": "\u5728 (x, y) \u5904\u6eda\u8f6e\u3002direction=-1 \u5411\u4e0b\u3002",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L291",
+      "community": 43,
+      "norm_label": "\u5728 (x, y) \u5904\u6eda\u8f6e\u3002direction=-1 \u5411\u4e0b\u3002",
+      "id": "scripts_app_drive_rationale_291"
+    },
+    {
+      "label": "\u6309\u952e\uff0c\u5982 `cmd+p`\u3001`escape`\u3001`f5`\u3002",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L300",
+      "community": 43,
+      "norm_label": "\u6309\u952e,\u5982 `cmd+p`\u3001`escape`\u3001`f5`\u3002",
+      "id": "scripts_app_drive_rationale_300"
+    },
+    {
+      "label": "\u4ee5**\u5e94\u7528\u7a97\u53e3\u5de6\u4e0a\u89d2**\u4e3a\u539f\u70b9\u70b9\u51fb\uff08\u5750\u6807\u53d6\u81ea\u7a97\u53e3\u622a\u56fe\uff09\u3002      \u7a97\u53e3\u4f4d\u7f6e\u4f1a\u53d8\uff08\u7528\u6237\u62d6\u52a8\u3001\u5176\u4ed6\u5e94\u7528\u62a2\u7126\u70b9\uff09\uff0c\u56e0\u6b64\u76f8\u5bf9\u5750\u6807\u6bd4\u7edd\u5bf9     \u5750\u6807\u53ef\u9760\u3002`dx` /",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L332",
+      "community": 43,
+      "norm_label": "\u4ee5**\u5e94\u7528\u7a97\u53e3\u5de6\u4e0a\u89d2**\u4e3a\u539f\u70b9\u70b9\u51fb(\u5750\u6807\u53d6\u81ea\u7a97\u53e3\u622a\u56fe)\u3002      \u7a97\u53e3\u4f4d\u7f6e\u4f1a\u53d8(\u7528\u6237\u62d6\u52a8\u3001\u5176\u4ed6\u5e94\u7528\u62a2\u7126\u70b9),\u56e0\u6b64\u76f8\u5bf9\u5750\u6807\u6bd4\u7edd\u5bf9     \u5750\u6807\u53ef\u9760\u3002`dx` /",
+      "id": "scripts_app_drive_rationale_332"
+    },
+    {
+      "label": "\u8d70\u4e00\u904d\u5b8c\u6574\u5bfc\u51fa\u6d41\u7a0b\uff1aFile \u2192 Export \u2192 \u586b\u6587\u4ef6\u540d \u2192 Save\u3002",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L368",
+      "community": 43,
+      "norm_label": "\u8d70\u4e00\u904d\u5b8c\u6574\u5bfc\u51fa\u6d41\u7a0b:file \u2192 export \u2192 \u586b\u6587\u4ef6\u540d \u2192 save\u3002",
+      "id": "scripts_app_drive_rationale_368"
+    },
+    {
+      "label": "\u901a\u8fc7\u547d\u4ee4\u9762\u677f\u6267\u884c\u4e00\u6761\u547d\u4ee4\uff08\u907f\u5f00\u5750\u6807\u4f9d\u8d56\uff09\u3002      \u6d41\u7a0b\uff1a\u2318\u21e7P \u6253\u5f00\u9762\u677f \u2192 \u7c98\u8d34\u67e5\u8be2 \u2192 \u7b49\u5019 \u2192 \u56de\u8f66\uff08\u9762\u677f\u7684\u9996\u4e2a\u5019\u9009     \u4f1a\u88ab\u9009\u4e2d\uff1b\u67e5\u8be2\u4f1a\u8fc7\u6ee4\u5230\u552f",
+      "file_type": "rationale",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L386",
+      "community": 43,
+      "norm_label": "\u901a\u8fc7\u547d\u4ee4\u9762\u677f\u6267\u884c\u4e00\u6761\u547d\u4ee4(\u907f\u5f00\u5750\u6807\u4f9d\u8d56)\u3002      \u6d41\u7a0b:\u2318\u21e7p \u6253\u5f00\u9762\u677f \u2192 \u7c98\u8d34\u67e5\u8be2 \u2192 \u7b49\u5019 \u2192 \u56de\u8f66(\u9762\u677f\u7684\u9996\u4e2a\u5019\u9009     \u4f1a\u88ab\u9009\u4e2d;\u67e5\u8be2\u4f1a\u8fc7\u6ee4\u5230\u552f",
+      "id": "scripts_app_drive_rationale_386"
+    },
+    {
       "label": "./WorkspaceSearchResult.svelte",
       "file_type": "code",
       "source_file": "frontend/src/components/workspace/WorkspaceSearchResult.svelte",
@@ -27320,7 +27446,7 @@
       "file_type": "code",
       "source_file": "scripts/test_backend.py",
       "source_location": "L65",
-      "community": 84,
+      "community": 118,
       "norm_label": "path",
       "id": "path"
     },
@@ -34169,7 +34295,7 @@
       "file_type": "code",
       "source_file": "$lib/plugins/multi-cursor",
       "confidence": "EXTRACTED",
-      "community": 159,
+      "community": 3,
       "norm_label": "$lib/plugins/multi-cursor",
       "id": "multi_cursor"
     },
@@ -34196,7 +34322,7 @@
       "file_type": "code",
       "source_file": "$lib/features/command-palette/commandRegistry",
       "confidence": "EXTRACTED",
-      "community": 3,
+      "community": 63,
       "norm_label": "$lib/features/command-palette/commandregistry",
       "id": "commandregistry"
     },
@@ -85829,9 +85955,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_ts",
-      "target": "scripts_lib_browser_harness_ts",
-      "confidence_score": 1.0
+      "target": "scripts_lib_browser_harness_ts"
     },
     {
       "relation": "imports",
@@ -85840,9 +85966,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_ts",
-      "target": "lib_browser_harness_startharness",
-      "confidence_score": 1.0
+      "target": "lib_browser_harness_startharness"
     },
     {
       "relation": "imports",
@@ -85851,9 +85977,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_ts",
-      "target": "lib_browser_harness_openfileintree",
-      "confidence_score": 1.0
+      "target": "lib_browser_harness_openfileintree"
     },
     {
       "relation": "imports",
@@ -85862,9 +85988,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_ts",
-      "target": "lib_browser_harness_sleep",
-      "confidence_score": 1.0
+      "target": "lib_browser_harness_sleep"
     },
     {
       "relation": "imports",
@@ -85873,9 +85999,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_ts",
-      "target": "lib_browser_harness_cdpclient",
-      "confidence_score": 1.0
+      "target": "lib_browser_harness_cdpclient"
     },
     {
       "relation": "imports",
@@ -85884,9 +86010,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_ts",
-      "target": "lib_browser_harness_findchrome",
-      "confidence_score": 1.0
+      "target": "lib_browser_harness_findchrome"
     },
     {
       "relation": "contains",
@@ -85894,9 +86020,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L24",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_ts",
-      "target": "scripts_validate_undo_redo_readeditor",
-      "confidence_score": 1.0
+      "target": "scripts_validate_undo_redo_readeditor"
     },
     {
       "relation": "contains",
@@ -85904,9 +86030,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L32",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_ts",
-      "target": "scripts_validate_undo_redo_clickeditmenuitem",
-      "confidence_score": 1.0
+      "target": "scripts_validate_undo_redo_clickeditmenuitem"
     },
     {
       "relation": "contains",
@@ -85914,9 +86040,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L50",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_ts",
-      "target": "scripts_validate_undo_redo_chromepath",
-      "confidence_score": 1.0
+      "target": "scripts_validate_undo_redo_chromepath"
     },
     {
       "relation": "calls",
@@ -85925,9 +86051,9 @@
       "source_file": "scripts/validate-undo-redo.ts",
       "source_location": "L39",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_validate_undo_redo_clickeditmenuitem",
-      "target": "lib_browser_harness_sleep",
-      "confidence_score": 1.0
+      "target": "lib_browser_harness_sleep"
     },
     {
       "relation": "imports_from",
@@ -88149,6 +88275,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
+      "source_location": "L313",
+      "weight": 1.0,
+      "source": "scripts_app_drive_py",
+      "target": "scripts_app_drive_rightclick",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
       "source_location": "L275",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -88181,9 +88317,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L320",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_py",
-      "target": "scripts_app_drive_window_origin",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_window_origin"
     },
     {
       "relation": "contains",
@@ -88191,9 +88327,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L331",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_py",
-      "target": "scripts_app_drive_click_window",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_click_window"
     },
     {
       "relation": "contains",
@@ -88221,9 +88357,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L385",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_py",
-      "target": "scripts_app_drive_command",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_command"
     },
     {
       "relation": "contains",
@@ -88256,6 +88392,17 @@
       "confidence_score": 1.0,
       "source": "scripts_app_drive_click",
       "target": "scripts_app_drive_display_scale"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L316",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rightclick",
+      "target": "scripts_app_drive_display_scale",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -88296,9 +88443,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L327",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_window_origin",
-      "target": "scripts_app_drive_py_float",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_py_float"
     },
     {
       "relation": "references",
@@ -88307,9 +88454,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L331",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_click_window",
-      "target": "scripts_app_drive_py_float",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_py_float"
     },
     {
       "relation": "calls",
@@ -88318,9 +88465,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L416",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_main",
-      "target": "scripts_app_drive_py_float",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_py_float"
     },
     {
       "relation": "references",
@@ -88354,6 +88501,17 @@
       "confidence_score": 1.0,
       "source": "scripts_app_drive_click",
       "target": "scripts_app_drive_osascript"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L323",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rightclick",
+      "target": "scripts_app_drive_osascript",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -88395,9 +88553,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L326",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_window_origin",
-      "target": "scripts_app_drive_osascript",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_osascript"
     },
     {
       "relation": "calls",
@@ -88409,6 +88567,16 @@
       "confidence_score": 1.0,
       "source": "scripts_app_drive_probe",
       "target": "scripts_app_drive_osascript"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L130",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rationale_130",
+      "target": "scripts_app_drive_osascript",
+      "confidence_score": 1.0
     },
     {
       "relation": "rationale_for",
@@ -88493,9 +88661,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L385",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_command",
-      "target": "scripts_app_drive_py_str",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_py_str"
     },
     {
       "relation": "references",
@@ -88535,6 +88703,17 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
+      "source_location": "L324",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rightclick",
+      "target": "scripts_app_drive_py_str",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
       "source_location": "L278",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -88562,6 +88741,16 @@
       "confidence_score": 1.0,
       "source": "scripts_app_drive_key",
       "target": "scripts_app_drive_key_script"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L147",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rationale_147",
+      "target": "scripts_app_drive_key_script",
+      "confidence_score": 1.0
     },
     {
       "relation": "rationale_for",
@@ -88665,6 +88854,16 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
+      "source_location": "L239",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rationale_239",
+      "target": "scripts_app_drive_launch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
       "source_location": "L220",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -88694,15 +88893,26 @@
       "target": "str"
     },
     {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L256",
+      "weight": 1.0,
+      "source": "scripts_app_drive_activate",
+      "target": "bool",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
       "source_location": "L254",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_shot",
-      "target": "scripts_app_drive_activate",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_activate"
     },
     {
       "relation": "calls",
@@ -88711,7 +88921,18 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L277",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_click",
+      "target": "scripts_app_drive_activate"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L320",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rightclick",
       "target": "scripts_app_drive_activate",
       "confidence_score": 1.0
     },
@@ -88733,9 +88954,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L391",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_command",
-      "target": "scripts_app_drive_activate",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_activate"
     },
     {
       "relation": "calls",
@@ -88749,13 +88970,45 @@
       "target": "scripts_app_drive_activate"
     },
     {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L257",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rationale_257",
+      "target": "scripts_app_drive_activate",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "references",
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
       "source_location": "L245",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_shot",
+      "target": "bool"
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L255",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_app_drive_click",
+      "target": "bool"
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L313",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rightclick",
       "target": "bool",
       "confidence_score": 1.0
     },
@@ -88774,11 +89027,21 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L246",
+      "source_location": "L269",
       "weight": 1.0,
-      "source": "scripts_app_drive_rationale_246",
+      "source": "scripts_app_drive_rationale_269",
       "target": "scripts_app_drive_shot",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L246",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_app_drive_rationale_246",
+      "target": "scripts_app_drive_shot"
     },
     {
       "relation": "references",
@@ -88790,17 +89053,6 @@
       "confidence_score": 1.0,
       "source": "scripts_app_drive_shot",
       "target": "str"
-    },
-    {
-      "relation": "references",
-      "context": "parameter_type",
-      "confidence": "EXTRACTED",
-      "source_file": "scripts/app_drive.py",
-      "source_location": "L255",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "scripts_app_drive_click",
-      "target": "bool"
     },
     {
       "relation": "calls",
@@ -88820,9 +89072,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L342",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_click_window",
-      "target": "scripts_app_drive_click",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_click"
     },
     {
       "relation": "calls",
@@ -88850,11 +89102,21 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L266",
+      "source_location": "L289",
       "weight": 1.0,
-      "source": "scripts_app_drive_rationale_266",
+      "source": "scripts_app_drive_rationale_289",
       "target": "scripts_app_drive_click",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L266",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_app_drive_rationale_266",
+      "target": "scripts_app_drive_click"
     },
     {
       "relation": "rationale_for",
@@ -88889,6 +89151,17 @@
       "target": "int"
     },
     {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L317",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rightclick",
+      "target": "scripts_app_drive_py_int",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "references",
       "context": "parameter_type",
       "confidence": "EXTRACTED",
@@ -88917,8 +89190,19 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L342",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_click_window",
-      "target": "scripts_app_drive_py_int",
+      "target": "scripts_app_drive_py_int"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L467",
+      "weight": 1.0,
+      "source": "scripts_app_drive_main",
+      "target": "scripts_app_drive_rightclick",
       "confidence_score": 1.0
     },
     {
@@ -88936,11 +89220,21 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L291",
+      "source_location": "L331",
       "weight": 1.0,
-      "source": "scripts_app_drive_rationale_291",
+      "source": "scripts_app_drive_rationale_331",
       "target": "scripts_app_drive_scroll",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L291",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_app_drive_rationale_291",
+      "target": "scripts_app_drive_scroll"
     },
     {
       "relation": "rationale_for",
@@ -88981,9 +89275,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L392",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_command",
-      "target": "scripts_app_drive_key",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_key"
     },
     {
       "relation": "calls",
@@ -89000,11 +89294,21 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L300",
+      "source_location": "L340",
       "weight": 1.0,
-      "source": "scripts_app_drive_rationale_300",
+      "source": "scripts_app_drive_rationale_340",
       "target": "scripts_app_drive_key",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L300",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_app_drive_rationale_300",
+      "target": "scripts_app_drive_key"
     },
     {
       "relation": "rationale_for",
@@ -89045,9 +89349,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L394",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_command",
-      "target": "scripts_app_drive_text",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_text"
     },
     {
       "relation": "calls",
@@ -89078,9 +89382,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L338",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_click_window",
-      "target": "scripts_app_drive_window_origin",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_window_origin"
     },
     {
       "relation": "calls",
@@ -89089,7 +89393,17 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L416",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_main",
+      "target": "scripts_app_drive_click_window"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L372",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rationale_372",
       "target": "scripts_app_drive_click_window",
       "confidence_score": 1.0
     },
@@ -89099,9 +89413,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L332",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_rationale_332",
-      "target": "scripts_app_drive_click_window",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_click_window"
     },
     {
       "relation": "calls",
@@ -89129,11 +89443,21 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/app_drive.py",
-      "source_location": "L368",
+      "source_location": "L408",
       "weight": 1.0,
-      "source": "scripts_app_drive_rationale_368",
+      "source": "scripts_app_drive_rationale_408",
       "target": "scripts_app_drive_export",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L368",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "scripts_app_drive_rationale_368",
+      "target": "scripts_app_drive_export"
     },
     {
       "relation": "rationale_for",
@@ -89163,7 +89487,17 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L414",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_main",
+      "target": "scripts_app_drive_command"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/app_drive.py",
+      "source_location": "L426",
+      "weight": 1.0,
+      "source": "scripts_app_drive_rationale_426",
       "target": "scripts_app_drive_command",
       "confidence_score": 1.0
     },
@@ -89173,9 +89507,9 @@
       "source_file": "scripts/app_drive.py",
       "source_location": "L386",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "scripts_app_drive_rationale_386",
-      "target": "scripts_app_drive_command",
-      "confidence_score": 1.0
+      "target": "scripts_app_drive_command"
     },
     {
       "relation": "references",
@@ -92028,8 +92362,28 @@
       "source_file": "AGENTS.md",
       "source_location": "L144",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "markpure_agents_\u771f\u5b9e\u684c\u9762\u5e94\u7528\u6d4b\u8bd5",
-      "target": "markpure_agents_\u771f\u5b9e\u5e94\u7528\u6d4b\u8bd5\u7684\u4e09\u4e2a\u5751",
+      "target": "markpure_agents_\u771f\u5b9e\u5e94\u7528\u6d4b\u8bd5\u7684\u4e09\u4e2a\u5751"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "AGENTS.md",
+      "source_location": "L158",
+      "weight": 1.0,
+      "source": "markpure_agents_\u771f\u5b9e\u684c\u9762\u5e94\u7528\u6d4b\u8bd5",
+      "target": "markpure_agents_\u771f\u5b9e\u5e94\u7528\u91cc\u9a8c\u8bc1\u8fc7\u7684\u529f\u80fd",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "AGENTS.md",
+      "source_location": "L167",
+      "weight": 1.0,
+      "source": "markpure_agents_\u771f\u5b9e\u684c\u9762\u5e94\u7528\u6d4b\u8bd5",
+      "target": "markpure_agents_\u5df2\u77e5\u9650\u5236_\u6807\u7b7e\u6495\u79bb\u6ca1\u6709\u63a5\u7ebf",
       "confidence_score": 1.0
     },
     {
@@ -103429,5 +103783,5 @@
       "source_file": "frontend/src/plugins/AGENTS.md"
     }
   ],
-  "built_at_commit": "549bdf670232f753036e5e637bd561ba8662ce0e"
+  "built_at_commit": "929dc219f5a9a57fe1b9bb8a7dda19d1fb7133f1"
 }
