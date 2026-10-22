@@ -95,6 +95,25 @@ function clickAt(x, y, count) {
 clickAt(X, Y, COUNT);
 """
 
+# JXA 辅助：右键（button 2 = 右键）。
+_JXA_RIGHTCLICK = """
+ObjC.import('CoreGraphics');
+ObjC.import('Foundation');
+function sleep(sec) { $.NSThread.sleepForTimeInterval(sec); }
+function rightClickAt(x, y) {
+  var pt = $.CGPointMake(x, y);
+  var move = $.CGEventCreateMouseEvent(null, 5, pt, 0);
+  $.CGEventPost(0, move);
+  sleep(0.08);
+  var down = $.CGEventCreateMouseEvent(null, 3, pt, 0);
+  $.CGEventPost(0, down);
+  sleep(0.08);
+  var up = $.CGEventCreateMouseEvent(null, 4, pt, 0);
+  $.CGEventPost(0, up);
+}
+rightClickAt(X, Y);
+"""
+
 # JXA 辅助：滚轮。direction 为 1（上）/ -1（下）。
 _JXA_SCROLL = """
 ObjC.import('CoreGraphics');
@@ -234,12 +253,16 @@ def launch(workspace: pathlib.Path | None = None) -> None:
     print(f"launched: workspace={ws} config={CONFIG_DIR}")
 
 
-def activate() -> None:
-    """把应用切到前台。"""
-    _osascript(
-        f'tell application "System Events" to set frontmost of process "{APP_NAME}" to true'
-    )
+def activate() -> bool:
+    """把应用切到前台。应用没在运行时返回 False（不抛异常）。"""
+    try:
+        _osascript(
+            f'tell application "System Events" to set frontmost of process "{APP_NAME}" to true'
+        )
+    except RuntimeError:
+        return False
     time.sleep(0.4)
+    return True
 
 
 def shot(path: str, front: bool = False) -> None:
@@ -285,6 +308,23 @@ def click(x: int, y: int, displayed: bool = False, double: bool = False) -> None
         lang="JavaScript",
     )
     time.sleep(0.35)
+
+
+def rightclick(x: int, y: int, displayed: bool = False) -> None:
+    """在 (x, y) 处右键。"""
+    if displayed:
+        k = display_scale()
+        x = int(round(x * k))
+        y = int(round(y * k))
+    try:
+        activate()
+    except Exception:
+        pass
+    _osascript(
+        _JXA_RIGHTCLICK.replace("X", str(x)).replace("Y", str(y)),
+        lang="JavaScript",
+    )
+    time.sleep(0.6)
 
 
 def scroll(x: int, y: int, direction: int = -1) -> None:
@@ -423,6 +463,8 @@ def main(argv: list[str]) -> int:
         )
     elif cmd == "scale":
         print(f"display_scale = {display_scale():.4f}")
+    elif cmd == "rightclick":
+        rightclick(int(argv[1]), int(argv[2]), displayed=(len(argv) > 3))
     elif cmd == "scroll":
         scroll(int(argv[1]), int(argv[2]), int(argv[3]) if len(argv) > 3 else -1)
     elif cmd == "key":
