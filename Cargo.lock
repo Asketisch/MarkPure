@@ -2123,6 +2123,7 @@ version = "0.1.0"
 dependencies = [
  "assets",
  "base64",
+ "block2 0.5.1",
  "bookmark",
  "export",
  "fs",
