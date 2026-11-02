@@ -1,0 +1,120 @@
+# 持续集成：push 到 main / 一律 PR 触发。
+#
+# 结构：
+#   frontend      —— 类型检查 + 前端构建冒烟（最快，先挂先知道）
+#   tests         —— Linux 上跑全量测试（Rust 单测 + 后端 IPC + Markdown 回归 +
+#                    前端验证脚本；6 个浏览器端到端在无 Chrome 时自动跳过）
+#   check-macos / check-windows —— 平台编译验证，提前抓 #[cfg] 代码的破坏
+#
+# 关键约束：rust-embed 在编译期嵌入 dist/，所以**任何 cargo 命令之前
+# 必须先 npx vite build**，否则 markpure crate 连编译都过不了。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  frontend:
+    name: 前端检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 类型检查（svelte-check + tsc）
+        run: npm run check
+      - name: 前端构建冒烟
+        run: npx vite build .
+
+  tests:
+    name: 全量测试（Linux）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 webkit2gtk / gtk 与字体
+        # webkit2gtk-4.1 + gtk3：wry/tao 的 Linux 依赖；
+        # dejavu/liberation：PDF 导出拉丁字体（export crate 单测断言存在）；
+        # wqy-zenhei：PDF 中文测试断言 PDF 里能提取出中文。
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            pkg-config \
+            fonts-dejavu-core \
+            fonts-liberation \
+            fonts-wqy-zenhei
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: 安装依赖
+        run: npm ci
+      - name: 构建前端（rust-embed 需要 dist/ 存在）
+        run: npx vite build .
+      - name: 构建 mt_harness（后端 IPC 测试驱动）
+        run: cargo build --locked --bin mt_harness
+      - name: 构建 lint_cli（validate-lint-on-save 直接调用该二进制）
+        run: cargo build --locked -p mt_core --example lint_cli
+      - name: 后端 IPC 全量测试
+        run: python3 scripts/test_backend.py
+      - name: Rust 单元测试
+        run: cargo test --workspace --locked
+      - name: Markdown 往返与归一化回归
+        run: npm run test:markdown
+      - name: 前端验证脚本（浏览器端到端无 Chrome 时自动跳过）
+        run: npm run test:frontend
+
+  check-macos:
+    name: 编译检查（macOS）
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: npm ci
+      - run: npx vite build .
+      - name: cargo check（含测试/示例目标）
+        run: cargo check --workspace --all-targets --locked
+
+  check-windows:
+    name: 编译检查（Windows）
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: npm ci
+      - run: npx vite build .
+      - name: cargo check（含测试/示例目标）
+        run: cargo check --workspace --all-targets --locked

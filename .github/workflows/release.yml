@@ -1,0 +1,153 @@
+# 发布构建：push `v*` tag 触发，自动构建四平台便携包并附到 GitHub Release。
+#
+# 目标矩阵：
+#   macos-arm64   Apple Silicon（原生）
+#   macos-x64     Intel Mac（在 arm64 runner 上交叉编译——Intel runner 已停用）
+#   windows-x64   Windows 便携 zip
+#   linux-x64     Linux tar.gz（构建需 webkit2gtk-4.1 / gtk3 系统库）
+#
+# 版本一致性：tag 的 X.Y.Z 必须等于 backend/apps/desktop/Cargo.toml 的
+# version（用 scripts/sync-version.sh 同步后提交再打 tag）。不在 CI 里
+# 改写版本——那会让已提交的 Cargo.lock 过期，--locked 构建直接失败。
+#
+# workflow_dispatch（无 tag）只构建并上传 artifact，不创建 Release，
+# 用于发布前演练。
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    # Windows 步骤也统一走 bash（runner 自带 Git Bash），脚本才有可移植性
+    shell: bash
+
+jobs:
+  build:
+    name: 构建 (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bundle: macos
+          - name: macos-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bundle: macos
+          - name: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundle: windows
+          - name: linux-x64
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            bundle: linux
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: 安装 Linux 系统依赖
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev pkg-config
+
+      - name: 校验 tag 与 Cargo.toml 版本一致
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CARGO_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' backend/apps/desktop/Cargo.toml | head -n1)"
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::tag v$TAG_VERSION 与 Cargo.toml 版本 $CARGO_VERSION 不一致。请先运行 ./scripts/sync-version.sh $TAG_VERSION 并提交，再打 tag。"
+            exit 1
+          fi
+
+      - name: 记录版本号
+        run: |
+          VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' backend/apps/desktop/Cargo.toml | head -n1)"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: 安装依赖
+        run: npm ci
+
+      # rust-embed 在编译期嵌入 dist/，必须先于一切 cargo 构建
+      - name: 构建前端
+        run: npx vite build .
+
+      - name: 构建 Rust（release）
+        run: cargo build --release --locked --bin markpure --target ${{ matrix.target }}
+
+      - name: 组装便携包目录
+        run: SKIP_BUILD=1 TARGET_DIR="target/${{ matrix.target }}/release" ./scripts/bundle-${{ matrix.bundle }}.sh
+
+      - name: 压缩（macOS .app → zip）
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p release-out
+          (cd target && zip -qry "../release-out/MarkPure-v${VERSION}-${{ matrix.name }}.zip" MarkPure.app)
+
+      - name: 压缩（Windows → zip）
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p release-out
+          ZIP_NAME="MarkPure-v${VERSION}-${{ matrix.name }}.zip"
+          powershell -NoProfile -Command "Compress-Archive -Path 'target/MarkPure-windows/*' -DestinationPath 'release-out/$ZIP_NAME' -Force"
+
+      - name: 压缩（Linux → tar.gz）
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p release-out
+          tar -czf "release-out/MarkPure-v${VERSION}-${{ matrix.name }}.tar.gz" -C target MarkPure-linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.name }}
+          path: release-out/*
+          if-no-files-found: error
+
+  release:
+    name: 发布到 GitHub Release
+    # 只有 tag 触发才创建 Release；workflow_dispatch 演练只留 artifact
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/*
+          generate_release_notes: true

@@ -33,3 +33,10 @@ objc2-app-kit = { version = "0.2", features = ["NSMenuItem"] }
 objc2-foundation = { version = "0.2", features = ["NSString"] }
 # 测试驱动器（test_driver）的快照完成回调使用 ObjC block。
 block2 = "0.5"
+
+# Windows exe 资源嵌入（图标/版本信息，见 build.rs）。刻意不加 cfg gate：
+# cargo 不为非宿主 target 的依赖写 lockfile，gate 会让 Windows 上的
+# --locked 构建因 lock 缺条目而失败。非 Windows 平台只是多编译一个
+# 小 crate，build.rs 内部用 #[cfg] 跳过实际逻辑。
+[build-dependencies]
+winresource = "0.1"

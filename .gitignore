@@ -1,6 +1,7 @@
 # Rust
 /target/
-Cargo.lock
+# 发布演练产物（release workflow 在 CI 上生成）
+/release-out/
 
 # Node
 node_modules/
@@ -23,25 +24,23 @@ npm-debug.log*
 
 # 测试
 coverage/
-package-lock.json
 # Python 字节码缓存（scripts/lib/pdf_extract.py 等模块被导入时生成）
 __pycache__/
 *.pyc
 
 
-# graphify — 机器特定 & 可重新生成的文件
-graphify-out/.graphify_python
-graphify-out/.graphify_root
-graphify-out/.graphify_labels.json
-graphify-out/.rebuild.lock
-graphify-out/cache/
-graphify-out/manifest.json
-graphify-out/graph.html
-graphify-out/cost.json
-# 按日期归档的图谱快照——`graphify update` 每次自动备份一份，
-# 属于本地产物，不进版本库（当前图谱由 graph.json / GRAPH_REPORT.md 承载）。
-graphify-out/20??-??-??/
-graphify-out/20??-??-??_*/
+# graphify-out —— 知识图谱工具产物，可重新生成，不进版本库
+graphify-out/
+
+# AI 协作文件——本地开发辅助，不进开源仓库
+.claude/
+.claude.json
+.zcode/
+CLAUDE.md
+AGENTS.md
+
+# 内部规划文档
+docs/COMPETITOR_TODO.md
 
 # 性能测试夹具——由脚本生成，可随时重建（见 exportActions.svelte.ts 的说明）
 /synth-1k.md
