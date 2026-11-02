@@ -16,6 +16,7 @@
 
 use lru::LruCache;
 use std::num::NonZeroUsize;
+use std::io::Read;
 use std::process::Command;
 use std::sync::Mutex;
 
@@ -95,6 +96,42 @@ pub(super) fn mmdc_available() -> bool {
 /// 文件，让 `mmdc` 指向它，再读取 SVG 输出。若 `mmdc` 未安装
 ///（PATH 中无该可执行文件），我们优雅地回退到仅校验，使调用方
 /// 仍能展示原始代码块。
+/// 带超时地运行 mmdc 子进程。mmdc 底层是 puppeteer/Chrome，
+/// 挂起并不罕见；`output()` 会无限阻塞慢速 IPC 线程，导出从此
+/// 无响应。超时后 kill 子进程并返回超时错误。
+/// stderr/stdout 体量小（SVG 走文件不走红），退出后一次读净即可。
+fn run_mmdc_with_timeout(
+    cmd: &mut Command,
+    timeout: std::time::Duration,
+) -> std::io::Result<std::process::Output> {
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+    cmd.stdin(std::process::Stdio::null());
+    let mut child = cmd.spawn()?;
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            if let Some(mut s) = child.stdout.take() {
+                let _ = s.read_to_end(&mut stdout);
+            }
+            if let Some(mut s) = child.stderr.take() {
+                let _ = s.read_to_end(&mut stderr);
+            }
+            return Ok(std::process::Output { status, stdout, stderr });
+        }
+        if std::time::Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(std::io::Error::other("mmdc timed out"));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+const MMDC_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
 pub(super) fn render_mermaid_to_svg_inner(code: &str) -> MermaidResult {
     // 先校验
     if !validate_mermaid(code) {
@@ -126,15 +163,16 @@ pub(super) fn render_mermaid_to_svg_inner(code: &str) -> MermaidResult {
         };
     }
 
-    let result = Command::new("mmdc")
-        .args([
+    let result = run_mmdc_with_timeout(
+        Command::new("mmdc").args([
             "-i",
             in_path.to_string_lossy().as_ref(),
             "-o",
             out_path.to_string_lossy().as_ref(),
             "-q",
-        ])
-        .output();
+        ]),
+        MMDC_TIMEOUT,
+    );
 
     let _ = std::fs::remove_file(&in_path);
 
@@ -235,8 +273,8 @@ pub(super) fn render_mermaid_to_png_inner(code: &str) -> Result<Vec<u8>, String>
         return Err(format!("failed to write temp input: {}", e));
     }
 
-    let result = Command::new("mmdc")
-        .args([
+    let result = run_mmdc_with_timeout(
+        Command::new("mmdc").args([
             "-i",
             in_path.to_string_lossy().as_ref(),
             "-o",
@@ -244,8 +282,9 @@ pub(super) fn render_mermaid_to_png_inner(code: &str) -> Result<Vec<u8>, String>
             "-e",
             "png",
             "-q",
-        ])
-        .output();
+        ]),
+        MMDC_TIMEOUT,
+    );
 
     let _ = std::fs::remove_file(&in_path);
 

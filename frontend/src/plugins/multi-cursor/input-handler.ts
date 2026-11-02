@@ -37,6 +37,10 @@ export function attachInputHandlers(
   // 重新应用。翻转模块级标志并派发一个空事务，是强制重新渲染
   // 最廉价的方式。
   const blinkTimer = window.setInterval(() => {
+    // 无次光标时跳过：空事务每秒派发会连锁触发 vim 装饰重建、
+    // undo-tree 快照等下游事务订阅者，纯浪费。
+    const state = getState()
+    if (!state || state.cursors.length === 0) return
     setBlinkPhase(!currentBlinkOn())
     // 空事务：只是让 decorations 缓存失效，供重渲染时
     // `buildCursorDecorations` 读取。
@@ -55,6 +59,34 @@ function currentBlinkOn(): boolean {
 }
 setBlinkPhase(true) // 初始化；之后由定时器接管
 
+
+/**
+ * 构建需要扇出写入的 [from, to) 范围列表：主选区 + 每个次光标，
+ * 按 `from` 降序排序（后面的插入不会使前面的位置失效）。
+ *
+ * 与主选区**重合**的次光标会被剔除：`addCursor` 会把主选区移到
+ * 新光标处，两者重合是常态；不去重的话同一段文本会被插入两次。
+ */
+function buildRanges(
+  view: EditorView,
+  cursors: Array<{ pos: number; anchor?: number | null }>,
+): Array<{ from: number; to: number }> {
+  const main = { from: view.state.selection.from, to: view.state.selection.to }
+  const ranges: Array<{ from: number; to: number }> = [main]
+  for (const c of cursors) {
+    const r =
+      c.anchor != null
+        ? { from: Math.min(c.anchor, c.pos), to: Math.max(c.anchor, c.pos) }
+        : { from: c.pos, to: c.pos }
+    const dup = r.from === r.to
+      ? r.from >= main.from && r.from <= main.to   // 点光标落在主选区内
+      : r.from === main.from && r.to === main.to   // 范围完全一致
+    if (!dup) ranges.push(r)
+  }
+  ranges.sort((a, b) => b.from - a.from)
+  return ranges
+}
+
 /**
  * 文本输入扇出。返回 `true` 表示已处理该输入，
  * `false` 表示交给 PM 的默认行为。
@@ -70,21 +102,7 @@ export function handleTextInput(
   if (!state || state.cursors.length === 0) return false
   if (view.composing) return false // 让 IME 先完成组合
 
-  const cursors = state.cursors
-  // 构建需要写入的 [from, to) 范围列表：
-  //   - 主选区（state.selection.from/to）
-  //   - 每个次光标（点或范围）
-  // 按 `from` 降序排序，这样每次 `insertText` 都不会让尚未
-  // 处理的范围位置失效。
-  const ranges: Array<{ from: number; to: number }> = [
-    { from: view.state.selection.from, to: view.state.selection.to },
-    ...cursors.map(c =>
-      c.anchor != null
-        ? { from: Math.min(c.anchor, c.pos), to: Math.max(c.anchor, c.pos) }
-        : { from: c.pos, to: c.pos },
-    ),
-  ]
-  ranges.sort((a, b) => b.from - a.from)
+  const ranges = buildRanges(view, state.cursors)
 
   let tr = view.state.tr
   for (const r of ranges) {
@@ -118,15 +136,7 @@ export function handleMultiCursorKeyDown(
   const key = event.key
   if (key !== 'Backspace' && key !== 'Delete') return false
 
-  const cursors = state.cursors
-  const ranges: Array<{ from: number; to: number }> = [
-    { from: view.state.selection.from, to: view.state.selection.to },
-    ...cursors.map(c =>
-      c.anchor != null
-        ? { from: Math.min(c.anchor, c.pos), to: Math.max(c.anchor, c.pos) }
-        : { from: c.pos, to: c.pos },
-    ),
-  ]
+  const ranges = buildRanges(view, state.cursors)
 
   // 退格删除 [from-1, from)；删除键删除 [to, to+1)。
   // 若范围非空，则原样删除整个范围。
@@ -190,16 +200,7 @@ export function handleMultiCursorPaste(
   // 空粘贴：无事可做。
   if (text === '') return false
 
-  const ranges: Array<{ from: number; to: number }> = [
-    { from: view.state.selection.from, to: view.state.selection.to },
-    ...state.cursors.map(c =>
-      c.anchor != null
-        ? { from: Math.min(c.anchor, c.pos), to: Math.max(c.anchor, c.pos) }
-        : { from: c.pos, to: c.pos },
-    ),
-  ]
-  // 降序排序，让每次 insertText 不会使剩余范围的位置失效。
-  ranges.sort((a, b) => b.from - a.from)
+  const ranges = buildRanges(view, state.cursors)
 
   let tr = view.state.tr
   for (const r of ranges) {

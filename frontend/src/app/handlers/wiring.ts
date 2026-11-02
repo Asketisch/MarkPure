@@ -65,6 +65,7 @@ export function wireApp(ctx: AppCtx) {
     ...ctx,
     getActiveContent: sync.getActiveContent,
     switchTab: tabOps.switchTab,
+    performCloseTab: tabOps.performCloseTab,
     handleOpenFile: fileOps.handleOpenFile,
   })
   wikiOps = createWikiOps({
@@ -103,6 +104,7 @@ export function wireApp(ctx: AppCtx) {
     applyEditorConfig: configOps.applyEditorConfig,
     initEditor: editorInit.initEditor,
     updateTableState: editorInit.updateTableState,
+    restoreSession: fileOps.restoreSession,
   })
   const windowEvents = createWindowEvents({
     ...ctx,

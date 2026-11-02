@@ -75,6 +75,14 @@ export function createFileOps(ctx: FileOpsDeps) {
       if (!info) return
       const existing = app.tabs.find(t => t.path === info.path)
       if (existing) {
+        // 标签有未保存修改时不静默覆盖——弹「文件已变更」对话框，
+        // 由用户决定重新加载还是保留自己的修改。
+        if (existing.dirty) {
+          if (!app.fileReloadPrompt) {
+            app.fileReloadPrompt = { tabId: existing.id, path: info.path, fileName: existing.name }
+          }
+          return
+        }
         existing.content = info.content
         existing.dirty = false
         existing.preview = false  // 显式打开时固定为普通标签页
@@ -125,6 +133,12 @@ export function createFileOps(ctx: FileOpsDeps) {
       if (!info) return
       const existing = app.tabs.find(t => t.path === info.path)
       if (existing) {
+        if (existing.dirty) {
+          if (!app.fileReloadPrompt) {
+            app.fileReloadPrompt = { tabId: existing.id, path: info.path, fileName: existing.name }
+          }
+          return
+        }
         existing.content = info.content
         existing.dirty = false
         existing.preview = false  // 固定标签页
@@ -147,9 +161,13 @@ export function createFileOps(ctx: FileOpsDeps) {
         previewTab.encoding = info.encoding
         previewTab.lineEnding = info.line_ending
         docClose(previewTab.id).catch(() => {})
+        // 注册文档：存储格式（另存为时沿用）+ 所属工作区根目录
         docOpen(previewTab.id, info.content, {
-          encoding: info.encoding,
-          lineEnding: info.line_ending,
+          format: {
+            encoding: info.encoding,
+            lineEnding: info.line_ending,
+          },
+          workspaceRootId: ctx.workspace.rootIdForPath(info.path),
         }).catch(() => {})
         switchTab(previewTab.id)
       } else {
@@ -177,6 +195,12 @@ export function createFileOps(ctx: FileOpsDeps) {
       if (!info) return
       const existing = app.tabs.find(t => t.path === info.path)
       if (existing) {
+        if (existing.dirty) {
+          if (!app.fileReloadPrompt) {
+            app.fileReloadPrompt = { tabId: existing.id, path: info.path, fileName: existing.name }
+          }
+          return
+        }
         existing.content = info.content
         existing.dirty = false
         existing.mtime = info.mtime
@@ -225,7 +249,40 @@ export function createFileOps(ctx: FileOpsDeps) {
     }
   }
 
-  return { handleOpenRecent, openFileInNewTab, handleOpenFile, handlePinTab, handleOpen, reloadTabFromDisk }
+  /**
+   * 会话恢复：把上次退出时打开的标签页按路径逐个从磁盘重新加载。
+   * 已失效的路径（文件被移动/删除）静默跳过——恢复是尽力而为，
+   * 不应在启动时弹一堆错误。全部失效时返回 false，让调用方落到
+   * 空状态 / 欢迎页。
+   * 注意：这里刻意不走 switchTab（initEditor 由调用方在恢复完成后
+   * 统一触发一次），避免 N 个文件触发 N 次编辑器销毁重建。
+   */
+  async function restoreSession(paths: string[], activePath: string | null): Promise<boolean> {
+    if (paths.length === 0) return false
+    const restored: Tab[] = []
+    for (const p of paths) {
+      try {
+        const info = await openFileByPath(p)
+        restored.push({
+          id: app.nextId++,
+          path: info.path,
+          name: info.file_name,
+          dirty: false,
+          content: info.content,
+          mtime: info.mtime,
+        })
+      } catch {
+        // 文件已不存在——跳过。
+      }
+    }
+    if (restored.length === 0) return false
+    app.tabs = [...app.tabs, ...restored]
+    const active = (activePath && restored.find(t => t.path === activePath)) || restored[0]
+    app.activeTabId = active.id
+    return true
+  }
+
+  return { handleOpenRecent, openFileInNewTab, handleOpenFile, handlePinTab, handleOpen, reloadTabFromDisk, restoreSession }
 }
 
 export type FileOps = ReturnType<typeof createFileOps>

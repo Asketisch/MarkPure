@@ -149,8 +149,9 @@ export function selectAllMatches(view: EditorView): boolean {
   const occurrences = findAllOccurrences(view.state.doc, needle.text)
   if (occurrences.length === 0) return false
 
-  // 跳过第一个——主光标就落在那里。
-  const rest = occurrences.slice(1)
+  // 剔除当前选区所在的那一条（不能按下标 slice(1)：主光标词在文档
+  // 中未必是文档序的第一个出现位置，按下标会漏掉一个真实匹配）。
+  const rest = occurrences.filter(o => !(o.from === needle.from && o.to === needle.to))
   const cursors: Cursor[] = rest.map(o => ({ pos: o.to, anchor: o.from }))
 
   const tr = view.state.tr

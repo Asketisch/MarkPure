@@ -19,4 +19,5 @@ pub mod editor_ops;
 pub mod export_ops;
 pub mod file_ops;
 pub mod state;
+pub mod test_driver;
 pub mod workspace_ops;

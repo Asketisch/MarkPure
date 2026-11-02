@@ -320,6 +320,11 @@ pub fn cmd_import_config(
         let _ = std::fs::create_dir_all(&dir);
         for theme in themes {
             let Some(id) = theme.get("id").and_then(|v| v.as_str()) else { continue };
+            // id 来自导入 payload——未校验就拼路径，`../../x` 可以
+            // 写出主题目录。复用保存路径上的同一校验。
+            if let Err(e) = mt_core::theme::validate_theme_id(id) {
+                return Err(format!("invalid theme in backup: {e}"));
+            }
             let target = dir.join(format!("{id}.json"));
             if target.exists() {
                 themes_skipped += 1;

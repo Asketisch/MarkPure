@@ -236,11 +236,12 @@ export function handleFromIdle(state: VimState, key: string, count: number): Par
   // （插件在 handleKeyDown 里返回 false）。不过我们接受其中
   // 几个会产出真实命令的：
   if (key === 'p' || key === 'P') {
-    return ready({ type: 'noOp' }, state, { ...state, pending: { kind: 'idle' } })
+    // 粘贴 V1 依赖 PM 的默认粘贴，必须真正放行（此前 noOp 会吞键）。
+    return ready({ type: 'pass' }, state, { ...state, pending: { kind: 'idle' } })
   }
   if (key === 'u') {
-    // 'u' 是撤销，交给 PM 处理。
-    return ready({ type: 'noOp' }, state, { ...state, pending: { kind: 'idle' } })
+    // 'u' 是撤销，交给 PM 处理（pass 而非 noOp——noOp 会吞键）。
+    return ready({ type: 'pass' }, state, { ...state, pending: { kind: 'idle' } })
   }
   if (key === 'g') {
     // 单独的 'g' 是空操作；'gg' 经由 motion 槽路径处理

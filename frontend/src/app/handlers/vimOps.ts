@@ -14,6 +14,7 @@ import type { AppCtx } from './ctx'
 export interface VimOpsDeps extends AppCtx {
   getActiveContent: () => string
   switchTab: (id: number, force?: boolean) => void
+  performCloseTab: (id: number) => void
   handleOpenFile: (path: string) => Promise<void>
 }
 
@@ -30,6 +31,10 @@ export function createVimOps(ctx: VimOpsDeps) {
     setVimEnabled(next)
     persistVimMode(next)
   }
+
+  // 调试 / 自动化测试钩子：Cmd+. 在部分环境下无法通过合成 DOM
+  // 事件触发（全局快捷键），测试驱动经此入口切换 Vim 模式。
+  ;(window as unknown as Record<string, unknown>).__markpure_toggle_vim = toggleVimMode
 
   /** 安装 ex 命令上下文（一次性）。 */
   function initExContext() {
@@ -76,12 +81,11 @@ export function createVimOps(ctx: VimOpsDeps) {
         if (tab.dirty && !_force) {
           return { ok: false, error: 'unsaved changes' }
         }
-        // 镜像常规关闭流程。
-        const id = tab.id
-        const newTabs = app.tabs.filter(t => t.id !== id)
-        const newActive = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null
-        app.tabs = newTabs
-        app.activeTabId = newActive
+        // 复用常规关闭流程：它负责从 Rust 文档端注销（docClose）、
+        // 清理自动保存 / 同步定时器、把活动标签切到相邻标签并重新
+        // 初始化编辑器。此前手写的镜像流程漏掉了这些步骤，导致
+        // `:q` 后编辑器仍显示已关标签的内容，输入会串写进别的标签。
+        ctx.performCloseTab(tab.id)
         return { ok: true }
       },
       isDirty: () => {

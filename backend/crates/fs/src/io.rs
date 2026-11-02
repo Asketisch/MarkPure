@@ -141,7 +141,10 @@ pub async fn write_file(document: &Document, path: &Path) -> Result<()> {
         encoded.into_owned()
     };
 
-    tokio::fs::write(path, encoded).await.map_err(Error::Io)
+    // 原子写：`tokio::fs::write` 先截断再写，中途失败/断电会把
+    // 用户文档截成半截。临时文件 + rename 与 tabs/config 的保存
+    // 策略一致。编码产物是原始字节，用字节版本。
+    mt_core::atomic::atomic_write_bytes(path, &encoded).map_err(Error::Io)
 }
 
 /// 检测编码并将字节解码为字符串
@@ -242,6 +245,15 @@ pub async fn rename_file(old_path: &Path, new_name: &str) -> Result<PathBuf> {
     })?;
     if !new_path.starts_with(parent) {
         return Err(Error::Other("rename escapes parent directory".into()));
+    }
+
+    // POSIX rename 会静默替换已存在的目标——把 `a.md` 改名为已有
+    // 的 `b.md` 等于无提示销毁 `b.md`。目标存在时显式报错。
+    if new_path.exists() {
+        return Err(Error::Other(format!(
+            "target already exists: {}",
+            new_path.display()
+        )));
     }
 
     tokio::fs::rename(old_path, &new_path).await.map_err(Error::Io)?;

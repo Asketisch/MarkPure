@@ -31,3 +31,5 @@ base64 = "0.22"
 objc2 = "0.5"
 objc2-app-kit = { version = "0.2", features = ["NSMenuItem"] }
 objc2-foundation = { version = "0.2", features = ["NSString"] }
+# 测试驱动器（test_driver）的快照完成回调使用 ObjC block。
+block2 = "0.5"

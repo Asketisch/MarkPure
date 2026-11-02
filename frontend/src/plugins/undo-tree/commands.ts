@@ -11,8 +11,8 @@
  *   - `labelBranch(id, l)`   → meta {type: 'label'}
  *   - `pruneBranch(id)`      → meta {type: 'prune'}
  *   - `collapseSubtree(id, c)` → meta {type: 'collapse'}
- *   - `goToParent()`         → meta {type: 'switch', toId: parent}
- *   - `goToChild(idx)`       → meta {type: 'switch', toId: child[idx]}
+ *   - `goToParent()`         → tr.replaceWith(...) + meta {type: 'switch', toId: parent}
+ *   - `goToChild(idx)`       → tr.replaceWith(...) + meta {type: 'switch', toId: child[idx]}
  *
  * 插件的 `apply` 读取 `tr.getMeta(undoTreePluginKey)`，并派发给
  * `state.ts` 中对应的 reducer。
@@ -81,24 +81,48 @@ export function collapseSubtree(branchId: string, collapsed: boolean) {
     dispatchMeta(editor, { type: 'collapse', id: branchId, collapsed })
 }
 
-/** 导航到当前节点的父节点。在根节点为空操作。 */
+/** 导航到当前节点的父节点，并把文档恢复为该节点的快照。在根节点为空操作。 */
 export function goToParent() {
-  return ({ editor, state }: { editor: Editor; state: import('@tiptap/pm/state').EditorState }): boolean => {
+  return ({ editor, state, dispatch }: {
+    editor: Editor
+    state: import('@tiptap/pm/state').EditorState
+    dispatch?: (tr: import('@tiptap/pm/state').Transaction) => void
+  }): boolean => {
     const tree = undoTreePluginKey.getState(state) as UndoTreeState | undefined
     const node = tree?.nodes[tree.currentId]
     if (!tree || !node || node.parentId === null) return false
-    return dispatchMeta(editor, { type: 'switch', fromId: tree.currentId, toId: node.parentId })
+    const target = tree.nodes[node.parentId]
+    if (!dispatch) return true
+    // 必须把文档恢复为目标节点的快照——只切 `currentId` 的话文档
+    // 仍是旧叶子的内容，后续 1 秒内的编辑会覆写错误节点的快照。
+    const tr = state.tr
+    tr.replaceWith(0, state.doc.content.size, state.schema.nodeFromJSON(target.docJson))
+    tr.setMeta(undoTreePluginKey, { type: 'switch', fromId: tree.currentId, toId: node.parentId })
+    dispatch(tr)
+    editor.commands.focus()
+    return true
   }
 }
 
-/** 导航到当前节点的第 n 个子节点。 */
+/** 导航到当前节点的第 n 个子节点，并把文档恢复为该节点的快照。 */
 export function goToChild(index: number) {
-  return ({ editor, state }: { editor: Editor; state: import('@tiptap/pm/state').EditorState }): boolean => {
+  return ({ editor, state, dispatch }: {
+    editor: Editor
+    state: import('@tiptap/pm/state').EditorState
+    dispatch?: (tr: import('@tiptap/pm/state').Transaction) => void
+  }): boolean => {
     const tree = undoTreePluginKey.getState(state) as UndoTreeState | undefined
     const node = tree?.nodes[tree.currentId]
     if (!tree || !node) return false
     const childId = node.childIds[index]
     if (!childId) return false
-    return dispatchMeta(editor, { type: 'switch', fromId: tree.currentId, toId: childId })
+    const target = tree.nodes[childId]
+    if (!dispatch) return true
+    const tr = state.tr
+    tr.replaceWith(0, state.doc.content.size, state.schema.nodeFromJSON(target.docJson))
+    tr.setMeta(undoTreePluginKey, { type: 'switch', fromId: tree.currentId, toId: childId })
+    dispatch(tr)
+    editor.commands.focus()
+    return true
   }
 }

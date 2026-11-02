@@ -156,9 +156,13 @@ pub fn upload_image_remote(
 
     // 发送请求（ureq 3.x API）。ureq 3 的默认超时几乎全为 None——
     // 挂死的服务器会无限阻塞慢速 IPC 线程，这里显式设 30s 上限。
+    // 重定向必须禁用：`validate_upload_url` 只校验初始 URL，若允许
+    // 跟随 302，公网服务器一跳即可把请求转进 127.0.0.1 / 云元数据
+    // 地址，全部 SSRF 防护形同虚设。
     let mut request = ureq::post(upload_url)
         .config()
         .timeout_per_call(Some(std::time::Duration::from_secs(30)))
+        .max_redirects(0)
         .build()
         .header(
             "Content-Type",

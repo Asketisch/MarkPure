@@ -109,6 +109,9 @@ fn sanitize_body(html: &str) -> String {
                 // 第 2 步：从保留的标签中剥离内联事件处理属性。
                 // 没有 `<script>` 标签时 `on*` 属性也能执行 JS。
                 let cleaned = strip_event_handlers(tag_inner);
+                // 第 3 步：中和危险 URL scheme。`<a href="javascript:...">`
+                // 在 CSP 之外的上下文（复制出去的独立 HTML）仍是活的。
+                let cleaned = strip_dangerous_urls(&cleaned);
                 out.push('<');
                 out.push_str(&cleaned);
                 out.push('>');
@@ -123,6 +126,86 @@ fn sanitize_body(html: &str) -> String {
         out.push(html[i..].chars().next().unwrap());
         i += html[i..].chars().next().unwrap().len_utf8();
     }
+    out
+}
+
+/// 从标签内文移除 href/src 指向危险 scheme 的属性。
+/// `<a href="javascript:...">` → `<a>`。大小写不敏感，并容忍
+/// scheme 前的空白/控制字符（`jav	ascript:` 混淆是常见手法）。
+fn strip_dangerous_urls(tag_inner: &str) -> String {
+    let lower = tag_inner.to_ascii_lowercase();
+    let mut ranges_to_remove: Vec<(usize, usize)> = Vec::new();
+    for attr in ["href", "src"] {
+        let mut search_from = 0usize;
+        while let Some(rel) = lower[search_from..].find(attr) {
+            let name_start = search_from + rel;
+            // 属性名必须是完整词（前面是空白或标签开头）。
+            let boundary_ok = name_start == 0
+                || lower.as_bytes()[name_start - 1].is_ascii_whitespace();
+            let after = name_start + attr.len();
+            if boundary_ok
+                && after < lower.len()
+                && lower.as_bytes()[after] == b'='
+            {
+                // 值的起点（跳过引号）。
+                let mut v = after + 1;
+                while v < lower.len() && lower.as_bytes()[v].is_ascii_whitespace() {
+                    v += 1;
+                }
+                let quoted = v < lower.len() && (lower.as_bytes()[v] == b'"' || lower.as_bytes()[v] == b'\'');
+                if quoted {
+                    v += 1;
+                }
+                // 收集 scheme 字符（字母 + 容许插在中间的空白/控制字符）。
+                let scheme_end = (v..lower.len())
+                    .take_while(|&j| {
+                        let b = lower.as_bytes()[j];
+                        b.is_ascii_alphabetic() || b.is_ascii_whitespace()
+                            || (b <= 0x1f)
+                    })
+                    .last()
+                    .map(|j| j + 1)
+                    .unwrap_or(v);
+                // 冒号之前不能出现 `/` `#` `?`，否则不是 scheme。
+                let scheme_text: String = lower[v..scheme_end]
+                    .chars()
+                    .filter(|c| !c.is_whitespace())
+                    .collect();
+                let value_start = scheme_end;
+                if scheme_text.ends_with(':') {
+                    let scheme: String = scheme_text.trim_end_matches(':').to_string();
+                    if matches!(scheme.as_str(), "javascript" | "vbscript" | "data") {
+                        // 找属性值的结尾。
+                        let mut end = value_start;
+                        while end < lower.len() {
+                            let b = lower.as_bytes()[end];
+                            if quoted && b == b'"' {
+                                end += 1;
+                                break;
+                            }
+                            if !quoted && (b == b' ' || b == b'>') {
+                                break;
+                            }
+                            end += 1;
+                        }
+                        ranges_to_remove.push((name_start, end.min(tag_inner.len())));
+                    }
+                }
+            }
+            search_from = name_start + attr.len();
+        }
+    }
+    if ranges_to_remove.is_empty() {
+        return tag_inner.to_string();
+    }
+    let mut out = String::with_capacity(tag_inner.len());
+    let mut last = 0usize;
+    for (s, e) in ranges_to_remove {
+        // 以字节边界复制间隙（属性定位本身只在 ASCII 上操作）。
+        out.push_str(&tag_inner[last..s]);
+        last = e.max(last);
+    }
+    out.push_str(&tag_inner[last..]);
     out
 }
 

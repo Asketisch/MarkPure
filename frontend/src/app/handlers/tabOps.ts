@@ -33,6 +33,13 @@ export function createTabOps(ctx: TabOpsDeps) {
       current.content = getMarkdown(getEditor()!)
     }
     app.activeTabId = id
+    // 纯源码模式下没有 Tiptap 编辑器（initEditor 提前返回），
+    // 需要在这里把源码镜像同步到新标签页，否则 SourceEditor
+    // 仍显示上一个标签的 Markdown。
+    if (app.viewMode === 'source') {
+      const target = app.tabs.find(t => t.id === id)
+      if (target) app.sourceContent = target.content
+    }
     scheduleInitEditor()
   }
 

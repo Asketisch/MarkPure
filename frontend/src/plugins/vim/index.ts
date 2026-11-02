@@ -180,6 +180,8 @@ export function createVimPlugin(): Plugin {
           return true
         }
         // 把命令派发给编辑器。
+        // pass：按键放行给 PM / 浏览器（撤销、粘贴等），不吞键。
+        if (cmd.type === 'pass') return false
         event.preventDefault()
         if (cmd.type === 'noOp') return true
         return dispatchVimCommand(view, cmd)

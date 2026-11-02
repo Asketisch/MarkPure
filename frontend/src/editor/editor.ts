@@ -2,6 +2,7 @@ import { Editor, Extension, mergeAttributes } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { applyEditorPrefs, type EditorOptions } from './config'
+import { getMarkdown } from './content'
 export { getMarkdown, setContent } from './content'
 import { Markdown } from '@tiptap/markdown'
 import { marked } from 'marked'
@@ -423,6 +424,14 @@ export function createEditor(opts: EditorOptions): Editor {
       }
     },
   })
+
+  // 调试 / 自动化测试钩子：让驱动脚本与浏览器控制台能拿到当前
+  // 编辑器实例（多标签页场景下指向最近初始化的活动编辑器）。
+  // 应用逻辑不得依赖此全局量。getMarkdown 必须走 content.ts 的
+  // 统一包装（含序列化反转义），与保存路径保持一致。
+  ;(window as unknown as Record<string, unknown>).__markpure_editor = editor
+  ;(window as unknown as Record<string, unknown>).__markpure_get_markdown = () =>
+    getMarkdown(editor)
 
   return editor
 }

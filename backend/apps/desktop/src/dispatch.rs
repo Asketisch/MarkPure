@@ -81,6 +81,9 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
         // 搜索 → 慢速（遍历工作区）
         "search_workspace" => return None,
 
+        // 工作区搜索替换（预览不写盘；执行直接落盘）→ 慢速
+        "preview_workspace_replace" | "replace_in_workspace" => return None,
+
         // 国际化 — 快速（内存操作）
         "get_locale" => workspace_ops::cmd_get_locale(state),
         "set_locale" => workspace_ops::cmd_set_locale(&msg.params, state),
@@ -103,6 +106,10 @@ pub fn handle_command(msg: &IpcMessage, state: &AppState) -> Option<IpcResponse>
 
         // 应用信息 — 快速
         "get_app_info" => workspace_ops::cmd_get_app_info(),
+
+        // 测试驱动器的回传通道（`__` 前缀：非公开契约）。快速路径
+        // 直接写驱动目录下的 result 文件。
+        "__driver_report" => crate::test_driver::cmd_report(&msg.params),
 
         // 拼写检查 → 慢速（拼写检查器运行在主线程）
         "check_spelling" => return None,
@@ -217,7 +224,19 @@ pub fn dispatch_slow(msg: IpcMessage, state: Arc<AppState>) {
 
     let state_for_thread = state.clone();
     std::thread::spawn(move || {
-        let result = run_slow_command(&msg, &state_for_thread);
+        // 慢速处理器 panic（如畸形参数触发索引越界）时线程会静默
+        // 死亡，前端 promise 永久挂起。捕获并转为 error 响应。
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run_slow_command(&msg, &state_for_thread)
+        }))
+        .unwrap_or_else(|p| {
+            let m = p
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()))
+                .unwrap_or_else(|| "internal panic".into());
+            Err(format!("internal error: {m}"))
+        });
         let response = match result {
             Ok(v) => IpcResponse { id: msg.id, result: Some(v), error: None },
             Err(e) => IpcResponse { id: msg.id, result: None, error: Some(e) },
@@ -278,6 +297,10 @@ fn run_slow_command(
 
         // 工作区搜索
         "search_workspace" => export_ops::cmd_search_workspace(&msg.params),
+
+        // 工作区搜索替换（预览不写盘；执行直接落盘）
+        "preview_workspace_replace" => export_ops::cmd_preview_workspace_replace(&msg.params),
+        "replace_in_workspace" => export_ops::cmd_replace_in_workspace(&msg.params),
 
         // 资源
         "save_pasted_image" => export_ops::cmd_save_pasted_image(&msg.params, state),

@@ -101,7 +101,7 @@ impl DirKey {
 /// 将仓库的所有 Git 状态载入 HashMap 以便快速查询
 fn load_git_status_map(repo_root: &Path) -> Option<std::collections::HashMap<String, GitStatus>> {
     let output = std::process::Command::new("git")
-        .args(["status", "--porcelain", "-uall"])
+        .args(["-c", "core.quotepath=false", "status", "--porcelain", "-uall"])
         .current_dir(repo_root)
         .output()
         .ok()?;

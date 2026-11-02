@@ -42,6 +42,15 @@ impl FileWatcher {
         // 创建监视器时的路径。这是按根目录刷新的关键。
         let id_for_closure = id.clone();
 
+        // macOS 上 notify/FSEvents 报告的是**规范化**路径（`/tmp`
+        // 变成 `/private/tmp`），与前端标签页持有的用户输入路径
+        // 不一致——「按路径匹配标签页」的外部变更重载会因此失效。
+        // 记住用户提供的根与规范化根，事件路径改写回用户前缀。
+        let user_root = path.to_string_lossy().to_string();
+        let canonical_root = std::fs::canonicalize(path)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| user_root.clone());
+
         let mut watcher = RecommendedWatcher::new(
             move |res: Result<notify::Event, notify::Error>| {
                 if let Ok(event) = res {
@@ -53,15 +62,28 @@ impl FileWatcher {
                     };
 
                     for path in event.paths {
+                        let canonical = path.to_string_lossy().to_string();
+                        // 前缀必须落在路径边界（后跟分隔符或长度相等），
+                        // 否则 `/proj` 会错误改写 `/proj2/...`。
+                        let boundary = canonical_root.len() == canonical.len()
+                            || canonical.as_bytes().get(canonical_root.len()) == Some(&b'/');
+                        let reported = if canonical_root != user_root
+                            && canonical.starts_with(canonical_root.as_str())
+                            && boundary
+                        {
+                            format!("{}{}", user_root, &canonical[canonical_root.len()..])
+                        } else {
+                            canonical
+                        };
                         let change = FileChangeEvent {
                             workspace_id: id_for_closure.clone(),
-                            path: path.to_string_lossy().to_string(),
+                            path: reported.clone(),
                             kind: kind.to_string(),
                         };
                         if tx.send(change).is_err() {
                             eprintln!(
                                 "[FileWatcher] receiver dropped, event dropped: {}",
-                                path.to_string_lossy()
+                                reported
                             );
                         }
                     }
@@ -76,19 +98,19 @@ impl FileWatcher {
             .map_err(|e| e.to_string())?;
 
         let handle = WatcherHandle { watcher };
-        self.watchers.lock().unwrap().insert(id.clone(), handle);
+        self.watchers.lock().unwrap_or_else(|p| p.into_inner()).insert(id.clone(), handle);
 
         Ok(rx)
     }
 
     /// 停止监视目录
     pub fn unwatch(&mut self, id: &str) {
-        self.watchers.lock().unwrap().remove(id);
+        self.watchers.lock().unwrap_or_else(|p| p.into_inner()).remove(id);
     }
 
     /// 若给定工作区 id 有活动的监视器则返回 true。
     pub fn has_watcher(&self, id: &str) -> bool {
-        self.watchers.lock().unwrap().contains_key(id)
+        self.watchers.lock().unwrap_or_else(|p| p.into_inner()).contains_key(id)
     }
 
     /// 返回所有当前活动监视器的 id。

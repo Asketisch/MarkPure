@@ -10,8 +10,31 @@ import type { DocStats, FileEntry, FileFormat, FileInfo } from './types'
 
 // ============================== 文件对话框 ==============================
 
+/** Rust 侧对话框以 `Err("Cancelled")` 表示用户取消——这里归一化
+ *  为 resolve `null`，让调用方不必区分「取消」与「真错误」。 */
+function isCancelled(e: unknown): boolean {
+  return e instanceof Error && e.message === 'Cancelled'
+}
+
+/** 弹出原生对话框并取回选中的路径。
+ *
+ * 两个要点：
+ * - **超时**：用户在原生「打开 / 另存为」面板上停留的时间可能远超
+ *   默认的 IPC 超时，那会让一次正常的保存被误报成失败。原生对话框
+ *   用独立的、宽松的超时。
+ * - **取消归一化**：Rust 用 `Err("Cancelled")` 表示用户取消，这里
+ *   转成 `null`，调用方不必区分「取消」与「真错误」。 */
+async function pickPath(cmd: 'pick_open_file' | 'pick_save_file' | 'pick_directory'): Promise<string | null> {
+  try {
+    return await ipc<string>(cmd, {}, NATIVE_DIALOG_TIMEOUT_MS)
+  } catch (e) {
+    if (isCancelled(e)) return null
+    throw e
+  }
+}
+
 export async function openFile(): Promise<FileInfo | null> {
-  const path = await ipc<string>('pick_open_file', {}, NATIVE_DIALOG_TIMEOUT_MS)
+  const path = await pickPath('pick_open_file')
   if (!path) return null
   return await ipc<FileInfo>('open_file', { path })
 }
@@ -37,11 +60,17 @@ export async function saveFile(
   })
 }
 
+/**
+ * 另存为。
+ *
+ * `format` 是**源文档**的存储格式；目标是新路径时后端沿用它，
+ * 避免 GBK / CRLF 文档另存后被改写成 UTF-8 + LF。
+ */
 export async function saveFileAs(
   content: string,
   format?: FileFormat | null,
 ): Promise<string | null> {
-  const path = await ipc<string>('pick_save_file', {}, NATIVE_DIALOG_TIMEOUT_MS)
+  const path = await pickPath('pick_save_file')
   if (!path) return null
   await ipc('save_file', {
     path,
@@ -57,7 +86,7 @@ export async function getDocStats(content: string): Promise<DocStats> {
 }
 
 export async function pickDirectory(): Promise<string | null> {
-  return await ipc<string>('pick_directory', {}, NATIVE_DIALOG_TIMEOUT_MS)
+  return await pickPath('pick_directory')
 }
 
 // ============================== 目录树 ==============================
@@ -70,12 +99,20 @@ export async function getDirectoryTree(
   return await ipc('get_directory_tree', { path, depth, show_hidden })
 }
 
-export async function watchDirectory(path: string): Promise<void> {
-  await ipc('watch_directory', { path })
+/** 开始监视目录。多根工作区请传入稳定根目录 id（`workspaceId`），
+ *  让后端以 id（而非路径）标识监听器；省略时后端回退用路径作 id
+ *  并打印弃用警告。 */
+export async function watchDirectory(path: string, workspaceId?: string | null): Promise<void> {
+  await ipc('watch_directory', {
+    path,
+    workspace_id: workspaceId ?? undefined,
+  })
 }
 
-export async function unwatchDirectory(): Promise<void> {
-  await ipc('unwatch_directory')
+export async function unwatchDirectory(workspaceId?: string | null): Promise<void> {
+  await ipc('unwatch_directory', {
+    workspace_id: workspaceId ?? undefined,
+  })
 }
 
 // ============================== 文件增删改 ==============================
@@ -92,8 +129,11 @@ export async function deleteFile(path: string): Promise<void> {
   await ipc('delete_file', { path })
 }
 
+/** 重命名文件。后端返回 `{ path: <新路径> }`，这里解包成新路径
+ *  字符串返回。 */
 export async function renameFile(path: string, newName: string): Promise<string> {
-  return await ipc('rename_file', { path, new_name: newName })
+  const result = await ipc<{ path: string }>('rename_file', { path, new_name: newName })
+  return result?.path ?? ''
 }
 
 // ============================== 拖放 ==============================

@@ -121,6 +121,9 @@ pub fn render_footnote_section(notes: &[Footnote]) -> String {
 /// 把文中脚注引用渲染为 `<sup>` HTML。`number` 应来自
 /// `collect_footnotes`，让引用与定义共用相同的编号。
 pub fn render_footnote_ref_html(label: &str, number: usize) -> String {
+    // label 进入 HTML 属性值——`[^a"><img ...>]` 这类标签如果不转义
+    // 就能拆开属性结构。CSP 能挡住最终执行，但防御纵深不该省略。
+    let label = escape_html(label);
     format!(
         "<sup class=\"footnote-ref\"><a id=\"fnref-{label}\" href=\"#fn-{label}\">[{number}]</a></sup>",
     )
@@ -128,6 +131,7 @@ pub fn render_footnote_ref_html(label: &str, number: usize) -> String {
 
 /// 渲染脚注定义的单条 `<li>`。
 pub fn render_footnote_def_li_html(label: &str, number: usize, content: &str) -> String {
+    let label = escape_html(label);
     format!(
         "<li id=\"fn-{label}\" value=\"{number}\">{} <a class=\"footnote-back\" href=\"#fnref-{label}\" title=\"Back to text\">&#8617;</a></li>\n",
         escape_html(content),

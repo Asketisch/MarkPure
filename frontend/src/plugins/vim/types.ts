@@ -129,6 +129,9 @@ export type VimCommand =
   // 哨兵：解析器接受了按键但没有命令触发
   // （例如单独的 `:` 在等待 ex 命令文本）。插件改为读取待处理缓冲。
   | { type: 'noOp' }
+  // 哨兵：按键完全放行给 ProseMirror / 浏览器默认行为（不
+  // preventDefault）。`u`（撤销）、`p`/`P`（粘贴）在 V1 依赖 PM。
+  | { type: 'pass' }
   | { type: 'error'; message: string }
 
 /** 解析器当前正在组装的内容。 */

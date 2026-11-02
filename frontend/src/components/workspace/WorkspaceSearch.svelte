@@ -3,6 +3,7 @@
   import { useI18n } from '$lib/stores/i18n.svelte'
   import { onMount } from 'svelte'
   import WorkspaceSearchResult from './WorkspaceSearchResult.svelte'
+  import WorkspaceReplacePanel from './WorkspaceReplacePanel.svelte'
 
   const i18n = useI18n()
 
@@ -37,8 +38,16 @@
   let error = $state('')
   let selectedIndex = $state(-1)
   // 多根搜索范围。宿主可以通过 `initialScope` 预置；用户也可以
-  // 通过工具栏里的小下拉切换。
+  // 通过工具栏里的小下拉切换。组件常驻不卸载——`$state` 只在
+  // 首次挂载时取 initialScope，此后宿主再次以 `all` 打开时需要
+  // 显式同步，否则「搜索所有根目录」入口永远只搜活动根。
   let scope = $state<'active' | 'all'>(initialScope)
+  $effect(() => {
+    if (visible) scope = initialScope
+  })
+
+  // ----- 替换模式 -----
+  let replaceMode = $state(false)
   let searchSeq = 0 // 请求序号，用于丢弃过期结果
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -108,6 +117,14 @@
   function debouncedSearch() {
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => doSearch(), 200)
+  }
+
+  /** 替换根：与 doSearch 的范围解析保持一致。 */
+  function replaceRoots(): string | string[] | null {
+    if (scope === 'all' && rootPaths && rootPaths.length > 1) {
+      return rootPaths
+    }
+    return workspacePath || null
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -191,6 +208,12 @@
       <button class="ws-opt" class:active={caseSensitive} onclick={() => caseSensitive = !caseSensitive} title={i18n.t('search.match_case')}>Aa</button>
       <button class="ws-opt" class:active={wholeWord} onclick={() => wholeWord = !wholeWord} title={i18n.t('search.whole_word')}>Ab</button>
       <button class="ws-opt" class:active={useRegex} onclick={() => useRegex = !useRegex} title={i18n.t('search.regex')}>.*</button>
+      <button
+        class="ws-opt"
+        class:active={replaceMode}
+        onclick={() => replaceMode = !replaceMode}
+        title={i18n.t('search.replace_toggle')}
+      >⇄</button>
       {#if rootPaths && rootPaths.length > 1}
         <button
           class="ws-opt"
@@ -207,6 +230,17 @@
         {/if}
       </span>
     </div>
+
+    {#if replaceMode}
+      <WorkspaceReplacePanel
+        {query}
+        roots={replaceRoots()}
+        {caseSensitive}
+        {wholeWord}
+        {useRegex}
+        onReplaced={doSearch}
+      />
+    {/if}
 
     {#if error}
       <div class="ws-error">{error}</div>

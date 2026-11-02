@@ -428,7 +428,10 @@ fn strip_footnote_refs(text: &str, footnotes: &[Footnote]) -> String {
                     out.push('[');
                     out.push_str(&note.number.to_string());
                     out.push(']');
-                    i += close + 1;
+                    // 跳过 `[^`（2 字节）+ label（close 字节）+ `]`（1 字节）。
+                    // 旧代码 `close + 1` 少跳 2 字节，label 残留输出
+                    //（"see [^a] now" → "see [1]a] now"）。
+                    i += close + 3;
                     continue;
                 }
             }
@@ -442,6 +445,19 @@ fn strip_footnote_refs(text: &str, footnotes: &[Footnote]) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn test_strip_footnote_refs_consumes_label() {
+        // 回归：旧的 `i += close + 1` 少跳 2 字节，label 残留
+        //（"see [^a] now" → "see [1]a] now"）。
+        let footnotes = vec![markdown::FootnoteDef {
+            label: "a".to_string(),
+            content: "note text".to_string(),
+            number: 1,
+        }];
+        let out = strip_footnote_refs("see [^a] now", &footnotes);
+        assert_eq!(out, "see [1] now");
+    }
     use super::*;
 
     #[test]

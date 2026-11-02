@@ -81,6 +81,59 @@ export async function searchWorkspace(
   })
 }
 
+// ============================== 工作区搜索替换 ==============================
+
+/** 单条替换预览：一行替换前后的对照。 */
+export interface ReplacePreviewItem {
+  file_path: string
+  line_number: number
+  line_before: string
+  line_after: string
+}
+
+/** 跨文件替换的执行结果摘要。 */
+export interface ReplaceSummaryResult {
+  total_files_modified: number
+  total_replacements: number
+}
+
+export interface WorkspaceReplaceOptions {
+  case_sensitive: boolean
+  whole_word: boolean
+  use_regex: boolean
+  max_depth?: number
+}
+
+function replaceParams(
+  path: string | string[],
+  query: string,
+  replacement: string,
+  options: WorkspaceReplaceOptions,
+): Record<string, unknown> {
+  const pathOrPaths = Array.isArray(path) ? { paths: path } : { path }
+  return { ...pathOrPaths, query, replacement, ...options }
+}
+
+/** 替换预览：不写盘，返回每处匹配所在行的前后对照。 */
+export async function previewWorkspaceReplace(
+  path: string | string[],
+  query: string,
+  replacement: string,
+  options: WorkspaceReplaceOptions,
+): Promise<ReplacePreviewItem[]> {
+  return await ipc<ReplacePreviewItem[]>('preview_workspace_replace', replaceParams(path, query, replacement, options)) ?? []
+}
+
+/** 执行跨文件替换（直接落盘）。 */
+export async function replaceInWorkspace(
+  path: string | string[],
+  query: string,
+  replacement: string,
+  options: WorkspaceReplaceOptions,
+): Promise<ReplaceSummaryResult> {
+  return await ipc<ReplaceSummaryResult>('replace_in_workspace', replaceParams(path, query, replacement, options)) ?? { total_files_modified: 0, total_replacements: 0 }
+}
+
 // ============================== 资产（图片） ==============================
 
 export interface SavedImage {
@@ -95,7 +148,7 @@ export async function savePastedImage(
   name?: string,
 ): Promise<SavedImage> {
   return await ipc('save_pasted_image', {
-    workspace_path: workspacePath, data, name,
+    workspace_root_path: workspacePath, data, name,
   })
 }
 

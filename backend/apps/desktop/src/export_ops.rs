@@ -13,6 +13,24 @@ use std::path::PathBuf;
 
 // ============================== 导出 ==============================
 
+/// 把文档标题消毒成可安全用作文件名的形式。`rfd` 的
+/// `set_file_name` 遇到 `/` 等非法字符时会静默失败——保存对话框
+/// 一闪而过或干脆不弹，用户以为导出坏了。这里把路径分隔符与
+/// 控制字符替换为 `_`，并限制长度（多数文件系统上限 255 字节）。
+fn sanitize_title_for_filename(title: &str) -> String {
+    let cleaned: String = title
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            c if (c as u32) < 32 => '_',
+            c => c,
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_end_matches('.');
+    let out = if trimmed.is_empty() { "untitled".to_string() } else { trimmed.to_string() };
+    out.chars().take(120).collect()
+}
+
 /// 解析导出目标路径。
 ///
 /// 当 `params.dest_path` 非空时直接使用它，跳过原生「另存为」对话框。
@@ -24,10 +42,13 @@ use std::path::PathBuf;
 ///  2. **可复用性** —— 未来「导出到固定位置」「批量导出」
 ///     这类功能不必再引入第二个 IPC 命令。
 ///
-/// 省略 `dest_path` 时行为不变：弹出原生对话框。
+/// 省略 `dest_path` 时行为不变：弹出原生对话框，默认文件名经
+/// `sanitize_title_for_filename` 消毒（标题与扩展名分开处理，
+/// 空标题回退为 `untitled.<ext>`）。
 fn export_target(
     params: &serde_json::Value,
-    default_name: &str,
+    title: &str,
+    extension: &str,
     filter: (&str, &[&str]),
     dialog_title: &str,
 ) -> std::result::Result<PathBuf, String> {
@@ -36,9 +57,10 @@ fn export_target(
             return Ok(PathBuf::from(p));
         }
     }
+    let file_name = format!("{}.{}", sanitize_title_for_filename(title), extension);
     FileDialog::new()
         .add_filter(filter.0, filter.1)
-        .set_file_name(default_name)
+        .set_file_name(file_name)
         .set_title(dialog_title)
         .save_file()
         .ok_or_else(|| "Cancelled".to_string())
@@ -59,12 +81,7 @@ pub fn cmd_export_html(params: &serde_json::Value) -> std::result::Result<serde_
 
     let html = export::export_html(content, title, theme_css);
 
-    let path = export_target(
-        params,
-        &format!("{}.html", title),
-        ("HTML", &["html"]),
-        "Export HTML",
-    )?;
+    let path = export_target(params, title, "html", ("HTML", &["html"]), "Export HTML")?;
 
     std::fs::write(&path, html).map_err(|e| e.to_string())?;
 
@@ -84,12 +101,7 @@ pub fn cmd_export_pdf(params: &serde_json::Value) -> std::result::Result<serde_j
     // （与无法解析 URL 时的旧行为一致）。
     let source_path = params.get("source_path").and_then(|v| v.as_str());
 
-    let path = export_target(
-        params,
-        &format!("{}.pdf", title),
-        ("PDF", &["pdf"]),
-        "Export PDF",
-    )?;
+    let path = export_target(params, title, "pdf", ("PDF", &["pdf"]), "Export PDF")?;
 
     export::export_pdf(content, title, &path.to_string_lossy(), source_path)?;
 
@@ -109,7 +121,8 @@ pub fn cmd_export_word(params: &serde_json::Value) -> std::result::Result<serde_
 
     let path = export_target(
         params,
-        &format!("{}.docx", title),
+        title,
+        "docx",
         ("Word Document", &["docx"]),
         "Export Word Document",
     )?;
@@ -148,7 +161,8 @@ pub fn cmd_export_png(params: &serde_json::Value) -> std::result::Result<serde_j
 
     let path = export_target(
         params,
-        &format!("{}.png", title),
+        title,
+        "png",
         ("PNG Image", &["png"]),
         "Export PNG Image",
     )?;
@@ -214,6 +228,113 @@ pub fn cmd_search_workspace(
     };
 
     serde_json::to_value(result).map_err(|e| e.to_string())
+}
+
+// ============================== 工作区搜索替换 ==============================
+
+/// 解析工作区替换命令的公共参数：`query` / `replacement` /
+/// `path|paths` / 搜索选项。`preview_workspace_replace` 与
+/// `replace_in_workspace` 共用。
+struct WorkspaceReplaceParams {
+    query: String,
+    replacement: String,
+    root_paths: Vec<PathBuf>,
+    options: search::SearchOptions,
+}
+
+fn parse_workspace_replace_params(
+    params: &serde_json::Value,
+) -> std::result::Result<WorkspaceReplaceParams, String> {
+    let query = params["query"]
+        .as_str()
+        .ok_or("Missing 'query' parameter")?
+        .to_string();
+    let replacement = params["replacement"]
+        .as_str()
+        .ok_or("Missing 'replacement' parameter")?
+        .to_string();
+
+    let mut path_strs: Vec<String> = params["paths"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+    if path_strs.is_empty() {
+        if let Some(p) = params["path"].as_str() {
+            path_strs.push(p.to_string());
+        }
+    }
+    if path_strs.is_empty() {
+        return Err("Missing 'path' or 'paths' parameter".to_string());
+    }
+    let root_paths: Vec<PathBuf> = path_strs.iter().map(PathBuf::from).collect();
+
+    let options = search::SearchOptions {
+        case_sensitive: params
+            .get("case_sensitive")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        whole_word: params
+            .get("whole_word")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        use_regex: params
+            .get("use_regex")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
+        max_depth: params.get("max_depth").and_then(|v| v.as_u64()).map(|v| v as usize),
+    };
+
+    Ok(WorkspaceReplaceParams { query, replacement, root_paths, options })
+}
+
+/// `preview_workspace_replace`：跨文件替换预览（不写盘）。
+/// 多根：逐根执行后合并（不同根的文件路径天然不重叠）。
+pub fn cmd_preview_workspace_replace(
+    params: &serde_json::Value,
+) -> std::result::Result<serde_json::Value, String> {
+    let p = parse_workspace_replace_params(params)?;
+    let mut all: Vec<serde_json::Value> = Vec::new();
+    for root in &p.root_paths {
+        let previews = search::preview_replace(root, &p.query, &p.replacement, &p.options)
+            .map_err(|e| e.to_string())?;
+        all.extend(
+            previews
+                .into_iter()
+                .map(|pv| serde_json::to_value(&pv).unwrap_or(serde_json::Value::Null)),
+        );
+    }
+    Ok(serde_json::Value::Array(all))
+}
+
+/// `replace_in_workspace`：执行跨文件替换并落盘。
+pub fn cmd_replace_in_workspace(
+    params: &serde_json::Value,
+) -> std::result::Result<serde_json::Value, String> {
+    let p = parse_workspace_replace_params(params)?;
+    let mut total_files = 0usize;
+    let mut total_replacements = 0usize;
+    let mut all_results: Vec<serde_json::Value> = Vec::new();
+    for root in &p.root_paths {
+        let summary = search::replace_in_files(root, &p.query, &p.replacement, &p.options)
+            .map_err(|e| e.to_string())?;
+        total_files += summary.total_files_modified;
+        total_replacements += summary.total_replacements;
+        all_results.extend(
+            summary
+                .results
+                .into_iter()
+                .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null)),
+        );
+    }
+    Ok(serde_json::json!({
+        "total_files_modified": total_files,
+        "total_replacements": total_replacements,
+        "results": all_results,
+    }))
 }
 
 // ============================== 资源 ==============================

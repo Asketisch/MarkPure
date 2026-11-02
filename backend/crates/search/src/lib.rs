@@ -145,9 +145,23 @@ pub fn search_workspace(
     let mut truncated = false;
 
     // 构建文件遍历器
+    // `filter_entry` 真正剪枝：`continue` 只跳过目录条目本身，
+    // walkdir 仍会下降进 `.git/`、`node_modules/` 内部，把里面的
+    // .js/.json 等白名单文件全部卷进搜索结果。
     let walker = WalkDir::new(root_path)
         .follow_links(true)
-        .max_depth(options.max_depth.unwrap_or(10));
+        .max_depth(options.max_depth.unwrap_or(10))
+        .into_iter()
+        .filter_entry(|e| {
+            // 根目录自身不过滤（工作区路径可能以 . 开头）。
+            if e.depth() == 0 {
+                return true;
+            }
+            e.file_name()
+                .to_str()
+                .map(|name| !(name.starts_with('.') || name == "node_modules" || name == "target"))
+                .unwrap_or(true)
+        });
 
     // 环护栏：`follow_links` 下符号链接目录环（`ln -s ..`）会无限
     // 遍历。按 (设备, inode/file_id) 记录每个已访问的真实目录，
@@ -336,27 +350,27 @@ fn is_binary_file(path: &PathBuf) -> bool {
             if sample.contains(&0) {
                 return true;
             }
-            // 额外启发式：控制字符占比过高视为二进制。
+            // 按 **字符** 统计不可打印比例（UTF-8 lossy 解码）。
+            // 旧的按字节启发式把 UTF-8 中文（每字符 3 个 ≥0x80 的
+            // 字节）全算成「不可打印」，中文笔记一律被误判为二进制
+            // 而跳过搜索——中文场景下搜索功能等于完全失效。
             //
-            // **注意 0x80–0xFF 不能算作「不可打印」**：它们在 UTF-8 里
-            // 是中文 / 日文 / emoji 等多字节序列的组成部分。早期版本
-            // 把它们计入 non_printable，结果**所有中文文件都被判成
-            // 二进制**——工作区搜索因此完全搜不到中文内容（这对一个
-            // 中文 Markdown 编辑器是致命的）。
-            //
-            // 真正的二进制（PNG / zip / 可执行文件）几乎必然含 NUL，
-            // 那一条已经覆盖；控制字符只是辅助判据。
-            let mut suspicious = 0usize;
-            for &b in sample {
-                if b == 0 {
-                    return true;
-                }
-                let is_control = b < 0x20 && b != b'\n' && b != b'\r' && b != b'\t';
-                if is_control || b == 0x7f {
-                    suspicious += 1;
+            // 按字符统计还能区分「无效 UTF-8 字节」（解码成 U+FFFD）
+            // 与「合法的多字节序列」：中文 / 日文 / emoji 都不会被
+            // 误算成不可打印。
+            let text = String::from_utf8_lossy(sample);
+            let mut non_printable = 0usize;
+            let mut total = 0usize;
+            for ch in text.chars() {
+                total += 1;
+                if ch == '\u{FFFD}' {
+                    // 解码失败的字节：疑似二进制
+                    non_printable += 1;
+                } else if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
+                    non_printable += 1;
                 }
             }
-            if suspicious * 10 > sample.len() {
+            if total > 0 && non_printable as f64 / total as f64 > 0.3 {
                 return true;
             }
         }

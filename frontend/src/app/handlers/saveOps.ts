@@ -90,8 +90,14 @@ export function createSaveOps(ctx: SaveOpsDeps) {
       const tab = app.tabs.find(t => t.id === id)
       if (!tab) continue
       ctx.switchTab(id)
-      // 在读取 Markdown 前给 Tiptap 一点时间安定。
-      await new Promise(r => requestAnimationFrame(() => r(null)))
+      // 在读取 Markdown 前给 Tiptap 一点时间安定。rAF 在不可见
+      // 窗口会被暂停，这里与兜底定时器先到先得。
+      await new Promise(r => {
+        let done = false
+        const fin = () => { if (!done) { done = true; r(null) } }
+        requestAnimationFrame(fin)
+        setTimeout(fin, 120)
+      })
       // 在 `handleSave` 清除它之前捕获 `path`
       //（或取消时返回 null），以便检测用户对未命名标签页
       // 取消的「另存为」。
@@ -119,7 +125,7 @@ export function createSaveOps(ctx: SaveOpsDeps) {
     // 在调用 IPC 之前确保标签页内容反映实时编辑器。
     // 否则仍在编辑器防抖窗口内的未保存更改
     // 会用过期内容通过 `saveFile` 写入。
-    if (prompt.kind === 'single' || prompt.kind === 'other' || prompt.kind === 'all') {
+    if (prompt.kind === 'single' || prompt.kind === 'other' || prompt.kind === 'all' || prompt.kind === 'right') {
       // 对 'other' / 'all' / 'right'，用户一次关闭多个标签页；
       // 只保存活动标签页仍会让其余标签页保持脏。我们顺序保存每个
       // 脏标签页，让每次 `handleSave` 都能切换、刷新内容并写入磁盘。

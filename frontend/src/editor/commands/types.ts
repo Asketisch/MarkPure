@@ -56,6 +56,8 @@ export interface TabState {
   is_modified: boolean
   scroll_ratio: number
   read_only: boolean
+  /** 所属多根工作区根 id（宿主保存时会带上；缺省视为未知）。 */
+  workspace_root_id?: string | null
 }
 
 export interface WindowTabs {

@@ -11,6 +11,23 @@ use std::path::Path;
 ///
 /// 临时文件以 `.{文件名}.tmp` 命名，避免与真实配置互相覆盖；
 /// 写入或重命名失败时会清理临时文件，不在配置目录留垃圾。
+/// [`atomic_write`] 的字节版本——文档保存的编码产物是原始字节
+///（GBK 等非 UTF-8 编码），同样需要"临时文件 + rename"的原子性，
+/// 避免截断后写失败把用户文档变成半截文件。
+pub fn atomic_write_bytes(path: &Path, content: &[u8]) -> std::io::Result<()> {
+    let file_name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
+    let tmp = path.with_file_name(format!(".{file_name}.tmp"));
+    std::fs::write(&tmp, content)?;
+    if let Err(e) = std::fs::rename(&tmp, path) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    Ok(())
+}
+
 pub fn atomic_write(path: &Path, content: &str) -> std::io::Result<()> {
     let file_name = path
         .file_name()

@@ -45,17 +45,26 @@ export async function openFileByPath(path: string): Promise<FileInfo> {
  *  驱逐）。渲染进程每次打开文档都会调用，让 Rust 的统计 / 搜索
  *  IPC 从一个规范缓冲区读取，而不必来回传递整个内容。
  *
- *  `format` 记录源文件的存储格式，保存到新路径（另存为）时会被沿用。 */
+ *  `format` 记录源文件的存储格式，保存到新路径（另存为）时会被沿用。
+ *  `workspaceRootId` 把文档绑定到所属工作区根目录——切换活动根时
+ *  （`set_active_workspace_root`）Rust 会据此回收其他根目录的文档
+ *  并返回被淘汰的 id 列表。两者互相独立，可任意组合。 */
+export interface DocOpenOptions {
+  format?: FileFormat | null
+  workspaceRootId?: string | null
+}
+
 export async function docOpen(
   docId: number,
   content: string,
-  format?: FileFormat | null,
+  options?: DocOpenOptions | null,
 ): Promise<void> {
   await ipc('doc_open', {
     doc_id: docId,
     content,
-    encoding: format?.encoding ?? undefined,
-    line_ending: format?.lineEnding ?? undefined,
+    encoding: options?.format?.encoding ?? undefined,
+    line_ending: options?.format?.lineEnding ?? undefined,
+    workspace_root_id: options?.workspaceRootId ?? undefined,
   })
 }
 
@@ -63,8 +72,16 @@ export async function docClose(docId: number): Promise<void> {
   await ipc('doc_close', { doc_id: docId })
 }
 
-export async function docSetContent(docId: number, content: string): Promise<void> {
-  await ipc('doc_set_content', { doc_id: docId, content })
+export async function docSetContent(
+  docId: number,
+  content: string,
+  workspaceRootId?: string | null,
+): Promise<void> {
+  await ipc('doc_set_content', {
+    doc_id: docId,
+    content,
+    workspace_root_id: workspaceRootId ?? undefined,
+  })
 }
 
 export interface DocStatsResult {
