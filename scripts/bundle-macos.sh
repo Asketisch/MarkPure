@@ -3,12 +3,16 @@ set -e
 
 # MarkPure macOS App Bundle Script
 # Usage:
-#   ./bundle-macos.sh          - build and package .app
+#   ./bundle-macos.sh            - build and package .app
+#   SKIP_BUILD=1 ./bundle-macos.sh - skip the build step (bundle a prebuilt binary)
+#   TARGET_DIR=target/x86_64-apple-darwin/release ./bundle-macos.sh SKIP_BUILD=1
+#                                - bundle a cross-compiled binary (CI 用)
 #   SIGN=0 ./bundle-macos.sh   - skip ad-hoc codesigning
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="MarkPure"
 BUNDLE_DIR="$PROJECT_DIR/target/${APP_NAME}.app"
+TARGET_DIR="${TARGET_DIR:-target/release}"
 
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -18,8 +22,12 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 
 # ---- Step 1: Build ----
-log_info "Running release build..."
-"$PROJECT_DIR/scripts/build.sh" release
+if [ "${SKIP_BUILD:-0}" = "1" ]; then
+    log_info "Skipping build (SKIP_BUILD=1), using binary in $TARGET_DIR"
+else
+    log_info "Running release build..."
+    "$PROJECT_DIR/scripts/build.sh" release
+fi
 
 # ---- Step 2: Create .app bundle structure ----
 log_info "Creating app bundle..."
@@ -28,7 +36,7 @@ mkdir -p "$BUNDLE_DIR/Contents/MacOS"
 mkdir -p "$BUNDLE_DIR/Contents/Resources"
 
 # ---- Step 3: Copy binary ----
-cp "$PROJECT_DIR/target/release/markpure" "$BUNDLE_DIR/Contents/MacOS/markpure"
+cp "$PROJECT_DIR/$TARGET_DIR/markpure" "$BUNDLE_DIR/Contents/MacOS/markpure"
 
 # ---- Step 4: Copy Info.plist ----
 cp "$PROJECT_DIR/distribution/macos/Info.plist" "$BUNDLE_DIR/Contents/"

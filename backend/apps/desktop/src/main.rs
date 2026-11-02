@@ -101,6 +101,15 @@ fn main() {
         if dev_path.exists() {
             return Some(dev_path.to_path_buf());
         }
+        // 便携布局：icons/ 与可执行文件同目录（Windows / Linux 便携包）
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                let portable_path = exe_dir.join("icons/256x256.png");
+                if portable_path.exists() {
+                    return Some(portable_path);
+                }
+            }
+        }
         // 尝试打包模式：可执行文件在 Contents/MacOS/，图标在 Contents/Resources/icons/
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {

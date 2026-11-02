@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=MarkPure
+GenericName=Markdown Editor
+Comment=A WYSIWYG Markdown editor
+Exec=markpure
+Icon=markpure
+Terminal=false
+Categories=Office;TextEditor;Utility;
+Keywords=markdown;editor;text;
+StartupWMClass=markpure
