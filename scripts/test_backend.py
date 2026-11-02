@@ -1968,6 +1968,29 @@ class TestSnippets(BackendTestCase):
 class TestStaticContract(BackendTestCase):
     """静态检查：前端调用的每条 IPC 命令都必须在后端路由表里。"""
 
+    @staticmethod
+    def _scan_frontend_ipc_commands() -> set[str]:
+        """扫描前端源码里出现的 IPC 命令名。
+
+        识别两种调用形态：
+        - 直接调用 `ipc('cmd', …)`
+        - 经薄封装的调用（`pickPath('pick_open_file')`）——命令名作为
+          参数传给封装函数，字面量不再紧跟 `ipc(`，需要单独识别，
+          否则这些命令会被误判成「前端从不调用」。
+        """
+        patterns = (
+            re.compile(r"ipc(?:<[^>]*>)?\(\s*'([a-z_0-9]+)'"),
+            re.compile(r"pickPath\(\s*'([a-z_0-9]+)'"),
+        )
+        found: set[str] = set()
+        for path in FRONTEND_SRC.rglob("*"):
+            if path.suffix not in (".ts", ".svelte") or not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8")
+            for pattern in patterns:
+                found.update(pattern.findall(text))
+        return found
+
     def test_frontend_commands_are_implemented_in_backend(self) -> None:
         dispatch = DISPATCH_RS.read_text(encoding="utf-8")
         backend_cmds = set(re.findall(r'"([a-z_0-9]+)"', dispatch))
@@ -2000,13 +2023,7 @@ class TestStaticContract(BackendTestCase):
             }
         }
 
-        frontend_cmds: set[str] = set()
-        pattern = re.compile(r"ipc(?:<[^>]*>)?\(\s*'([a-z_0-9]+)'")
-        for path in FRONTEND_SRC.rglob("*"):
-            if path.suffix not in (".ts", ".svelte") or not path.is_file():
-                continue
-            text = path.read_text(encoding="utf-8")
-            frontend_cmds.update(pattern.findall(text))
+        frontend_cmds = self._scan_frontend_ipc_commands()
 
         missing = sorted(frontend_cmds - backend_cmds)
         assert not missing, (
@@ -2020,15 +2037,10 @@ class TestStaticContract(BackendTestCase):
         dispatch = DISPATCH_RS.read_text(encoding="utf-8")
         backend_cmds = set(re.findall(r'^\s+"([a-z_0-9]+)"', dispatch, re.M))
 
-        frontend_cmds: set[str] = set()
-        pattern = re.compile(r"ipc(?:<[^>]*>)?\(\s*'([a-z_0-9]+)'")
-        for path in FRONTEND_SRC.rglob("*"):
-            if path.suffix not in (".ts", ".svelte") or not path.is_file():
-                continue
-            frontend_cmds.update(pattern.findall(path.read_text(encoding="utf-8")))
+        frontend_cmds = self._scan_frontend_ipc_commands()
 
         orphans = sorted(backend_cmds - frontend_cmds)
-        # 这些是前端不直接调用、但由其它 IPC 间接驱动的命令。
+        # 这些是前端不直接调用、但由其它路径间接驱动的命令。
         known_orphans = {
             "get_expanded_dirs_v2",
             "set_expanded_dirs_v2",
@@ -2038,6 +2050,9 @@ class TestStaticContract(BackendTestCase):
             "lint_markdown",
             "remove_missing_workspace_roots",
             "track_file",
+            # 由 test_driver 注入到 WebView 的 JS 直接 postMessage
+            # 上报求值结果，不经前端源码。
+            "__driver_report",
         }
         unexpected = sorted(set(orphans) - known_orphans)
         assert not unexpected, (
