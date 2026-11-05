@@ -130,14 +130,18 @@ jobs:
             windows) BIN="target/MarkPure-windows/markpure.exe" ;;
             linux)   BIN="target/MarkPure-linux/markpure" ;;
           esac
-          if [ ! -f "$BIN" ]; then
-            echo "::error::产物缺失：$BIN"
+          if [ ! -f "${BIN}" ]; then
+            echo "::error::产物缺失：${BIN}"
             exit 1
           fi
-          SIZE="$(wc -c < "$BIN")"
-          echo "产物：$BIN（$SIZE 字节）"
-          if [ "$SIZE" -lt 1000000 ]; then
-            echo "::error::产物只有 $SIZE 字节，疑似构建链中断"
+          SIZE="$(wc -c < "${BIN}")"
+          # 变量一律写成 ${VAR}：紧跟非 ASCII 字符（如中文全角括号）时，
+          # UTF-8 locale 下的 bash 会把那个字符并进变量名，$VAR（非 ASCII）
+          # 会变成「unbound variable」。Linux 的 POSIX locale 不犯这个毛病，
+          # macOS runner 会。
+          echo "产物：${BIN}（${SIZE} 字节）"
+          if [ "${SIZE}" -lt 1000000 ]; then
+            echo "::error::产物只有 ${SIZE} 字节，疑似构建链中断"
             exit 1
           fi
 
