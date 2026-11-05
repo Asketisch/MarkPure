@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# Generate AppIcon.icns from icons/markpure_icon.png
-# Usage: ./macos/gen-icns.sh
+# Generate AppIcon.icns from resources/icons/1024x1024.png
+# Usage: ./scripts/gen-icns.sh
 # Output: macos/AppIcon.icns
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"

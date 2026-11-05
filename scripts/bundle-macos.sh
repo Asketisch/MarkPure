@@ -44,7 +44,7 @@ cp "$PROJECT_DIR/distribution/macos/Info.plist" "$BUNDLE_DIR/Contents/"
 # ---- Step 5: Copy icon ----
 ICNS="$PROJECT_DIR/macos/AppIcon.icns"
 if [ ! -f "$ICNS" ]; then
-    log_warn "AppIcon.icns not found, generating from favicon.svg..."
+    log_warn "AppIcon.icns not found, generating from resources/icons/1024x1024.png..."
     bash "$PROJECT_DIR/scripts/gen-icns.sh"
 fi
 
