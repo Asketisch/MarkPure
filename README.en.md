@@ -136,14 +136,17 @@ Open a directory and everything is already there: file tree, full-text search (w
 
 ## Download
 
-Grab the portable build for your platform from [Releases](https://github.com/Demon1019/MarkPure/releases), unzip, and run:
+Grab the portable build for your platform from [Releases](https://github.com/Asketisch/MarkPure/releases), unzip, and run:
 
 | Platform | Package | Notes |
 |---|---|---|
 | macOS (Apple Silicon) | `MarkPure-v*-macos-arm64.zip` | Drag into Applications. Not notarized — right-click → Open on first launch |
 | macOS (Intel) | `MarkPure-v*-macos-x64.zip` | Same as above |
 | Windows | `MarkPure-v*-windows-x64.zip` | Run `markpure.exe`; needs the WebView2 runtime (bundled with Win10/11) |
-| Linux | `MarkPure-v*-linux-x64.tar.gz` | Needs system webkit2gtk-4.1 — see `README.txt` inside the archive |
+| Linux (x64) | `MarkPure-v*-linux-x64.tar.gz` | Needs system webkit2gtk-4.1 — see `README.txt` inside the archive |
+| Linux (ARM64) | `MarkPure-v*-linux-arm64.tar.gz` | Same as above (Raspberry Pi 4+, ARM servers, …) |
+
+Each release ships a `SHA256SUMS.txt` for verifying download integrity.
 
 Or build from source — see [Getting started](#getting-started).
 
