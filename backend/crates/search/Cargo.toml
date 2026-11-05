@@ -10,6 +10,14 @@ serde_json = "1"
 thiserror = "2"
 regex = "1"
 encoding_rs = "0.8"
+# Windows 上取目录的稳定身份（卷号 + 文件索引）。
+# std::os::windows::fs::MetadataExt 的 file_index / volume_serial_number
+# 至今仍是 unstable（feature windows_by_handle），stable 通道用不了；
+# same-file 走 GetFileInformationByHandle 拿到同样的 (volume, index)，
+# 并以该二元组实现 Eq + Hash。
+# 刻意不加 cfg gate：与 walkdir 同源的 same-file 在所有平台都会编译，
+# 且 Cargo.lock 已有该条目（walkdir 的传递依赖），--locked 构建不受影响。
+same-file = "1"
 
 [dev-dependencies]
 tempfile = "3"

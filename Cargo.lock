@@ -3466,6 +3466,7 @@ version = "0.1.0"
 dependencies = [
  "encoding_rs",
  "regex",
+ "same-file",
  "serde",
  "serde_json",
  "tempfile",

@@ -238,27 +238,38 @@ pub fn search_workspace(
     })
 }
 
-/// 环护栏用的真实目录标识（设备 + inode / file_id）。
+/// 环护栏用的真实目录标识。
+///
+/// unix：设备号 + inode 号。
+/// Windows：std 的身份 API（file_index / volume_serial_number）至今仍是
+/// unstable，stable 通道用不了；改用 same-file——它内部走
+/// GetFileInformationByHandle 取 (volume, index)，并在 Windows 上以该
+/// 二元组实现 Eq + Hash，语义与 unix 的 (dev, ino) 对齐。
+#[cfg(unix)]
 #[derive(Eq, PartialEq, Hash)]
 struct DirKey(u64, u64);
 
-#[cfg(any(unix, windows))]
-fn dir_key(path: &std::path::Path) -> Option<DirKey> {
-    let meta = std::fs::metadata(path).ok()?;
-    Some(dir_key_from_meta(&meta))
-}
+#[cfg(windows)]
+#[derive(Eq, PartialEq, Hash)]
+struct DirKey(same_file::Handle);
+
+#[cfg(not(any(unix, windows)))]
+#[derive(Eq, PartialEq, Hash)]
+struct DirKey;
 
 #[cfg(unix)]
-fn dir_key_from_meta(meta: &std::fs::Metadata) -> DirKey {
+fn dir_key(path: &std::path::Path) -> Option<DirKey> {
     use std::os::unix::fs::MetadataExt;
-    DirKey(meta.dev(), meta.ino())
+    let meta = std::fs::metadata(path).ok()?;
+    Some(DirKey(meta.dev(), meta.ino()))
 }
 
 #[cfg(windows)]
-fn dir_key_from_meta(meta: &std::fs::Metadata) -> DirKey {
-    use std::os::windows::fs::MetadataExt;
-    let id = meta.file_id();
-    DirKey(id.as_u64() as u64, id.as_u128() as u64)
+fn dir_key(path: &std::path::Path) -> Option<DirKey> {
+    // from_path 对目录同样可用（内部以 FILE_FLAG_BACKUP_SEMANTICS 打开），
+    // 且跟随符号链接——与 unix 分支 metadata() 的语义一致。
+    let handle = same_file::Handle::from_path(path).ok()?;
+    Some(DirKey(handle))
 }
 
 #[cfg(not(any(unix, windows)))]
