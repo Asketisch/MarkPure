@@ -42,9 +42,11 @@ pub(crate) fn english_dictionary() -> &'static HashMap<&'static str, ()> {
         let mut dict = HashMap::with_capacity(8192);
         for word in words.lines() {
             let w = word.trim();
-            if !w.is_empty() {
-                dict.insert(w, ());
+            // 以 # 开头的整行是注释，不进词典。
+            if w.is_empty() || w.starts_with('#') {
+                continue;
             }
+            dict.insert(w, ());
         }
         dict
     })
@@ -200,6 +202,28 @@ mod tests {
         // "and" 和 "world" 在词典中，因此一定不会被标记。
         assert!(errs.iter().all(|e| e.word != "and"));
         assert!(errs.iter().all(|e| e.word != "world"));
+    }
+
+    /// 后端 IPC 测试用的探针串（"the quick brown fox"）必须一个错都不报。
+    ///
+    /// 这句话是**内置词典路径**（Windows / Linux）上唯一的英文正例——
+    /// macOS 走 NSSpellChecker，压根不碰这份词典。词典一旦漏掉其中
+    /// 任何一个词，Windows / Linux 的用户就会看到最基本的英文被划红线，
+    /// 而 macOS 用户看不到——这类分平台差异只有这条断言能兜住。
+    #[test]
+    fn test_probe_pangram_has_no_errors() {
+        let errs = check("the quick brown fox");
+        assert!(errs.is_empty(), "常用词被误判为错拼: {:?}", errs);
+    }
+
+    /// 词典必须收录探针串里的每个词——比行为断言更直接，缺词时能一眼
+    /// 看出缺的是哪一个。
+    #[test]
+    fn test_dictionary_contains_probe_pangram_words() {
+        let dict = english_dictionary();
+        for word in ["the", "quick", "brown", "fox"] {
+            assert!(dict.contains_key(word), "内置词典缺少常用词: {word}");
+        }
     }
 
     #[test]
