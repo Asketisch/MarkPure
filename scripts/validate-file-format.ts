@@ -322,9 +322,15 @@ for (const s of samples) {
   const info = opened.result!
 
   captures.length = 0
+  // docOpen 的第三个参数是 DocOpenOptions：存储格式必须嵌在 `format` 里
+  // （frontend/src/editor/commands/editor.ts）。直接传 { encoding, lineEnding }
+  // 会被静默忽略——options?.format?.encoding 取到 undefined，
+  // 文档注册表里就没有编码信息，另存为时按 UTF-8 + LF 落盘。
   await docOpen(7, info.content, {
-    encoding: info.encoding,
-    lineEnding: info.line_ending,
+    format: {
+      encoding: info.encoding,
+      lineEnding: info.line_ending,
+    },
   })
   const cap = captures[0]
   assertEq('doc_open: 带上 encoding', cap.params.encoding, info.encoding)
