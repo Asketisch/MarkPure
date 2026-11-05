@@ -185,7 +185,11 @@ jobs:
       - name: 生成 SHA256 校验和
         run: |
           cd release-files
-          sha256sum ./* > SHA256SUMS.txt
+          # 显式排除 SHA256SUMS.txt 自身；输出用纯文件名，
+          # 下载方 `sha256sum -c SHA256SUMS.txt` 可直接校验。
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' -printf '%f\n' \
+            | sort \
+            | xargs -r sha256sum > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - uses: softprops/action-gh-release@v2
