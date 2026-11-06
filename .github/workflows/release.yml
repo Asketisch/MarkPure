@@ -158,32 +158,43 @@ jobs:
         run: |
           mkdir -p release-out
           export ZIP_NAME="MarkPure-v${VERSION}-${{ matrix.name }}.zip"
-          # 用 .NET 的 ZipFile，**不用** PowerShell 的 Compress-Archive：
-          # 后者（Windows PowerShell 5.1）在 Windows 上把条目名写成
-          # **反斜杠**（icons\256x256.png），违反 zip 规范
-          # （APPNOTE 4.4.17.1 要求正斜杠）——在 Linux / macOS 上用严格
-          # 工具解压，会得到一个名字里带反斜杠的怪文件而不是目录。
-          # ZipFile 内部会把分隔符归一化成 '/'。
+          # **逐条**写 zip，条目名里的分隔符显式归一化成正斜杠。
           #
-          # includeBaseDirectory=$true：条目统一放在 MarkPure-windows/
-          # 目录下，与 Linux 的 MarkPure-linux/、macOS 的 MarkPure.app/
-          # 结构一致。
+          # zip 规范（APPNOTE 4.4.17.1）要求路径分隔符一律用正斜杠，
+          # 但 Windows 上现成的两个实现都写反斜杠（实测确认）：
+          #   - PowerShell 5.1 的 Compress-Archive
+          #   - .NET 的 ZipFile.CreateFromDirectory（按**平台**分隔符归一化，
+          #     Windows 上就是 '\'）
+          # Windows 自己（Explorer / 7-Zip / WinRAR）能正常处理，但用严格
+          # 工具在 Linux / macOS 上解压时，Python 的 zipfile.extractall()
+          # 会把 `icons\256x256.png` 当成一个名字里带反斜杠的**单文件**，
+          # 而不是目录——所以这里自己写条目名。
+          #
+          # 条目统一放在 MarkPure-windows/ 下，与 Linux 的 MarkPure-linux/、
+          # macOS 的 MarkPure.app/ 结构一致。
           powershell -NoProfile -Command "
             Add-Type -AssemblyName System.IO.Compression.FileSystem;
-            \$src = Join-Path (Get-Location) 'target/MarkPure-windows';
+            \$src = (Resolve-Path 'target/MarkPure-windows').Path;
             \$dst = Join-Path (Get-Location) ('release-out/' + \$env:ZIP_NAME);
-            [System.IO.Compression.ZipFile]::CreateFromDirectory(
-              \$src, \$dst,
-              [System.IO.Compression.CompressionLevel]::Optimal,
-              \$true) | Out-Null
+            \$zip = [System.IO.Compression.ZipFile]::Open(\$dst, 'Create');
+            try {
+              Get-ChildItem -LiteralPath \$src -Recurse -File | ForEach-Object {
+                \$rel = \$_.FullName.Substring(\$src.Length).TrimStart('\','/').Replace('\','/');
+                [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                  \$zip, \$_.FullName, ('MarkPure-windows/' + \$rel),
+                  [System.IO.Compression.CompressionLevel]::Optimal)
+              }
+            } finally { \$zip.Dispose() }
           "
-          # 自检：条目名必须是正斜杠，且都位于 MarkPure-windows/ 下。
+          # 自检：逐条核对条目名，出现反斜杠立即失败并打印实际名字。
           powershell -NoProfile -Command "
             Add-Type -AssemblyName System.IO.Compression.FileSystem;
             \$z = [System.IO.Compression.ZipFile]::OpenRead((Join-Path (Get-Location) ('release-out/' + \$env:ZIP_NAME)));
-            \$bad = @(\$z.Entries | Where-Object { \$_.FullName -match '\\\\' });
+            \$names = @(\$z.Entries | ForEach-Object { \$_.FullName });
             \$z.Dispose();
-            if (\$bad.Count -gt 0) { Write-Error ('条目名含反斜杠: ' + (\$bad.FullName -join ', ')); exit 1 }
+            Write-Host ('zip 条目: ' + (\$names -join ', '));
+            \$bad = @(\$names | Where-Object { \$_ -match '\\\\' });
+            if (\$bad.Count -gt 0) { Write-Error ('条目名含反斜杠: ' + (\$bad -join ', ')); exit 1 }
             Write-Host 'zip 条目名检查通过'
           "
 
