@@ -26,6 +26,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = resolve(__dirname, '..', '..')
 const HARNESS_BIN = join(REPO_ROOT, 'target', 'debug', 'mt_harness')
 
+/**
+ * preview 服务启动（报告端口 + 响应 HTTP）的超时上限。
+ *
+ * 60s 而不是 20s：CI runner 比本地慢得多（首次构建 + 冷启动），
+ * 20s 在 CI 上是**误报**——实测那里 26s 才失败，等于每次都白跑一轮。
+ */
+const PORT_TIMEOUT_MS = 60000
+
 // ---- Chrome 查找 --------------------------------------------------------
 
 /**
@@ -34,8 +42,16 @@ const HARNESS_BIN = join(REPO_ROOT, 'target', 'debug', 'mt_harness')
  * 查找顺序：`$MARKPURE_CHROME` → 各平台默认安装路径。
  * 返回 null 表示本机没有——调用方应**跳过**而不是失败：布局与交互
  * 断言需要真实排版引擎，缺它时无法验证，但也不该让整个测试套件变红。
+ *
+ * `$MARKPURE_SKIP_BROWSER_E2E=1` 同样返回 null——**显式**关掉浏览器
+ * 端到端。注意不能只靠「本机没装 Chrome」来跳过：GitHub 的 ubuntu
+ * runner **预装了 Chrome**，于是「缺 Chrome 就跳过」的逻辑在 CI 上
+ * 根本不生效，浏览器回归会在共享 runner 上真的跑起来——既慢又不稳定
+ * （实测把 CI 挂住 6 小时）。想在 CI 上跑，就设 `$MARKPURE_CHROME`
+ * 明确指定可执行文件路径。
  */
 export function findChrome(): string | null {
+  if (process.env.MARKPURE_SKIP_BROWSER_E2E === '1') return null
   const candidates = [
     process.env.MARKPURE_CHROME,
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -312,20 +328,25 @@ export async function startHarness(opts: {
   execFileSync('npx', ['vite', 'build', '--outDir', outDir, '--emptyOutDir'], {
     cwd: REPO_ROOT,
     stdio: 'ignore',
+    // 构建也可能卡死（vite 卡在一个插件上、npx 在等输入……）。
+    // 没有超时的话，整个测试进程会无限期挂住——CI 上就是「job 跑 6 小时」。
+    timeout: 300000,
+    killSignal: 'SIGKILL',
   })
 
-  const port = opts.port ?? 4200 + Math.floor(Math.random() * 400)
+  const port = opts.port ?? 0
   // `--port 0`：让操作系统分配一个空闲端口。两处理由：
   // 1. 随机端口可能撞上**上一次运行残留的** preview 服务——
   //    `--strictPort` 会让新 preview 启动失败，而 HTTP 探测又会打到
   //    那个残留服务上（它服务的是已被删除的临时目录），于是页面加载
   //    失败、所有断言莫名其妙地挂掉。
   // 2. 端口冲突是这个测试最容易踩的坑，值得从根上避免。
+  // 调用方显式给了 `opts.port` 时就用它（此前这个参数被静默忽略）。
   const preview = spawn(
     'npx',
     [
       'vite', 'preview',
-      '--port', '0',
+      '--port', String(port),
       '--strictPort',
       // `--host 127.0.0.1`：显式绑 IPv4。默认绑 `localhost` 时 macOS 会
       // 优先解析到 ::1，用 127.0.0.1 连就会连接失败。
@@ -350,26 +371,48 @@ export async function startHarness(opts: {
   preview.stdout?.setEncoding('utf8')
   preview.stderr?.setEncoding('utf8')
 
-  // 从 vite 的输出里读实际分配的端口
+  // **必须持续排空 stdout 与 stderr**：
+  //
+  // 1. 管道缓冲区写满后，写方会**阻塞在 write 上**。vite 的横幅
+  //    （含端口行）就排在 stderr/stdout 之后——一旦 stderr 先被写满，
+  //    vite 永远打不出端口行，表现为「preview 服务未能在 20s 内报告端口」。
+  // 2. 端口行可能横跨多个数据块（vite 先打 IPC bridge 那行，
+  //    再打 Local 那行）。只看「最新一块」会漏掉——必须扫描**累积**输出。
+  let output = ''
+  let spawnError = ''
+  const capture = (chunk: string) => {
+    output += chunk
+    if (output.length > 16384) output = output.slice(-8192)
+  }
+  preview.stdout?.on('data', capture)
+  preview.stderr?.on('data', capture)
+  preview.on('error', (e) => { spawnError = String(e) })
+
+  // 从累积的输出里读实际分配的端口
   let actualPort = 0
-  const portDeadline = Date.now() + 20000
+  const portDeadline = Date.now() + PORT_TIMEOUT_MS
   while (Date.now() < portDeadline && !actualPort) {
-    const chunk = await new Promise<string>((res) => {
-      const onData = (d: string) => { preview.stdout?.off('data', onData); res(d) }
-      preview.stdout?.once('data', onData)
-      setTimeout(() => { preview.stdout?.off('data', onData); res('') }, 1000)
-    })
-    const m = /http:\/\/127\.0\.0\.1:(\d+)\//.exec(chunk)
+    const m = /http:\/\/127\.0\.0\.1:(\d+)\//.exec(output)
     if (m) actualPort = Number(m[1])
+    if (!actualPort && spawnError) break
+    if (!actualPort) await sleep(200)
   }
   if (!actualPort) {
-    preview.kill()
-    rmSync(workDir, { recursive: true, force: true })
-    throw new Error('preview 服务未能在 20s 内报告端口')
+    // **必须杀整个进程组**：只 `preview.kill()` 杀掉的是 npx 外壳，
+    // 真正的 vite preview 子进程还活着——它的 stdout 管道仍被持有，
+    // node 的事件循环因此永远不空，测试进程**挂起不退出**。
+    // 实测这让 CI 的 job 跑了 6 小时才被取消。
+    stopProcessGroup(preview)
+    rmSync(workDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
+    throw new Error(
+      `preview 服务未能在 ${PORT_TIMEOUT_MS / 1000}s 内报告端口` +
+      (spawnError ? `（spawn 失败：${spawnError}）` : '') +
+      `\n--- preview 输出 ---\n${output.slice(-2000)}\n---`,
+    )
   }
 
   // 等 preview 真的能响应
-  const deadline = Date.now() + 20000
+  const deadline = Date.now() + PORT_TIMEOUT_MS
   let ready = false
   while (Date.now() < deadline && !ready) {
     try {
@@ -382,8 +425,11 @@ export async function startHarness(opts: {
   }
   if (!ready) {
     stopProcessGroup(preview)
-    rmSync(workDir, { recursive: true, force: true })
-    throw new Error('preview 服务未能在 20s 内就绪')
+    rmSync(workDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
+    throw new Error(
+      `preview 服务未能在 ${PORT_TIMEOUT_MS / 1000}s 内就绪` +
+      `\n--- preview 输出 ---\n${output.slice(-2000)}\n---`,
+    )
   }
   // bridge 会自动注册工作区；给它一点时间
   await sleep(1500)
@@ -398,7 +444,9 @@ export async function startHarness(opts: {
     },
     stop() {
       stopProcessGroup(preview)
-      rmSync(workDir, { recursive: true, force: true })
+      // `maxRetries`：Chrome 退出时还在写 profile 目录，目录非空会让
+      // 递归删除报 ENOTEMPTY（macOS 上尤其容易撞上）。
+      rmSync(workDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
     },
   }
 }

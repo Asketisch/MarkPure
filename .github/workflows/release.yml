@@ -47,6 +47,8 @@ jobs:
   build:
     name: 构建 (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    # 兜底超时：cargo 构建卡死（拉依赖、等锁）不该让 job 无限期挂着。
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -176,6 +178,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@v4
         with:

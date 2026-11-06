@@ -3,7 +3,9 @@
 # 结构：
 #   frontend      —— 类型检查 + 前端构建冒烟（最快，先挂先知道）
 #   tests         —— Linux 上跑全量测试（Rust 单测 + 后端 IPC + Markdown 回归 +
-#                    前端验证脚本；6 个浏览器端到端在无 Chrome 时自动跳过）
+#                    前端验证脚本；6 个浏览器端到端由 MARKPURE_SKIP_BROWSER_E2E
+#                    显式关闭——CI runner 预装了 Chrome，靠「缺 Chrome 就跳过」
+#                    根本不生效，浏览器回归在共享 runner 上慢且不稳)
 #   check-macos / check-windows —— 平台编译验证，提前抓 #[cfg] 代码的破坏
 #
 # 关键约束：rust-embed 在编译期嵌入 dist/，所以**任何 cargo 命令之前
@@ -27,6 +29,7 @@ jobs:
   frontend:
     name: 前端检查
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,6 +46,17 @@ jobs:
   tests:
     name: 全量测试（Linux）
     runs-on: ubuntu-latest
+    # 兜底超时：任何一步卡死都必须在 40 分钟内失败，而不是把 job
+    # 挂几个小时（实测浏览器端到端在 runner 上挂过一次，跑了 6 小时）。
+    timeout-minutes: 40
+    env:
+      # 浏览器端到端（布局几何、交互、编辑、文件监视）**显式**关掉。
+      #
+      # 不能只靠「本机没装 Chrome 就跳过」：GitHub 的 ubuntu runner
+      # **预装了 Chrome**，那条跳过逻辑在 CI 上根本不生效，于是浏览器
+      # 回归会在共享 runner 上真的跑起来——慢且不稳。
+      # 详见 scripts/lib/browser-harness.ts 的 findChrome()。
+      MARKPURE_SKIP_BROWSER_E2E: '1'
     steps:
       - uses: actions/checkout@v4
       - name: 安装 webkit2gtk / gtk 与字体
@@ -86,6 +100,7 @@ jobs:
   check-macos:
     name: 编译检查（macOS）
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -104,6 +119,7 @@ jobs:
   check-windows:
     name: 编译检查（Windows）
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
