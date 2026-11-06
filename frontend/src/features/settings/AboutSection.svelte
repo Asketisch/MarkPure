@@ -18,6 +18,6 @@
   <div class="about-info">
     <h1>{i18n.t('app.name')}</h1>
     <p>{i18n.t('app.description')}</p>
-    <p class="version">v0.1.0</p>
+    <p class="version">v0.1.1</p>
   </div>
 </section>

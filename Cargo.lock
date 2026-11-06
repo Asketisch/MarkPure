@@ -2119,7 +2119,7 @@ dependencies = [
 
 [[package]]
 name = "markpure"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "assets",
  "base64",

@@ -157,8 +157,35 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           mkdir -p release-out
-          ZIP_NAME="MarkPure-v${VERSION}-${{ matrix.name }}.zip"
-          powershell -NoProfile -Command "Compress-Archive -Path 'target/MarkPure-windows/*' -DestinationPath 'release-out/$ZIP_NAME' -Force"
+          export ZIP_NAME="MarkPure-v${VERSION}-${{ matrix.name }}.zip"
+          # 用 .NET 的 ZipFile，**不用** PowerShell 的 Compress-Archive：
+          # 后者（Windows PowerShell 5.1）在 Windows 上把条目名写成
+          # **反斜杠**（icons\256x256.png），违反 zip 规范
+          # （APPNOTE 4.4.17.1 要求正斜杠）——在 Linux / macOS 上用严格
+          # 工具解压，会得到一个名字里带反斜杠的怪文件而不是目录。
+          # ZipFile 内部会把分隔符归一化成 '/'。
+          #
+          # includeBaseDirectory=$true：条目统一放在 MarkPure-windows/
+          # 目录下，与 Linux 的 MarkPure-linux/、macOS 的 MarkPure.app/
+          # 结构一致。
+          powershell -NoProfile -Command "
+            Add-Type -AssemblyName System.IO.Compression.FileSystem;
+            \$src = Join-Path (Get-Location) 'target/MarkPure-windows';
+            \$dst = Join-Path (Get-Location) ('release-out/' + \$env:ZIP_NAME);
+            [System.IO.Compression.ZipFile]::CreateFromDirectory(
+              \$src, \$dst,
+              [System.IO.Compression.CompressionLevel]::Optimal,
+              \$true) | Out-Null
+          "
+          # 自检：条目名必须是正斜杠，且都位于 MarkPure-windows/ 下。
+          powershell -NoProfile -Command "
+            Add-Type -AssemblyName System.IO.Compression.FileSystem;
+            \$z = [System.IO.Compression.ZipFile]::OpenRead((Join-Path (Get-Location) ('release-out/' + \$env:ZIP_NAME)));
+            \$bad = @(\$z.Entries | Where-Object { \$_.FullName -match '\\\\' });
+            \$z.Dispose();
+            if (\$bad.Count -gt 0) { Write-Error ('条目名含反斜杠: ' + (\$bad.FullName -join ', ')); exit 1 }
+            Write-Host 'zip 条目名检查通过'
+          "
 
       - name: 压缩（Linux → tar.gz）
         if: runner.os == 'Linux'

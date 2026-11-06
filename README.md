@@ -142,7 +142,7 @@ MarkPure 走的是第四条路：**所见即所得的写作体验 + 文件夹就
 |------|-----|------|
 | macOS (Apple Silicon) | `MarkPure-v*-macos-arm64.zip` | 解压后拖入「应用程序」。未做公证，首次打开需右键 → 打开 |
 | macOS (Intel) | `MarkPure-v*-macos-x64.zip` | 同上 |
-| Windows | `MarkPure-v*-windows-x64.zip` | 解压后双击 `markpure.exe`；需 WebView2 运行时（Win10/11 默认自带） |
+| Windows | `MarkPure-v*-windows-x64.zip` | 解压后进入 `MarkPure-windows/` 目录，双击 `markpure.exe`；需 WebView2 运行时（Win10/11 默认自带） |
 | Linux (x64) | `MarkPure-v*-linux-x64.tar.gz` | 需系统 webkit2gtk-4.1，安装命令见包内 `README.txt` |
 | Linux (ARM64) | `MarkPure-v*-linux-arm64.tar.gz` | 同上（树莓派 4+/ARM 服务器等） |
 
